@@ -1,7 +1,10 @@
-"""Cellrix CLI entry point. Use `cellrix preview <manifest>` to see live layouts."""
+"""Cellrix CLI entry point. Use `cellrix preview <manifest>` to see live layouts,
+or `cellrix stream` to read Manifest JSON from stdin in real time."""
 
 from __future__ import annotations
 
+import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -36,6 +39,7 @@ FOCUSED_TITLE_STYLE = Style(color="green", bold=True, bgcolor="default")
 
 
 def _normalize_key(raw: str) -> str:
+    """Map readchar output to standard key names."""
     if raw in ('\x1bOP', '\x1b[11~', '\x1bOQ'):
         return 'f1'
     if raw == '\x1b[Z':
@@ -82,6 +86,11 @@ class CellrixRenderer:
         self.state = UIState()
         self._flat_nodes: List[Node] = []
         self._cached_view_tree: Optional[ViewTree] = None
+
+    def update_manifest(self, new_manifest: CellManifest) -> None:
+        """Replace the current manifest and clear the cached layout."""
+        self.manifest = new_manifest
+        self._cached_view_tree = None
 
     def _get_sorted_leaf_nodes(self, root: Node) -> List[Node]:
         leaves: List[Node] = []
@@ -277,6 +286,9 @@ class CellrixRenderer:
         return None
 
 
+# ---------------------------------------------------------------------------
+# CLI Entry Points
+# ---------------------------------------------------------------------------
 @click.group()
 def cli() -> None:
     """Cellrix CLI - intent-driven terminal interface toolkit."""
@@ -286,6 +298,7 @@ def cli() -> None:
 @click.argument("manifest_path", type=click.Path(exists=True))
 @click.option("--strict", is_flag=True, help="Enable strict schema validation")
 def preview(manifest_path: str, strict: bool) -> None:
+    """Live preview of a Cell-Manifest layout."""
     manifest_file = Path(manifest_path)
     try:
         manifest = parse_manifest(manifest_file, strict=strict)
@@ -325,6 +338,86 @@ def preview(manifest_path: str, strict: bool) -> None:
 
         except KeyboardInterrupt:
             pass
+
+
+@cli.command()
+@click.option("--strict", is_flag=True, help="Enable strict schema validation")
+def stream(strict: bool) -> None:
+    """Read a stream of Manifest JSON lines from stdin and render in real time.
+
+    After the input stream ends, the display remains interactive so you can
+    inspect the final state. Press 'q' to quit.
+    """
+    # Read the first manifest to initialize the renderer
+    first_line = sys.stdin.readline()
+    if not first_line:
+        click.echo("No input received on stdin.", err=True)
+        return
+
+    try:
+        initial_manifest = parse_manifest(first_line.strip(), strict=strict)
+    except Exception as e:
+        click.echo(f"Error parsing initial manifest: {e}", err=True)
+        raise SystemExit(1)
+
+    renderer = CellrixRenderer(initial_manifest, strict=strict)
+
+    with Live(renderer, screen=True, refresh_per_second=10) as live:
+        # Phase 1: consume stream lines until the pipe is closed
+        try:
+            while True:
+                line = sys.stdin.readline()
+                if not line:          # EOF / pipe closed
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    new_manifest = parse_manifest(line, strict=strict)
+                    renderer.update_manifest(new_manifest)
+                except Exception as e:
+                    click.echo(f"Error parsing manifest: {e}", err=True)
+        except KeyboardInterrupt:
+            return
+
+        # Phase 2: stream ended – switch to interactive mode so the user can
+        #          explore the final state. We read keys from /dev/tty because
+        #          stdin is no longer available.
+        tty_path = '/dev/tty'
+        try:
+            with open(tty_path, 'r') as tty:
+                orig_stdin = sys.stdin
+                sys.stdin = tty
+                try:
+                    while True:
+                        raw = readchar.readkey()
+                        if not raw:
+                            continue
+                        key = _normalize_key(raw)
+                        manifest_actions = renderer._get_focused_manifest_actions()
+                        action = renderer.keybindings.resolve(key, manifest_actions)
+
+                        if action == QUIT or key == 'q':
+                            break
+                        elif action == FOCUS_NEXT:
+                            if renderer._flat_nodes:
+                                renderer.state.focus_index = (
+                                    renderer.state.focus_index + 1
+                                ) % len(renderer._flat_nodes)
+                        elif action == FOCUS_PREV:
+                            if renderer._flat_nodes:
+                                renderer.state.focus_index = (
+                                    renderer.state.focus_index - 1
+                                ) % len(renderer._flat_nodes)
+                        elif action == TOGGLE_HELP:
+                            renderer.state.full_help = not renderer.state.full_help
+
+                        live.update(renderer)
+                finally:
+                    sys.stdin = orig_stdin
+        except (FileNotFoundError, OSError):
+            # No /dev/tty available (e.g., Windows); simply exit after stream ends.
+            time.sleep(1.5)  # give user a moment to see the final frame
 
 
 if __name__ == "__main__":
