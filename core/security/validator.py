@@ -2,7 +2,7 @@
 
 import ipaddress
 
-from . import SecurityError
+from .sanitizer import SecurityError
 
 
 def validate_network_target(allowed_rules: list[str], target: str) -> None:
@@ -31,11 +31,10 @@ def validate_network_target(allowed_rules: list[str], target: str) -> None:
     # Domain match
     domain = target.lower()
     for rule in allowed_rules:
-        if rule.startswith('*.'):
-            suffix = rule[2:]  # .example.com
-            if domain.endswith(suffix) and domain == suffix[1:]:
-                return  # exact domain match? No, wildcard excludes root
-            if domain.endswith('.' + suffix[1:]):
+        if rule.startswith("*."):
+            suffix = rule[2:]  # e.g. "example.com"
+            # Wildcard matches subdomains only, not the root domain
+            if domain.endswith("." + suffix):
                 return
         elif rule == domain:
             return

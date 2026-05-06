@@ -43,3 +43,5 @@ ignore_missing_imports = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --cov=core --cov-report=term-missing"
+[tool.hatch.build.targets.wheel]
+packages = ["core"]

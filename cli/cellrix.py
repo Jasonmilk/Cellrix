@@ -11,13 +11,14 @@ from core.manifest.parser import parse_manifest
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """Cellrix CLI - intent-driven terminal interface toolkit."""
 
+
 @cli.command()
-@click.argument('manifest_path', type=click.Path(exists=True))
-@click.option('--strict', is_flag=True, help='Enable strict schema validation')
-def preview(manifest_path: str, strict: bool):
+@click.argument("manifest_path", type=click.Path(exists=True))
+@click.option("--strict", is_flag=True, help="Enable strict schema validation")
+def preview(manifest_path: str, strict: bool) -> None:
     """Load a manifest, compute layout, and show an ANSI preview."""
     manifest_file = Path(manifest_path)
     try:
@@ -35,6 +36,7 @@ def preview(manifest_path: str, strict: bool):
 
     # TODO: Render view to terminal via rich
     click.echo(f"Layout computed: {len(view.nodes)} nodes (rendering not yet implemented)")
+
 
 if __name__ == "__main__":
     cli()

@@ -6,7 +6,9 @@ from ..tree import ViewTree
 
 class LayoutError(Exception):
     """Raised when layout constraints cannot be satisfied."""
+
     pass
+
 
 def solve(manifest: CellManifest, terminal_width: int, terminal_height: int) -> ViewTree:
     """Compute layout coordinates.
