@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cellrix-core"
+version = "0.1.0"
+description = "Cellrix Protocol Core: deterministic layout solver, manifest parser, and semantic tree generator"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Jasonmilk & Cellrix Contributors"}
+]
+dependencies = [
+    "pydantic>=2.0",
+    "rich>=13.0",
+    "click>=8.0",
+    "protobuf>=4.0",
+    "anyio>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+    "hypothesis",
+    "ruff",
+    "mypy",
+    "pip-audit",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --cov=core --cov-report=term-missing"
