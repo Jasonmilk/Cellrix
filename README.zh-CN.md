@@ -8,6 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-strict-blue)](https://mypy-lang.org/)
+[![Tests](https://img.shields.io/badge/tests-23%2F23%20passed-green)](#)
 
 ---
 
@@ -26,69 +27,60 @@
 
 ---
 
+## 🎯 里程碑：交互式工作台正式上线
+
+布局求解器（纯函数，O(N)，零重排）现已驱动一个完全可交互的终端预览体验，具备：
+
+*   **Nano 风格的自解释界面**：单行状态栏与全屏帮助覆盖层（`F1`），动态展示全局和当前面板的专属快捷键。
+*   **解耦的主题与键位系统**：切换色彩风格或重映射按键，零行渲染器代码改动。
+*   **焦点追踪**：`Tab` / `Shift+Tab` 在面板间循环切换；激活的面板以醒目的亮绿色边框高亮。
+*   **稳健的跨平台输入**：通过 `readchar` 实现非阻塞键盘交互，零延迟、零闪烁。
+
+```bash
+cellrix preview examples/hello.json
+```
+
+---
+
+## 当前状态
+
+| 门禁 | 状态 |
+|:---|:---|
+| 协议规范 (WHITEPAPER.md v2.0) | ✅ 定稿 |
+| 工程指引手册 (10 章) | ✅ 完成 |
+| Manifest 解析器与严格校验 | ✅ 完成 |
+| ANSI 净化与网络权限验证 | ✅ 完成 |
+| `ruff check` | ✅ 全部通过 |
+| `mypy --strict` (18 个源文件) | ✅ 成功，0 错误 |
+| 布局求解器 + 交互渲染 | ✅ 交互式工作台已就绪 |
+
+---
+
+## 快速上手
+
+**环境要求:** Python 3.11+, [`uv`](https://astral.sh/uv)
+
+```bash
+git clone git@github.com:Jasonmilk/Cellrix.git
+cd Cellrix
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+uv run cellrix preview examples/hello.json
+```
+
+---
+
 ## 设计哲学 —— *Cellrix Zen*
 
-我们视以下公理为神圣不可侵犯。每一次提交、每一个 PR、每一项设计决策，都必须遵守。
+每一次提交、每一个 PR、每一项设计决策，都必须恪守这六条公理：
 
-1. **编排优先，拒造实体** — Runtime 是调度引擎，不是渲染器。渲染委托给久经考验的库（`rich`）。
-2. **契约至上，模型校验** — 所有组件通过强类型 Pydantic 模型通信。开发模式下遇到未知字段？直接拒绝。
-3. **纯净 I/O，异常熔断** — `stdout` 只输出结构化数据；`stderr` 只输出诊断信息。绝不静默吞没错误。
-4. **绝对幂等** — 布局求解器是纯函数。相同的 Manifest + 终端尺寸 = 永远相同的 ViewTree。
-5. **极简复用，外包生态** — 直接依赖限制在 ≤5 个。每一行新增代码都必须证明其存在的必要性。
-6. **安全第一，人机协同** — ANSI 注入在渲染层被阻断。关键操作触发物理确认屏障。
-
----
-
-## 快速开始
-
-### 安装
-
-```bash
-pip install cellrix-core
-```
-
-或使用 `uv`：
-
-```bash
-uv pip install cellrix-core
-```
-
-### 你的第一份 Manifest
-
-创建 `hello.json`：
-
-```json
-{
-  "version": "2.0",
-  "layout": { "direction": "vertical", "slots": [
-    { "id": "main", "weight": 1 }
-  ]},
-  "cells": [
-    {
-      "id": "greeting",
-      "type": "static",
-      "slot": "main",
-      "content": "你好，Cellrix！"
-    }
-  ]
-}
-```
-
-### 渲染它
-
-```bash
-cellrix preview hello.json
-```
-
----
-
-## 协议与实现
-
-| 文档 | 用途 |
-|:---|:---|
-| [**WHITEPAPER.md**](WHITEPAPER.md) | 协议宪法——Manifest Schema、HITL 状态机、语义树、版本治理。 |
-| [**ARCHITECTURE.md**](ARCHITECTURE.md) | `cellrix-core` 参考实现的工程决策（环形缓冲区、WASM 沙盒、持久化）。 |
-| [**ENGINEERING_GUIDE.md**](ENGINEERING_GUIDE.md) | 代码风格、模块结构、测试策略、发布流程。 |
+1. **编排优先，拒造实体** — 运行时是调度引擎，而非渲染器本身。
+2. **契约至上，模型校验** — 所有组件通过强类型 Pydantic 模型通信。
+3. **纯净 I/O，异常熔断** — `stdout` 传递数据，`stderr` 输送诊断，错误绝不静默吞没。
+4. **绝对幂等** — 同一份 Manifest 与终端尺寸，永远产生完全相同的 ViewTree。
+5. **极简复用，外包生态** — 直接依赖上限为 ≤5 个；每一行新代码都须证明其存在之必要性。
+6. **安全第一，人机协同** — ANSI 注入已在渲染层阻断；关键操作必经物理确认屏障。
 
 ---
 
@@ -97,27 +89,35 @@ cellrix preview hello.json
 ```
 cellrix/
 ├── core/                   # 协议引擎（解析器、求解器、安全模块）
-├── cli/                    # 薄 CLI 外壳（`cellrix preview`、`cellrix init`）
-├── devkit/                 # 模板、协议桥接（MCP/AG-UI）
+├── cli/                    # 交互式终端客户端 + 主题与键位
+├── devkit/                 # 模板、协议桥接 (MCP/AG-UI)
 ├── tests/                  # 单元测试 + 一致性测试套件
-├── WHITEPAPER.md           # 协议
-├── ARCHITECTURE.md         # 参考实现
-├── ENGINEERING_GUIDE.md    # 施工手册
+├── WHITEPAPER.md           # 协议宪法
+├── ARCHITECTURE.md         # 参考实现决策
+├── ENGINEERING_GUIDE.md    # 施工手册 (中文)
 └── pyproject.toml
 ```
 
 ---
 
-## 贡献
+## 质量门禁
 
-我们欢迎尊重 Zen 公理的贡献者。
+```bash
+uv run ruff check .          # 零警告
+uv run ruff format . --check # 格式一致
+uv run mypy --strict cli/ core/ devkit/  # 零错误
+uv run pytest                # 23/23 通过
+```
 
-1. Fork 并创建分支（`feat/`、`fix/`、`docs/`）。
-2. 代码使用英语，遵循工程指引手册。
-3. 确保本地通过 `ruff check`、`mypy strict` 和 `pytest`。
-4. 提交 PR——Core Team 成员将进行审查。
+---
 
-完整指引见 [ENGINEERING_GUIDE.md](ENGINEERING_GUIDE.md)。
+## 协议与实现
+
+| 文档 | 用途 |
+|:---|:---|
+| [**WHITEPAPER.md**](WHITEPAPER.md) | 协议宪法 — Manifest Schema、HITL 状态机、语义树、版本治理。 |
+| [**ARCHITECTURE.md**](ARCHITECTURE.md) | `cellrix-core` 参考实现的工程决策记录。 |
+| [**ENGINEERING_GUIDE.md**](ENGINEERING_GUIDE.md) | 代码风格、模块结构、测试策略、发布流程。 |
 
 ---
 
@@ -128,3 +128,5 @@ MIT。行善，勿害，保持简单。
 ---
 
 *若白皮书为魂，此引擎即为体。二者遵循同一套六项法则。*
+
+*English version: [README.md](README.md)*
