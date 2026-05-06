@@ -27,17 +27,26 @@ Describe your interface in a strict JSON/YAML **Cell‑Manifest**, and the **Cel
 
 ---
 
-## 🎯 Milestone: Interactive Workbench Goes Live
+## 🚀 Milestone: Interactive Workbench with Dynamic Data Pipes
 
-The layout solver (pure function, O(N), zero‑reflow) now powers a fully interactive terminal preview with:
+The layout solver (pure function, O(N), zero‑reflow) now powers a fully interactive terminal dashboard with:
 
 *   **Nano‑style self‑explaining interface** – single‑line status bar and a full‑screen help overlay (`F1`) that shows global and context‑sensitive shortcuts.
 *   **Decoupled theme & keybinding system** – change colors or remap keys without touching a line of renderer code.
 *   **Focus tracking** – `Tab` / `Shift+Tab` cycle through panels; active panel highlighted with a bold green border.
+*   **Dynamic data pipes** – bind cells to real-time data sources (pipes, subprocesses) with `--trust` security gate.
+*   **Stream mode** – pipe a stream of Manifest JSON lines into `cellrix stream` for real‑time updates.
 *   **Robust cross‑platform input** – non‑blocking keyboard handling via `readchar`, zero flicker.
 
 ```bash
+# Interactive static preview
 cellrix preview examples/hello.json
+
+# Real‑time dashboard with pipe source (clock example)
+cellrix preview examples/dynamic_clock.json --trust
+
+# Stream mode (consume Manifest JSON from stdin)
+cat manifests_stream.ndjson | cellrix stream
 ```
 
 ---
@@ -51,8 +60,10 @@ cellrix preview examples/hello.json
 | Manifest Parser + Strict Validation | ✅ Complete |
 | ANSI Sanitizer + Capability Validator | ✅ Complete |
 | `ruff check` | ✅ All checks passed |
-| `mypy --strict` (18 source files) | ✅ Success, 0 errors |
+| `mypy --strict` (21 source files) | ✅ Success, 0 errors |
 | Layout Solver + Rendering | ✅ Interactive workbench live |
+| Dynamic Data Pipes (SourceManager) | ✅ `--trust` gate enabled |
+| Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
 
 ---
 
@@ -88,7 +99,7 @@ Every commit, every PR, every design decision must honor these six axioms:
 
 ```
 cellrix/
-├── core/                   # Protocol engine (parser, solver, security)
+├── core/                   # Protocol engine (parser, solver, security, source)
 ├── cli/                    # Interactive terminal client + theme & keybinding
 ├── devkit/                 # Templates, protocol bridges (MCP/AG-UI)
 ├── tests/                  # Unit + conformance suite
