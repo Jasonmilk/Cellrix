@@ -6,7 +6,7 @@ Contains no event loops or input handling — pure view logic.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -19,6 +19,7 @@ from rich import box
 from core.layout.solver import solve
 from core.manifest.models import Cell, CellManifest, CellType
 from core.tree import Node, ViewTree
+from core.source import SourceManager
 from .theme import Theme, DEFAULT_THEME
 from .keybindings import Keybindings, DEFAULT_KEYBINDINGS
 
@@ -44,6 +45,7 @@ class CellrixRenderer:
         strict: bool = False,
         theme: Theme = DEFAULT_THEME,
         keybindings: Keybindings = DEFAULT_KEYBINDINGS,
+        source_manager: Optional[SourceManager] = None,
     ) -> None:
         self.manifest = manifest
         self.strict = strict
@@ -53,6 +55,7 @@ class CellrixRenderer:
         self._flat_nodes: List[Node] = []
         self._cached_view_tree: Optional[ViewTree] = None
         self.dynamic_content: Dict[str, str] = {}
+        self.source_manager = source_manager
 
     def update_manifest(self, new_manifest: CellManifest) -> None:
         """Replace the current manifest and clear the cached layout."""
@@ -80,6 +83,12 @@ class CellrixRenderer:
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
+        # Dynamic data auto‑poll (driven by Rich's refresh cycle)
+        if self.source_manager is not None:
+            updates = self.source_manager.poll_all()
+            if updates:
+                self.dynamic_content.update(updates)
+
         term_w = console.width
         term_h = console.height
 
