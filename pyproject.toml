@@ -45,3 +45,6 @@ testpaths = ["tests"]
 addopts = "-v --cov=core --cov-report=term-missing"
 [tool.hatch.build.targets.wheel]
 packages = ["core"]
+
+[project.scripts]
+cellrix = "cli.cellrix:cli"

@@ -1,6 +1,7 @@
 """Deterministic layout solver — Round 3: tree‐aware recursive solver."""
 
 from collections import namedtuple
+from typing import Dict, List, Tuple
 
 from ..manifest.models import Cell, CellManifest, Layout, Slot
 from ..tree import Node, ViewTree
@@ -8,18 +9,17 @@ from ..tree import Node, ViewTree
 
 class LayoutError(Exception):
     """Raised when layout constraints cannot be satisfied."""
-
     pass
 
 
 # Named tuple for slot specifications — minimal, no class overhead.
 _SlotSpec = namedtuple(
-    "_SlotSpec",
-    ["weight", "min_constraint", "priority", "collapse_mode"],
+    '_SlotSpec',
+    ['weight', 'min_constraint', 'priority', 'collapse_mode'],
 )
 
 
-def _distribute_1d(space: int, weights: list[int]) -> list[int]:
+def _distribute_1d(space: int, weights: List[int]) -> List[int]:
     """Distribute integer space proportionally by weights.
 
     Uses dynamic remainder absorption to ensure the sum of
@@ -45,7 +45,7 @@ def _distribute_1d(space: int, weights: list[int]) -> list[int]:
     if total_weight == 0:
         raise LayoutError("Total weight must be positive")
 
-    allocated: list[int] = []
+    allocated: List[int] = []
     remaining_space = space
     remaining_weight = total_weight
 
@@ -63,7 +63,7 @@ def _distribute_1d(space: int, weights: list[int]) -> list[int]:
     return allocated
 
 
-def _allocate_slots_1d(space: int, slots: list[_SlotSpec]) -> list[int]:
+def _allocate_slots_1d(space: int, slots: List[_SlotSpec]) -> List[int]:
     """Allocate integer space to slots with constraints and downgrade logic.
 
     Implements Flexbox-style two-phase resolution adapted for discrete
@@ -93,7 +93,8 @@ def _allocate_slots_1d(space: int, slots: list[_SlotSpec]) -> list[int]:
     n = len(slots)
     if space < n:
         raise LayoutError(
-            f"Terminal too small: space={space}, slots={n}. Each slot needs at least 1 unit."
+            f"Terminal too small: space={space}, slots={n}. "
+            f"Each slot needs at least 1 unit."
         )
 
     # Phase 1: Downgrade loop — compress by ascending priority
@@ -108,7 +109,8 @@ def _allocate_slots_1d(space: int, slots: list[_SlotSpec]) -> list[int]:
 
     if sum(current_mins) > space:
         raise LayoutError(
-            f"Terminal too small after full downgrade: space={space}, min_sum={sum(current_mins)}"
+            f"Terminal too small after full downgrade: "
+            f"space={space}, min_sum={sum(current_mins)}"
         )
 
     # Phase 2 & 3: initial distribution and freeze-correction
@@ -116,7 +118,9 @@ def _allocate_slots_1d(space: int, slots: list[_SlotSpec]) -> list[int]:
     final_alloc = [0] * n
 
     while True:
-        frozen_sum = sum(final_alloc[i] for i in range(n) if i not in unfrozen)
+        frozen_sum = sum(
+            final_alloc[i] for i in range(n) if i not in unfrozen
+        )
         remaining_space = space - frozen_sum
         unfrozen_weights = [slots[i].weight for i in unfrozen]
         unfrozen_indices = list(unfrozen)
@@ -144,8 +148,8 @@ def _allocate_slots_1d(space: int, slots: list[_SlotSpec]) -> list[int]:
 
 def _measure_slot(
     slot: Slot,
-    cell_map: dict[str, Cell],
-) -> tuple[int, int, int]:
+    cell_map: Dict[str, Cell],
+) -> Tuple[int, int, int]:
     """Compute the intrinsic minimum dimensions and effective priority of a slot.
 
     If the slot contains a nested layout, the minima are aggregated
@@ -160,7 +164,10 @@ def _measure_slot(
         A tuple of (min_width, min_height, effective_priority).
     """
     if slot.layout is not None:
-        child_mins = [_measure_slot(child_slot, cell_map) for child_slot in slot.layout.slots]
+        child_mins = [
+            _measure_slot(child_slot, cell_map)
+            for child_slot in slot.layout.slots
+        ]
         if slot.layout.direction == "horizontal":
             min_w = sum(m[0] for m in child_mins)
             min_h = max(m[1] for m in child_mins)
@@ -185,7 +192,7 @@ def _measure_slot(
 
 def _layout_tree(
     layout: Layout,
-    cell_map: dict[str, Cell],
+    cell_map: Dict[str, Cell],
     x: int,
     y: int,
     w: int,
@@ -206,7 +213,7 @@ def _layout_tree(
     space = w if direction == "horizontal" else h
 
     # Build slot specifications using measured minima and priorities
-    specs: list[_SlotSpec] = []
+    specs: List[_SlotSpec] = []
     for slot in layout.slots:
         min_w, min_h, eff_priority = _measure_slot(slot, cell_map)
         min_constraint = min_w if direction == "horizontal" else min_h
@@ -227,7 +234,7 @@ def _layout_tree(
     sizes = _allocate_slots_1d(space, specs)
 
     # Build child nodes and track coordinates
-    child_nodes: list[Node] = []
+    child_nodes: List[Node] = []
     offset = x if direction == "horizontal" else y
 
     for i, slot in enumerate(layout.slots):
@@ -247,12 +254,14 @@ def _layout_tree(
         slot_h = max(1, slot_h)
 
         if slot.id in cell_map:
+            cell = cell_map[slot.id]
             child = Node(
-                id=cell_map[slot.id].id,
+                id=cell.id,
                 x=slot_x,
                 y=slot_y,
                 width=slot_w,
                 height=slot_h,
+                content=cell.content,
             )
             child_nodes.append(child)
         elif slot.layout is not None:
@@ -304,7 +313,7 @@ def solve(
     Returns:
         A fully computed ViewTree ready for rendering.
     """
-    cell_map: dict[str, Cell] = {cell.slot: cell for cell in manifest.cells}
+    cell_map: Dict[str, Cell] = {cell.slot: cell for cell in manifest.cells}
     root_node = _layout_tree(
         manifest.layout,
         cell_map,

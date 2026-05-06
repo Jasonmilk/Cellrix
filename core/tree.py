@@ -16,6 +16,7 @@ class Node:
     children: list["Node"] = field(default_factory=list)
     role: str | None = None
     summary: str | None = None
+    content: str | None = None  # Cell content from Manifest
 
 
 @dataclass

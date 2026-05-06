@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-strict-blue)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-22/22%20passed-green)](#)
+[![Tests](https://img.shields.io/badge/tests-all%20passing-green)](#)
 
 ---
 
@@ -27,19 +27,19 @@ Describe your interface in a strict JSON/YAML **Cell‑Manifest**, and the **Cel
 
 ---
 
-## Current Status: Solver Engine Running
+## Current Status: Coordinate Engine Complete
 
-The layout solver is evolving in three planned rounds. Rounds 1 and 2 are complete — pure weight distribution and constraint-aware allocation with priority‑based downgrade.
+The layout solver has finished all three planned rounds. Nested manifests now produce precise (x, y, w, h) coordinates for every cell — ready for rendering.
 
 | Gate | Status |
 |:---|:---|
 | Protocol Spec (WHITEPAPER.md v2.0) | ✅ Finalized |
 | Engineering Guide (10 chapters) | ✅ Complete |
 | Manifest Parser + Strict Validation | ✅ Complete |
-| ANSI Sanitizer + Capability Validator | ✅ 22/22 Tests Passing |
+| ANSI Sanitizer + Capability Validator | ✅ All Tests Passing |
 | `ruff check` | ✅ All checks passed |
 | `mypy --strict` (15 source files) | ✅ Success, 0 errors |
-| Layout Solver | 🔨 Round 2 complete (constraints + downgrade) |
+| Layout Solver | ✅ Round 3 complete (coordinate mapping) |
 
 **Installation (development-only for now):**
 
@@ -49,7 +49,7 @@ cd Cellrix
 uv venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
-uv run pytest  # 22 passed
+uv run pytest  # all passing
 ```
 
 ---
