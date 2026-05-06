@@ -12,60 +12,170 @@
 
 ---
 
+## What is Cellrix?
+
+Describe your terminal interface in a JSON file. Cellrix renders it — with layout, focus tracking, keyboard shortcuts, and a built‑in help system. No manual coordinate math, no boilerplate drawing code, no framework lock‑in.
+
+Cellrix is a **protocol first**, not an implementation. The layout solver is a pure function: same manifest + same terminal size = identical result every time. The renderer is just one compliant consumer of the protocol. Write your own if you prefer — as long as it passes the Conformance Suite, it's a valid Cellrix Runtime.
+
+
 ## Why Cellrix?
 
-Modern terminal UIs require too much manual layout calculation, and web UIs are too heavy for fast‑moving backends and AI agents. Cellrix solves both with **declarative intent**.
-
-Describe your interface in a strict JSON/YAML **Cell‑Manifest**, and the **Cellrix Runtime** deterministically computes the layout, data binding, and interaction — outputting a fully adaptive TUI (and GUI) in milliseconds.
-
-| Traditional TUI | Cellrix |
+| Problem | Cellrix answer |
 |:---|:---|
-| Hand‑computed x,y coordinates | Declare `weight`, `minConstraint`, `slot` |
-| Hundreds of lines of code per pane | Single manifest, zero UI boilerplate |
-| Screen reader unfriendly | Semantic tree aligned with W3C ARIA 1.3 |
-| AI cannot understand the screen | AI reads the Semantic Tree directly |
+| TUI development is repetitive coordinate math | Declare `weight`, `minConstraint`, `slot` — Solver computes the rest |
+| Every tool invents its own keyboard handling | Unified input routing via Keybindings (decoupled from renderer) |
+| Terminal apps are invisible to screen readers | Semantic tree aligned with W3C ARIA 1.3 |
+| AI agents cannot read terminal output | Semantic tree is structured JSON — no OCR needed |
 
----
 
-## 🚀 Milestone: Interactive Workbench with Dynamic Data Pipes
+## What can Cellrix do for you?
 
-The layout solver (pure function, O(N), zero‑reflow) now powers a fully interactive terminal dashboard with:
+Cellrix is designed for **four levels of engagement**. You can use only what you need, without complexity you don't.
 
-*   **Nano‑style self‑explaining interface** – single‑line status bar and a full‑screen help overlay (`F1`) that shows global and context‑sensitive shortcuts.
-*   **Decoupled theme & keybinding system** – change colors or remap keys without touching a line of renderer code.
-*   **Focus tracking** – `Tab` / `Shift+Tab` cycle through panels; active panel highlighted with a bold green border.
-*   **Dynamic data pipes** – bind cells to real-time data sources (pipes, subprocesses) with `--trust` security gate.
-*   **Stream mode** – pipe a stream of Manifest JSON lines into `cellrix stream` for real‑time updates.
-*   **Robust cross‑platform input** – non‑blocking keyboard handling via `readchar`, zero flicker.
+### Level 1: Declare & Preview
+
+Write a Cell‑Manifest and see it rendered immediately. This is the fastest way to get started.
 
 ```bash
-# Interactive static preview
-cellrix preview examples/hello.json
-
-# Real‑time dashboard with pipe source (clock example)
-cellrix preview examples/dynamic_clock.json --trust
-
-# Stream mode (consume Manifest JSON from stdin)
-cat manifests_stream.ndjson | cellrix stream
+cellrix preview hello.json
 ```
 
----
+```json
+{
+  "version": "2.0",
+  "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
+  "cells": [
+    { "id": "greeting", "type": "static", "slot": "main", "content": "Hello, Cellrix!" }
+  ]
+}
+```
 
-## Current Status
+Press `F1` anytime to see available shortcuts. Press `Tab` to move focus between panels. Press `q` to quit.
 
-| Gate | Status |
+### Level 2: Design Layouts
+
+Use `weight`, `minConstraint`, `collapseMode`, and nested slots to build sophisticated, responsive layouts that adapt to terminal resizing — with zero manual coordinate math.
+
+```json
+{
+  "version": "2.0",
+  "layout": {
+    "direction": "horizontal",
+    "slots": [
+      { "id": "sidebar", "weight": 1 },
+      { "id": "main", "weight": 3, "layout": {
+        "direction": "vertical",
+        "slots": [
+          { "id": "status", "weight": 1 },
+          { "id": "log", "weight": 4 }
+        ]
+      }}
+    ]
+  },
+  "cells": [
+    { "id": "nav", "type": "static", "slot": "sidebar", "content": "# Dashboard",
+      "minConstraint": { "width": 10, "height": 3 }, "priority": 100 },
+    { "id": "cpu", "type": "realtime", "slot": "status", "content": "CPU: idle",
+      "minConstraint": { "width": 5, "height": 1 } },
+    { "id": "events", "type": "dynamic", "slot": "log",
+      "collapseMode": "scroll", "priority": 50 }
+  ]
+}
+```
+
+The Solver automatically:
+- Splits horizontal space 1:3 between sidebar and main area
+- Splits main area vertically 1:4 between status and log
+- Protects high‑priority panels from being squeezed when the terminal shrinks
+- Collapses low‑priority panels into scroll mode instead of crashing
+
+You define **what** — the Runtime handles **how**.
+
+### Level 3: Connect Data Pipes (Dynamic Content)
+
+Bind cells to real data sources: shell commands, log files, sockets. Content updates automatically — no full‑manifest replacement needed.
+
+```bash
+# Real‑time clock (requires --trust to enable pipe execution)
+cellrix preview clock.json --trust
+```
+
+```json
+{
+  "version": "2.0",
+  "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
+  "cells": [
+    { "id": "clock", "type": "realtime", "slot": "main",
+      "source": { "type": "pipe", "command": "while true; do date; sleep 1; done" } }
+  ]
+}
+```
+
+**Security first:** Pipe execution is disabled by default. You must explicitly opt in with `--trust`. Without it, the cell displays a security lock notice and no subprocess runs.
+
+### Level 4: Stream & Embed (Programmatic Usage)
+
+Pipe a stream of Manifest JSON lines into `cellrix stream` for real‑time dashboards that update as data arrives. When the stream ends, the display stays interactive so you can inspect the final state.
+
+```bash
+# Generate a manifest every second and stream it
+generate_manifests | cellrix stream
+```
+
+Or embed the Runtime directly into your Python application:
+
+```python
+from core.manifest.parser import parse_manifest
+from cli.runtime import CellrixRuntime
+
+manifest = parse_manifest("my_dashboard.json")
+runtime = CellrixRuntime(manifest)
+runtime.run()   # blocks until user presses 'q'
+```
+
+The Runtime controls the entire interactive loop: rendering, input handling, and dynamic data polling. You provide the Manifest — Cellrix handles everything else.
+
+
+## Interactive Workbench (Built‑in)
+
+Every `cellrix preview` session includes these interaction features automatically:
+
+| Feature | Key | What it does |
+|:---|:---|:---|
+| **Full‑screen help** | `F1` | Shows all global shortcuts and panel‑specific actions |
+| **Panel navigation** | `Tab` / `Shift+Tab` | Cycles focus forward/backward; focused panel highlighted green |
+| **Quit** | `q` | Exits the preview (terminal state fully restored) |
+| **Status bar** | always visible | Shows current key bindings relevant to the focused panel |
+| **Dynamic refresh** | automatic | Data pipe cells update in real time without blocking input |
+
+No configuration needed. Press `F1` anytime — it always works.
+
+
+## Core Concepts
+
+### Cell‑Manifest
+
+A JSON file that describes your interface. Three cell types:
+
+| Type | Behavior |
 |:---|:---|
-| Protocol Spec (WHITEPAPER.md v2.0) | ✅ Finalized |
-| Engineering Guide (10 chapters) | ✅ Complete |
-| Manifest Parser + Strict Validation | ✅ Complete |
-| ANSI Sanitizer + Capability Validator | ✅ Complete |
-| `ruff check` | ✅ All checks passed |
-| `mypy --strict` (21 source files) | ✅ Success, 0 errors |
-| Layout Solver + Rendering | ✅ Interactive workbench live |
-| Dynamic Data Pipes (SourceManager) | ✅ `--trust` gate enabled |
-| Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
+| `static` | Never updates (headers, navigation, buttons) |
+| `dynamic` | Appends data from a source (log streams, event lists) |
+| `realtime` | Polls and replaces content (CPU gauges, status indicators) |
 
----
+### Layout
+
+Nested slots with `weight` ratios. Horizontal and vertical splits compose into fractal grids. No pixel math — the Solver computes coordinates deterministically.
+
+### Keybindings
+
+Decoupled from the renderer. Global bindings (`q` = quit) cannot be overridden by Manifest actions. Context‑sensitive bindings are shown in the help overlay and status bar.
+
+### Theme
+
+Colors stored as data (`cli/theme.py`), not hardcoded. Swap themes without touching renderer logic.
+
 
 ## Quick Start
 
@@ -80,20 +190,33 @@ uv pip install -e ".[dev]"
 uv run cellrix preview examples/hello.json
 ```
 
----
+
+## Current Status
+
+| Gate | Status |
+|:---|:---|
+| Protocol Spec (WHITEPAPER.md v2.0) | ✅ Finalized |
+| Engineering Guide (10 chapters) | ✅ Complete |
+| Manifest Parser + Strict Validation | ✅ Complete |
+| ANSI Sanitizer + Capability Validator | ✅ Complete |
+| `ruff check` | ✅ All checks passed |
+| `mypy --strict` (21 source files) | ✅ Success, 0 errors |
+| Layout Solver + Interactive Rendering | ✅ Live workbench |
+| Dynamic Data Pipes (SourceManager) | ✅ `--trust` gate enabled |
+| Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
+
 
 ## Design Philosophy — *The Cellrix Zen*
 
 Every commit, every PR, every design decision must honor these six axioms:
 
-1. **Orchestrate, Don't Build** – The runtime is a scheduler, not a renderer.
-2. **Strict Contracts, Model Validation** – All communication via typed Pydantic models.
-3. **Pure Streams & Hard Fails** – `stdout` for data, `stderr` for diagnostics, errors never swallowed.
-4. **Absolute Idempotency** – Same manifest + terminal size = identical ViewTree.
-5. **Radical Simplicity & Ecosystem Reuse** – Direct dependencies capped at ≤5; every new line must justify itself.
-6. **Security‑First & Human‑in‑the‑Loop** – ANSI injection blocked; critical actions require physical approval.
+1. **Orchestrate, Don't Build** — The runtime is a scheduler, not a renderer.
+2. **Strict Contracts, Model Validation** — All communication via typed Pydantic models.
+3. **Pure Streams & Hard Fails** — `stdout` for data, `stderr` for diagnostics, errors never swallowed.
+4. **Absolute Idempotency** — Same manifest + terminal size = identical ViewTree.
+5. **Radical Simplicity & Ecosystem Reuse** — Direct dependencies capped at ≤5; every new line must justify itself.
+6. **Security‑First & Human‑in‑the‑Loop** — ANSI injection blocked; critical actions require physical approval.
 
----
 
 ## Repository Layout
 
@@ -109,6 +232,7 @@ cellrix/
 └── pyproject.toml
 ```
 
+
 ## Quality Gates
 
 ```bash
@@ -118,7 +242,6 @@ uv run mypy --strict cli/ core/ devkit/  # Zero errors
 uv run pytest                # 23/23 passing
 ```
 
----
 
 ## License
 
