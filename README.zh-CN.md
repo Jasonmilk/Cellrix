@@ -2,7 +2,7 @@
 
 **意图驱动的、确定性的、空间-语义化终端 UI 协议与高性能运行时。**
 
-> *Cellrix 不只是一个终端复古工具。它是为后 AGI 时代准备的、跨越碳基与硅基理解鸿沟的操作系统级 UI 协议。*
+> *Cellrix 不只是一个终端工具。它是为后 AGI 时代准备的、跨越碳基与硅基理解鸿沟的操作系统级 UI 协议。*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
@@ -12,49 +12,170 @@
 
 ---
 
-## 为什么是 Cellrix？
+## 什么是 Cellrix？
 
-现代终端 UI 需要太多手动坐标计算，而 Web UI 对高速迭代的后端和 AI 智能体而言又过于臃肿。Cellrix 用**声明式意图**解决了这两个问题。
+用一份 JSON 文件描述你的终端界面，Cellrix 负责渲染——包括布局、焦点追踪、键盘快捷键和内置帮助系统。无需手动计算坐标，无样板绘制代码，无框架锁定。
 
-用一份严格的 JSON/YAML **Cell-Manifest** 描述你的界面，**Cellrix Runtime** 便确定性地计算出布局、数据绑定和交互——在毫秒内输出一个完全自适应的 TUI（以及 GUI）。
+Cellrix **协议优先**，而非实现优先。布局求解器是纯函数：相同的 Manifest + 相同的终端尺寸 = 每次完全相同的输出。渲染器只是协议的一个合规实例。只要你愿意，可以自己实现渲染器——只要通过 Conformance Suite，就是合法的 Cellrix Runtime。
 
-| 传统 TUI | Cellrix |
+
+## 为什么选择 Cellrix？
+
+| 痛点 | Cellrix 的解决方案 |
 |:---|:---|
-| 手动计算 x,y 坐标 | 声明 `weight`、`minConstraint`、`slot` |
-| 每个窗格数百行代码 | 一份 Manifest，零 UI 样板代码 |
-| 屏幕阅读器无法识别 | 语义树严格对齐 W3C ARIA 1.3 |
-| AI 无法理解屏幕内容 | AI 直接读取语义树 |
+| TUI 开发是重复的坐标数学 | 声明 `weight`、`minConstraint`、`slot`——求解器自动计算 |
+| 每个工具各自发明键盘处理机制 | 通过 Keybindings 统一输入路由（与渲染器解耦） |
+| 终端应用对视障工程师不友好 | 语义树严格对齐 W3C ARIA 1.3 |
+| AI 智能体无法阅读终端输出 | 语义树是结构化 JSON——无需 OCR |
 
----
 
-## 🎯 里程碑：交互式工作台正式上线
+## Cellrix 能为你做什么？
 
-布局求解器（纯函数，O(N)，零重排）现已驱动一个完全可交互的终端预览体验，具备：
+Cellrix 专为**四个递进层次**设计。你可以只使用需要的部分，不引入额外复杂性。
 
-*   **Nano 风格的自解释界面**：单行状态栏与全屏帮助覆盖层（`F1`），动态展示全局和当前面板的专属快捷键。
-*   **解耦的主题与键位系统**：切换色彩风格或重映射按键，零行渲染器代码改动。
-*   **焦点追踪**：`Tab` / `Shift+Tab` 在面板间循环切换；激活的面板以醒目的亮绿色边框高亮。
-*   **稳健的跨平台输入**：通过 `readchar` 实现非阻塞键盘交互，零延迟、零闪烁。
+### 第一层：声明与预览
+
+编写一份 Cell‑Manifest，立即看到渲染结果。这是最快的入门方式。
 
 ```bash
-cellrix preview examples/hello.json
+cellrix preview hello.json
 ```
 
----
+```json
+{
+  "version": "2.0",
+  "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
+  "cells": [
+    { "id": "greeting", "type": "static", "slot": "main", "content": "你好，Cellrix！" }
+  ]
+}
+```
 
-## 当前状态
+随时按 `F1` 查看可用快捷键。按 `Tab` 在面板间移动焦点。按 `q` 退出。
 
-| 门禁 | 状态 |
+### 第二层：设计布局
+
+使用 `weight`、`minConstraint`、`collapseMode` 和嵌套槽位，构建复杂、响应式的布局，自适应终端尺寸变化——零手动坐标计算。
+
+```json
+{
+  "version": "2.0",
+  "layout": {
+    "direction": "horizontal",
+    "slots": [
+      { "id": "sidebar", "weight": 1 },
+      { "id": "main", "weight": 3, "layout": {
+        "direction": "vertical",
+        "slots": [
+          { "id": "status", "weight": 1 },
+          { "id": "log", "weight": 4 }
+        ]
+      }}
+    ]
+  },
+  "cells": [
+    { "id": "nav", "type": "static", "slot": "sidebar", "content": "# 仪表盘",
+      "minConstraint": { "width": 10, "height": 3 }, "priority": 100 },
+    { "id": "cpu", "type": "realtime", "slot": "status", "content": "CPU: 空闲",
+      "minConstraint": { "width": 5, "height": 1 } },
+    { "id": "events", "type": "dynamic", "slot": "log",
+      "collapseMode": "scroll", "priority": 50 }
+  ]
+}
+```
+
+求解器自动完成：
+- 侧边栏与主区域以 1:3 比例分割水平空间
+- 主区域以 1:4 比例垂直分割状态栏和日志面板
+- 终端缩小时保护高优先级面板不被挤压
+- 低优先级面板折叠为滚动模式，而非崩溃
+
+你定义**什么**，运行时负责**如何**。
+
+### 第三层：连接数据管道（动态内容）
+
+将单元绑定到真实数据源：Shell 命令、日志文件、Socket。内容自动更新——无需全量替换 Manifest。
+
+```bash
+# 实时时钟（需要 --trust 启用管道执行）
+cellrix preview clock.json --trust
+```
+
+```json
+{
+  "version": "2.0",
+  "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
+  "cells": [
+    { "id": "clock", "type": "realtime", "slot": "main",
+      "source": { "type": "pipe", "command": "while true; do date; sleep 1; done" } }
+  ]
+}
+```
+
+**安全第一：** 管道执行默认禁用。你必须显式使用 `--trust` 来启用。否则，单元显示安全锁定提示，不启动子进程。
+
+### 第四层：流式传输与嵌入（程序化使用）
+
+将 Manifest JSON 流传输到 `cellrix stream`，实现数据到达时实时更新的仪表盘。流结束后，界面保持交互状态，你可以检查最终状态。
+
+```bash
+# 每秒钟生成一个 Manifest 并流式传输
+generate_manifests | cellrix stream
+```
+
+或直接将运行时嵌入你的 Python 应用：
+
+```python
+from core.manifest.parser import parse_manifest
+from cli.runtime import CellrixRuntime
+
+manifest = parse_manifest("my_dashboard.json")
+runtime = CellrixRuntime(manifest)
+runtime.run()   # 阻塞直到用户按下 'q'
+```
+
+运行时控制整个交互循环：渲染、输入处理和动态数据轮询。你提供 Manifest——Cellrix 处理其余一切。
+
+
+## 交互式工作台（内置）
+
+每次 `cellrix preview` 会话自动包含以下交互功能：
+
+| 功能 | 按键 | 说明 |
+|:---|:---|:---|
+| **全屏帮助** | `F1` | 显示所有全局快捷键和当前面板的特定操作 |
+| **面板导航** | `Tab` / `Shift+Tab` | 向前/向后循环焦点；聚焦面板以绿色高亮 |
+| **退出** | `q` | 退出预览（终端状态完全恢复） |
+| **状态栏** | 始终可见 | 显示与当前面板相关的按键绑定 |
+| **动态刷新** | 自动 | 数据管道单元实时更新，不阻塞输入 |
+
+无需任何配置。随时按 `F1`——它始终有效。
+
+
+## 核心概念
+
+### Cell‑Manifest
+
+描述界面的 JSON 文件。三种单元类型：
+
+| 类型 | 行为 |
 |:---|:---|
-| 协议规范 (WHITEPAPER.md v2.0) | ✅ 定稿 |
-| 工程指引手册 (10 章) | ✅ 完成 |
-| Manifest 解析器与严格校验 | ✅ 完成 |
-| ANSI 净化与网络权限验证 | ✅ 完成 |
-| `ruff check` | ✅ 全部通过 |
-| `mypy --strict` (18 个源文件) | ✅ 成功，0 错误 |
-| 布局求解器 + 交互渲染 | ✅ 交互式工作台已就绪 |
+| `static` | 永不更新（标题、导航、按钮） |
+| `dynamic` | 从数据源追加数据（日志流、事件列表） |
+| `realtime` | 轮询并替换内容（CPU 仪表、状态指示器） |
 
----
+### 布局
+
+带有 `weight` 比例的嵌套槽位。水平和垂直分割组合成分形网格。无像素计算——求解器确定性地计算坐标。
+
+### 键位
+
+与渲染器解耦。全局绑定（`q` = 退出）不可被 Manifest 动作覆盖。上下文相关绑定在帮助覆盖层和状态栏中显示。
+
+### 主题
+
+颜色存储为数据（`cli/theme.py`），不硬编码。切换主题无需修改渲染器逻辑。
+
 
 ## 快速上手
 
@@ -69,7 +190,21 @@ uv pip install -e ".[dev]"
 uv run cellrix preview examples/hello.json
 ```
 
----
+
+## 当前状态
+
+| 门禁 | 状态 |
+|:---|:---|
+| 协议规范 (WHITEPAPER.md v2.0) | ✅ 定稿 |
+| 工程指引手册 (10 章) | ✅ 完成 |
+| Manifest 解析器 + 严格校验 | ✅ 完成 |
+| ANSI 净化 + 能力验证 | ✅ 完成 |
+| `ruff check` | ✅ 全部通过 |
+| `mypy --strict` (21 个源文件) | ✅ 成功，0 错误 |
+| 布局求解器 + 交互式渲染 | ✅ 工作台就绪 |
+| 动态数据管道 (SourceManager) | ✅ `--trust` 门控启用 |
+| 流模式 (stdin ndjson) | ✅ 流结束后交互可用 |
+
 
 ## 设计哲学 —— *Cellrix Zen*
 
@@ -82,13 +217,12 @@ uv run cellrix preview examples/hello.json
 5. **极简复用，外包生态** — 直接依赖上限为 ≤5 个；每一行新代码都须证明其存在之必要性。
 6. **安全第一，人机协同** — ANSI 注入已在渲染层阻断；关键操作必经物理确认屏障。
 
----
 
 ## 仓库结构
 
 ```
 cellrix/
-├── core/                   # 协议引擎（解析器、求解器、安全模块）
+├── core/                   # 协议引擎（解析器、求解器、安全、数据源）
 ├── cli/                    # 交互式终端客户端 + 主题与键位
 ├── devkit/                 # 模板、协议桥接 (MCP/AG-UI)
 ├── tests/                  # 单元测试 + 一致性测试套件
@@ -98,7 +232,6 @@ cellrix/
 └── pyproject.toml
 ```
 
----
 
 ## 质量门禁
 
@@ -109,17 +242,6 @@ uv run mypy --strict cli/ core/ devkit/  # 零错误
 uv run pytest                # 23/23 通过
 ```
 
----
-
-## 协议与实现
-
-| 文档 | 用途 |
-|:---|:---|
-| [**WHITEPAPER.md**](WHITEPAPER.md) | 协议宪法 — Manifest Schema、HITL 状态机、语义树、版本治理。 |
-| [**ARCHITECTURE.md**](ARCHITECTURE.md) | `cellrix-core` 参考实现的工程决策记录。 |
-| [**ENGINEERING_GUIDE.md**](ENGINEERING_GUIDE.md) | 代码风格、模块结构、测试策略、发布流程。 |
-
----
 
 ## 许可证
 
@@ -129,4 +251,4 @@ MIT。行善，勿害，保持简单。
 
 *若白皮书为魂，此引擎即为体。二者遵循同一套六项法则。*
 
-*English version: [README.md](README.md)*
+*英文版: [README.md](README.md)*
