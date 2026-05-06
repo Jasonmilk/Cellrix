@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
-[![Mypy](https://img.shields.io/badge/type--checker-Mypy-strict-blue)](https://mypy-lang.org/)
+[![Mypy](https://img.shields.io/badge/type-checker-Mypy-strict-blue)](https://mypy-lang.org/)
 [![Tests](https://img.shields.io/badge/tests-23%2F23%20passed-green)](#)
 
 ---
