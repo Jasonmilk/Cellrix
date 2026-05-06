@@ -8,6 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-strict-blue)](https://mypy-lang.org/)
+[![Tests](https://img.shields.io/badge/tests-6/6%20passed-green)](#)
 
 ---
 
@@ -26,6 +27,33 @@ Describe your interface in a strict JSON/YAML **Cell‑Manifest**, and the **Cel
 
 ---
 
+## Current Status: Foundation Established
+
+The project has completed its protocol specification phase and established rigorous engineering discipline. The layout solver is the next milestone.
+
+| Gate | Status |
+|:---|:---|
+| Protocol Spec (WHITEPAPER.md v2.0) | ✅ Finalized |
+| Engineering Guide (10 chapters) | ✅ Complete |
+| Manifest Parser + Strict Validation | ✅ Complete |
+| ANSI Sanitizer + Capability Validator | ✅ 6/6 Tests Passing |
+| `ruff check` | ✅ All checks passed |
+| `mypy --strict` (15 source files) | ✅ Success, 0 errors |
+| Layout Solver | 🔨 In progress |
+
+**Installation (development-only for now):**
+
+```bash
+git clone git@github.com:Jasonmilk/Cellrix.git
+cd Cellrix
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+uv run pytest  # 6 passed
+```
+
+---
+
 ## Design Philosophy — *The Cellrix Zen*
 
 We hold these axioms sacred. Every commit, every PR, every design decision must honor them.
@@ -39,56 +67,13 @@ We hold these axioms sacred. Every commit, every PR, every design decision must 
 
 ---
 
-## Quick Start
-
-### Installation
-
-```bash
-pip install cellrix-core
-```
-
-Or with `uv`:
-
-```bash
-uv pip install cellrix-core
-```
-
-### Your First Manifest
-
-Create `hello.json`:
-
-```json
-{
-  "version": "2.0",
-  "layout": { "direction": "vertical", "slots": [
-    { "id": "main", "weight": 1 }
-  ]},
-  "cells": [
-    {
-      "id": "greeting",
-      "type": "static",
-      "slot": "main",
-      "content": "Hello, Cellrix!"
-    }
-  ]
-}
-```
-
-### Render It
-
-```bash
-cellrix preview hello.json
-```
-
----
-
 ## Protocol & Implementation
 
 | Document | Purpose |
 |:---|:---|
 | [**WHITEPAPER.md**](WHITEPAPER.md) | The protocol constitution — Manifest schema, HITL state machine, Semantic Tree, versioning. |
-| [**ARCHITECTURE.md**](ARCHITECTURE.md) | Implementation‑specific decisions of the `cellrix‑core` reference implementation (ring buffer, WASM sandbox, persistence). |
-| [**ENGINEERING_GUIDE.md**](ENGINEERING_GUIDE.md) | Code style, module structure, testing strategy, release process. |
+| [**ARCHITECTURE.md**](ARCHITECTURE.md) | Implementation‑specific decisions of the `cellrix‑core` reference implementation. |
+| [**ENGINEERING_GUIDE.md**](ENGINEERING_GUIDE.md) | Code style, module structure, testing strategy, release process (10 chapters). |
 
 ---
 
@@ -97,27 +82,27 @@ cellrix preview hello.json
 ```
 cellrix/
 ├── core/                   # Protocol engine (parser, solver, security)
-├── cli/                    # Thin CLI shell (`cellrix preview`, `cellrix init`)
+├── cli/                    # Thin CLI shell (`cellrix preview`)
 ├── devkit/                 # Templates, protocol bridges (MCP/AG-UI)
 ├── tests/                  # Unit + conformance suite
 ├── WHITEPAPER.md           # The Protocol
-├── ARCHITECTURE.md         # The Reference Implementation
-├── ENGINEERING_GUIDE.md    # The Construction Manual
+├── ARCHITECTURE.md         # Reference Implementation
+├── ENGINEERING_GUIDE.md    # Construction Manual (Chinese)
 └── pyproject.toml
 ```
 
 ---
 
-## Contribution
+## Quality Gates
 
-We welcome contributors who respect the Zen axioms.
+Every PR must pass:
 
-1. Fork & branch (`feat/`, `fix/`, `docs/`).
-2. Code in English, follow the Engineering Guide.
-3. Ensure `ruff check`, `mypy strict`, and `pytest` pass locally.
-4. Open a PR — a Core Team member will review.
-
-See the complete instructions in [ENGINEERING_GUIDE.md](ENGINEERING_GUIDE.md).
+```bash
+uv run ruff check .          # Zero warnings
+uv run ruff format . --check # Consistent formatting
+uv run mypy --strict core/ cli/ devkit/  # Zero errors
+uv run pytest                # All tests pass
+```
 
 ---
 
@@ -128,3 +113,7 @@ MIT. Do good, don't harm, keep it simple.
 ---
 
 *If the white paper is the soul, this engine is the body. Both obey the same six laws.*
+
+---
+
+*README in other languages: [中文](README.zh-CN.md)*
