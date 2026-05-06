@@ -1,5 +1,5 @@
 """Cellrix Core - protocol engine for deterministic terminal UIs."""
 
-from .tree import ViewTree, SemanticTree
+from .tree import SemanticTree, ViewTree
 
 __all__ = ["ViewTree", "SemanticTree"]
