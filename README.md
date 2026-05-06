@@ -1,4 +1,3 @@
-```markdown
 # Cellrix
 
 **An intent-driven, deterministic, spatial-semantic terminal UI protocol and high-performance runtime.**
@@ -118,4 +117,3 @@ MIT. Do good, don't harm, keep it simple.
 ---
 
 *README in other languages: [中文](README.zh-CN.md)*
-```
