@@ -27,19 +27,28 @@ Describe your interface in a strict JSON/YAML **Cell‑Manifest**, and the **Cel
 
 ---
 
-## Current Status: Coordinate Engine Complete
+## 🚀 Milestone: First Render Goes Live
 
-The layout solver has finished all three planned rounds. Nested manifests now produce precise (x, y, w, h) coordinates for every cell — ready for rendering.
+The layout solver (pure function, O(N), zero‑reflow) now feeds into a terminal renderer. **Real text content appears inside dynamically sized panels**. Resize your terminal and watch the layout recalculate in real‑time — no crashes, no flicker, just deterministic elegance.
+
+> **Try it yourself:**
+> ```bash
+> cellrix preview hello.json
+> ```
+
+---
+
+## Current Status
 
 | Gate | Status |
 |:---|:---|
 | Protocol Spec (WHITEPAPER.md v2.0) | ✅ Finalized |
 | Engineering Guide (10 chapters) | ✅ Complete |
 | Manifest Parser + Strict Validation | ✅ Complete |
-| ANSI Sanitizer + Capability Validator | ✅ All Tests Passing |
+| ANSI Sanitizer + Capability Validator | ✅ Complete |
 | `ruff check` | ✅ All checks passed |
 | `mypy --strict` (15 source files) | ✅ Success, 0 errors |
-| Layout Solver | ✅ Round 3 complete (coordinate mapping) |
+| Layout Solver + Rendering | ✅ First render milestone achieved |
 
 **Installation (development-only for now):**
 
@@ -49,7 +58,7 @@ cd Cellrix
 uv venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
-uv run pytest  # all passing
+uv run cellrix preview examples/hello.json
 ```
 
 ---
