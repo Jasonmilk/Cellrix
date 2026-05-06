@@ -1,3 +1,4 @@
+```markdown
 # Cellrix
 
 **An intent-driven, deterministic, spatial-semantic terminal UI protocol and high-performance runtime.**
@@ -8,7 +9,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-strict-blue)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-6/6%20passed-green)](#)
+[![Tests](https://img.shields.io/badge/tests-14/14%20passed-green)](#)
 
 ---
 
@@ -27,19 +28,19 @@ Describe your interface in a strict JSON/YAML **Cell‑Manifest**, and the **Cel
 
 ---
 
-## Current Status: Foundation Established
+## Current Status: Solver Foundation Laid
 
-The project has completed its protocol specification phase and established rigorous engineering discipline. The layout solver is the next milestone.
+The layout solver is evolving in planned rounds. Round 1 (pure weight distribution) is complete; the next rounds will add constraint handling and recursive tree mapping.
 
 | Gate | Status |
 |:---|:---|
 | Protocol Spec (WHITEPAPER.md v2.0) | ✅ Finalized |
 | Engineering Guide (10 chapters) | ✅ Complete |
 | Manifest Parser + Strict Validation | ✅ Complete |
-| ANSI Sanitizer + Capability Validator | ✅ 6/6 Tests Passing |
+| ANSI Sanitizer + Capability Validator | ✅ 14/14 Tests Passing |
 | `ruff check` | ✅ All checks passed |
 | `mypy --strict` (15 source files) | ✅ Success, 0 errors |
-| Layout Solver | 🔨 In progress |
+| Layout Solver | 🔨 Round 1 complete (pure weights) |
 
 **Installation (development-only for now):**
 
@@ -49,7 +50,7 @@ cd Cellrix
 uv venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
-uv run pytest  # 6 passed
+uv run pytest  # 14 passed
 ```
 
 ---
@@ -117,3 +118,4 @@ MIT. Do good, don't harm, keep it simple.
 ---
 
 *README in other languages: [中文](README.zh-CN.md)*
+```
