@@ -137,6 +137,72 @@ runtime.run()   # blocks until user presses 'q'
 The Runtime controls the entire interactive loop: rendering, input handling, and dynamic data polling. You provide the Manifest — Cellrix handles everything else.
 
 
+## For Project Authors: Make Your CLI Speak Cellrix
+
+Cellrix is not a library you import — it's a protocol your project speaks. Any project can become an "intent producer" and be rendered by Cellrix without installing any Cellrix dependency.
+
+The [Cellrix Intents Specification (CIS)](CIS.md) defines the standard. At a glance:
+
+### The Rule
+
+Your project needs **one entry point** that produces a Cell‑Manifest JSON. There are two ways to register it:
+
+**Channel A — Manifest file** (language‑agnostic, recommended)
+
+Place a `cellrix_manifest.json` in your project root:
+
+```json
+{
+  "bridge": {
+    "type": "python_function",
+    "module": "my_project.cellrix",
+    "function": "build_manifest"
+  },
+  "config": {}
+}
+```
+
+For non‑Python projects, use a CLI subprocess instead:
+
+```json
+{
+  "bridge": {
+    "type": "cli_subprocess",
+    "command": "my-cli-tool --cellrix"
+  }
+}
+```
+
+**Channel B — Python entry point** (optional bonus for Python packages)
+
+Declare in `pyproject.toml`:
+
+```toml
+[project.entry-points."cellrix.bridge"]
+my_bridge = "my_project.cellrix:build_manifest"
+```
+
+### The Function
+
+In a Python project, a `build_manifest` function may look like:
+
+```python
+# my_project/cellrix.py  —  no import cellrix needed!
+def build_manifest(config: dict | None = None) -> dict:
+    return {
+        "version": "2.0",
+        "layout": ...,
+        "cells": [...]
+    }
+```
+
+### Discovery & Validation
+
+Run `cellrix check` — it scans both channels, invokes the bridge, and validates the output against the JSON Schema. Once verified, your project is Cellrix‑ready.
+
+See the full [CIS specification](CIS.md) for details on event protocols, semantic widgets, and all supported bridge modes.
+
+
 ## Interactive Workbench (Built‑in)
 
 Every `cellrix preview` session includes these interaction features automatically:
@@ -195,7 +261,7 @@ uv run cellrix preview examples/hello.json
 
 | Gate | Status |
 |:---|:---|
-| Protocol Spec (WHITEPAPER.md v2.0) | ✅ Finalized |
+| Protocol Spec (WHITEPAPER.md v2.2) | ✅ Finalized |
 | Engineering Guide (10 chapters) | ✅ Complete |
 | Manifest Parser + Strict Validation | ✅ Complete |
 | ANSI Sanitizer + Capability Validator | ✅ Complete |
@@ -204,6 +270,7 @@ uv run cellrix preview examples/hello.json
 | Layout Solver + Interactive Rendering | ✅ Live workbench |
 | Dynamic Data Pipes (SourceManager) | ✅ `--trust` gate enabled |
 | Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
+| Textual Adapter (`cellrix run`) | ✅ Bidirectional pipe |
 
 
 ## Design Philosophy — *The Cellrix Zen*
@@ -225,8 +292,11 @@ cellrix/
 ├── core/                   # Protocol engine (parser, solver, security, source)
 ├── cli/                    # Interactive terminal client + theme & keybinding
 ├── devkit/                 # Templates, protocol bridges (MCP/AG-UI)
+├── adapters/               # Rendering adapters (optional dependencies)
+│   └── textual/            # Textual adapter (production-grade interactivity)
 ├── tests/                  # Unit + conformance suite
 ├── WHITEPAPER.md           # The Protocol Constitution
+├── CIS.md                  # Intents Specification
 ├── ARCHITECTURE.md         # Reference Implementation Decisions
 ├── ENGINEERING_GUIDE.md    # Construction Manual (Chinese)
 └── pyproject.toml
@@ -250,5 +320,7 @@ MIT. Do good, don't harm, keep it simple.
 ---
 
 *If the white paper is the soul, this engine is the body. Both obey the same six laws.*
+
+---
 
 *中文版: [README.zh-CN.md](README.zh-CN.md)*
