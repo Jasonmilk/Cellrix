@@ -1,5 +1,6 @@
 """Cellrix CLI entry point. Use `cellrix preview <manifest>` to see live layouts,
-or `cellrix stream` to read Manifest JSON from stdin in real time."""
+or `cellrix stream` to read Manifest JSON from stdin in real time,
+or `cellrix run` to launch a bridge command with the Textual adapter."""
 
 from __future__ import annotations
 
@@ -24,6 +25,13 @@ from .keybindings import (
     FOCUS_PREV,
     TOGGLE_HELP,
 )
+
+# Attempt to import Textual runner (optional dependency)
+try:
+    from adapters.textual.cellrix_textual.runner import run_cellrix as _run_textual
+    _HAS_TEXTUAL = True
+except ImportError:
+    _HAS_TEXTUAL = False
 
 
 @click.group()
@@ -145,6 +153,45 @@ def stream(strict: bool) -> None:
                 tty.close()
         except (FileNotFoundError, OSError):
             time.sleep(1.5)
+
+
+@cli.command(
+    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+    help="Run a bridge command with the Textual adapter.",
+)
+@click.option("--strict", is_flag=True, help="Enable strict schema validation")
+@click.argument("command", nargs=-1, required=True)
+def run(strict: bool, command: tuple[str, ...]) -> None:
+    """Run a Cellrix bridge command with the Textual adapter.
+
+    This command launches the given subprocess, reads its Manifest output,
+    renders a full‑screen Textual application, and writes user actions
+    (in standard Cellrix Action JSON format) back to the subprocess.
+
+    Example:
+
+        cellrix run -- ana loom --cellrix
+
+    The subprocess must output one line of JSON per update and must be
+    able to read Action JSON lines from stdin.
+    """
+    if not _HAS_TEXTUAL:
+        click.echo(
+            "Textual adapter is not installed. Run: pip install cellrix[textual]",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    # Convert the tuple to a list, removing the leading '--' if present
+    cmd_list = list(command)
+    if cmd_list and cmd_list[0] == "--":
+        cmd_list = cmd_list[1:]
+
+    if not cmd_list:
+        click.echo("No command specified after --.", err=True)
+        return
+
+    _run_textual(cmd_list, strict=strict)
 
 
 if __name__ == "__main__":
