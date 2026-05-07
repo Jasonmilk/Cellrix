@@ -1,0 +1,7 @@
+{
+  "version": "2.0",
+  "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
+  "cells": [
+    { "id": "greeting", "type": "static", "slot": "main", "content": "Hello, Cellrix!" }
+  ]
+}

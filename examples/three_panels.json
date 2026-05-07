@@ -1,0 +1,16 @@
+{
+  "version": "2.0",
+  "layout": {
+    "direction": "horizontal",
+    "slots": [
+      { "id": "panel_a", "weight": 1 },
+      { "id": "panel_b", "weight": 1 },
+      { "id": "panel_c", "weight": 1 }
+    ]
+  },
+  "cells": [
+    { "id": "cell_a", "type": "static", "slot": "panel_a", "content": "Panel A\n(weight=1)" },
+    { "id": "cell_b", "type": "static", "slot": "panel_b", "content": "Panel B\n(weight=1)" },
+    { "id": "cell_c", "type": "static", "slot": "panel_c", "content": "Panel C\n(weight=1)" }
+  ]
+}
