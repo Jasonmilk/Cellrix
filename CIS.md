@@ -1,10 +1,10 @@
-# Cellrix Intents Specification (CIS) v0.2.0
+# Cellrix Intents Specification (CIS) v0.3.0
 
 **Intent Generation Specification — How to Speak Cellrix**
 
-**Status:** Draft
-**Aligned with:** Cellrix White Paper v2.1
-**Date:** 2026-05-07
+**Status:** Draft  
+**Aligned with:** Cellrix White Paper v2.1  
+**Date:** 2026-05-08
 
 ---
 
@@ -85,6 +85,7 @@ Cellrix provides `cellrix_manifest.schema.json`, which defines the legal shape o
 - `type` is restricted to `static`, `dynamic`, `realtime`.
 - `source` is optional; its `type` can be `pipe`, `file`, or `socket`.
 - An optional `semantic_widget` field may declare a widget class (see §7).
+- An optional `content_type` field may declare the format of the `content` field (see §7).
 
 The schema is versioned alongside the Cellrix protocol. Every implementation must align with it.
 
@@ -103,18 +104,51 @@ A Manifest that passes validation may then be visually inspected with `cellrix p
 
 ---
 
-## 7. Semantic Widgets
+## 7. Content Types & Semantic Widgets
+
+### 7.1 Content Types
+
+A Cell may optionally declare a `content_type` field to indicate how its `content` field should be interpreted. The adapter is responsible for rendering accordingly.
+
+| Value | Semantics | Notes |
+|:---|:---|:---|
+| `"text"` | Plain text | Default when omitted. |
+| `"markdown"` | Markdown formatted text | Adapter should use native Markdown rendering capabilities (tables, code blocks, lists, etc.). |
+| `"code"` | Source code block | Adapter should apply syntax highlighting. A `language` field (e.g., `"python"`, `"rust"`) may be specified alongside to guide the highlighter. |
+
+The protocol never references any specific Markdown or syntax‑highlighting library.
+
+### 7.2 Semantic Widgets
 
 A Cell may optionally declare a `semantic_widget` field to indicate its intended interactive role. The protocol defines a small set of universal values — **no framework‑specific class names are ever allowed**.
 
 | Value | Semantics | Notes |
 |:---|:---|:---|
-| `"text"` | Text block | Default; plain text rendering. |
-| `"table"` | Table | Requires `columns` and `rows` fields. |
-| `"list"` | List | Requires `items` field; supports focus selection. |
+| `"text"` | Static or dynamic text block | Default. |
+| `"table"` | Tabular data | Requires `columns` and `rows` fields. |
+| `"list"` | Flat selectable list | Requires `items` field; supports focus selection. |
 | `"progress"` | Progress bar | Requires `value` field (0–100). |
+| `"input"` | Single‑ or multi‑line text input | Supports `placeholder`, `multiline`, `autocomplete` properties. Must be accompanied by an `actions.onSubmit` that carries `payload.value`. |
+| `"modal"` | Overlay dialog for confirmation or alert | Rendered as a centered floating overlay, **independent of the layout grid**. Must define `actions.onConfirm` and/or `actions.onCancel`. |
+| `"tree"` | Hierarchical expandable tree | Uses a `data` field with a recursive `{label, children}` structure (see §7.3). Supports `actions.onNodeSelect`. |
 
-The `semantic_widget` field is always optional. When omitted, adapters default to `"text"`. It is the adapter’s responsibility to map these semantics to concrete UI components.
+### 7.3 Tree Data Schema
+
+When `semantic_widget` is `"tree"`, the `data` field must conform to the following recursive structure:
+
+```json
+"data": [
+  {
+    "label": "Node label",
+    "children": [
+      { "label": "Child A" },
+      { "label": "Child B", "children": [...] }
+    ]
+  }
+]
+```
+
+Each node may optionally carry an `icon` or `metadata` field. The adapter is responsible for rendering the hierarchy and handling expand/collapse interactions.
 
 ---
 
@@ -139,6 +173,55 @@ Cellrix adapters must translate user interactions (keyboard, mouse, touch) into 
 | `focus_prev` | Move focus to the previous panel |
 | `toggle_help` | Toggle the full‑screen help overlay |
 | `quit` | Exit the current session |
+| `submit_input` | Emitted when an `input` widget submits its value |
+| `confirm_modal` | Emitted when a `modal` dialog is confirmed |
+| `cancel_modal` | Emitted when a `modal` dialog is dismissed |
+| `node_select` | Emitted when a `tree` node is selected |
+
+### 8.1 Input Payload Specification
+
+When a `semantic_widget: "input"` Cell triggers its `actions.onSubmit`, the emitted Action JSON must include the current input value in `payload.value`:
+
+```json
+{
+  "event": "cellrix.action",
+  "action": "submit_input",
+  "cell_id": "code_editor",
+  "payload": {
+    "value": "print('Hello, Cellrix!')"
+  }
+}
+```
+
+### 8.2 Modal Event Specification
+
+Modal events carry an optional payload indicating the user's choice:
+
+```json
+{
+  "event": "cellrix.action",
+  "action": "confirm_modal",
+  "cell_id": "restart_confirm",
+  "payload": {
+    "choice": "yes"
+  }
+}
+```
+
+### 8.3 Tree Node Selection Event
+
+When a `semantic_widget: "tree"` node is selected, the event carries the selected node's path:
+
+```json
+{
+  "event": "cellrix.action",
+  "action": "node_select",
+  "cell_id": "file_browser",
+  "payload": {
+    "path": ["src", "main.py"]
+  }
+}
+```
 
 **Business‑logic side:**
 - Receives the Action JSON, processes it, and returns either a new Manifest or an update to the existing one.
@@ -159,6 +242,10 @@ Any compliant Cellrix adapter must fulfil three duties:
 3. **Dynamic update** — accept a new Manifest and re‑render (partially or fully).
 
 Adapters are free to choose their own rendering technology, input‑handling strategy, and update policy.
+
+### 9.1 Modal Rendering Rule
+
+Adapters must render `semantic_widget: "modal"` cells as a centered overlay that floats above the main layout. Such cells must not participate in the layout grid (`weight`, `slot` allocation); their position and size are determined exclusively by the adapter's modal implementation.
 
 ---
 

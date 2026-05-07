@@ -1,10 +1,10 @@
-# Cellrix Whitepaper v2.1
+# Cellrix Whitepaper v2.2
 
 **Intent-Driven Spatial & Semantic Protocol and High-Performance Runtime**
 
 **Status:** Final  
 **Authors:** Jasonmilk & Cellrix Research Community  
-**Date:** 2026-05-07
+**Date:** 2026-05-08
 
 > *Cellrix is not just a terminal tool. It is an OS-grade UI protocol built for the post-AGI era — bridging the comprehension gap between carbon-based and silicon-based minds.*
 
@@ -82,7 +82,7 @@ Cellrix employs a Daemon-Client separation architecture, physically decoupling t
 
 ---
 
-## 4. Cell-Manifest v2.1 Protocol Specification
+## 4. Cell-Manifest v2.2 Protocol Specification
 
 ### 4.0 Global Capability Declaration & AI Security Whitelist (`capabilities`)
 
@@ -95,8 +95,8 @@ The top-level Manifest declares global sandbox permissions, simultaneously servi
 
 ```json
 {
-  "$schema": "https://cellrix.dev/protocol/v2.1/schema.json",
-  "version": "2.1",
+  "$schema": "https://cellrix.dev/protocol/v2.2/schema.json",
+  "version": "2.2",
   "capabilities": {
     "network": ["*.example.com", "192.168.1.0/24"],
     "fs.read": ["/var/log/"],
@@ -125,7 +125,7 @@ The top-level Manifest declares global sandbox permissions, simultaneously servi
 }
 ```
 
-### 4.2 Atomic Units: Cell Types, Semantic Widgets, Dual-State Data Binding, Secure Interaction Routing
+### 4.2 Atomic Units: Cell Types, Content Types, Semantic Widgets, Dual-State Data Binding, Secure Interaction Routing
 
 Each `Cell` possesses one of three **non-extensible** lifecycle types.
 
@@ -135,18 +135,35 @@ Each `Cell` possesses one of three **non-extensible** lifecycle types.
 | **`dynamic`** | Pulls/pushes data via `source`, appending-style rendering. |
 | **`realtime`** | Runtime actively subscribes to data source; partial instantaneous refresh. |
 
+**Content Type (`content_type`)**
+
+A Cell may optionally declare a `content_type` field to indicate how its `content` field should be interpreted. The adapter is responsible for rendering accordingly.
+
+| Value | Semantics | Notes |
+|:---|:---|:---|
+| `"text"` | Plain text | Default. |
+| `"markdown"` | Markdown formatted text | Adapter should use native Markdown rendering (tables, code blocks, lists, etc.). |
+| `"code"` | Source code block | Adapter should provide syntax highlighting. A `language` field (e.g., `"python"`, `"rust"`) may guide the highlighter. |
+
 **Semantic Widget (`semantic_widget`)**
 
 A Cell may optionally declare a `semantic_widget` field to indicate its interactive role. The protocol defines a minimal set of universal values — **no framework-specific class names are ever allowed**.
 
 | Value | Semantics | Notes |
 |:---|:---|:---|
-| `"text"` | Text block | Default; plain text rendering. |
-| `"table"` | Table | Requires `columns` and `rows` fields. |
-| `"list"` | List | Requires `items` field; supports focus selection. |
+| `"text"` | Static or dynamic text block | Default. |
+| `"table"` | Tabular data | Requires `columns` and `rows` fields. |
+| `"list"` | Flat selectable list | Requires `items` field; supports focus selection. |
 | `"progress"` | Progress bar | Requires `value` field (0–100). |
+| `"input"` | Single‑ or multi‑line text input | Supports `placeholder`, `multiline`, `autocomplete` properties. Must be accompanied by an `actions.onSubmit` that carries `payload.value`. |
+| `"modal"` | Overlay dialog for confirmation or alert | **Exempt from the layout grid** — adapters must render it as a centered floating overlay. Must define `actions.onConfirm` and/or `actions.onCancel`. |
+| `"tree"` | Hierarchical expandable tree | Uses a `data` field with a recursive `{label, children}` structure. Supports `actions.onNodeSelect`. |
 
 The `semantic_widget` field is always optional. When omitted, adapters default to `"text"`. It is the adapter's responsibility to map these semantics to concrete UI components.
+
+**Modal Special Layout Rule**
+
+Cells with `semantic_widget: "modal"` are exempt from the `weight` allocation. The solver treats them as ordinary cells, but the adapter must ignore their computed coordinates and render them as a centered overlay floating above the main interface.
 
 **Dual-State High-Performance Data Channel**
 
@@ -294,7 +311,7 @@ Cellrix protocol evolution follows the **RFC model** (CEP, Cellrix Enhancement P
 ## 9. Roadmap
 
 **Phase 1 (Current – 2026 Q3)**
-Release v2.1 Schema and complete specification, CEP-0001 initiates governance, reference implementation validates the full chain, AG-UI/MCP bridge design, Conformance Suite published.
+Release v2.2 Schema and complete specification, CEP-0001 initiates governance, reference implementation validates the full chain, AG-UI/MCP bridge design, Conformance Suite published.
 
 **Phase 2 (2026 Q4 – 2027 Q2)**
 Production adapter development, WASI sandbox prototype, HITL interceptor, `cellrix preview` CLI.
@@ -320,7 +337,8 @@ Following the philosophy of **orchestrate over build, strict contracts, pure I/O
 | :--- | :--- | :--- |
 | v1.2.0 | 2026-05-06 | ANSI sanitization, O(N) solver constraints, governance model, AI whitelist |
 | v2.0 | 2026-05-06 | Injected Helix Zen design philosophy, clarified protocol-implementation boundary, rewritten principles into six axioms, added philosophy-review governance clause |
-| **v2.1** | **2026-05-07** | **Added multi-backend rendering architecture declaration, added semantic widget enumeration (semantic_widget), clarified protocol rendering-backend agnosticism** |
+| v2.1 | 2026-05-07 | Added multi-backend rendering architecture declaration, added semantic widget enumeration (semantic_widget), clarified protocol rendering-backend agnosticism |
+| **v2.2** | **2026-05-08** | **Content types (content_type), semantic widget extension (input/modal/tree), Modal special layout rule, aligned with CIS v0.3.0** |
 
 ---
 
