@@ -17,6 +17,7 @@ dependencies = [
     "click>=8.0",
     "protobuf>=4.0",
     "anyio>=4.0",
+    "readchar>=4.0",
 ]
 
 [project.optional-dependencies]
