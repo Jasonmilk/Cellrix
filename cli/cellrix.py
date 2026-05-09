@@ -15,7 +15,8 @@ from rich.live import Live
 
 from core.manifest.parser import parse_manifest
 from core.source import SourceManager
-from .runtime import CellrixRuntime, _normalize_key
+from .runtime import CellrixRuntime
+from .input_router import _normalize_key
 from .renderer import CellrixRenderer
 from .theme import DEFAULT_THEME
 from .keybindings import (

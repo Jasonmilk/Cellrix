@@ -6,7 +6,7 @@ Contains no event loops or input handling — pure view logic.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -31,9 +31,12 @@ FOCUSED_TITLE_STYLE = Style(color="green", bold=True, bgcolor="default")
 @dataclass
 class UIState:
     full_help: bool = False
+    show_shortcuts: bool = False       # toggled by '?'
     focus_index: int = 0
     last_width: int = 0
     last_height: int = 0
+    scroll_offsets: Dict[str, int] = field(default_factory=dict)
+    leader_active: bool = False        # True while waiting for leader letter
 
 
 class CellrixRenderer:
@@ -80,10 +83,16 @@ class CellrixRenderer:
         leaves.sort(key=lambda n: (n.y, n.x))
         return leaves
 
+    def get_focused_cell(self) -> Optional[Cell]:
+        if not self._flat_nodes or self.state.focus_index >= len(self._flat_nodes):
+            return None
+        focused_id = self._flat_nodes[self.state.focus_index].id
+        return self._get_cell_by_id(focused_id)
+
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        # Dynamic data auto‑poll (driven by Rich's refresh cycle)
+        # Dynamic data auto‑poll
         if self.source_manager is not None:
             updates = self.source_manager.poll_all()
             if updates:
@@ -92,7 +101,7 @@ class CellrixRenderer:
         term_w = console.width
         term_h = console.height
 
-        available_h = term_h if self.state.full_help else term_h - 1
+        available_h = term_h if (self.state.full_help or self.state.show_shortcuts) else term_h - 1
 
         if (
             self._cached_view_tree is None
@@ -112,9 +121,9 @@ class CellrixRenderer:
 
         main_layout = self._build_node(root)
 
-        if self.state.full_help:
-            help_overlay = self._build_full_help_panel(term_w, term_h)
-            outer = Layout(help_overlay, size=term_h)
+        if self.state.show_shortcuts or self.state.full_help:
+            overlay = self._build_shortcut_overlay(term_w, term_h)
+            outer = Layout(overlay, size=term_h)
         else:
             status_panel = self._build_status_bar()
             outer = Layout()
@@ -132,6 +141,35 @@ class CellrixRenderer:
             if cell and cell.type in (CellType.DYNAMIC, CellType.REALTIME):
                 display_text = self.dynamic_content.get(node.id, display_text)
 
+            # ---------- Scroll handling ----------
+            if cell and cell.collapse_mode == "scroll" and node.height > 0:
+                lines = display_text.splitlines()
+                visible_lines = node.height
+                offset = self.state.scroll_offsets.get(node.id, 0)
+                max_offset = max(0, len(lines) - visible_lines)
+                offset = max(0, min(offset, max_offset))
+                self.state.scroll_offsets[node.id] = offset
+                slice_end = offset + visible_lines
+                displayed_lines = lines[offset:slice_end]
+                if offset > 0:
+                    displayed_lines.insert(0, "↑ (scroll up)")
+                if offset + visible_lines < len(lines):
+                    displayed_lines.append("↓ (scroll down)")
+                display_text = "\n".join(displayed_lines)
+
+            # ---------- Panel label ----------
+            label = ""
+            if self._flat_nodes and node in self._flat_nodes:
+                idx = self._flat_nodes.index(node)
+                if idx < 26:
+                    letter = chr(ord('a') + idx)
+                    if self.state.leader_active:
+                        label = f"[{letter}] "
+                    else:
+                        label = f"[{idx+1}] "
+
+            title_text = f" {label}{node.id} " if label else f" {node.id} "
+
             if node.width < 3 or node.height < 3:
                 txt = Text(display_text[: node.width], overflow="ellipsis", style=WHITE_TEXT)
                 return Layout(txt, name=node.id)
@@ -148,7 +186,7 @@ class CellrixRenderer:
             )
 
             title = Text(
-                f" {node.id} ",
+                title_text,
                 style=FOCUSED_TITLE_STYLE if is_focused else WHITE_TEXT,
             )
 
@@ -161,6 +199,7 @@ class CellrixRenderer:
             )
             return Layout(panel, name=node.id)
 
+        # Container node
         child_layouts = [self._build_node(child) for child in node.children]
 
         is_horizontal = False
@@ -190,8 +229,8 @@ class CellrixRenderer:
         return container
 
     def _build_status_bar(self) -> Panel:
-        left = "[F1] Help"
-        right = "[Q] Quit  [Tab] Focus Next"
+        left = "[F1] Help  [?] Shortcuts"
+        right = "[Q] Quit  [Tab] Focus Next  [g] Leader"
 
         if self._flat_nodes and self.state.focus_index < len(self._flat_nodes):
             focused_id = self._flat_nodes[self.state.focus_index].id
@@ -211,40 +250,35 @@ class CellrixRenderer:
         )
 
     def _build_full_help_panel(self, width: int, height: int) -> Panel:
-        lines: List[str] = [
-            "═" * (width - 4),
-            "  CELLRIX HELP  (Press F1 or Esc to close)",
-            "═" * (width - 4),
-            "",
-            "Global shortcuts:",
-        ]
+        # Unused for now, kept for compatibility
+        return self._build_shortcut_overlay(width, height)
 
-        for key, action in self.keybindings.global_bindings.items():
-            lines.append(f"  {key:<12} → {action}")
-
+    def _build_shortcut_overlay(self, width: int, height: int) -> Panel:
+        """Build an overlay panel showing all available shortcuts."""
+        lines = ["═══ AVAILABLE SHORTCUTS (Press ? or F1 to close) ═══", ""]
+        lines.append("Global:")
+        lines.append("  q / Esc          Quit")
+        lines.append("  Tab / Shift+Tab  Focus next/prev")
+        lines.append("  F1               Help")
+        lines.append("  ?                Shortcut reference")
+        lines.append("  g                Leader key (then a-z to jump)")
+        lines.append("  ↑↓ PgUp PgDn     Scroll focused panel")
+        lines.append("  Alt+1..9         Direct panel jump")
         lines.append("")
-        lines.append("Context shortcuts (current panel):")
-
-        if self._flat_nodes and self.state.focus_index < len(self._flat_nodes):
-            focused_id = self._flat_nodes[self.state.focus_index].id
-            cell = self._get_cell_by_id(focused_id)
-            if cell and cell.actions and cell.actions.on_key:
-                for action_dict in cell.actions.on_key:
-                    key = action_dict.get("key", "?")
-                    emit = action_dict.get("emit", "action")
-                    lines.append(f"  {key.upper():<12} → {emit}")
-            else:
-                lines.append("  (no actions defined for this panel)")
+        lines.append("Panel‑specific:")
+        cell = self.get_focused_cell()
+        if cell and cell.actions and cell.actions.on_key:
+            for action in cell.actions.on_key:
+                lines.append(f"  {action.get('key', '?')}  →  {action.get('emit', 'action')}")
         else:
-            lines.append("  (no panel focused)")
+            lines.append("  (none)")
 
         while len(lines) < height - 2:
             lines.append("")
 
-        title = Text("Help", style=WHITE_TEXT)
         return Panel(
             Text("\n".join(lines), style=WHITE_TEXT),
-            title=title,
+            title="Shortcuts",
             border_style=self.theme.help_border_style,
             box=box.HEAVY,
             style=TRANS_BG,
@@ -262,8 +296,5 @@ class CellrixRenderer:
         focused_id = self._flat_nodes[self.state.focus_index].id
         for cell in self.manifest.cells:
             if cell.id == focused_id and cell.actions and cell.actions.on_key:
-                return [
-                    (a.get("key", "?"), a.get("emit", "action"))
-                    for a in cell.actions.on_key
-                ]
+                return [(a.get("key", "?"), a.get("emit", "action")) for a in cell.actions.on_key]
         return None
