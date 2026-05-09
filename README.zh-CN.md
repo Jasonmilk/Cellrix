@@ -2,7 +2,7 @@
 
 **意图驱动的、确定性的、空间-语义化终端 UI 协议与高性能运行时。**
 
-> *Cellrix 不只是一个终端工具。它是为后 AGI 时代准备的、跨越碳基与硅基理解鸿沟的操作系统级 UI 协议。*
+> *Cellrix 不只是一个终端复古工具。它是为后 AGI 时代准备的、跨越碳基与硅基理解鸿沟的操作系统级 UI 协议。*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
@@ -51,7 +51,7 @@ cellrix preview hello.json
 }
 ```
 
-随时按 `F1` 查看可用快捷键。按 `Tab` 在面板间移动焦点。按 `q` 退出。
+随时按 `F1` 或 `?` 查看可用快捷键。按 `Tab` 在面板间移动焦点。按 `q` 退出。
 
 ### 第二层：设计布局
 
@@ -139,17 +139,101 @@ runtime.run()   # 阻塞直到用户按下 'q'
 
 ## 交互式工作台（内置）
 
-每次 `cellrix preview` 会话自动包含以下交互功能：
+每次 `cellrix preview` 会话自动包含以下交互功能，无需任何配置。
 
-| 功能 | 按键 | 说明 |
-|:---|:---|:---|
-| **全屏帮助** | `F1` | 显示所有全局快捷键和当前面板的特定操作 |
-| **面板导航** | `Tab` / `Shift+Tab` | 向前/向后循环焦点；聚焦面板以绿色高亮 |
-| **退出** | `q` | 退出预览（终端状态完全恢复） |
-| **状态栏** | 始终可见 | 显示与当前面板相关的按键绑定 |
-| **动态刷新** | 自动 | 数据管道单元实时更新，不阻塞输入 |
+### 导航
 
-无需任何配置。随时按 `F1`——它始终有效。
+| 功能 | 按键 |
+|:---|:---|
+| 焦点移到下一个面板 | `Tab` |
+| 焦点移到上一个面板 | `Shift+Tab` |
+| 按面板索引直接跳转 | `Alt+1` … `Alt+9` |
+| Leader Key（显示跳转标签） | `g` |
+| 跳转到标签面板 | `g` 然后 `a` … `z` |
+
+### 滚动（面板需设置 `collapseMode: "scroll"`）
+
+| 功能 | 按键 |
+|:---|:---|
+| 向上/向下滚动（行） | `↑` / `↓` |
+| 向上/向下翻页 | `PgUp` / `PgDn` |
+| 跳到开头/结尾 | `Home` / `End` |
+
+### 帮助与退出
+
+| 功能 | 按键 |
+|:---|:---|
+| 显示所有快捷键（上下文感知） | `F1` 或 `?` |
+| 关闭帮助覆盖层 | `Esc`（仅当帮助打开时） |
+| 退出 | `q` |
+
+底部状态栏始终显示最相关的快捷键。无需记忆——随时按 `?` 即可看到一切。
+
+
+## 给项目作者：让你的 CLI 开口说 Cellrix
+
+Cellrix 不是一个需要你导入的库——它是一个你的项目可以说出的协议。任何项目都能成为“意图生产者”，并被 Cellrix 渲染，而无需安装任何 Cellrix 依赖。
+
+[Cellrix Intents Specification (CIS)](CIS.md) 定义了标准。概览如下：
+
+### 规则
+
+你的项目需要**一个入口点**，产出 Cell‑Manifest JSON。有两种注册方式：
+
+**通道 A — Manifest 文件**（语言无关，推荐）
+
+在项目根目录放置 `cellrix_manifest.json`：
+
+```json
+{
+  "bridge": {
+    "type": "python_function",
+    "module": "my_project.cellrix",
+    "function": "build_manifest"
+  },
+  "config": {}
+}
+```
+
+非 Python 项目使用 CLI 子进程代替：
+
+```json
+{
+  "bridge": {
+    "type": "cli_subprocess",
+    "command": "my-cli-tool --cellrix"
+  }
+}
+```
+
+**通道 B — Python 入口点**（Python 包的可选加分项）
+
+在 `pyproject.toml` 中声明：
+
+```toml
+[project.entry-points."cellrix.bridge"]
+my_bridge = "my_project.cellrix:build_manifest"
+```
+
+### 函数
+
+在 Python 项目中，`build_manifest` 函数可以像这样：
+
+```python
+# my_project/cellrix.py  —  无需 import cellrix!
+def build_manifest(config: dict | None = None) -> dict:
+    return {
+        "version": "2.0",
+        "layout": ...,
+        "cells": [...]
+    }
+```
+
+### 发现与验证
+
+运行 `cellrix check`——它会扫描两条通道，调用桥接，并按 JSON Schema 验证输出。一旦通过，你的项目就是 Cellrix 就绪的。
+
+完整的事件协议、语义控件和所有支持的桥接模式，请参阅 [CIS 规范](CIS.md)。
 
 
 ## 核心概念
@@ -195,7 +279,7 @@ uv run cellrix preview examples/hello.json
 
 | 门禁 | 状态 |
 |:---|:---|
-| 协议规范 (WHITEPAPER.md v2.0) | ✅ 定稿 |
+| 协议规范 (WHITEPAPER.md v2.2) | ✅ 定稿 |
 | 工程指引手册 (10 章) | ✅ 完成 |
 | Manifest 解析器 + 严格校验 | ✅ 完成 |
 | ANSI 净化 + 能力验证 | ✅ 完成 |
@@ -204,6 +288,8 @@ uv run cellrix preview examples/hello.json
 | 布局求解器 + 交互式渲染 | ✅ 工作台就绪 |
 | 动态数据管道 (SourceManager) | ✅ `--trust` 门控启用 |
 | 流模式 (stdin ndjson) | ✅ 流结束后交互可用 |
+| Textual 适配器 (`cellrix run`) | ✅ 双向管道 |
+| 多层输入路由（Leader Key、滚动、上下文帮助） | ✅ 完成 |
 
 
 ## 设计哲学 —— *Cellrix Zen*
@@ -225,8 +311,11 @@ cellrix/
 ├── core/                   # 协议引擎（解析器、求解器、安全、数据源）
 ├── cli/                    # 交互式终端客户端 + 主题与键位
 ├── devkit/                 # 模板、协议桥接 (MCP/AG-UI)
+├── adapters/               # 渲染适配器（可选依赖）
+│   └── textual/            # Textual 适配器（生产级交互）
 ├── tests/                  # 单元测试 + 一致性测试套件
 ├── WHITEPAPER.md           # 协议宪法
+├── CIS.md                  # 意图规范
 ├── ARCHITECTURE.md         # 参考实现决策
 ├── ENGINEERING_GUIDE.md    # 施工手册 (中文)
 └── pyproject.toml

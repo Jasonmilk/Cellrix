@@ -51,7 +51,7 @@ cellrix preview hello.json
 }
 ```
 
-Press `F1` anytime to see available shortcuts. Press `Tab` to move focus between panels. Press `q` to quit.
+Press `F1` or `?` anytime to see available shortcuts. Press `Tab` to move focus between panels. Press `q` to quit.
 
 ### Level 2: Design Layouts
 
@@ -137,6 +137,39 @@ runtime.run()   # blocks until user presses 'q'
 The Runtime controls the entire interactive loop: rendering, input handling, and dynamic data polling. You provide the Manifest — Cellrix handles everything else.
 
 
+## Interactive Workbench (Built‑in)
+
+Every `cellrix preview` session includes these interaction features automatically. No configuration needed.
+
+### Navigation
+
+| Feature | Key |
+|:---|:---|
+| Focus next panel | `Tab` |
+| Focus previous panel | `Shift+Tab` |
+| Direct jump to panel by index | `Alt+1` … `Alt+9` |
+| Leader key (show jump labels) | `g` |
+| Jump to labelled panel | `g` then `a` … `z` |
+
+### Scrolling (when panel has `collapseMode: "scroll"`)
+
+| Feature | Key |
+|:---|:---|
+| Scroll up / down (line) | `↑` / `↓` |
+| Scroll page up / down | `PgUp` / `PgDn` |
+| Jump to top / bottom | `Home` / `End` |
+
+### Help & Quit
+
+| Feature | Key |
+|:---|:---|
+| Show all shortcuts (context‑aware) | `F1` or `?` |
+| Close help overlay | `Esc` (when help is open) |
+| Quit | `q` |
+
+The bottom status bar always shows the most relevant shortcuts. No memorisation required — press `?` anytime to see everything.
+
+
 ## For Project Authors: Make Your CLI Speak Cellrix
 
 Cellrix is not a library you import — it's a protocol your project speaks. Any project can become an "intent producer" and be rendered by Cellrix without installing any Cellrix dependency.
@@ -203,21 +236,6 @@ Run `cellrix check` — it scans both channels, invokes the bridge, and validate
 See the full [CIS specification](CIS.md) for details on event protocols, semantic widgets, and all supported bridge modes.
 
 
-## Interactive Workbench (Built‑in)
-
-Every `cellrix preview` session includes these interaction features automatically:
-
-| Feature | Key | What it does |
-|:---|:---|:---|
-| **Full‑screen help** | `F1` | Shows all global shortcuts and panel‑specific actions |
-| **Panel navigation** | `Tab` / `Shift+Tab` | Cycles focus forward/backward; focused panel highlighted green |
-| **Quit** | `q` | Exits the preview (terminal state fully restored) |
-| **Status bar** | always visible | Shows current key bindings relevant to the focused panel |
-| **Dynamic refresh** | automatic | Data pipe cells update in real time without blocking input |
-
-No configuration needed. Press `F1` anytime — it always works.
-
-
 ## Core Concepts
 
 ### Cell‑Manifest
@@ -271,6 +289,7 @@ uv run cellrix preview examples/hello.json
 | Dynamic Data Pipes (SourceManager) | ✅ `--trust` gate enabled |
 | Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
 | Textual Adapter (`cellrix run`) | ✅ Bidirectional pipe |
+| Multi‑level Input Routing (Leader Key, scrolling, contextual help) | ✅ Complete |
 
 
 ## Design Philosophy — *The Cellrix Zen*
