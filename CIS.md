@@ -1,10 +1,10 @@
-# Cellrix Intents Specification (CIS) v0.3.0
+# Cellrix Intents Specification (CIS) v0.4.0
 
 **Intent Generation Specification — How to Speak Cellrix**
 
 **Status:** Draft  
-**Aligned with:** Cellrix White Paper v2.1  
-**Date:** 2026-05-08
+**Aligned with:** Cellrix White Paper v2.3  
+**Date:** 2026-05-12
 
 ---
 
@@ -25,6 +25,7 @@ CIS defines a language‑agnostic, zero‑dependency contract that allows any pr
 | **Self‑Describing** | An intent producer declares its capabilities through a Manifest file or a Python entry point (or both). |
 | **Fail Fast** | Cellrix performs strict schema validation before consuming any Manifest. Any deviation is immediately rejected with a precise error path. |
 | **Minimal Interface** | Everything needed is a single entry point plus a pure function (`config → dict`). |
+| **Visual Independence** | The contract conveys semantic intent only; all visual presentation is determined by the adapter's local design system (CDS). |
 
 ---
 
@@ -84,8 +85,10 @@ Cellrix provides `cellrix_manifest.schema.json`, which defines the legal shape o
 - Every `Cell` must specify `id`, `type`, `slot`.
 - `type` is restricted to `static`, `dynamic`, `realtime`.
 - `source` is optional; its `type` can be `pipe`, `file`, or `socket`.
-- An optional `semantic_widget` field may declare a widget class (see §7).
-- An optional `content_type` field may declare the format of the `content` field (see §7).
+- An optional `semantic_widget` field may declare a widget class (see §7.2).
+- An optional `content_type` field may declare the format of the `content` field (see §7.1).
+- An optional `semantic_data` field may carry structured payload (see §7.3).
+- **Strict JSON compliance**: All payloads must conform to RFC 8259. `NaN`, `Infinity`, and similar non‑standard literals are forbidden. Python adapters must use `parse_constant` hooks or libraries like `orjson` to reject them.
 
 The schema is versioned alongside the Cellrix protocol. Every implementation must align with it.
 
@@ -97,16 +100,17 @@ When a user runs `cellrix check`, Cellrix will:
 
 1. **Discover** — locate a Manifest file or entry point.
 2. **Generate** — invoke the bridge function (or execute the CLI command) to obtain a raw dictionary.
-3. **Validate** — apply the JSON Schema; any failure results in a detailed error message and a non‑zero exit code.
-4. **Report** — display a summary including version‑compatibility checks.
+3. **Size gate** — if the raw payload exceeds the size limit (recommended ≤ 2 MB per Cell), reject before parsing to prevent OOM attacks.
+4. **Validate** — apply the JSON Schema, including type checks on `semantic_data` (see §7.3); any failure results in a detailed error message and a non‑zero exit code.
+5. **Report** — display a summary including version‑compatibility checks.
 
 A Manifest that passes validation may then be visually inspected with `cellrix preview`.
 
 ---
 
-## 7. Content Types & Semantic Widgets
+## 7. Content Types, Semantic Widgets & Structured Data
 
-### 7.1 Content Types
+### 7.1 Content Types (`content_type`)
 
 A Cell may optionally declare a `content_type` field to indicate how its `content` field should be interpreted. The adapter is responsible for rendering accordingly.
 
@@ -118,21 +122,43 @@ A Cell may optionally declare a `content_type` field to indicate how its `conten
 
 The protocol never references any specific Markdown or syntax‑highlighting library.
 
-### 7.2 Semantic Widgets
+### 7.2 Semantic Widgets (`semantic_widget`)
 
 A Cell may optionally declare a `semantic_widget` field to indicate its intended interactive role. The protocol defines a small set of universal values — **no framework‑specific class names are ever allowed**.
 
 | Value | Semantics | Notes |
 |:---|:---|:---|
 | `"text"` | Static or dynamic text block | Default. |
-| `"table"` | Tabular data | Requires `columns` and `rows` fields. |
-| `"list"` | Flat selectable list | Requires `items` field; supports focus selection. |
-| `"progress"` | Progress bar | Requires `value` field (0–100). |
+| `"table"` | Tabular data | Requires `semantic_data` as a 2‑D array (see §7.3). |
+| `"list"` | Flat selectable list | Requires `semantic_data` as an array of strings (see §7.3). |
+| `"progress"` | Progress bar | Requires `semantic_data` as a number (0–100) (see §7.3). |
 | `"input"` | Single‑ or multi‑line text input | Supports `placeholder`, `multiline`, `autocomplete` properties. Must be accompanied by an `actions.onSubmit` that carries `payload.value`. |
 | `"modal"` | Overlay dialog for confirmation or alert | Rendered as a centered floating overlay, **independent of the layout grid**. Must define `actions.onConfirm` and/or `actions.onCancel`. |
-| `"tree"` | Hierarchical expandable tree | Uses a `data` field with a recursive `{label, children}` structure (see §7.3). Supports `actions.onNodeSelect`. |
+| `"tree"` | Hierarchical expandable tree | Uses a `data` field with a recursive `{label, children}` structure (see §7.4). Supports `actions.onNodeSelect`. |
 
-### 7.3 Tree Data Schema
+### 7.3 Structured Data (`semantic_data`)
+
+An optional field that carries typed payload for semantic widgets. Its expected type is determined by the accompanying `semantic_widget`:
+
+| `semantic_widget` | Expected `semantic_data` type | Fallback |
+|:---|:---|:---|
+| `"text"` (default) | Not required | — |
+| `"table"` | `Array<Array<string\|number>>` (2‑D array) | Downgrade to `text`, rendering `content` |
+| `"progress"` | `number` (integer or float, domain 0‑‑100) | Clamp to boundaries; if `NaN`, `Infinity`, or non‑numeric → downgrade to `text` |
+| `"list"` | `Array<string>` (1‑D array of strings) | Downgrade to `text`, rendering `content` |
+
+**Type validation rules:**
+- `Boolean` values (`true`/`false`) are **not** acceptable as `semantic_data` for `"progress"` — they must trigger downgrade.
+- For `"table"` and `"list"`, if any element is a non‑primitive (Object, Array, null, boolean), the adapter must replace it with an empty string `""` — not with a language‑specific string representation.
+- For `"table"`, jagged arrays (rows with unequal lengths) must be padded with empty strings `""`.
+
+**Safety contracts (mandatory for all adapters):**
+- **Strict JSON**: No `NaN`, `Infinity`, or other non‑RFC‑8259 tokens are allowed. Python adapters must intercept them via `json.loads` hooks or use libraries such as `orjson`.
+- **Memory gate**: Before parsing, adapters must enforce a per‑Cell payload size limit (recommended ≤ 2 MB). Payloads exceeding the limit are rejected.
+- **Anti‑ReDoS**: All input cleaning (HTML escaping, ANSI stripping) must run in $O(N)$ time; no backtracking‑prone regular expressions.
+- **Unknown widget**: Any `semantic_widget` value not listed in §7.2 must be treated as `"text"`.
+
+### 7.4 Tree Data Schema
 
 When `semantic_widget` is `"tree"`, the `data` field must conform to the following recursive structure:
 
@@ -149,6 +175,22 @@ When `semantic_widget` is `"tree"`, the `data` field must conform to the followi
 ```
 
 Each node may optionally carry an `icon` or `metadata` field. The adapter is responsible for rendering the hierarchy and handling expand/collapse interactions.
+
+### 7.5 Keybinding Visual Enhancement
+
+Each keybinding object may carry optional visual fields to guide adapter‑side rendering:
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `label` | `string` | Button label. If omitted, the shortcut is invisible but still active. |
+| `style` | `string` | Semantic style enum: `primary`, `secondary`, `success`, `danger`, `warning`, `info`. |
+| `show_key` | `boolean` | Whether to display the key hint (default `true`). |
+| `hint` | `string` (optional) | A CDS hint for the adapter; adapters may ignore it. |
+
+**Rendering rules:**
+- `key` is **case‑sensitive**: `"a"` matches only the lowercase key, `"A"` matches `Shift+A`.
+- **Key collision resolution**: If duplicate `key` values appear within the same `keybindings` array, adopt **First‑Wins** — only the first occurrence is registered, subsequent ones are silently ignored.
+- Invalid `style` values must fall back to the adapter's default button style; no crash.
 
 ---
 
@@ -247,6 +289,15 @@ Adapters are free to choose their own rendering technology, input‑handling str
 
 Adapters must render `semantic_widget: "modal"` cells as a centered overlay that floats above the main layout. Such cells must not participate in the layout grid (`weight`, `slot` allocation); their position and size are determined exclusively by the adapter's modal implementation.
 
+### 9.2 Defensive Rendering (v0.4.0 addendum)
+
+In addition to the duties above, adapters must implement the following safety measures:
+
+- **Pre‑parse size gating**: Reject any Cell whose raw JSON payload exceeds the configured size limit (recommended ≤ 2 MB) before full parsing.
+- **Strict JSON enforcement**: Reject non‑RFC‑8259 tokens (`NaN`, `Infinity`). Python adapters must use `json.loads` with a `parse_constant` hook or a library like `orjson`.
+- **Linear‑time sanitisation**: All input cleaning (HTML escaping, ANSI stripping) must execute in $O(N)$ time; never use backtracking‑prone regular expressions.
+- **Fallback‑first rendering**: Any structural mismatch or type violation in `semantic_data` must trigger immediate fallback to the `text` widget, rendering only the `content` string.
+
 ---
 
 ## 10. Compliance
@@ -255,9 +306,52 @@ An implementation is CIS‑compliant if it:
 
 - Exposes an entry point through one of the discovery channels.
 - Produces a dictionary (or JSON) that passes Cellrix JSON Schema validation.
+- Passes all conformance tests defined in §11.
 - Does **not** import any Cellrix module.
 
 **Official recommendation:** Python projects should provide both a Manifest file and an entry point. Non‑Python projects need only supply a Manifest file.
+
+---
+
+## 11. Conformance Test Cases (v0.4.0)
+
+Any implementation claiming CIS compliance must pass the following tests:
+
+**Test 1 — Illegal table data downgrade**
+- **Input**: `{"type":"static","content":"My data","semantic_widget":"table","semantic_data":"not an array"}`
+- **Expected**: Silently downgrade to `text`, render `"My data"`.
+
+**Test 2 — Out‑of‑bounds progress value**
+- **Input**: `{"type":"static","content":"Loading","semantic_widget":"progress","semantic_data":999}`
+- **Expected**: Render as 100% progress; no crash.
+
+**Test 3 — Invalid button style enum**
+- **Input**: `{"keybindings":[{"key":"a","intent":"x","label":"Btn","style":"neon-pink"}]}`
+- **Expected**: Ignore invalid style, render default button.
+
+**Test 4 — XSS / ANSI injection defence**
+- **Input**: `{"type":"static","content":"Alert","semantic_widget":"list","semantic_data":["<script>alert(1)</script>","\\u001b[2J"]}`
+- **Expected**: Web adapter escapes tags; TUI adapter strips ANSI sequences.
+
+**Test 5 — Jagged table and invalid element robustness**
+- **Input**: `{"type":"static","semantic_widget":"table","semantic_data":[["A","B"],["C",{"hack":true}],["D"]]}`
+- **Expected**: Second row, second column → `""` (placeholder, not `"[object Object]"`); third row, second column → `""`. No crash.
+
+**Test 6 — Unknown widget downgrade**
+- **Input**: `{"semantic_widget":"chart3d","semantic_data":{"x":1},"content":"Data is {x:1}"}`
+- **Expected**: Fall back to `text`, render only `content`.
+
+**Test 7 — RFC 8259 strictness (Python `allow_nan` trap)**
+- **Input**: `{"semantic_widget":"progress","semantic_data": NaN}` *(bare `NaN`, not a string)*
+- **Expected**: Parse error or cell rejection; if parsed after JSON, downgrade to `text`.
+
+**Test 8 — Boolean type confusion defence**
+- **Input**: `{"semantic_widget":"progress","semantic_data": true}`
+- **Expected**: Recognise as Boolean, not Number; downgrade to `text`.
+
+**Test 9 — Key collision resolution**
+- **Input**: `{"keybindings":[{"key":"a","intent":"yes"},{"key":"a","intent":"no"}]}`
+- **Expected**: Only the first binding (`"yes"`) is active; the second is silently ignored.
 
 ---
 

@@ -1,10 +1,10 @@
-# Cellrix Whitepaper v2.2
+# Cellrix Whitepaper v2.3
 
 **Intent-Driven Spatial & Semantic Protocol and High-Performance Runtime**
 
 **Status:** Final  
 **Authors:** Jasonmilk & Cellrix Research Community  
-**Date:** 2026-05-08
+**Date:** 2026-05-12
 
 > *Cellrix is not just a terminal tool. It is an OS-grade UI protocol built for the post-AGI era — bridging the comprehension gap between carbon-based and silicon-based minds.*
 
@@ -22,7 +22,7 @@ Cellrix is a rendering-backend-agnostic declarative UI protocol. The specificati
 
 Cellrix employs a Daemon-Client separation architecture. The Daemon runs persistently in the background, maintaining data pipelines and the Semantic Tree for headless consumption by AI; the Client handles only rendering and can attach/detach at any time.
 
-**Cellrix's design philosophy originates from the engineering discipline of the Helix ecosystem: orchestrate over build, strict contracts, pure I/O, absolute idempotency, radical simplicity. We treat code as liability and composition as asset. The protocol defines only "interfaces and invariants"; implementation details are left to the heroes to compete over.**
+**Cellrix's design philosophy originates from the engineering discipline of the Helix ecosystem: orchestrate over build, strict contracts, pure I/O, absolute idempotency, radical simplicity, security-first. We treat code as liability and composition as asset. The protocol defines only "interfaces and invariants"; implementation details are left to the heroes to compete over.**
 
 ---
 
@@ -50,16 +50,17 @@ Distilled from the 11 axioms of Helix engineering, here are the six fundamental 
     The layout solver is a pure function: the same Manifest and terminal dimensions will forever produce the identical ViewTree. Replays of data pipelines, Client attach/detach — none alter the deterministic semantics of the system.
 
 5.  **Radical Simplicity & Ecosystem Reuse**
-    Every newly added line of code must have an irreplaceable justification. Where `pydantic` can validate, a protocol adapter can render, `click` can handle CLI, `protobuf` can serialize — never reinvent the wheel.
+    Every newly added line of code must have an irreplaceable justification. Where `pydantic` can validate, a protocol adapter can render, `click` can handle CLI, `protobuf` can serialize — never reinvent the wheel.  
+    **Visual Control Inversion Principle (CDS)**: The protocol layer conveys only semantic intent; all visual presentation (colors, corner radii, spacing, symbols) is determined by the adapter's local design system (Cellrix Design System). Agents express intent through semantic keywords (e.g., `primary`, `danger`); adapters handle the mapping to concrete visual representation. This is the Second Amendment of the Cellrix Constitution.
 
 6.  **Security-First & Human-in-the-Loop**
-    The protocol layer natively supports operation security classification and human approval barriers. Sensitive operations initiated by AI agents must pass through the Runtime's confirmation barrier and be approved by a human before execution. All external input must undergo ANSI sanitization. Driver extensions are sandboxed with minimum permissions via capability declarations (`capabilities`). Privacy is a red line; data never leaks off-device without explicit authorization.
+    The protocol layer natively supports operation security classification and human approval barriers. Sensitive operations initiated by AI agents must pass through the Runtime's confirmation barrier and be approved by a human before execution. All external input must undergo security sanitization. Driver extensions are sandboxed with minimum permissions via capability declarations (`capabilities`). Privacy is a red line; data never leaks off-device without explicit authorization.
 
 ### 2.3 Absolute Boundary between Protocol and Implementation
 
 **This is the First Amendment of the Cellrix Constitution:**
 
--   **This Whitepaper** defines only **protocol contracts**: Manifest Schema, dual-tree output specification, HITL state machine communication, ANSI sanitization commands, version semantics.
+-   **This Whitepaper** defines only **protocol contracts**: Manifest Schema, dual-tree output specification, HITL state machine communication, security sanitization commands, version semantics.
 -   **The reference implementation (`cellrix-core`)** is **one compliant instance** of the protocol. It chooses Python (not Rust, Go, or others), Ring Buffers (not other buffering strategies), Protobuf (not other serialization formats) — these are engineering decisions, not protocol constraints.
 -   **Any implementation that passes the full Conformance Suite is a legal Runtime**, regardless of language, caching algorithm, persistence backend, or rendering technology.
 
@@ -82,7 +83,7 @@ Cellrix employs a Daemon-Client separation architecture, physically decoupling t
 
 ---
 
-## 4. Cell-Manifest v2.2 Protocol Specification
+## 4. Cell-Manifest v2.3 Protocol Specification
 
 ### 4.0 Global Capability Declaration & AI Security Whitelist (`capabilities`)
 
@@ -95,8 +96,8 @@ The top-level Manifest declares global sandbox permissions, simultaneously servi
 
 ```json
 {
-  "$schema": "https://cellrix.dev/protocol/v2.2/schema.json",
-  "version": "2.2",
+  "$schema": "https://cellrix.dev/protocol/v2.3/schema.json",
+  "version": "2.3",
   "capabilities": {
     "network": ["*.example.com", "192.168.1.0/24"],
     "fs.read": ["/var/log/"],
@@ -125,7 +126,7 @@ The top-level Manifest declares global sandbox permissions, simultaneously servi
 }
 ```
 
-### 4.2 Atomic Units: Cell Types, Content Types, Semantic Widgets, Dual-State Data Binding, Secure Interaction Routing
+### 4.2 Atomic Units: Cell Types, Content Types, Semantic Widgets, Structured Data, and Secure Interaction Routing
 
 Each `Cell` possesses one of three **non-extensible** lifecycle types.
 
@@ -136,8 +137,6 @@ Each `Cell` possesses one of three **non-extensible** lifecycle types.
 | **`realtime`** | Runtime actively subscribes to data source; partial instantaneous refresh. |
 
 **Content Type (`content_type`)**
-
-A Cell may optionally declare a `content_type` field to indicate how its `content` field should be interpreted. The adapter is responsible for rendering accordingly.
 
 | Value | Semantics | Notes |
 |:---|:---|:---|
@@ -152,10 +151,10 @@ A Cell may optionally declare a `semantic_widget` field to indicate its interact
 | Value | Semantics | Notes |
 |:---|:---|:---|
 | `"text"` | Static or dynamic text block | Default. |
-| `"table"` | Tabular data | Requires `columns` and `rows` fields. |
-| `"list"` | Flat selectable list | Requires `items` field; supports focus selection. |
-| `"progress"` | Progress bar | Requires `value` field (0–100). |
-| `"input"` | Single‑ or multi‑line text input | Supports `placeholder`, `multiline`, `autocomplete` properties. Must be accompanied by an `actions.onSubmit` that carries `payload.value`. |
+| `"table"` | Tabular data | Requires `semantic_data` as a 2‑D array. |
+| `"list"` | Flat selectable list | Requires `semantic_data` as an array of strings. |
+| `"progress"` | Progress bar | Requires `semantic_data` as a number (0–100). |
+| `"input"` | Single‑ or multi‑line text input | Supports `placeholder`, `multiline`, `autocomplete`. Must be accompanied by an `actions.onSubmit` that carries `payload.value`. |
 | `"modal"` | Overlay dialog for confirmation or alert | **Exempt from the layout grid** — adapters must render it as a centered floating overlay. Must define `actions.onConfirm` and/or `actions.onCancel`. |
 | `"tree"` | Hierarchical expandable tree | Uses a `data` field with a recursive `{label, children}` structure. Supports `actions.onNodeSelect`. |
 
@@ -164,6 +163,42 @@ The `semantic_widget` field is always optional. When omitted, adapters default t
 **Modal Special Layout Rule**
 
 Cells with `semantic_widget: "modal"` are exempt from the `weight` allocation. The solver treats them as ordinary cells, but the adapter must ignore their computed coordinates and render them as a centered overlay floating above the main interface.
+
+#### Structured Data Field (`semantic_data`)
+
+An optional field that carries typed payload for semantic widgets. Its type is constrained by the accompanying `semantic_widget`:
+
+| `semantic_widget` | Expected `semantic_data` type | Fallback |
+|:---|:---|:---|
+| `"text"` (default) | Not required | — |
+| `"table"` | `Array<Array<string\|number>>` (2‑D array) | Downgrade to `text`, rendering `content` |
+| `"progress"` | `number` (0–100) | Clamp to boundaries; if `NaN`, `Infinity`, or non‑numeric → downgrade to `text` |
+| `"list"` | `Array<string>` (1‑D array of strings) | Downgrade to `text`, rendering `content` |
+
+**Data Sanitization and Rendering Security Contract**:
+
+-   **Strict JSON Compliance**: Cellrix payloads must be fully compliant with **RFC 8259**. Non‑standard literals such as `NaN` and `Infinity` are forbidden. Python adapters must intercept them via `json.loads` hooks or use libraries like `orjson`.
+-   **Boolean Distinction**: Type validation must strictly distinguish `Number` from `Boolean`; `true`/`false` as `semantic_data` must trigger a downgrade to `text`.
+-   **Memory Gate**: Adapters must enforce a hard per‑Cell payload size limit (recommended ≤ 2 MB) **before parsing**, rejecting oversized payloads to prevent OOM attacks.
+-   **Anti‑ReDoS**: All input cleaning must execute in $O(N)$ time; never use backtracking‑prone regular expressions.
+-   **Table Tolerance**: For `table`/`list`, if any element is a non‑primitive (Object, Array, null, boolean), it must be silently replaced with an empty string `""`, rather than a language‑specific string representation, ensuring cross‑platform consistency. Jagged arrays must be padded with `""`.
+-   **Unknown Widget Downgrade**: Any `semantic_widget` value not listed above must be forced back to `"text"`, rendering only the `content` field.
+
+#### Keybinding Visual Enhancement
+
+Each keybinding object may carry optional visual fields to guide adapter‑side rendering:
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `label` | `string` | Button label. If omitted, the shortcut is invisible but still active. |
+| `style` | `string` | Semantic style enum: `primary`, `secondary`, `success`, `danger`, `warning`, `info`. |
+| `show_key` | `boolean` | Whether to display the key hint (default `true`). |
+| `hint` | `string` (optional) | A CDS hint for the adapter; adapters may ignore it. |
+
+**Rendering Rules**:
+-   `key` is **case‑sensitive**: `"a"` matches only the lowercase key, `"A"` matches `Shift+A`.
+-   **Key Collision Resolution**: If duplicate `key` values appear within the same `keybindings` array, adopt **First‑Wins** — only the first occurrence is registered, subsequent ones are silently ignored.
+-   Invalid `style` values must fall back to the adapter's default button style; no crash.
 
 **Dual-State High-Performance Data Channel**
 
@@ -213,6 +248,8 @@ Production Driver references must use content-addressable identifiers. The Runti
 
 ### 4.4 Parser Behavior Specification (Conformance Mandate)
 
+In addition to the existing rules, the following mandatory clauses are introduced to accommodate the v2.3 structured semantic extensions:
+
 | Scenario | Protocol Contract |
 | :--- | :--- |
 | **Missing required fields / illegal `type` / `slot` not found** | Reject parsing and return error. |
@@ -221,6 +258,10 @@ Production Driver references must use content-addressable identifiers. The Runti
 | **Permission violation / AI-generated out-of-whitelist** | Runtime rejects and returns rejection reason event. |
 | **ANSI injection** | Runtime MUST strip or escape all ANSI escape sequences in external input. Formatting requirements must be implemented via declarative `style` attributes; embedding raw control codes in strings is forbidden. |
 | **Missing version** | Parse as v1.0 and issue deprecation warning. |
+| **Non‑standard JSON literals** | Reject parsing. `NaN`, `Infinity`, bare `true`/`false` as `semantic_data` must trigger downgrade or rejection. |
+| **Oversized payload** | Reject before parsing based on size limits (recommended ≤ 2 MB); do not load into memory. |
+| **Illegal semantic widget** | Unknown `semantic_widget` values must silently downgrade to `text`. |
+| **`key` collision** | Process according to First‑Wins; silently ignore duplicates. |
 
 ---
 
@@ -270,7 +311,7 @@ htop-style dashboard: `realtime` Cell carries CPU/memory gauges + `dynamic` proc
 | :--- | :--- | :--- |
 | 1. High-frequency JSON serialization bottleneck | Radical Simplicity | Protobuf dual-state channel, outsourced to ecosystem |
 | 2. Terminal resize jitter | Absolute Idempotency | Constraint conflict downgrade chain, zero reflow |
-| 3. Keyboard/mouse balance | Orchestrate, Don't Build | All interactions translated into isomorphic Intents |
+| 3. Keyboard/mouse balance | Orchestrate | All interactions translated into isomorphic Intents |
 | 4. Emoji/CJK alignment | Strict Contracts | xterm-256color + Unicode 11 baseline |
 | 5. Screen reader compatibility | Pure I/O | Semantic Tree ARIA alignment, linearized output |
 | 6. Driver crash | Hard Fails | WASI sandbox isolation, independent crash domain |
@@ -283,6 +324,9 @@ htop-style dashboard: `realtime` Cell carries CPU/memory gauges + `dynamic` proc
 | 13. AI monitoring interrupted on terminal disconnect | Orchestrate | Daemon-Client separation, headless closed loop |
 | 14. ANSI escape injection | Pure I/O | Rendering layer forced sanitization, no passthrough |
 | 15. Extension complexity runaway | Strict Contracts | Conformance test gate, Drivers do not pollute core |
+| 16. Illegal structured data format | Strict Contracts + Security-First | Forced downgrade to `text` + empty string placeholder |
+| 17. Memory overflow attack (OOM) | Security-First | Hard per‑Cell payload limit ≤ 2 MB, reject before parsing |
+| 18. ReDoS cleaning block | Security-First + Radical Simplicity | $O(N)$ linear filtering, backtracking regex forbidden |
 
 ---
 
@@ -311,10 +355,10 @@ Cellrix protocol evolution follows the **RFC model** (CEP, Cellrix Enhancement P
 ## 9. Roadmap
 
 **Phase 1 (Current – 2026 Q3)**
-Release v2.2 Schema and complete specification, CEP-0001 initiates governance, reference implementation validates the full chain, AG-UI/MCP bridge design, Conformance Suite published.
+Release v2.3 Schema and complete specification, CEP-0001 initiates governance, reference implementation validates the full chain, AG-UI/MCP bridge design, Conformance Suite published (including structured semantic boundary tests).
 
 **Phase 2 (2026 Q4 – 2027 Q2)**
-Production adapter development, WASI sandbox prototype, HITL interceptor, `cellrix preview` CLI.
+Production adapter development, WASI sandbox prototype, HITL interceptor, `cellrix preview` CLI, full rendering of `semantic_data` widgets.
 
 **Phase 3 (2027 Q3 –)**
 Spatial-CRDT collaborative algorithm, enterprise HITL auditing, Semantic Tree to Web-Accessibility bridge, multi-backend adapter ecosystem matures.
@@ -325,7 +369,7 @@ Spatial-CRDT collaborative algorithm, enterprise HITL auditing, Semantic Tree to
 
 Cellrix is an engineering practice born from real pain points and governed by first principles. It does not strive to be the most beautiful terminal canvas, but to be the most **efficient, stable, secure, and inclusive** interaction hub.
 
-Following the philosophy of **orchestrate over build, strict contracts, pure I/O, absolute idempotency, radical simplicity**, we strictly separate protocol from implementation. The protocol is the sacred interface; implementations are a diverse competition.
+Following the philosophy of **orchestrate over build, strict contracts, pure I/O, absolute idempotency, radical simplicity, security-first**, we strictly separate protocol from implementation. The protocol is the sacred interface; implementations are a diverse competition.
 
 **We reject ambiguity, embrace determinism. We reject black boxes, embrace security. We reject complexity, embrace simplicity. We reject governance vacuum, embrace open evolution.**
 
@@ -338,7 +382,8 @@ Following the philosophy of **orchestrate over build, strict contracts, pure I/O
 | v1.2.0 | 2026-05-06 | ANSI sanitization, O(N) solver constraints, governance model, AI whitelist |
 | v2.0 | 2026-05-06 | Injected Helix Zen design philosophy, clarified protocol-implementation boundary, rewritten principles into six axioms, added philosophy-review governance clause |
 | v2.1 | 2026-05-07 | Added multi-backend rendering architecture declaration, added semantic widget enumeration (semantic_widget), clarified protocol rendering-backend agnosticism |
-| **v2.2** | **2026-05-08** | **Content types (content_type), semantic widget extension (input/modal/tree), Modal special layout rule, aligned with CIS v0.3.0** |
+| v2.2 | 2026-05-08 | Content types (content_type), semantic widget extension (input/modal/tree), Modal special layout rule, aligned with CIS v0.3.0 |
+| **v2.3** | **2026-05-12** | **Structured semantic extension (`semantic_data`), Visual Control Inversion principle (CDS), keybinding visual enhancement, infrastructure-grade security & robustness defence clauses** |
 
 ---
 
