@@ -10,46 +10,89 @@ from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, ScrollableContainer, Center
+from textual.containers import Horizontal, Vertical, ScrollableContainer, Container
 from textual.screen import ModalScreen
-from textual.widgets import Static, Label, Button
+from textual.widgets import Static, Button, ProgressBar, DataTable
 
 from core.manifest.parser import parse_manifest
-from core.manifest.models import CellManifest
+from core.manifest.models import CellManifest, Cell
 
 
 # ─────────────────────────────── Help Screen ───────────────────────────────
 class HelpScreen(ModalScreen):
-    """A full‑screen modal help overlay."""
+    """A polished full‑screen modal help overlay."""
 
     BINDINGS = [
-        Binding("escape", "dismiss", "Close Help"),
+        Binding("escape", "dismiss", "Close"),
+        Binding("f1", "dismiss", "Close"),
     ]
 
+    DEFAULT_CSS = """
+    HelpScreen {
+        align: center middle;
+    }
+
+    HelpScreen > Container {
+        width: 80%;
+        height: 80%;
+        background: $surface;
+        border: thick $accent;
+        padding: 2 3;
+    }
+
+    HelpScreen .title {
+        text-style: bold;
+        color: $accent;
+        padding-bottom: 1;
+    }
+
+    HelpScreen .section-title {
+        text-style: bold;
+        color: $secondary;
+        padding-bottom: 1;
+    }
+
+    HelpScreen .shortcut-key {
+        color: $success;
+        text-style: bold;
+    }
+
+    HelpScreen .shortcut-desc {
+        color: $text;
+    }
+
+    HelpScreen .hint {
+        color: $text-muted;
+        padding-top: 2;
+    }
+    """
+
     def compose(self) -> ComposeResult:
-        with Vertical():
-            with ScrollableContainer():
-                yield Label("""
-Shortcuts:
+        with Container():
+            yield Static("╔══════════ Cellrix Help ══════════╗", classes="title")
+            yield Static("")
+            
+            with Horizontal():
+                with Container():
+                    yield Static("Global Shortcuts", classes="section-title")
+                    yield Static(" q / Esc          Quit")
+                    yield Static(" Tab / Shift+Tab  Focus next / prev")
+                    yield Static(" F1               Show this help")
+                    yield Static(" g                Leader key (a-z to jump)")
+                    yield Static(" ↑↓ PgUp PgDn     Scroll focused panel")
+                    yield Static(" Alt+1..9         Direct panel jump")
+                
+                with Container():
+                    yield Static("Panel Shortcuts", classes="section-title")
+                    yield Static(" (none)")
 
-  q         Quit Cellrix
-  Tab       Focus next panel
-  Shift+Tab Focus previous panel
-  F1        Show this help
-
-Press Escape (or click outside) to close.
-                """)
-            with Center():
-                yield Button("Close Help", variant="primary", action="dismiss")
+            yield Static("")
+            yield Static("Press Escape or F1 to close.", classes="hint")
 
 
 # ─────────────────────────── Main Application ──────────────────────────────
 class TextualCellrixApp(App):
-    """A Textual application that boots from a Cell-Manifest.
-
-    By default, every keypress that maps to a known Cellrix action
-    is printed to stdout as a Cellrix Action JSON line.
-    """
+    """A Textual application that boots from a Cell-Manifest."""
 
     CSS = """
     Screen {
@@ -78,7 +121,6 @@ class TextualCellrixApp(App):
     }
     """
 
-    # Standard Cellrix action definitions (CIS §8)
     ACTION_FOCUS_NEXT = "focus_next"
     ACTION_FOCUS_PREV = "focus_prev"
     ACTION_TOGGLE_HELP = "toggle_help"
@@ -95,7 +137,7 @@ class TextualCellrixApp(App):
         self,
         manifest_path: str | Path,
         strict: bool = False,
-        emit_events: bool = True,            # ← set to False to run silently
+        emit_events: bool = True,
     ) -> None:
         self.manifest_path = Path(manifest_path)
         self.strict = strict
@@ -103,9 +145,7 @@ class TextualCellrixApp(App):
         self.manifest: Optional[CellManifest] = None
         super().__init__()
 
-    # ── Composition ──────────────────────────────────────────────────────
     def compose(self) -> ComposeResult:
-        """Parse manifest and yield the widget tree."""
         try:
             self.manifest = parse_manifest(self.manifest_path, strict=self.strict)
         except Exception as e:
@@ -117,12 +157,80 @@ class TextualCellrixApp(App):
             and not any(s.layout for s in self.manifest.layout.slots)
         ):
             cell = self.manifest.cells[0]
-            w = Static(cell.content or cell.id, classes="cell")
-            w.can_focus = True
-            yield w
+            yield self._create_cell_widget(cell)
             return
 
         yield self._build_layout(self.manifest)
+
+    def _create_cell_widget(self, cell: Cell):
+        """Return an appropriate Textual widget for a single Cell."""
+        # Semantic widget rendering (v2.3)
+        if cell.semantic_widget and cell.semantic_data is not None:
+            try:
+                if cell.semantic_widget == "progress":
+                    if isinstance(cell.semantic_data, bool):
+                        raise ValueError("Boolean is not a valid progress value")
+                    val = float(cell.semantic_data)
+                    if val < 0:
+                        val = 0
+                    elif val > 100:
+                        val = 100
+                    progress = ProgressBar(total=100, show_eta=False)
+                    progress.advance(val)
+                    progress.add_class("cell")
+                    progress.can_focus = True
+                    return progress
+
+                elif cell.semantic_widget == "table":
+                    if isinstance(cell.semantic_data, list) and all(
+                        isinstance(row, list) for row in cell.semantic_data
+                    ):
+                        table = DataTable()
+                        table.add_class("cell")
+                        table.can_focus = True
+                        if cell.semantic_data and all(isinstance(c, str) for c in cell.semantic_data[0]):
+                            table.add_columns(*cell.semantic_data[0])
+                            for row in cell.semantic_data[1:]:
+                                padded = list(row) + [""] * (len(cell.semantic_data[0]) - len(row))
+                                cells = [
+                                    str(c) if isinstance(c, (str, int, float)) else ""
+                                    for c in padded
+                                ]
+                                table.add_row(*cells)
+                        else:
+                            for row in cell.semantic_data:
+                                padded = list(row)
+                                cells = [
+                                    str(c) if isinstance(c, (str, int, float)) else ""
+                                    for c in padded
+                                ]
+                                if not table.columns:
+                                    table.add_columns(*[f"C{i}" for i in range(len(cells))])
+                                table.add_row(*cells)
+                        return table
+                    raise ValueError("Table data is not a valid 2D array")
+
+                elif cell.semantic_widget == "list":
+                    if isinstance(cell.semantic_data, list):
+                        items = [
+                            f"• {item}" if isinstance(item, str) else ""
+                            for item in cell.semantic_data
+                        ]
+                        text = "\n".join(items)
+                        w = Static(text, classes="cell")
+                        w.can_focus = True
+                        return w
+                    raise ValueError("List data is not a valid array")
+
+                # Unknown or unsupported widget falls through to plain text
+            except (ValueError, TypeError):
+                pass  # fall back to Static below
+
+        # Default: plain text
+        content = cell.content or cell.id
+        w = Static(content, classes="cell")
+        w.can_focus = True
+        return w
 
     def _build_layout(self, manifest: CellManifest):
         """Recursively build a layout container from a Cell-Manifest."""
@@ -146,19 +254,18 @@ class TextualCellrixApp(App):
             else:
                 cell = slot_cells.get(slot.id, [None])[0]
                 if cell is not None:
-                    w = Static(cell.content or cell.id, classes="cell")
+                    children.append(self._create_cell_widget(cell))
                 else:
-                    w = Static("")
-                w.can_focus = True
-                children.append(w)
+                    w = Static("", classes="cell")
+                    w.can_focus = True
+                    children.append(w)
 
         if manifest.layout.direction == "horizontal":
             return Horizontal(*children)
         return Vertical(*children)
 
-    # ── Event Emitters (output JSON to stdout) ────────────────────────────
+    # ── Event Emitters ──────────────────────────────────────────────────
     def _emit(self, action: str, cell_id: str | None = None, payload: dict | None = None) -> None:
-        """Print a single Cellrix Action JSON line to stdout."""
         if not self.emit_events:
             return
         msg = {

@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-blue)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-23%2F23%20passed-green)](#)
+[![Tests](https://img.shields.io/badge/tests-32%2F32%20passed-green)](#)
 
 ---
 
@@ -106,7 +106,33 @@ The Solver automatically:
 
 You define **what** — the Runtime handles **how**.
 
-### Level 3: Connect Data Pipes (Dynamic Content)
+### Level 3: Structured Data & Semantic Widgets (v2.3)
+
+Beyond plain text, Cellrix can render **progress bars, tables, and lists** directly from structured data. Simply declare the `semantic_widget` and provide `semantic_data` — the adapter handles the rest.
+
+```json
+{
+  "version": "2.3",
+  "layout": { "direction": "vertical", "slots": [
+    { "id": "progress_pane", "weight": 1 },
+    { "id": "list_pane", "weight": 1 },
+    { "id": "table_pane", "weight": 1 }
+  ]},
+  "cells": [
+    { "id": "prog", "type": "static", "slot": "progress_pane",
+      "semantic_widget": "progress", "semantic_data": 75, "content": "Loading..." },
+    { "id": "items", "type": "static", "slot": "list_pane",
+      "semantic_widget": "list", "semantic_data": ["Apple", "Banana", "Cherry"] },
+    { "id": "data", "type": "static", "slot": "table_pane",
+      "semantic_widget": "table",
+      "semantic_data": [["Name", "Age"], ["Alice", 30], ["Bob", 25]] }
+  ]
+}
+```
+
+**Visual control stays with your design system.** Agents express intent through semantic keywords (`primary`, `danger`, `success`); adapters map them to actual colors. Invalid data is silently downgraded to plain text — never a crash.
+
+### Level 4: Connect Data Pipes (Dynamic Content)
 
 Bind cells to real data sources: shell commands, log files, sockets. Content updates automatically — no full‑manifest replacement needed.
 
@@ -128,7 +154,7 @@ cellrix preview clock.json --trust
 
 **Security first:** Pipe execution is disabled by default. You must explicitly opt in with `--trust`. Without it, the cell displays a security lock notice and no subprocess runs.
 
-### Level 4: Stream & Embed (Programmatic Usage)
+### Level 5: Stream & Embed (Programmatic Usage)
 
 Pipe a stream of Manifest JSON lines into `cellrix stream` for real‑time dashboards that update as data arrives. When the stream ends, the display stays interactive so you can inspect the final state.
 
@@ -181,7 +207,7 @@ Every `cellrix preview` session includes these interaction features automaticall
 | Close help overlay | `Esc` (when help is open) |
 | Quit | `q` |
 
-The bottom status bar always shows the most relevant shortcuts. No memorisation required — press `?` anytime to see everything.
+The bottom status bar always shows the most relevant shortcuts. Press `?` anytime to see everything.
 
 
 ## For Project Authors: Make Your CLI Speak Cellrix
@@ -247,7 +273,7 @@ def build_manifest(config: dict | None = None) -> dict:
 
 Run `cellrix check` — it scans both channels, invokes the bridge, and validates the output against the JSON Schema. Once verified, your project is Cellrix‑ready.
 
-See the full [CIS specification](CIS.md) for details on event protocols, semantic widgets, and all supported bridge modes.
+See the full [CIS specification](CIS.md) for details on event protocols, semantic widgets, structured data, and all supported bridge modes.
 
 
 ## Core Concepts
@@ -262,13 +288,28 @@ A JSON file that describes your interface. Three cell types:
 | `dynamic` | Appends data from a source (log streams, event lists) |
 | `realtime` | Polls and replaces content (CPU gauges, status indicators) |
 
+### Semantic Widgets (v2.3)
+
+Cells can declare a `semantic_widget` to render structured data beyond plain text:
+
+| Widget | Data | Renders as |
+|:---|:---|:---|
+| `"progress"` | Number 0–100 | `████████████░░░░ 75%` progress bar |
+| `"table"` | 2‑D array | Pipe‑separated text table |
+| `"list"` | Array of strings | Bulleted list |
+| `"input"` | — | Text input field |
+| `"modal"` | — | Centered overlay dialog |
+| `"tree"` | Recursive nodes | Hierarchical expandable tree |
+
+All visual styling is determined by the adapter's local design system (CDS). Agents express intent through semantic keywords — never raw color codes.
+
 ### Layout
 
 Nested slots with `weight` ratios. Horizontal and vertical splits compose into fractal grids. No pixel math — the Solver computes coordinates deterministically.
 
 ### Keybindings
 
-Decoupled from the renderer. Global bindings (`q` = quit) cannot be overridden by Manifest actions. Context‑sensitive bindings are shown in the help overlay and status bar.
+Decoupled from the renderer. Global bindings (`q` = quit) cannot be overridden by Manifest actions. Context‑sensitive bindings are shown in the help overlay and status bar, with semantic colour mapping (`danger` → red, `success` → green).
 
 ### Theme
 
@@ -293,18 +334,21 @@ uv run cellrix preview examples/hello.json
 
 | Gate | Status |
 |:---|:---|
-| Protocol Spec (WHITEPAPER.md v2.2) | ✅ Finalized |
+| Protocol Spec (WHITEPAPER.md v2.3) | ✅ Finalized |
+| Intents Specification (CIS.md v0.4.0) | ✅ Finalized |
 | Engineering Guide (10 chapters) | ✅ Complete |
 | Manifest Parser + Strict Validation | ✅ Complete |
 | ANSI Sanitizer + Capability Validator | ✅ Complete |
+| Structured Semantic Rendering (progress, table, list) | ✅ Complete |
 | `ruff check` | ✅ All checks passed |
-| `mypy --strict` (21 source files) | ✅ Success, 0 errors |
+| `mypy --strict` (23 source files) | ✅ Success, 0 errors |
 | Layout Solver + Interactive Rendering | ✅ Live workbench |
 | Dynamic Data Pipes (SourceManager) | ✅ `--trust` gate enabled |
 | Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
 | Textual Adapter (`cellrix run`) | ✅ Bidirectional pipe |
 | Multi‑level Input Routing (Leader Key, scrolling, contextual help) | ✅ Complete |
 | Manifest Validation (`cellrix check`) | ✅ Available |
+| Conformance Suite (9 boundary tests) | ✅ All passing |
 
 
 ## Design Philosophy — *The Cellrix Zen*
@@ -343,7 +387,7 @@ cellrix/
 uv run ruff check .          # Zero warnings
 uv run ruff format . --check # Consistent formatting
 uv run mypy --strict cli/ core/ devkit/  # Zero errors
-uv run pytest                # 23/23 passing
+uv run pytest                # 32/32 passing
 ```
 
 
