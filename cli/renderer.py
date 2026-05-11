@@ -141,6 +141,43 @@ class CellrixRenderer:
             if cell and cell.type in (CellType.DYNAMIC, CellType.REALTIME):
                 display_text = self.dynamic_content.get(node.id, display_text)
 
+            # ---------- Structured data rendering (v2.3) ----------
+            if cell and cell.semantic_widget and cell.semantic_data is not None:
+                try:
+                    if cell.semantic_widget == "progress":
+                        val = float(cell.semantic_data)
+                        if val < 0:
+                            val = 0
+                        elif val > 100:
+                            val = 100
+                        filled = int(val / 100 * 20)
+                        bar = "█" * filled + "░" * (20 - filled)
+                        display_text = f"{bar} {val:.0f}%"
+                    elif cell.semantic_widget == "list":
+                        if isinstance(cell.semantic_data, list):
+                            items = []
+                            for item in cell.semantic_data:
+                                if isinstance(item, str):
+                                    items.append(f"• {item}")
+                                else:
+                                    items.append("")  # fallback per spec
+                            display_text = "\n".join(items)
+                    elif cell.semantic_widget == "table":
+                        if isinstance(cell.semantic_data, list) and all(isinstance(row, list) for row in cell.semantic_data):
+                            table_text = []
+                            for row in cell.semantic_data:
+                                cells = []
+                                for c in row:
+                                    if isinstance(c, (str, int, float)):
+                                        cells.append(str(c))
+                                    else:
+                                        cells.append("")  # fallback
+                                table_text.append(" | ".join(cells))
+                            display_text = "\n".join(table_text)
+                except (ValueError, TypeError):
+                    # Keep original content
+                    pass
+
             # ---------- Scroll handling ----------
             if cell and cell.collapse_mode == "scroll" and node.height > 0:
                 lines = display_text.splitlines()
@@ -250,7 +287,6 @@ class CellrixRenderer:
         )
 
     def _build_full_help_panel(self, width: int, height: int) -> Panel:
-        # Unused for now, kept for compatibility
         return self._build_shortcut_overlay(width, height)
 
     def _build_shortcut_overlay(self, width: int, height: int) -> Panel:
