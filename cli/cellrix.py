@@ -1,6 +1,7 @@
 """Cellrix CLI entry point. Use `cellrix preview <manifest>` to see live layouts,
 or `cellrix stream` to read Manifest JSON from stdin in real time,
-or `cellrix run` to launch a bridge command with the Textual adapter."""
+or `cellrix run` to launch a bridge command with the Textual adapter,
+or `cellrix check [manifest]` to validate a manifest file."""
 
 from __future__ import annotations
 
@@ -193,6 +194,41 @@ def run(strict: bool, command: tuple[str, ...]) -> None:
         return
 
     _run_textual(cmd_list, strict=strict)
+
+
+@cli.command()
+@click.argument("manifest_path", type=click.Path(exists=True), required=False)
+@click.option(
+    "--strict",
+    is_flag=True,
+    default=True,
+    help="Enable strict schema validation (default: True)",
+)
+def check(manifest_path: Optional[str], strict: bool) -> None:
+    """Validate a Cell-Manifest JSON file.
+
+    If MANIFEST_PATH is not provided, looks for 'cellrix_manifest.json'
+    in the current directory.
+
+    Exits with code 0 if the manifest is valid, 1 otherwise.
+    """
+    if manifest_path is None:
+        default_path = Path("cellrix_manifest.json")
+        if not default_path.exists():
+            click.echo(
+                "Error: No manifest file specified and 'cellrix_manifest.json' "
+                "not found in current directory.",
+                err=True,
+            )
+            raise SystemExit(1)
+        manifest_path = str(default_path)
+
+    try:
+        parse_manifest(Path(manifest_path), strict=strict)
+        click.echo("✅ Manifest is valid.")
+    except Exception as e:
+        click.echo(f"❌ Manifest validation failed: {e}", err=True)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
