@@ -1,12 +1,15 @@
 """Tests for layout solver module — Rounds 1, 2 & 3."""
 
+from __future__ import annotations
+
 import pytest
+from typing import List
 
 from core.layout.solver import (
     LayoutError,
+    _SlotSpec,
     _allocate_slots_1d,
     _distribute_1d,
-    _SlotSpec,
     solve,
 )
 from core.manifest.models import (
@@ -21,61 +24,50 @@ from core.manifest.models import (
 # Round 1 tests: pure weight distribution
 # ============================================================
 
-
-def test_even_distribution():
+def test_even_distribution() -> None:
     result = _distribute_1d(9, [1, 1, 1])
     assert result == [3, 3, 3]
 
-
-def test_largest_remainder_method():
+def test_largest_remainder_method() -> None:
     result = _distribute_1d(10, [1, 1, 1])
     assert sum(result) == 10
     assert sorted(result, reverse=True) == [4, 3, 3]
 
-
-def test_unequal_weights():
+def test_unequal_weights() -> None:
     result = _distribute_1d(10, [2, 1, 1])
     assert sum(result) == 10
     assert result[0] == 5
 
-
-def test_single_element():
+def test_single_element() -> None:
     assert _distribute_1d(80, [1]) == [80]
 
-
-def test_insufficient_space():
+def test_insufficient_space() -> None:
     result = _distribute_1d(3, [1, 1, 1])
     assert sum(result) == 3
     assert all(s >= 1 for s in result)
 
-
-def test_zero_space():
+def test_zero_space() -> None:
     assert _distribute_1d(0, [1, 1]) == [0, 0]
 
-
-def test_large_weight_disparity():
+def test_large_weight_disparity() -> None:
     result = _distribute_1d(100, [10, 1, 1])
     assert sum(result) == 100
     assert result[0] > result[1]
 
-
-def test_non_integer_ratio():
+def test_non_integer_ratio() -> None:
     result = _distribute_1d(10, [1, 1, 2])
     assert sum(result) == 10
     assert max(result) == 5
-
 
 # ============================================================
 # Round 2 tests: constraint allocation
 # ============================================================
 
-
-def make_slot(weight=1, min_constraint=2, priority=50, collapse_mode="scroll"):
+def make_slot(weight: int = 1, min_constraint: int = 2, priority: int = 50, collapse_mode: str = "scroll") -> _SlotSpec:
     """Helper to create _SlotSpec instances."""
     return _SlotSpec(weight, min_constraint, priority, collapse_mode)
 
-
-def test_no_conflict_plenty_of_space():
+def test_no_conflict_plenty_of_space() -> None:
     slots = [
         make_slot(weight=1, min_constraint=5),
         make_slot(weight=1, min_constraint=5),
@@ -84,8 +76,7 @@ def test_no_conflict_plenty_of_space():
     assert sum(result) == 20
     assert all(r >= 5 for r in result)
 
-
-def test_partial_conflict_scroll_downgraded():
+def test_partial_conflict_scroll_downgraded() -> None:
     slots = [
         make_slot(weight=1, min_constraint=10, priority=100),
         make_slot(weight=1, min_constraint=10, priority=10),
@@ -95,8 +86,7 @@ def test_partial_conflict_scroll_downgraded():
     assert result[0] >= 10
     assert result[1] == 15 - result[0]
 
-
-def test_all_conflict_max_priority_wins():
+def test_all_conflict_max_priority_wins() -> None:
     slots = [
         make_slot(weight=1, min_constraint=8, priority=100),
         make_slot(weight=1, min_constraint=8, priority=50),
@@ -105,8 +95,7 @@ def test_all_conflict_max_priority_wins():
     assert sum(result) == 10
     assert result[0] >= 8
 
-
-def test_extreme_compression():
+def test_extreme_compression() -> None:
     slots = [
         make_slot(weight=1, min_constraint=8, priority=100),
         make_slot(weight=1, min_constraint=8, priority=50),
@@ -118,14 +107,12 @@ def test_extreme_compression():
     assert result[1] == 1
     assert result[2] == 1
 
-
-def test_zero_space_layout_error():
+def test_zero_space_layout_error() -> None:
     slots = [make_slot(weight=1, min_constraint=1) for _ in range(2)]
     with pytest.raises(LayoutError):
         _allocate_slots_1d(1, slots)
 
-
-def test_truncate_not_needlessly_cut():
+def test_truncate_not_needlessly_cut() -> None:
     slots = [
         _SlotSpec(weight=1, min_constraint=15, priority=1, collapse_mode="truncate"),
         _SlotSpec(weight=1, min_constraint=2, priority=1, collapse_mode="scroll"),
@@ -135,8 +122,7 @@ def test_truncate_not_needlessly_cut():
     assert result[0] >= 15
     assert result[1] >= 2
 
-
-def test_mixed_downgrade_scroll_and_truncate():
+def test_mixed_downgrade_scroll_and_truncate() -> None:
     slots = [
         _SlotSpec(weight=1, min_constraint=10, priority=90, collapse_mode="scroll"),
         _SlotSpec(weight=1, min_constraint=10, priority=50, collapse_mode="truncate"),
@@ -146,8 +132,7 @@ def test_mixed_downgrade_scroll_and_truncate():
     assert result[0] >= 10
     assert result[1] == 12 - result[0]
 
-
-def test_equal_priority_no_bias():
+def test_equal_priority_no_bias() -> None:
     slots = [
         make_slot(weight=1, min_constraint=5, priority=50),
         make_slot(weight=1, min_constraint=5, priority=50),
@@ -156,13 +141,11 @@ def test_equal_priority_no_bias():
     assert sum(result) == 12
     assert min(result) >= 5
 
-
 # ============================================================
 # Round 3 tests: nested tree coordinates
 # ============================================================
 
-
-def test_nested_layout_coordinates():
+def test_nested_layout_coordinates() -> None:
     """Verify coordinates of a nested horizontal/vertical layout."""
     manifest = CellManifest(
         version="2.0",

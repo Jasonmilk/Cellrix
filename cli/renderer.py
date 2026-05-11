@@ -27,6 +27,16 @@ TRANS_BG = Style(bgcolor="default")
 WHITE_TEXT = Style(color="white", bgcolor="default")
 FOCUSED_TITLE_STYLE = Style(color="green", bold=True, bgcolor="default")
 
+# Map semantic style keywords to Rich colors (v2.3 visual enhancement)
+_STYLE_COLOR_MAP: dict[str, str] = {
+    "primary": "bright_blue",
+    "secondary": "grey70",
+    "success": "green",
+    "danger": "red",
+    "warning": "yellow",
+    "info": "cyan",
+}
+
 
 @dataclass
 class UIState:
@@ -245,16 +255,20 @@ class CellrixRenderer:
         """Render semantic_data according to semantic_widget, or return fallback.
 
         Strictly follows White Paper v2.3 downgrade rules:
-        - progress: clamp 0‑100, format as bar; non‑numeric → fallback
+        - progress: clamp 0‑100, format as bar; non‑numeric / bool → fallback
         - list: array of strings → bulleted; non‑array → fallback
         - table: 2‑D array → pipe‑separated; jagged/invalid → fallback
         - unknown widget → fallback
+        All output strings are sanitised to remove ANSI escape sequences.
         """
         if not cell.semantic_widget or cell.semantic_data is None:
             return fallback
 
         try:
             if cell.semantic_widget == "progress":
+                # Explicitly reject boolean values
+                if isinstance(cell.semantic_data, bool):
+                    return fallback
                 val = float(cell.semantic_data)
                 if val < 0:
                     val = 0
@@ -262,7 +276,7 @@ class CellrixRenderer:
                     val = 100
                 filled = int(val / 100 * 20)
                 bar = "█" * filled + "░" * (20 - filled)
-                return f"{bar} {val:.0f}%"
+                return self._strip_ansi(f"{bar} {val:.0f}%")
 
             elif cell.semantic_widget == "list":
                 if isinstance(cell.semantic_data, list):
@@ -270,21 +284,24 @@ class CellrixRenderer:
                         f"• {item}" if isinstance(item, str) else ""
                         for item in cell.semantic_data
                     ]
-                    return "\n".join(items)
+                    return self._strip_ansi("\n".join(items))
                 return fallback
 
             elif cell.semantic_widget == "table":
                 if isinstance(cell.semantic_data, list) and all(
                     isinstance(row, list) for row in cell.semantic_data
                 ):
+                    # Determine max columns
+                    max_cols = max(len(row) for row in cell.semantic_data) if cell.semantic_data else 0
                     table_text = []
                     for row in cell.semantic_data:
+                        padded = list(row) + [""] * (max_cols - len(row))
                         cells = [
                             str(c) if isinstance(c, (str, int, float)) else ""
-                            for c in row
+                            for c in padded
                         ]
                         table_text.append(" | ".join(cells))
-                    return "\n".join(table_text)
+                    return self._strip_ansi("\n".join(table_text))
                 return fallback
 
             else:
@@ -292,8 +309,15 @@ class CellrixRenderer:
         except (ValueError, TypeError):
             return fallback
 
+    @staticmethod
+    def _strip_ansi(text: str) -> str:
+        """Remove ANSI escape sequences from a string (basic control codes)."""
+        import re
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', text)
+
     # ------------------------------------------------------------------
-    # Bottom status bar (single line, Nano style)
+    # Bottom status bar (single line, Nano style) + visual styles (v2.3)
     # ------------------------------------------------------------------
     def _build_status_bar(self) -> Panel:
         left = "[F1] Help  [?] Shortcuts"
@@ -303,10 +327,14 @@ class CellrixRenderer:
             focused_id = self._flat_nodes[self.state.focus_index].id
             cell = self._get_cell_by_id(focused_id)
             if cell and cell.actions and cell.actions.on_key:
-                extras = " | ".join(
-                    f"[{(a.key or '?').upper()}] {a.intent or 'action'}"
-                    for a in cell.actions.on_key[:2]
-                )
+                extras_parts = []
+                for a in cell.actions.on_key[:2]:
+                    key_display = (a.key or "?").upper()
+                    label = a.intent or "action"
+                    # Determine text color based on semantic style
+                    color = _STYLE_COLOR_MAP.get(a.style, "white") if a.style else "white"
+                    extras_parts.append(f"[{color}][{key_display}] {label}[/{color}]")
+                extras = " | ".join(extras_parts)
                 right = extras + "   " + right
 
         return Panel(
