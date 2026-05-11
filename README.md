@@ -33,6 +33,20 @@ Cellrix is a **protocol first**, not an implementation. The layout solver is a p
 
 Cellrix is designed for **four levels of engagement**. You can use only what you need, without complexity you don't.
 
+### Level 0: Validate First, Preview Later
+
+Before opening a full‑screen session, validate your manifest instantly. Catch schema errors in milliseconds — perfect for CI pipelines or local loops.
+
+```bash
+cellrix check my_dashboard.json
+# ✅ Manifest is valid.
+
+# Or without arguments to look for cellrix_manifest.json
+cellrix check
+```
+
+If there's a problem, you'll see a precise error message and a non‑zero exit code. No guesswork, no white screen.
+
 ### Level 1: Declare & Preview
 
 Write a Cell‑Manifest and see it rendered immediately. This is the fastest way to get started.
@@ -290,6 +304,7 @@ uv run cellrix preview examples/hello.json
 | Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
 | Textual Adapter (`cellrix run`) | ✅ Bidirectional pipe |
 | Multi‑level Input Routing (Leader Key, scrolling, contextual help) | ✅ Complete |
+| Manifest Validation (`cellrix check`) | ✅ Available |
 
 
 ## Design Philosophy — *The Cellrix Zen*

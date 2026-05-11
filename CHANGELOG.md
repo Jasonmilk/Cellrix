@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `cellrix check` command for headless manifest validation (strict Pydantic schema, exit codes).
 - Multi‑level input routing with Leader Key (`g` then `a-z`) for instant panel focus.
 - Scroll support for cells with `collapseMode: "scroll"` — arrow keys, page up/down, home/end.
 - Context‑aware shortcut overlay (`?` key) showing all available actions for the focused panel.
