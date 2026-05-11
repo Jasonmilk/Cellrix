@@ -89,6 +89,9 @@ class CellrixRenderer:
         focused_id = self._flat_nodes[self.state.focus_index].id
         return self._get_cell_by_id(focused_id)
 
+    # ------------------------------------------------------------------
+    # Rich protocol
+    # ------------------------------------------------------------------
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
@@ -134,6 +137,9 @@ class CellrixRenderer:
 
         yield outer
 
+    # ------------------------------------------------------------------
+    # Layout construction
+    # ------------------------------------------------------------------
     def _build_node(self, node: Node) -> Layout:
         if not node.children:
             cell = self._get_cell_by_id(node.id)
@@ -142,41 +148,8 @@ class CellrixRenderer:
                 display_text = self.dynamic_content.get(node.id, display_text)
 
             # ---------- Structured data rendering (v2.3) ----------
-            if cell and cell.semantic_widget and cell.semantic_data is not None:
-                try:
-                    if cell.semantic_widget == "progress":
-                        val = float(cell.semantic_data)
-                        if val < 0:
-                            val = 0
-                        elif val > 100:
-                            val = 100
-                        filled = int(val / 100 * 20)
-                        bar = "█" * filled + "░" * (20 - filled)
-                        display_text = f"{bar} {val:.0f}%"
-                    elif cell.semantic_widget == "list":
-                        if isinstance(cell.semantic_data, list):
-                            items = []
-                            for item in cell.semantic_data:
-                                if isinstance(item, str):
-                                    items.append(f"• {item}")
-                                else:
-                                    items.append("")  # fallback per spec
-                            display_text = "\n".join(items)
-                    elif cell.semantic_widget == "table":
-                        if isinstance(cell.semantic_data, list) and all(isinstance(row, list) for row in cell.semantic_data):
-                            table_text = []
-                            for row in cell.semantic_data:
-                                cells = []
-                                for c in row:
-                                    if isinstance(c, (str, int, float)):
-                                        cells.append(str(c))
-                                    else:
-                                        cells.append("")  # fallback
-                                table_text.append(" | ".join(cells))
-                            display_text = "\n".join(table_text)
-                except (ValueError, TypeError):
-                    # Keep original content
-                    pass
+            if cell:
+                display_text = self._build_semantic_content(cell, display_text)
 
             # ---------- Scroll handling ----------
             if cell and cell.collapse_mode == "scroll" and node.height > 0:
@@ -265,6 +238,63 @@ class CellrixRenderer:
 
         return container
 
+    # ------------------------------------------------------------------
+    # Semantic data rendering (v2.3)
+    # ------------------------------------------------------------------
+    def _build_semantic_content(self, cell: Cell, fallback: str) -> str:
+        """Render semantic_data according to semantic_widget, or return fallback.
+
+        Strictly follows White Paper v2.3 downgrade rules:
+        - progress: clamp 0‑100, format as bar; non‑numeric → fallback
+        - list: array of strings → bulleted; non‑array → fallback
+        - table: 2‑D array → pipe‑separated; jagged/invalid → fallback
+        - unknown widget → fallback
+        """
+        if not cell.semantic_widget or cell.semantic_data is None:
+            return fallback
+
+        try:
+            if cell.semantic_widget == "progress":
+                val = float(cell.semantic_data)
+                if val < 0:
+                    val = 0
+                elif val > 100:
+                    val = 100
+                filled = int(val / 100 * 20)
+                bar = "█" * filled + "░" * (20 - filled)
+                return f"{bar} {val:.0f}%"
+
+            elif cell.semantic_widget == "list":
+                if isinstance(cell.semantic_data, list):
+                    items = [
+                        f"• {item}" if isinstance(item, str) else ""
+                        for item in cell.semantic_data
+                    ]
+                    return "\n".join(items)
+                return fallback
+
+            elif cell.semantic_widget == "table":
+                if isinstance(cell.semantic_data, list) and all(
+                    isinstance(row, list) for row in cell.semantic_data
+                ):
+                    table_text = []
+                    for row in cell.semantic_data:
+                        cells = [
+                            str(c) if isinstance(c, (str, int, float)) else ""
+                            for c in row
+                        ]
+                        table_text.append(" | ".join(cells))
+                    return "\n".join(table_text)
+                return fallback
+
+            else:
+                return fallback
+        except (ValueError, TypeError):
+            return fallback
+
+    # ------------------------------------------------------------------
+    # Bottom status bar (single line, Nano style)
+    # ------------------------------------------------------------------
     def _build_status_bar(self) -> Panel:
         left = "[F1] Help  [?] Shortcuts"
         right = "[Q] Quit  [Tab] Focus Next  [g] Leader"
@@ -286,6 +316,9 @@ class CellrixRenderer:
             style=TRANS_BG,
         )
 
+    # ------------------------------------------------------------------
+    # Full‑screen help overlay (F1)
+    # ------------------------------------------------------------------
     def _build_full_help_panel(self, width: int, height: int) -> Panel:
         return self._build_shortcut_overlay(width, height)
 
@@ -320,6 +353,9 @@ class CellrixRenderer:
             style=TRANS_BG,
         )
 
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
     def _get_cell_by_id(self, cell_id: str) -> Optional[Cell]:
         for cell in self.manifest.cells:
             if cell.id == cell_id:
