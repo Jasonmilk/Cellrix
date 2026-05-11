@@ -1,4 +1,4 @@
-"""Pydantic models for Cell-Manifest v2.0."""
+"""Pydantic models for Cell-Manifest v2.3."""
 
 from enum import StrEnum
 from typing import Any, Literal, Optional
@@ -25,6 +25,16 @@ class ApprovalRequirement(BaseModel):
     fallback_emit: str = Field(..., alias="fallbackEmit")
 
 
+class KeyBinding(BaseModel):
+    """A single keybinding with optional visual enhancement (v2.3)."""
+    key: str
+    intent: str = ""  # emit
+    label: Optional[str] = None
+    style: Optional[Literal["primary", "secondary", "success", "danger", "warning", "info"]] = None
+    show_key: bool = True
+    hint: Optional[str] = None
+
+
 class ActionDef(BaseModel):
     target: str | None = None
     emit: str
@@ -36,24 +46,22 @@ class ActionDef(BaseModel):
 class Actions(BaseModel):
     on_press: ActionDef | None = Field(None, alias="onPress")
     on_focus: ActionDef | None = Field(None, alias="onFocus")
-    on_key: list[dict[str, str]] | None = Field(None, alias="onKey")
+    on_key: list[KeyBinding] | None = Field(None, alias="onKey")
 
 
 class Source(BaseModel):
-    model_config = {"populate_by_name": True}
     type: Literal["pipe", "file", "socket"]
     command: str | None = None
     protocol: Literal["json", "protobuf"] | None = None
-    # Use 'schema_' to avoid shadowing BaseModel.schema, alias ensures JSON key remains "schema"
     schema_: str | None = Field(None, alias="schema")
 
 
 class Cell(BaseModel):
-    model_config = {"populate_by_name": True}
     id: str
     type: CellType
     slot: str
     content: str | None = None
+    content_type: Optional[Literal["text", "markdown", "code"]] = Field("text", alias="content_type")
     source: Source | None = None
     driver: str | None = None
     driver_config: dict[str, Any] | None = Field(None, alias="driverConfig")
@@ -61,12 +69,17 @@ class Cell(BaseModel):
     min_constraint: dict[str, int] | None = Field(None, alias="minConstraint")
     collapse_mode: Literal["scroll", "truncate"] | None = Field("scroll", alias="collapseMode")
     priority: int = 50
+    semantic_widget: Optional[
+        Literal["text", "table", "list", "progress", "input", "modal", "tree"]
+    ] = Field(None, alias="semantic_widget")
+    semantic_data: Optional[Any] = Field(None, alias="semantic_data")
+    language: str | None = None
 
 
 class Slot(BaseModel):
     id: str
     weight: int = 1
-    layout: Optional["Layout"] = None
+    layout: Optional['Layout'] = None
 
 
 class Layout(BaseModel):

@@ -237,7 +237,7 @@ class CellrixRenderer:
             cell = self._get_cell_by_id(focused_id)
             if cell and cell.actions and cell.actions.on_key:
                 extras = " | ".join(
-                    f"[{a.get('key', '?').upper()}] {a.get('emit', 'action')}"
+                    f"[{(a.key or '?').upper()}] {a.intent or 'action'}"
                     for a in cell.actions.on_key[:2]
                 )
                 right = extras + "   " + right
@@ -269,7 +269,7 @@ class CellrixRenderer:
         cell = self.get_focused_cell()
         if cell and cell.actions and cell.actions.on_key:
             for action in cell.actions.on_key:
-                lines.append(f"  {action.get('key', '?')}  →  {action.get('emit', 'action')}")
+                lines.append(f"  {(action.key or '?')}  →  {action.intent or 'action'}")
         else:
             lines.append("  (none)")
 
@@ -296,5 +296,5 @@ class CellrixRenderer:
         focused_id = self._flat_nodes[self.state.focus_index].id
         for cell in self.manifest.cells:
             if cell.id == focused_id and cell.actions and cell.actions.on_key:
-                return [(a.get("key", "?"), a.get("emit", "action")) for a in cell.actions.on_key]
+                return [(a.key or "?", a.intent or "action") for a in cell.actions.on_key]
         return None
