@@ -29,6 +29,9 @@ dev = [
     "mypy",
     "pip-audit",
 ]
+textual = [
+    "cellrix-textual @ file:///opt/Cellrix/adapters/textual",
+]
 
 [tool.ruff]
 line-length = 100
@@ -45,7 +48,10 @@ ignore_missing_imports = false
 testpaths = ["tests"]
 addopts = "-v --cov=core --cov-report=term-missing"
 [tool.hatch.build.targets.wheel]
-packages = ["core"]
+packages = ["core", "cli", "devkit"]
 
 [project.scripts]
 cellrix = "cli.cellrix:cli"
+
+[tool.hatch.metadata]
+allow-direct-references = true

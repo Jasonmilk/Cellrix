@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -72,7 +73,6 @@ class CellrixRenderer:
             if cell is None:
                 continue
             if cell.semantic_widget:
-                # Directly update the cell's semantic_data so rendering uses it
                 try:
                     if isinstance(value, str):
                         value = value.strip()
@@ -232,9 +232,12 @@ class CellrixRenderer:
             return fallback
         try:
             if cell.semantic_widget == "progress":
+                # Reject boolean and non‑finite floats
                 if isinstance(cell.semantic_data, bool):
                     return fallback
                 val = float(cell.semantic_data)
+                if math.isnan(val) or math.isinf(val):
+                    return fallback
                 val = max(0, min(val, 100))
                 filled = int(val / 100 * 20)
                 bar = "█" * filled + "░" * (20 - filled)

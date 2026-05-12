@@ -1,10 +1,12 @@
 """Cellrix CLI entry point. Use `cellrix preview <manifest>` to see live layouts,
 or `cellrix stream` to read Manifest JSON from stdin in real time,
 or `cellrix run` to launch a bridge command with the Textual adapter,
-or `cellrix check [manifest]` to validate a manifest file."""
+or `cellrix check [manifest]` to validate a manifest file or bridge configuration."""
 
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -205,12 +207,15 @@ def run(strict: bool, command: tuple[str, ...]) -> None:
     help="Enable strict schema validation (default: True)",
 )
 def check(manifest_path: Optional[str], strict: bool) -> None:
-    """Validate a Cell-Manifest JSON file.
+    """Validate a Cell-Manifest JSON file, or test a bridge configuration.
+
+    If the file contains a 'bridge' field, the command will execute the
+    bridge and validate its output as a Manifest.
 
     If MANIFEST_PATH is not provided, looks for 'cellrix_manifest.json'
     in the current directory.
 
-    Exits with code 0 if the manifest is valid, 1 otherwise.
+    Exits with code 0 if validation succeeds, 1 otherwise.
     """
     if manifest_path is None:
         default_path = Path("cellrix_manifest.json")
@@ -223,12 +228,75 @@ def check(manifest_path: Optional[str], strict: bool) -> None:
             raise SystemExit(1)
         manifest_path = str(default_path)
 
+    raw = Path(manifest_path).read_text(encoding="utf-8")
+
     try:
-        parse_manifest(Path(manifest_path), strict=strict)
-        click.echo("✅ Manifest is valid.")
-    except Exception as e:
-        click.echo(f"❌ Manifest validation failed: {e}", err=True)
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        click.echo(f"❌ Invalid JSON: {e}", err=True)
         raise SystemExit(1)
+
+    # --- Bridge configuration detection ---
+    if "bridge" in data:
+        bridge = data.get("bridge", {})
+        bridge_type = bridge.get("type")
+
+        if bridge_type == "cli_subprocess":
+            command = bridge.get("command", [])
+            if not command:
+                click.echo("❌ Bridge config missing 'command' field.", err=True)
+                raise SystemExit(1)
+
+            click.echo(f"🔧 Executing bridge command: {' '.join(command)}")
+            try:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=10,
+                )
+            except subprocess.TimeoutExpired:
+                click.echo("❌ Bridge command timed out.", err=True)
+                raise SystemExit(1)
+            except Exception as e:
+                click.echo(f"❌ Failed to run bridge command: {e}", err=True)
+                raise SystemExit(1)
+
+            if result.returncode != 0:
+                click.echo(
+                    f"❌ Bridge command failed (exit code {result.returncode}).",
+                    err=True,
+                )
+                if result.stderr:
+                    click.echo(f"   stderr: {result.stderr.strip()}", err=True)
+                raise SystemExit(1)
+
+            # Validate the bridge output as a Manifest
+            try:
+                manifest_output = json.loads(result.stdout)
+            except json.JSONDecodeError as e:
+                click.echo(f"❌ Bridge output is not valid JSON: {e}", err=True)
+                raise SystemExit(1)
+
+            try:
+                # parse_manifest expects a Path or a raw JSON string
+                parse_manifest(json.dumps(manifest_output, ensure_ascii=False), strict=strict)
+                click.echo("✅ Bridge executed successfully. Manifest is valid.")
+            except Exception as e:
+                click.echo(f"❌ Bridge output validation failed: {e}", err=True)
+                raise SystemExit(1)
+        else:
+            click.echo(f"❌ Unsupported bridge type: '{bridge_type}'", err=True)
+            raise SystemExit(1)
+    else:
+        # Standard manifest file validation
+        try:
+            parse_manifest(Path(manifest_path), strict=strict)
+            click.echo("✅ Manifest is valid.")
+        except Exception as e:
+            click.echo(f"❌ Manifest validation failed: {e}", err=True)
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":
