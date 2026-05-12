@@ -16,7 +16,14 @@
 
 Describe your terminal interface in a JSON file. Cellrix renders it — with layout, focus tracking, keyboard shortcuts, and a built‑in help system. No manual coordinate math, no boilerplate drawing code, no framework lock‑in.
 
-Cellrix is a **protocol first**, not an implementation. The layout solver is a pure function: same manifest + same terminal size = identical result every time. The renderer is just one compliant consumer of the protocol. Write your own if you prefer — as long as it passes the Conformance Suite, it's a valid Cellrix Runtime.
+Cellrix is a **protocol first**, not an implementation. The layout solver is a pure function: same manifest + same terminal size = identical result every time. The renderer is just one compliant consumer of the protocol.
+
+**Two production‑grade adapters ship with Cellrix:**
+
+| Adapter | Best for |
+|:---|:---|
+| `cellrix preview` (Rich) | Lightweight, zero‑config terminal preview |
+| `cellrix run` (Textual) | Full‑screen interactive workbench with native widgets |
 
 
 ## Why Cellrix?
@@ -31,25 +38,14 @@ Cellrix is a **protocol first**, not an implementation. The layout solver is a p
 
 ## What can Cellrix do for you?
 
-Cellrix is designed for **four levels of engagement**. You can use only what you need, without complexity you don't.
-
-### Level 0: Validate First, Preview Later
-
-Before opening a full‑screen session, validate your manifest instantly. Catch schema errors in milliseconds — perfect for CI pipelines or local loops.
+### Level 0: Validate First
 
 ```bash
-cellrix check my_dashboard.json
+cellrix check my-dashboard.json
 # ✅ Manifest is valid.
-
-# Or without arguments to look for cellrix_manifest.json
-cellrix check
 ```
 
-If there's a problem, you'll see a precise error message and a non‑zero exit code. No guesswork, no white screen.
-
 ### Level 1: Declare & Preview
-
-Write a Cell‑Manifest and see it rendered immediately. This is the fastest way to get started.
 
 ```bash
 cellrix preview hello.json
@@ -57,7 +53,7 @@ cellrix preview hello.json
 
 ```json
 {
-  "version": "2.0",
+  "version": "2.3",
   "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
   "cells": [
     { "id": "greeting", "type": "static", "slot": "main", "content": "Hello, Cellrix!" }
@@ -65,269 +61,61 @@ cellrix preview hello.json
 }
 ```
 
-Press `F1` or `?` anytime to see available shortcuts. Press `Tab` to move focus between panels. Press `q` to quit.
+Press `F1` or `?` for shortcuts. `Tab` to move focus. `q` to quit.
 
 ### Level 2: Design Layouts
 
-Use `weight`, `minConstraint`, `collapseMode`, and nested slots to build sophisticated, responsive layouts that adapt to terminal resizing — with zero manual coordinate math.
+Use `weight`, `minConstraint`, `collapseMode`, and nested slots for responsive layouts that adapt to terminal resizing.
 
-```json
-{
-  "version": "2.0",
-  "layout": {
-    "direction": "horizontal",
-    "slots": [
-      { "id": "sidebar", "weight": 1 },
-      { "id": "main", "weight": 3, "layout": {
-        "direction": "vertical",
-        "slots": [
-          { "id": "status", "weight": 1 },
-          { "id": "log", "weight": 4 }
-        ]
-      }}
-    ]
-  },
-  "cells": [
-    { "id": "nav", "type": "static", "slot": "sidebar", "content": "# Dashboard",
-      "minConstraint": { "width": 10, "height": 3 }, "priority": 100 },
-    { "id": "cpu", "type": "realtime", "slot": "status", "content": "CPU: idle",
-      "minConstraint": { "width": 5, "height": 1 } },
-    { "id": "events", "type": "dynamic", "slot": "log",
-      "collapseMode": "scroll", "priority": 50 }
-  ]
-}
-```
+### Level 3: Semantic Widgets (v2.3)
 
-The Solver automatically:
-- Splits horizontal space 1:3 between sidebar and main area
-- Splits main area vertically 1:4 between status and log
-- Protects high‑priority panels from being squeezed when the terminal shrinks
-- Collapses low‑priority panels into scroll mode instead of crashing
+Render progress bars, tables, and lists directly from structured data:
 
-You define **what** — the Runtime handles **how**.
+| Widget | Data | Renders as |
+|:---|:---|:---|
+| `"progress"` | Number 0–100 | `████████████░░░░ 75%` |
+| `"table"` | 2‑D array | Pipe‑separated table |
+| `"list"` | Array of strings | Bulleted list |
 
-### Level 3: Structured Data & Semantic Widgets (v2.3)
-
-Beyond plain text, Cellrix can render **progress bars, tables, and lists** directly from structured data. Simply declare the `semantic_widget` and provide `semantic_data` — the adapter handles the rest.
-
-```json
-{
-  "version": "2.3",
-  "layout": { "direction": "vertical", "slots": [
-    { "id": "progress_pane", "weight": 1 },
-    { "id": "list_pane", "weight": 1 },
-    { "id": "table_pane", "weight": 1 }
-  ]},
-  "cells": [
-    { "id": "prog", "type": "static", "slot": "progress_pane",
-      "semantic_widget": "progress", "semantic_data": 75, "content": "Loading..." },
-    { "id": "items", "type": "static", "slot": "list_pane",
-      "semantic_widget": "list", "semantic_data": ["Apple", "Banana", "Cherry"] },
-    { "id": "data", "type": "static", "slot": "table_pane",
-      "semantic_widget": "table",
-      "semantic_data": [["Name", "Age"], ["Alice", 30], ["Bob", 25]] }
-  ]
-}
-```
-
-**Visual control stays with your design system.** Agents express intent through semantic keywords (`primary`, `danger`, `success`); adapters map them to actual colors. Invalid data is silently downgraded to plain text — never a crash.
-
-### Level 4: Connect Data Pipes (Dynamic Content)
-
-Bind cells to real data sources: shell commands, log files, sockets. Content updates automatically — no full‑manifest replacement needed.
+### Level 4: Dynamic Data Pipes
 
 ```bash
-# Real‑time clock (requires --trust to enable pipe execution)
 cellrix preview clock.json --trust
 ```
 
-```json
-{
-  "version": "2.0",
-  "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
-  "cells": [
-    { "id": "clock", "type": "realtime", "slot": "main",
-      "source": { "type": "pipe", "command": "while true; do date; sleep 1; done" } }
-  ]
-}
-```
+Cells update in real‑time from shell commands, log files, or sockets.
 
-**Security first:** Pipe execution is disabled by default. You must explicitly opt in with `--trust`. Without it, the cell displays a security lock notice and no subprocess runs.
-
-### Level 5: Stream & Embed (Programmatic Usage)
-
-Pipe a stream of Manifest JSON lines into `cellrix stream` for real‑time dashboards that update as data arrives. When the stream ends, the display stays interactive so you can inspect the final state.
+### Level 5: Stream & Embed
 
 ```bash
-# Generate a manifest every second and stream it
 generate_manifests | cellrix stream
 ```
 
-Or embed the Runtime directly into your Python application:
+Or embed directly:
 
 ```python
-from core.manifest.parser import parse_manifest
 from cli.runtime import CellrixRuntime
-
-manifest = parse_manifest("my_dashboard.json")
 runtime = CellrixRuntime(manifest)
-runtime.run()   # blocks until user presses 'q'
+runtime.run()
 ```
 
-The Runtime controls the entire interactive loop: rendering, input handling, and dynamic data polling. You provide the Manifest — Cellrix handles everything else.
 
-
-## Interactive Workbench (Built‑in)
-
-Every `cellrix preview` session includes these interaction features automatically. No configuration needed.
-
-### Navigation
+## Interactive Workbench
 
 | Feature | Key |
 |:---|:---|
-| Focus next panel | `Tab` |
-| Focus previous panel | `Shift+Tab` |
-| Direct jump to panel by index | `Alt+1` … `Alt+9` |
+| Focus next / prev panel | `Tab` / `Shift+Tab` |
 | Leader key (show jump labels) | `g` |
-| Jump to labelled panel | `g` then `a` … `z` |
-
-### Scrolling (when panel has `collapseMode: "scroll"`)
-
-| Feature | Key |
-|:---|:---|
-| Scroll up / down (line) | `↑` / `↓` |
-| Scroll page up / down | `PgUp` / `PgDn` |
-| Jump to top / bottom | `Home` / `End` |
-
-### Help & Quit
-
-| Feature | Key |
-|:---|:---|
-| Show all shortcuts (context‑aware) | `F1` or `?` |
-| Close help overlay | `Esc` (when help is open) |
+| Scroll | `↑↓ PgUp PgDn Home End` |
+| Help overlay | `F1` or `?` |
 | Quit | `q` |
-
-The bottom status bar always shows the most relevant shortcuts. Press `?` anytime to see everything.
 
 
 ## For Project Authors: Make Your CLI Speak Cellrix
 
-Cellrix is not a library you import — it's a protocol your project speaks. Any project can become an "intent producer" and be rendered by Cellrix without installing any Cellrix dependency.
+Your project needs **one entry point** that produces a Cell‑Manifest JSON. No Cellrix dependency required.
 
-The [Cellrix Intents Specification (CIS)](CIS.md) defines the standard. At a glance:
-
-### The Rule
-
-Your project needs **one entry point** that produces a Cell‑Manifest JSON. There are two ways to register it:
-
-**Channel A — Manifest file** (language‑agnostic, recommended)
-
-Place a `cellrix_manifest.json` in your project root:
-
-```json
-{
-  "bridge": {
-    "type": "python_function",
-    "module": "my_project.cellrix",
-    "function": "build_manifest"
-  },
-  "config": {}
-}
-```
-
-For non‑Python projects, use a CLI subprocess instead:
-
-```json
-{
-  "bridge": {
-    "type": "cli_subprocess",
-    "command": "my-cli-tool --cellrix"
-  }
-}
-```
-
-**Channel B — Python entry point** (optional bonus for Python packages)
-
-Declare in `pyproject.toml`:
-
-```toml
-[project.entry-points."cellrix.bridge"]
-my_bridge = "my_project.cellrix:build_manifest"
-```
-
-### The Function
-
-In a Python project, a `build_manifest` function may look like:
-
-```python
-# my_project/cellrix.py  —  no import cellrix needed!
-def build_manifest(config: dict | None = None) -> dict:
-    return {
-        "version": "2.0",
-        "layout": ...,
-        "cells": [...]
-    }
-```
-
-### Discovery & Validation
-
-Run `cellrix check` — it scans both channels, invokes the bridge, and validates the output against the JSON Schema. Once verified, your project is Cellrix‑ready.
-
-See the full [CIS specification](CIS.md) for details on event protocols, semantic widgets, structured data, and all supported bridge modes.
-
-
-## Core Concepts
-
-### Cell‑Manifest
-
-A JSON file that describes your interface. Three cell types:
-
-| Type | Behavior |
-|:---|:---|
-| `static` | Never updates (headers, navigation, buttons) |
-| `dynamic` | Appends data from a source (log streams, event lists) |
-| `realtime` | Polls and replaces content (CPU gauges, status indicators) |
-
-### Semantic Widgets (v2.3)
-
-Cells can declare a `semantic_widget` to render structured data beyond plain text:
-
-| Widget | Data | Renders as |
-|:---|:---|:---|
-| `"progress"` | Number 0–100 | `████████████░░░░ 75%` progress bar |
-| `"table"` | 2‑D array | Pipe‑separated text table |
-| `"list"` | Array of strings | Bulleted list |
-| `"input"` | — | Text input field |
-| `"modal"` | — | Centered overlay dialog |
-| `"tree"` | Recursive nodes | Hierarchical expandable tree |
-
-All visual styling is determined by the adapter's local design system (CDS). Agents express intent through semantic keywords — never raw color codes.
-
-### Layout
-
-Nested slots with `weight` ratios. Horizontal and vertical splits compose into fractal grids. No pixel math — the Solver computes coordinates deterministically.
-
-### Keybindings
-
-Decoupled from the renderer. Global bindings (`q` = quit) cannot be overridden by Manifest actions. Context‑sensitive bindings are shown in the help overlay and status bar, with semantic colour mapping (`danger` → red, `success` → green).
-
-### Theme
-
-Colors stored as data (`cli/theme.py`), not hardcoded. Swap themes without touching renderer logic.
-
-
-## Quick Start
-
-**Requirements:** Python 3.11+, [`uv`](https://astral.sh/uv)
-
-```bash
-git clone git@github.com:Jasonmilk/Cellrix.git
-cd Cellrix
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
-uv run cellrix preview examples/hello.json
-```
+See the [Cellrix Intents Specification (CIS)](CIS.md) for the full standard.
 
 
 ## Current Status
@@ -336,68 +124,39 @@ uv run cellrix preview examples/hello.json
 |:---|:---|
 | Protocol Spec (WHITEPAPER.md v2.3) | ✅ Finalized |
 | Intents Specification (CIS.md v0.4.0) | ✅ Finalized |
-| Engineering Guide (10 chapters) | ✅ Complete |
-| Manifest Parser + Strict Validation | ✅ Complete |
-| ANSI Sanitizer + Capability Validator | ✅ Complete |
-| Structured Semantic Rendering (progress, table, list) | ✅ Complete |
 | `ruff check` | ✅ All checks passed |
-| `mypy --strict` (23 source files) | ✅ Success, 0 errors |
-| Layout Solver + Interactive Rendering | ✅ Live workbench |
-| Dynamic Data Pipes (SourceManager) | ✅ `--trust` gate enabled |
-| Stream Mode (stdin ndjson) | ✅ Interactive after stream ends |
-| Textual Adapter (`cellrix run`) | ✅ Bidirectional pipe |
-| Multi‑level Input Routing (Leader Key, scrolling, contextual help) | ✅ Complete |
-| Manifest Validation (`cellrix check`) | ✅ Available |
-| Conformance Suite (9 boundary tests) | ✅ All passing |
+| `mypy --strict` | ✅ Success, 0 errors |
+| Tests | ✅ 32/32 passing |
+| Rich adapter | ✅ Complete |
+| Textual adapter | ✅ Complete |
+| Semantic widgets (progress, table, list) | ✅ Complete |
+| Conformance Suite | ✅ 9 boundary tests |
+
+
+## Quick Start
+
+```bash
+git clone git@github.com:Jasonmilk/Cellrix.git
+cd Cellrix
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev]"
+uv run cellrix preview examples/hello.json
+```
 
 
 ## Design Philosophy — *The Cellrix Zen*
 
-Every commit, every PR, every design decision must honor these six axioms:
-
 1. **Orchestrate, Don't Build** — The runtime is a scheduler, not a renderer.
 2. **Strict Contracts, Model Validation** — All communication via typed Pydantic models.
-3. **Pure Streams & Hard Fails** — `stdout` for data, `stderr` for diagnostics, errors never swallowed.
+3. **Pure Streams & Hard Fails** — `stdout` for data, `stderr` for diagnostics.
 4. **Absolute Idempotency** — Same manifest + terminal size = identical ViewTree.
-5. **Radical Simplicity & Ecosystem Reuse** — Direct dependencies capped at ≤5; every new line must justify itself.
-6. **Security‑First & Human‑in‑the‑Loop** — ANSI injection blocked; critical actions require physical approval.
-
-
-## Repository Layout
-
-```
-cellrix/
-├── core/                   # Protocol engine (parser, solver, security, source)
-├── cli/                    # Interactive terminal client + theme & keybinding
-├── devkit/                 # Templates, protocol bridges (MCP/AG-UI)
-├── adapters/               # Rendering adapters (optional dependencies)
-│   └── textual/            # Textual adapter (production-grade interactivity)
-├── tests/                  # Unit + conformance suite
-├── WHITEPAPER.md           # The Protocol Constitution
-├── CIS.md                  # Intents Specification
-├── ARCHITECTURE.md         # Reference Implementation Decisions
-├── ENGINEERING_GUIDE.md    # Construction Manual (Chinese)
-└── pyproject.toml
-```
-
-
-## Quality Gates
-
-```bash
-uv run ruff check .          # Zero warnings
-uv run ruff format . --check # Consistent formatting
-uv run mypy --strict cli/ core/ devkit/  # Zero errors
-uv run pytest                # 32/32 passing
-```
+5. **Radical Simplicity & Ecosystem Reuse** — Direct dependencies ≤5.
+6. **Security‑First & Human‑in‑the‑Loop** — ANSI injection blocked; critical actions require human approval.
 
 
 ## License
 
 MIT. Do good, don't harm, keep it simple.
-
----
-
-*If the white paper is the soul, this engine is the body. Both obey the same six laws.*
 
 ---
 
