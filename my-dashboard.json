@@ -1,0 +1,46 @@
+{
+  "version": "2.3",
+  "layout": {
+    "direction": "horizontal",
+    "slots": [
+      { "id": "left", "weight": 1 },
+      { "id": "right", "weight": 2, "layout": {
+        "direction": "vertical",
+        "slots": [
+          { "id": "top", "weight": 1 },
+          { "id": "bottom", "weight": 2 }
+        ]
+      }}
+    ]
+  },
+  "cells": [
+    {
+      "id": "nav",
+      "type": "static",
+      "slot": "left",
+      "content": "🚀 My Dashboard\n\n[Q] Quit\n[Tab] Focus",
+      "minConstraint": { "width": 15, "height": 5 },
+      "priority": 100
+    },
+    {
+      "id": "progress",
+      "type": "realtime",
+      "slot": "top",
+      "semantic_widget": "progress",
+      "semantic_data": 42,
+      "content": "Loading..."
+    },
+    {
+      "id": "events",
+      "type": "dynamic",
+      "slot": "bottom",
+      "collapseMode": "scroll",
+      "content": "Waiting for events...",
+      "actions": {
+        "onKey": [
+          {"key": "r", "intent": "refresh", "label": "Refresh", "style": "primary"}
+        ]
+      }
+    }
+  ]
+}
