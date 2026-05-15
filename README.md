@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-blue)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-32%2F32%20passed-green)](#)
+[![Tests](https://img.shields.io/badge/tests-35%2F35%20passed-green)](#)
 
 ---
 
@@ -73,7 +73,7 @@ Render progress bars, tables, and lists directly from structured data:
 
 | Widget | Data | Renders as |
 |:---|:---|:---|
-| `"progress"` | Number 0–100 | `████████████░░░░ 75%` |
+| `"progress"` | Number 0–100 | `████████████████░░░░ 75%` |
 | `"table"` | 2‑D array | Pipe‑separated table |
 | `"list"` | Array of strings | Bulleted list |
 
@@ -98,6 +98,21 @@ from cli.runtime import CellrixRuntime
 runtime = CellrixRuntime(manifest)
 runtime.run()
 ```
+
+### Level 6: Agent‑Accessible API (NEW)
+
+```bash
+cellrix daemon
+```
+
+Launches a local HTTP server that exposes the current UI state to AI agents:
+
+| Endpoint | Purpose |
+|:---|:---|
+| `GET /v1/agent/snapshot` | Read‑only semantic tree + viewport metadata |
+| `POST /v1/agent/action` | Execute a registered action (e.g. `focus_next`) |
+
+Agents can navigate, scroll, and toggle panels without OCR — structured JSON, strict Pydantic contracts, P99 < 10ms latency. High‑risk actions are gated by the **ActionInterceptor** (human approval loop). See `docs/ROADMAP.md` Phase 1.
 
 
 ## Interactive Workbench
@@ -126,10 +141,11 @@ See the [Cellrix Intents Specification (CIS)](CIS.md) for the full standard.
 | Intents Specification (CIS.md v0.4.0) | ✅ Finalized |
 | `ruff check` | ✅ All checks passed |
 | `mypy --strict` | ✅ Success, 0 errors |
-| Tests | ✅ 32/32 passing |
+| Tests | ✅ 35/35 passing |
 | Rich adapter | ✅ Complete |
 | Textual adapter | ✅ Complete |
 | Semantic widgets (progress, table, list) | ✅ Complete |
+| Agent API daemon (P1a/P1b) | ✅ Complete |
 | Conformance Suite | ✅ 9 boundary tests |
 
 
@@ -139,7 +155,7 @@ See the [Cellrix Intents Specification (CIS)](CIS.md) for the full standard.
 git clone git@github.com:Jasonmilk/Cellrix.git
 cd Cellrix
 uv venv && source .venv/bin/activate
-uv pip install -e ".[dev]"
+uv pip install -e ".[dev,server]"
 uv run cellrix preview examples/hello.json
 ```
 
