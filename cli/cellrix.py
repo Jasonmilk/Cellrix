@@ -15,7 +15,7 @@ from typing import Optional
 import click
 import readchar
 from rich.live import Live
-
+from cli.daemon import daemon_command
 from core.manifest.parser import parse_manifest
 from core.source import SourceManager
 from .runtime import CellrixRuntime
@@ -298,6 +298,6 @@ def check(manifest_path: Optional[str], strict: bool) -> None:
             click.echo(f"❌ Manifest validation failed: {e}", err=True)
             raise SystemExit(1)
 
-
+cli.add_command(daemon_command)
 if __name__ == "__main__":
     cli()

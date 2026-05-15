@@ -43,10 +43,15 @@ def register(action: str, handler: Handler) -> None:
     _handlers[action] = handler
 
 def dispatch(action: str, *args: Any, **kwargs: Any) -> None:
-    """Execute the handler for *action*, if registered."""
+    """Execute the handler for *action*, if registered.
+    
+    Raises:
+        ValueError: If the action is not registered.
+    """
     handler = _handlers.get(action)
-    if handler is not None:
-        handler(*args, **kwargs)
+    if handler is None:
+        raise ValueError(f"Unknown action: {action}")
+    handler(*args, **kwargs)
 
 def clear() -> None:
     """Remove all registered handlers (useful in tests)."""
