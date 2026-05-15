@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Centralised action constants and handler registry (`cli/actions.py`).
 - `cli/input_router.py`: stateful key resolver with leader‑key state machine.
 - `cellrix run` command for bidirectional pipe communication with subprocess (Textual adapter).
+- `cellrix daemon` command launching FastAPI server for Agent accessibility.
+- `GET /v1/agent/snapshot` and `POST /v1/agent/action` endpoints with Pydantic strict contracts.
+- Agent API contract models in `core/schemas/agent.py`.
+- Action dispatcher now raises `ValueError` for unregistered actions (fail-fast).
+- Phase 1e agent accessibility test suite (`tests/test_agent_accessibility.py`).
 
 ### Changed
 - Refactored `cli/runtime.py` — all hard‑coded key handling moved into `actions` and `InputRouter`.
