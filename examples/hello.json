@@ -1,7 +1,58 @@
 {
-  "version": "2.0",
-  "layout": { "direction": "vertical", "slots": [{ "id": "main", "weight": 1 }] },
+  "version": "2.3",
+  "layout": {
+    "direction": "vertical",
+    "slots": [
+      { "id": "header", "weight": 1 },
+      { "id": "main", "weight": 4 },
+      { "id": "footer", "weight": 1 }
+    ]
+  },
   "cells": [
-    { "id": "greeting", "type": "static", "slot": "main", "content": "Hello, Cellrix!" }
+    {
+      "id": "title",
+      "type": "static",
+      "slot": "header",
+      "content": "Cellrix — Intent-Driven Terminal UI Protocol",
+      "role": "title"
+    },
+    {
+      "id": "progress_demo",
+      "type": "dynamic",
+      "slot": "main",
+      "semantic_widget": "progress",
+      "semantic_data": 75
+    },
+    {
+      "id": "table_demo",
+      "type": "dynamic",
+      "slot": "main",
+      "semantic_widget": "table",
+      "semantic_data": [
+        ["Feature", "Status"],
+        ["Layout Solver", "✅ Pure Function"],
+        ["Theme Tokens", "✅ 10 Colors"],
+        ["CIS Intents", "✅ v0.6.0"],
+        ["Agent API", "✅ P99 < 10ms"]
+      ]
+    },
+    {
+      "id": "list_demo",
+      "type": "dynamic",
+      "slot": "main",
+      "semantic_widget": "list",
+      "semantic_data": [
+        "Press Tab to move focus between panels",
+        "Press ? for shortcut help",
+        "Press q to quit"
+      ]
+    },
+    {
+      "id": "status",
+      "type": "static",
+      "slot": "footer",
+      "content": "All systems nominal | Theme: Dracula (default)",
+      "role": "footer"
+    }
   ]
 }
