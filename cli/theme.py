@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class ThemeTokens(BaseModel):
     """Set of semantic color tokens for a Cellrix theme."""
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     primary: str = Field(..., pattern=r"^#[0-9a-fA-F]{6}$")
     secondary: str = Field(..., pattern=r"^#[0-9a-fA-F]{6}$")
@@ -37,7 +37,7 @@ class ThemeTokens(BaseModel):
 class Theme(BaseModel):
     """A named theme containing color tokens."""
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     name: str = Field(..., min_length=1)
     tokens: ThemeTokens

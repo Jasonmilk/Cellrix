@@ -4,7 +4,16 @@
     "direction": "vertical",
     "slots": [
       { "id": "header", "weight": 1 },
-      { "id": "main", "weight": 4 },
+      { "id": "main", "weight": 6,
+        "layout": {
+          "direction": "vertical",
+          "slots": [
+            { "id": "progress_area", "weight": 1 },
+            { "id": "table_area", "weight": 3 },
+            { "id": "list_area", "weight": 2 }
+          ]
+        }
+      },
       { "id": "footer", "weight": 1 }
     ]
   },
@@ -19,32 +28,32 @@
     {
       "id": "progress_demo",
       "type": "dynamic",
-      "slot": "main",
+      "slot": "progress_area",
       "semantic_widget": "progress",
       "semantic_data": 75
     },
     {
       "id": "table_demo",
       "type": "dynamic",
-      "slot": "main",
+      "slot": "table_area",
       "semantic_widget": "table",
       "semantic_data": [
         ["Feature", "Status"],
-        ["Layout Solver", "✅ Pure Function"],
-        ["Theme Tokens", "✅ 10 Colors"],
-        ["CIS Intents", "✅ v0.6.0"],
-        ["Agent API", "✅ P99 < 10ms"]
+        ["Layout Solver", "✅ Pure"],
+        ["Theme Tokens", "✅ 10"],
+        ["CIS Intents", "✅ v0.6"],
+        ["Agent API", "✅ <10ms"]
       ]
     },
     {
       "id": "list_demo",
       "type": "dynamic",
-      "slot": "main",
+      "slot": "list_area",
       "semantic_widget": "list",
       "semantic_data": [
-        "Press Tab to move focus between panels",
-        "Press ? for shortcut help",
-        "Press q to quit"
+        "Tab → move focus",
+        "? → shortcuts",
+        "q → quit"
       ]
     },
     {
