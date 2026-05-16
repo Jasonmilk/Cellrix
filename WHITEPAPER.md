@@ -18,7 +18,7 @@ Cellrix is a universal terminal workspace and UI protocol designed for developer
 
 Cellrix strictly adheres to the **MVI (Model-View-Intent)** architecture, cleanly separating interface "structure and rules (Manifest)" from "high-frequency data streams (Source)". Its pure-function solver produces two abstract trees simultaneously: a **Render Tree** carrying physical coordinates for human vision, and a **Semantic Tree** preserving full spatial topology, strictly aligned with **W3C ARIA 1.3**, serving both AI agents and screen readers for visually impaired engineers in a noise-free, structured, machine-readable form.
 
-Cellrix is a rendering-backend-agnostic declarative UI protocol. The specification itself does not mandate any specific terminal rendering technology or graphics library. Any event-driven system capable of consuming a Manifest and outputting a visual interface qualifies as a compliant Cellrix adapter. The official reference implementation provides both a lightweight terminal adapter and a production-grade adapter for complex interactions; developers may choose according to their scenario or implement their own following the CIS specification.
+Cellrix is a rendering-backend-agnostic declarative UI protocol. The specification itself does not mandate any specific terminal rendering technology or graphics library. Any event-driven system capable of consuming a Manifest and outputting a visual interface qualifies as a compliant Cellrix adapter. The official reference implementation provides both a lightweight terminal adapter and a production-grade adapter for complex interactions; developers may choose according to their scenario or implement their own following the [CIS specification](https://github.com/CommonIntents/CIS).
 
 Cellrix employs a Daemon-Client separation architecture. The Daemon runs persistently in the background, maintaining data pipelines and the Semantic Tree for headless consumption by AI; the Client handles only rendering and can attach/detach at any time.
 
@@ -382,7 +382,7 @@ Following the philosophy of **orchestrate over build, strict contracts, pure I/O
 | v1.2.0 | 2026-05-06 | ANSI sanitization, O(N) solver constraints, governance model, AI whitelist |
 | v2.0 | 2026-05-06 | Injected Helix Zen design philosophy, clarified protocol-implementation boundary, rewritten principles into six axioms, added philosophy-review governance clause |
 | v2.1 | 2026-05-07 | Added multi-backend rendering architecture declaration, added semantic widget enumeration (semantic_widget), clarified protocol rendering-backend agnosticism |
-| v2.2 | 2026-05-08 | Content types (content_type), semantic widget extension (input/modal/tree), Modal special layout rule, aligned with CIS v0.3.0 |
+| v2.2 | 2026-05-08 | Content types (content_type), semantic widget extension (input/modal/tree), Modal special layout rule, aligned with [CIS v0.6.0](https://github.com/CommonIntents/CIS) |
 | **v2.3** | **2026-05-12** | **Structured semantic extension (`semantic_data`), Visual Control Inversion principle (CDS), keybinding visual enhancement, infrastructure-grade security & robustness defence clauses** |
 
 ---

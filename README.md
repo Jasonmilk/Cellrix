@@ -1,5 +1,7 @@
 # Cellrix
 
+Cellrix is the reference TUI implementation of the [Common Intents Specification (CIS)](https://github.com/CommonIntents/CIS).
+
 **An intent-driven, deterministic, spatial-semantic terminal UI protocol and high-performance runtime.**
 
 > *Cellrix is not just a tool for the terminal age. It is an OS-grade UI protocol built for the post-AGI era — bridging the comprehension gap between carbon-based and silicon-based minds.*
@@ -138,7 +140,7 @@ See the [Cellrix Intents Specification (CIS)](CIS.md) for the full standard.
 | Gate | Status |
 |:---|:---|
 | Protocol Spec (WHITEPAPER.md v2.3) | ✅ Finalized |
-| Intents Specification (CIS.md v0.4.0) | ✅ Finalized |
+| Intents Specification (CIS v0.6.0) | ✅ Finalized |
 | `ruff check` | ✅ All checks passed |
 | `mypy --strict` | ✅ Success, 0 errors |
 | Tests | ✅ 35/35 passing |

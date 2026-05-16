@@ -328,7 +328,7 @@ cellrix/
 uv run ruff check .          # 零警告
 uv run ruff format . --check # 格式一致
 uv run mypy --strict cli/ core/ devkit/  # 零错误
-uv run pytest                # 23/23 通过
+uv run pytest                # 35/35 通过
 ```
 
 
