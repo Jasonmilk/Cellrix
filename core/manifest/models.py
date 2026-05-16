@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CellType(StrEnum):
@@ -19,6 +19,7 @@ class SecurityClass(StrEnum):
 
 
 class ApprovalRequirement(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     prompt: str
     timeout: int = 30000
     timeout_action: Literal["reject", "approve"] = Field("reject", alias="timeoutAction")
@@ -36,6 +37,7 @@ class KeyBinding(BaseModel):
 
 
 class ActionDef(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     target: str | None = None
     emit: str
     security_class: SecurityClass = Field(SecurityClass.SAFE, alias="securityClass")

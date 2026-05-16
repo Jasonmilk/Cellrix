@@ -3,7 +3,8 @@ FastAPI application factory for Agent Accessibility endpoints.
 
 Provides GET /v1/agent/snapshot and POST /v1/agent/action.
 Uses lifespan to manage core resources, and delegates action execution
-to the existing actions dispatcher.
+to the existing actions dispatcher. High-risk actions are intercepted by
+the ActionInterceptor before execution.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from core.schemas.agent import (
 
 # Existing Cellrix core API – provided by the daemon context.
 from cli.actions import dispatch, register, FOCUS_NEXT, FOCUS_PREV, TOGGLE_HELP, QUIT
+from cli.daemon.interceptor import ActionInterceptor, InterceptResult
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,9 @@ def create_app() -> FastAPI:
         lifespan=daemon_lifespan,
     )
 
+    # Single interceptor instance for the daemon.
+    interceptor = ActionInterceptor()
+
     # ------------------------------------------------------------------
     # P1a: Semantic Snapshot
     # ------------------------------------------------------------------
@@ -130,17 +135,31 @@ def create_app() -> FastAPI:
             )
 
     # ------------------------------------------------------------------
-    # P1b: Action Execution
+    # P1b: Action Execution (with HITL interceptor)
     # ------------------------------------------------------------------
     @app.post("/v1/agent/action", response_model=ActionResponse)
     async def execute_action(request: ActionRequest) -> ActionResponse:
         """Execute a parameterised action dispatched by an Agent.
 
         Action validity and security constraints are enforced by the core
-        dispatch layer. High-risk actions may be intercepted by the
-        ActionInterceptor (future Phase).
+        dispatch layer. High-risk actions are intercepted by the
+        ActionInterceptor before execution.
         """
         try:
+            # Evaluate HITL requirements.
+            # In full implementation, action_def is fetched from the manifest's
+            # ActionDef for the focused cell. Currently using placeholder None
+            # (all actions pass through).
+            result = interceptor.evaluate(
+                action_def=None, action_name=request.action
+            )
+            if result == InterceptResult.CONFIRMATION_REQUIRED:
+                return ActionResponse(
+                    success=False,
+                    message=f"Action '{request.action}' requires human confirmation.",
+                    action_taken=request.action,
+                )
+
             # Delegate to the existing action dispatcher.
             # dispatch raises ValueError for unknown actions.
             dispatch(
