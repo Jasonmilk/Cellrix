@@ -1,0 +1,47 @@
+{
+  "cis_version": "0.6",
+  "intents": [
+    {
+      "id": "refresh_system_data",
+      "name": "Refresh System Data",
+      "description": "Reload all cached business data, will temporarily occupy system bandwidth, no permanent data loss.",
+      "security": {
+        "risk_level": "low",
+        "requires_hitl": false,
+        "required_scopes": ["data:read"]
+      }
+    },
+    {
+      "id": "save_config_setting",
+      "name": "Save Config Setting",
+      "description": "Write modified system configuration to local file, changes take effect immediately.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "config_key": {
+            "type": "string"
+          },
+          "config_value": {
+            "type": "string"
+          }
+        },
+        "required": ["config_key", "config_value"]
+      },
+      "security": {
+        "risk_level": "medium",
+        "requires_hitl": false,
+        "required_scopes": ["config:write"]
+      }
+    },
+    {
+      "id": "reset_all_settings",
+      "name": "Reset All Settings",
+      "description": "Restore all system configurations to factory defaults, all custom settings will be permanently lost and cannot be restored.",
+      "security": {
+        "risk_level": "high",
+        "requires_hitl": true,
+        "required_scopes": ["admin:full"]
+      }
+    }
+  ]
+}

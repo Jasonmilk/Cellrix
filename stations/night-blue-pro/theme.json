@@ -1,0 +1,15 @@
+{
+  "name": "night-blue-pro",
+  "tokens": {
+    "primary": "#2563eb",
+    "secondary": "#7c3aed",
+    "surface": "#0f172a",
+    "panel": "#1e293b",
+    "text": "#f8fafc",
+    "text_muted": "#94a3b8",
+    "border": "#334155",
+    "success": "#10b981",
+    "warning": "#f59e0b",
+    "error": "#ef4444"
+  }
+}

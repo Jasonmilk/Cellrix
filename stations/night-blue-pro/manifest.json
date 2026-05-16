@@ -1,0 +1,54 @@
+{
+  "version": "2.3",
+  "layout": {
+    "direction": "vertical",
+    "slots": [
+      {
+        "id": "top_bar",
+        "weight": 1
+      },
+      {
+        "id": "sidebar",
+        "weight": 2
+      },
+      {
+        "id": "main_view",
+        "weight": 6
+      },
+      {
+        "id": "footer",
+        "weight": 1
+      }
+    ]
+  },
+  "cells": [
+    {
+      "id": "app_header",
+      "type": "static",
+      "slot": "top_bar",
+      "content": "Cellrix Admin Console",
+      "role": "title"
+    },
+    {
+      "id": "side_menu_text",
+      "type": "static",
+      "slot": "sidebar",
+      "content": "Navigation Menu Area",
+      "role": "sidebar"
+    },
+    {
+      "id": "main_panel_content",
+      "type": "static",
+      "slot": "main_view",
+      "content": "Main business display & operation area",
+      "role": "body"
+    },
+    {
+      "id": "copyright_info",
+      "type": "static",
+      "slot": "footer",
+      "content": "Powered by Cellrix Design System",
+      "role": "footer"
+    }
+  ]
+}
