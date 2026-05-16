@@ -18,7 +18,7 @@ from core.layout.solver import solve
 from core.manifest.models import Cell, CellManifest, CellType
 from core.tree import Node, ViewTree
 from core.source import SourceManager
-from .theme import Theme, DEFAULT_THEME
+from .theme import Theme, DEFAULT_THEME, resolve_theme_styles
 from .keybindings import Keybindings, DEFAULT_KEYBINDINGS
 
 TRANS_BG = Style(bgcolor="default")
@@ -56,6 +56,7 @@ class CellrixRenderer:
         self.manifest = manifest
         self.strict = strict
         self.theme = theme
+        self.theme_styles = resolve_theme_styles(theme)
         self.keybindings = keybindings
         self.state = UIState()
         self._flat_nodes: List[Node] = []
@@ -190,7 +191,7 @@ class CellrixRenderer:
                 and node.id == self._flat_nodes[self.state.focus_index].id
             )
             border = (
-                self.theme.focused_border_style if is_focused else self.theme.border_style
+                self.theme_styles.focused_border_style if is_focused else self.theme_styles.border_style
             )
             title = Text(title_text, style=FOCUSED_TITLE_STYLE if is_focused else WHITE_TEXT)
 
@@ -232,7 +233,6 @@ class CellrixRenderer:
             return fallback
         try:
             if cell.semantic_widget == "progress":
-                # Reject boolean and non‑finite floats
                 if isinstance(cell.semantic_data, bool):
                     return fallback
                 val = float(cell.semantic_data)
@@ -281,7 +281,7 @@ class CellrixRenderer:
         return Panel(
             Text(f"{left:<20}{right:>60}", style=WHITE_TEXT),
             box=box.SIMPLE,
-            border_style=self.theme.status_border_style,
+            border_style=self.theme_styles.status_border_style,
             style=TRANS_BG,
         )
 
@@ -311,7 +311,7 @@ class CellrixRenderer:
         return Panel(
             Text("\n".join(lines), style=WHITE_TEXT),
             title="Shortcuts",
-            border_style=self.theme.help_border_style,
+            border_style=self.theme_styles.help_border_style,
             box=box.HEAVY,
             style=TRANS_BG,
         )

@@ -21,7 +21,7 @@ from core.source import SourceManager
 from .runtime import CellrixRuntime
 from .input_router import _normalize_key
 from .renderer import CellrixRenderer
-from .theme import DEFAULT_THEME
+from .theme import DEFAULT_THEME, PRESETS, discover_presets
 from .keybindings import (
     DEFAULT_KEYBINDINGS,
     QUIT,
@@ -41,6 +41,7 @@ except ImportError:
 @click.group()
 def cli() -> None:
     """Cellrix CLI - intent-driven terminal interface toolkit."""
+    discover_presets()  # auto-load stations/ themes
 
 
 @cli.command()
@@ -49,7 +50,8 @@ def cli() -> None:
 @click.option(
     "--trust", is_flag=True, help="Allow execution of pipe sources (dangerous)"
 )
-def preview(manifest_path: str, strict: bool, trust: bool) -> None:
+@click.option("--theme", default=None, help="Theme preset name (e.g., dracula, slate-dark, night-blue-pro)")
+def preview(manifest_path: str, strict: bool, trust: bool, theme: Optional[str]) -> None:
     """Live preview of a Cell-Manifest layout."""
     manifest_file = Path(manifest_path)
     try:
@@ -72,9 +74,18 @@ def preview(manifest_path: str, strict: bool, trust: bool) -> None:
                 )
                 cell.source = None
 
+    # Theme selection
+    if theme is not None:
+        if theme not in PRESETS:
+            click.echo(f"Unknown theme: {theme}. Available: {', '.join(PRESETS.keys())}", err=True)
+            raise SystemExit(1)
+        selected_theme = PRESETS[theme]
+    else:
+        selected_theme = DEFAULT_THEME
+
     runtime = CellrixRuntime(
         manifest,
-        theme=DEFAULT_THEME,
+        theme=selected_theme,
         keybindings=DEFAULT_KEYBINDINGS,
         source_manager=source_manager,
     )
@@ -298,6 +309,9 @@ def check(manifest_path: Optional[str], strict: bool) -> None:
             click.echo(f"❌ Manifest validation failed: {e}", err=True)
             raise SystemExit(1)
 
+
 cli.add_command(daemon_command)
+
+
 if __name__ == "__main__":
     cli()

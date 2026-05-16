@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict
 
 from pydantic import BaseModel, ConfigDict, Field
+from rich.style import Style
 
 logger = logging.getLogger(__name__)
 
@@ -136,3 +137,29 @@ def load_theme_from_file(path: str) -> Theme:
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
     return load_theme_from_dict(raw)
+
+
+# ---------------------------------------------------------------------------
+# Theme style resolver (maps tokens to Rich Style objects)
+# ---------------------------------------------------------------------------
+
+from dataclasses import dataclass
+
+@dataclass
+class ThemeStyles:
+    """Rich Style objects derived from a Theme's tokens."""
+    border_style: Style
+    focused_border_style: Style
+    status_border_style: Style
+    help_border_style: Style
+
+
+def resolve_theme_styles(theme: Theme) -> ThemeStyles:
+    """Convert semantic tokens into Rich styles for the renderer."""
+    t = theme.tokens
+    return ThemeStyles(
+        border_style=Style(color=t.border),
+        focused_border_style=Style(color=t.primary, bold=True),
+        status_border_style=Style(color=t.border),
+        help_border_style=Style(color=t.secondary),
+    )
