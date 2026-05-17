@@ -1,7 +1,7 @@
 # Cellrix 执行蓝图 · ROADMAP.md
 
 **定位**：Cellrix 白皮书 v2.4 的执行级补充文档  
-**状态**：Phase 1 核心已交付 (P1a, P1b, P1e ✅)  
+**状态**：Phase 2 核心已交付 (P2a, P2b, P2c, P2d ✅)  
 **哲学基石**：编排优先、契约至上、纯净 I/O、绝对幂等、极简复用、安全第一、按需驱动、零硬编码、如无必要勿增实体  
 **关联文档**：本文档是 [Cellrix 技术白皮书 v2.4](./WHITEPAPER.md) 的执行级补充，随 Phase 推进持续更新。白皮书定义“是什么”和“为什么”，本文档定义“怎么做”和“何时做”。
 
@@ -50,15 +50,16 @@
 - **交付物**：`POST /v1/agent/action` 端点
 - **功能**：接收 `{"action": "focus_next"}` 或 `{"action": "scroll_down", "payload": {"lines": 5}}`，调用 `actions.dispatch()` 执行
 
-### P1c：设计契约与主题扩展
+### ✅ P1c：设计契约与主题扩展
 - **交付物**：
-  1. 扩展 `cli/theme.py` 令牌字段
-  2. 实现 `TuiFallback` 混入模型
-  3. 创建 `style_template.md`
-  4. 强制 Pydantic Strict 校验
+  1. 扩展 `cli/theme.py` 令牌字段 (Pydantic Strict 模型)
+  2. 实现 `docs/design_guide.md` (AI 可读设计指引)
+  3. 实现 `ThemeStyles` 与 `resolve_theme_styles()` 令牌解析器
+  4. 强制 Pydantic Strict 校验 (extra="forbid")
   5. 强制 UTF-8 编码
+  6. 自动发现 `stations/` 目录预设主题
 
-### P1d：验证脚本
+### ✅ P1d：验证脚本
 - **交付物**：`examples/agent_demo.py`
 - **功能**：模拟 Agent 连接 Daemon、读取快照、执行动作的完整闭环
 
@@ -74,19 +75,19 @@
 **目标**：Agent 可执行参数化操作；所有危险操作须经人类确认。  
 **风险**：低
 
-### P2a：参数化 Action Executor
+### ✅ P2a：参数化 Action Executor
 - **交付物**：扩展 `actions.dispatch` 签名 + 参数验证
 - **功能**：Agent 传入的 payload 必须通过 Pydantic 参数校验模型，恶意 Shell 逃逸字符直接被拒绝。
 
-### P2b：ActionInterceptor 安全网关适配
-- **交付物**：Agent 协议层的拦截器适配
-- **功能**：Agent 触发危险操作 → 协议层挂起 → Modal 确认 → 回传事件。复用 Manifest 已有的 `securityClass`、`requiresApproval` 机制。
+### ✅ P2b：ActionInterceptor 安全网关适配
+- **交付物**：`cli/daemon/interceptor.py`
+- **功能**：Agent 触发危险操作 → 协议层挂起 → Modal 确认 → 回传事件。复用 Manifest 已有的 `securityClass`、`requiresApproval` 机制。CRITICAL 级别操作自动触发 HITL。
 
-### P2c：协议规范 v0.2
-- **交付物**：`docs/cap.md`（Cellrix Agent Protocol 规范）
-- **功能**：参数化动作契约、ActionInterceptor 事件流、错误码。
+### ✅ P2c：协议规范 v0.2
+- **交付物**：`docs/CAP.md` + `docs/CAP.zh-CN.md`（Cellrix Agent Protocol 规范）
+- **功能**：参数化动作契约、ActionInterceptor 事件流、错误码映射、版本对齐。
 
-### P2d：[NEW] ActionInterceptor 状态机一致性测试
+### ✅ P2d：ActionInterceptor 状态机一致性测试
 - **交付物**：`tests/test_hitl_state_machine.py`
 - **功能**：测试高危操作触发 → 状态挂起 → 模态确认 → 超时/回退的完整链路。必须用自动化测试覆盖所有状态迁移。
 - **新增代码量**：~60 行 Python

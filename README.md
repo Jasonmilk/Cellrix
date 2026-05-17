@@ -10,7 +10,7 @@ Cellrix is the reference TUI implementation of the [Common Intents Specification
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-blue)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-35%2F35%20passed-green)](#)
+[![Tests](https://img.shields.io/badge/tests-48%2F48%20passed-green)](#)
 
 ---
 
@@ -101,7 +101,7 @@ runtime = CellrixRuntime(manifest)
 runtime.run()
 ```
 
-### Level 6: Agent‑Accessible API (NEW)
+### Level 6: Agent‑Accessible API
 
 ```bash
 cellrix daemon
@@ -114,8 +114,7 @@ Launches a local HTTP server that exposes the current UI state to AI agents:
 | `GET /v1/agent/snapshot` | Read‑only semantic tree + viewport metadata |
 | `POST /v1/agent/action` | Execute a registered action (e.g. `focus_next`) |
 
-Agents can navigate, scroll, and toggle panels without OCR — structured JSON, strict Pydantic contracts, P99 < 10ms latency. High‑risk actions are gated by the **ActionInterceptor** (human approval loop). See `docs/ROADMAP.md` Phase 1.
-
+Agents can navigate, scroll, and toggle panels without OCR — structured JSON, strict Pydantic contracts, P99 < 10ms latency. High‑risk actions are gated by the **ActionInterceptor** (human approval loop). See `docs/CAP.md` for the full protocol specification.
 
 ## Interactive Workbench
 
@@ -132,22 +131,24 @@ Agents can navigate, scroll, and toggle panels without OCR — structured JSON, 
 
 Your project needs **one entry point** that produces a Cell‑Manifest JSON. No Cellrix dependency required.
 
-See the [Cellrix Intents Specification (CIS)](CIS.md) for the full standard.
+See the [Common Intents Specification (CIS)](https://github.com/CommonIntents/CIS) for the full standard.
 
 
 ## Current Status
 
 | Gate | Status |
 |:---|:---|
-| Protocol Spec (WHITEPAPER.md v2.3) | ✅ Finalized |
+| Protocol Spec (WHITEPAPER.md v2.4) | ✅ Finalized |
 | Intents Specification (CIS v0.6.0) | ✅ Finalized |
 | `ruff check` | ✅ All checks passed |
 | `mypy --strict` | ✅ Success, 0 errors |
-| Tests | ✅ 35/35 passing |
+| Tests | ✅ 48/48 passing |
 | Rich adapter | ✅ Complete |
 | Textual adapter | ✅ Complete |
 | Semantic widgets (progress, table, list) | ✅ Complete |
 | Agent API daemon (P1a/P1b) | ✅ Complete |
+| ActionInterceptor (HITL Gateway) | ✅ Complete |
+| CAP v0.2 Specification | ✅ Complete |
 | Conformance Suite | ✅ 9 boundary tests |
 
 

@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent API contract models in `core/schemas/agent.py`.
 - Action dispatcher now raises `ValueError` for unregistered actions (fail-fast).
 - Phase 1e agent accessibility test suite (`tests/test_agent_accessibility.py`).
+- `cli/daemon/interceptor.py`: ActionInterceptor enforcing HITL security model.
+- HITL state machine with approve/reject/timeout lifecycle.
+- `tests/test_hitl_state_machine.py` (6/6 passing).
+- `docs/CAP.md` + `docs/CAP.zh-CN.md`: Cellrix Agent Protocol v0.2 specification.
+- `docs/design_guide.md`: AI-readable design guide for theme/intents generation.
+- `stations/night-blue-pro/`: full example station (manifest + theme + intents).
+- Auto-discovery of station presets from `stations/` directory.
+- `--theme` option on `cellrix preview` for runtime theme switching.
 
 ### Changed
 - Refactored `cli/runtime.py` — all hard‑coded key handling moved into `actions` and `InputRouter`.

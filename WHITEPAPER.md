@@ -1,4 +1,4 @@
-# Cellrix Whitepaper v2.3
+# Cellrix Whitepaper v2.4
 
 **Intent-Driven Spatial & Semantic Protocol and High-Performance Runtime**
 
@@ -71,6 +71,7 @@ Distilled from the 11 axioms of Helix engineering, here are the six fundamental 
 ## 3. Core Architecture: Cellrix Process Model
 
 Cellrix employs a Daemon-Client separation architecture, physically decoupling the interface lifecycle from human attention spans.
+The Daemon exposes the Cellrix Agent Protocol (CAP v0.2); see docs/CAP.md.
 
 | Process | Responsibility | Lifecycle |
 | :--- | :--- | :--- |
@@ -232,6 +233,7 @@ Each keybinding object may carry optional visual fields to guide adapter‑side 
 ```
 
 **HITL State Machine**: Safe/normal → direct execution; restricted/critical → suspended, rendering confirmation barrier. Human confirms → execute; rejected or timeout → execute timeoutAction, send fallbackEmit to AI Agent.
+The ActionInterceptor (implemented in cli/daemon/interceptor.py) enforces this model.
 
 ### 4.3 Extension Mechanism & Supply-Chain Security (`Driver` Field)
 
