@@ -1,7 +1,7 @@
 # Cellrix 执行蓝图 · ROADMAP.md
 
 **定位**：Cellrix 白皮书 v2.4 的执行级补充文档  
-**状态**：Phase 2 核心已交付 (P2a, P2b, P2c, P2d ✅)  
+**状态**：Phase 2 核心已交付；Phase 2.5 Web 概念验证完成  
 **哲学基石**：编排优先、契约至上、纯净 I/O、绝对幂等、极简复用、安全第一、按需驱动、零硬编码、如无必要勿增实体  
 **关联文档**：本文档是 [Cellrix 技术白皮书 v2.4](./WHITEPAPER.md) 的执行级补充，随 Phase 推进持续更新。白皮书定义“是什么”和“为什么”，本文档定义“怎么做”和“何时做”。
 
@@ -99,16 +99,16 @@
 **目标**：同一棵 ViewTree 和 SemanticTree 同时驱动终端和浏览器。严格按需加载，零运行时浪费。  
 **风险**：中
 
-### P2.5a：极简 HTTP/WebSocket 服务
+### ✅ P2.5a：极简 HTTP/WebSocket 服务
 - **功能**：启动后监听本地端口。仅浏览器连接时激活 WebSocket；无连接时自动释放资源。
 
-### P2.5b：Vanilla JS 前端（零框架依赖）
+### ✅ P2.5b：Vanilla JS 前端（零框架依赖）
 - **功能**：使用原生 DOM API 渲染。字符网格 CSS 基准，确保与 TUI 绝对对齐。
 
-### P2.5c：ViewTree 序列化与事件反向冒泡
+### ✅ P2.5c：ViewTree 序列化与事件反向冒泡
 - **功能**：通过 JSON 差分帧驱动 DOM 更新。浏览器事件格式化为标准 Cellrix Action JSON。
 
-### P2.5d：仅 WebUI 模式
+### ✅ P2.5d：仅 WebUI 模式
 - **功能**：`cellrix serve manifest.json --web-only` 启动模式。完全按需驱动。
 
 ### P2.5e：[NEW] Web-TUI 视觉对齐回归测试

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Event‑driven WebSocket endpoint `/v1/ws/view` for ViewTree streaming.
+- Vanilla JS Web preview (`stations/_dev/view.html`) with CSS Grid rendering.
+- Semantic widget support in Web client (progress bar, table, list).
+- Panel index labels in Web preview matching TUI focus order.
+- `core/tree.py` extended with `semantic_widget` and `semantic_data` fields.
 - `cellrix check` command for headless manifest validation (strict Pydantic schema, exit codes).
 - Multi‑level input routing with Leader Key (`g` then `a-z`) for instant panel focus.
 - Scroll support for cells with `collapseMode: "scroll"` — arrow keys, page up/down, home/end.
@@ -42,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-05-06
 ### Added
+- Event‑driven WebSocket endpoint `/v1/ws/view` for ViewTree streaming.
+- Vanilla JS Web preview (`stations/_dev/view.html`) with CSS Grid rendering.
+- Semantic widget support in Web client (progress bar, table, list).
+- Panel index labels in Web preview matching TUI focus order.
+- `core/tree.py` extended with `semantic_widget` and `semantic_data` fields.
 - Initial release of Cellrix protocol and reference implementation.
 - Layout solver, manifest parser, security sanitizer, and interactive preview.
 - White Paper v2.0, Engineering Guide, and Intents Specification (CIS).
