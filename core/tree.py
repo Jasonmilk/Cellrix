@@ -1,6 +1,7 @@
 """Data structures for the Cellrix ViewTree and SemanticTree."""
 
 from __future__ import annotations
+from typing import Any
 
 from dataclasses import dataclass, field
 
@@ -18,6 +19,8 @@ class Node:
     role: str = ""
     summary: str = ""
     content: str = ""
+    semantic_widget: str | None = None
+    semantic_data: Any | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -30,6 +33,8 @@ class Node:
             "role": self.role,
             "summary": self.summary,
             "content": self.content,
+            "semantic_widget": self.semantic_widget,
+            "semantic_data": self.semantic_data,
         }
 
 

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cellrix ViewTree — Grid Preview</title>
+    <style>
+        :root {
+            --cols: 80;
+            --rows: 24;
+            --cell-size: 12px;
+            --bg: #0f172a;
+            --panel-bg: #1e293b;
+            --text: #f8fafc;
+            --border: #334155;
+            --primary: #60a5fa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        #viewport {
+            display: grid;
+            grid-template-columns: repeat(var(--cols), var(--cell-size));
+            grid-template-rows: repeat(var(--rows), var(--cell-size));
+            gap: 0;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .cell {
+            position: relative;
+            border: 1px solid var(--border);
+            background: var(--panel-bg);
+            overflow: hidden;
+            font-size: 10px;
+            line-height: 1.2;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            display: flex;
+            flex-direction: column;
+        }
+        .cell-label {
+            position: absolute;
+            top: 0; left: 0;
+            background: var(--border);
+            color: var(--text);
+            font-size: 8px;
+            padding: 0 2px;
+            line-height: 1;
+            z-index: 2;
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+        .cell-content {
+            flex: 1;
+            padding-top: 8px; /* space for label */
+            overflow: hidden;
+        }
+        .cell.focused .cell-label {
+            background: var(--primary);
+            color: white;
+        }
+        /* Semantic widgets */
+        .progress-bar {
+            width: 100%;
+            height: 100%;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            box-sizing: border-box;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            text-align: center;
+            line-height: 1.2;
+            font-size: 9px;
+            color: white;
+        }
+        .widget-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+            table-layout: fixed;
+        }
+        .widget-table td {
+            border: 1px solid var(--border);
+            padding: 0 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .widget-list {
+            margin: 0;
+            padding-left: 1.2em;
+            font-size: 9px;
+            list-style-position: inside;
+        }
+        #legend {
+            margin-top: 1rem;
+            text-align: center;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div id="viewport"></div>
+        <div id="legend">Cellrix ViewTree Live Preview</div>
+    </div>
+
+    <script>
+        const viewport = document.getElementById('viewport');
+        const legend = document.getElementById('legend');
+        let focusedId = null;
+        // Store leaf nodes in traversal order to assign indices
+        let leafNodes = [];
+
+        function renderWidget(node) {
+            const widget = node.semantic_widget;
+            const data = node.semantic_data;
+            if (!widget || data === undefined || data === null) {
+                return node.content || '';
+            }
+            switch (widget) {
+                case 'progress': {
+                    const pct = Math.min(100, Math.max(0, Number(data) || 0));
+                    return `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%">${pct}%</div></div>`;
+                }
+                case 'table': {
+                    if (Array.isArray(data) && data.every(row => Array.isArray(row))) {
+                        let html = '<table class="widget-table">';
+                        data.forEach(row => {
+                            html += '<tr>';
+                            row.forEach(cell => {
+                                html += `<td>${cell != null ? cell : ''}</td>`;
+                            });
+                            html += '</tr>';
+                        });
+                        html += '</table>';
+                        return html;
+                    }
+                    return node.content || '';
+                }
+                case 'list': {
+                    if (Array.isArray(data)) {
+                        return '<ul class="widget-list">' + data.map(item => `<li>${item != null ? item : ''}</li>`).join('') + '</ul>';
+                    }
+                    return node.content || '';
+                }
+                default:
+                    return node.content || '';
+            }
+        }
+
+        function renderViewTree(tree) {
+            viewport.innerHTML = '';
+            leafNodes = [];
+            if (!tree || !tree.nodes) return;
+
+            // Flatten leaves
+            const stack = [...tree.nodes];
+            while (stack.length) {
+                const node = stack.pop();
+                if (node.children && node.children.length > 0) {
+                    node.children.forEach(child => stack.push(child));
+                } else {
+                    leafNodes.push(node);
+                }
+            }
+            // Sort by (y, x) to match TUI order
+            leafNodes.sort((a, b) => a.y - b.y || a.x - b.x);
+
+            // Render each leaf
+            leafNodes.forEach((node, index) => {
+                const div = document.createElement('div');
+                div.className = 'cell';
+                div.style.gridColumn = `${node.x + 1} / span ${node.width}`;
+                div.style.gridRow = `${node.y + 1} / span ${node.height}`;
+                div.title = `[${index + 1}] ${node.id} (${node.x},${node.y}) ${node.width}x${node.height}`;
+
+                // Label
+                const label = document.createElement('span');
+                label.className = 'cell-label';
+                label.textContent = `[${index + 1}] ${node.id}`;
+                div.appendChild(label);
+
+                // Content
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'cell-content';
+                const widgetHtml = renderWidget(node);
+                if (widgetHtml && widgetHtml.startsWith('<')) {
+                    contentDiv.innerHTML = widgetHtml;
+                } else {
+                    contentDiv.textContent = widgetHtml;
+                }
+                div.appendChild(contentDiv);
+
+                if (node.id === focusedId) {
+                    div.classList.add('focused');
+                }
+                viewport.appendChild(div);
+            });
+        }
+
+        let ws;
+        function connectWs() {
+            ws = new WebSocket('ws://' + location.hostname + ':8765/v1/ws/view');
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    renderViewTree(data);
+                } catch (err) {
+                    console.error('Failed to parse ViewTree', err);
+                }
+            };
+            ws.onerror = () => {
+                legend.textContent = 'WebSocket error';
+            };
+            ws.onclose = () => {
+                legend.textContent = 'Disconnected. Reconnecting...';
+                setTimeout(connectWs, 2000);
+            };
+        }
+        connectWs();
+    </script>
+</body>
+</html>

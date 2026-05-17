@@ -262,6 +262,8 @@ def _layout_tree(
                 width=slot_w,
                 height=slot_h,
                 content=cell.content,
+                semantic_widget=cell.semantic_widget,
+                semantic_data=cell.semantic_data,
             )
             child_nodes.append(child)
         elif slot.layout is not None:
