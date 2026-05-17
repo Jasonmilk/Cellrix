@@ -1,34 +1,50 @@
-"""Abstract tree structures shared across Core."""
+"""Data structures for the Cellrix ViewTree and SemanticTree."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
 class Node:
-    """A single node in a ViewTree or SemanticTree."""
+    """A node in the ViewTree (spatial) and SemanticTree (semantic)."""
 
     id: str
     x: int = 0
     y: int = 0
     width: int = 0
     height: int = 0
-    children: list["Node"] = field(default_factory=list)
-    role: str | None = None
-    summary: str | None = None
-    content: str | None = None  # Cell content from Manifest
+    children: list[Node] = field(default_factory=list)
+    role: str = ""
+    summary: str = ""
+    content: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "height": self.height,
+            "children": [child.to_dict() for child in self.children],
+            "role": self.role,
+            "summary": self.summary,
+            "content": self.content,
+        }
 
 
 @dataclass
 class ViewTree:
-    """Render Tree with physical coordinates for terminal rendering."""
+    """The spatial render tree. A tree of Nodes with absolute coordinates."""
 
     nodes: list[Node] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {"nodes": [node.to_dict() for node in self.nodes]}
 
 
 @dataclass
 class SemanticTree:
-    """Semantic Tree stripped of coordinates, exposed to AI and screen readers."""
+    """The semantic tree. A tree of Nodes with semantic metadata."""
 
     nodes: list[Node] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
