@@ -60,3 +60,17 @@ class ActionResponse(BaseModel):
     success: bool
     message: str
     action_taken: str
+
+
+class CapabilityManifest(BaseModel):
+    """Response for GET /v1/cap/manifest.
+
+    Declares the runtime's capabilities and protocol support.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    runtime: str = "Cellrix"
+    version: str
+    capabilities: dict[str, bool]
+    trace_id_support: bool = True

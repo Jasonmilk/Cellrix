@@ -2,7 +2,7 @@
 FastAPI application factory for Agent Accessibility endpoints.
 
 Provides GET /v1/agent/snapshot, POST /v1/agent/action,
-and event‑driven WebSocket /v1/ws/view.
+event‑driven WebSocket /v1/ws/view, and CAP manifest endpoint.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from fastapi import FastAPI, HTTPException, status, WebSocket, WebSocketDisconne
 from core.schemas.agent import (
     ActionRequest,
     ActionResponse,
+    CapabilityManifest,
     CellEntity,
     SnapshotResponse,
     ViewportMeta,
@@ -133,6 +134,19 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("Unexpected error during action dispatch")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal dispatch error")
+
+    @app.get("/v1/cap/manifest", response_model=CapabilityManifest)
+    async def get_capability_manifest() -> CapabilityManifest:
+        """Return the runtime's capability declaration."""
+        return CapabilityManifest(
+            version="0.2.0",
+            capabilities={
+                "snapshot": True,
+                "action": True,
+                "hitl": True,
+                "decisions": False,  # coming in next step
+            },
+        )
 
     @app.websocket("/v1/ws/view")
     async def websocket_view(websocket: WebSocket):
