@@ -150,6 +150,7 @@ Agent 无需 OCR 即可导航、滚动和切换面板——结构化 JSON、严�
 | ActionInterceptor (人机确认网关) | ✅ 完成 |
 | CAP v0.2 规范 | ✅ 完成 |
 | 合规性套件 | ✅ 9 项边界测试 |
+| CIS 意图注册表 | ✅ 完成 |
 | CAP协议接口 (Manifest + Decisions)  | ✅ 已完成 |
 | CIS 意图注册 | ✅ Complete |
 

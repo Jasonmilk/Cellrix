@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CIS intent registry loader and static mapping module (`core/cis/`).
 - Pydantic models for CISRegistry, CISIntent, CISSecurity, CISBinding.
 - Intent registry capability flag in CAP manifest.
+- CIS intent registry models and loader (core/cis/).\
+- Static intent-to-action mapping with payload support.\
+- Intent registry capability flag in CAP manifest.\
+- Generic intent registry example aligned with CIS v0.6.0 Core Intent Set.' CHANGELOG.md
 
 ### Changed
 - Refactored `cli/runtime.py` — all hard‑coded key handling moved into `actions` and `InputRouter`.
