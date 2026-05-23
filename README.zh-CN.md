@@ -133,6 +133,7 @@ Agent 无需 OCR 即可导航、滚动和切换面板——结构化 JSON、严�
 
 完整标准请参见 [通用意图规范 (CIS)](https://github.com/CommonIntents/CIS)。
 
+对于 AI 代理或开发者生成 Cellrix 界面，请参阅[设计指引](docs/design_guide.md)。
 
 ## 当前状态
 

@@ -133,6 +133,7 @@ Your project needs **one entry point** that produces a Cell‑Manifest JSON. No 
 
 See the [Common Intents Specification (CIS)](https://github.com/CommonIntents/CIS) for the full standard.
 
+For AI agents or developers generating Cellrix interfaces, see the [Design Guide](docs/design_guide.md).
 
 ## Current Status
 
