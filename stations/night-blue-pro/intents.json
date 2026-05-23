@@ -1,46 +1,57 @@
 {
   "cis_version": "0.6",
+  "interface_id": "cellrix_generic_station",
   "intents": [
     {
-      "id": "refresh_system_data",
-      "name": "Refresh System Data",
-      "description": "Reload all cached business data, will temporarily occupy system bandwidth, no permanent data loss.",
-      "security": {
-        "risk_level": "low",
-        "requires_hitl": false,
-        "required_scopes": ["data:read"]
-      }
+      "id": "navigate",
+      "name": "Navigate",
+      "description": "Move focus to a target panel or section. No data is modified."
     },
     {
-      "id": "save_config_setting",
-      "name": "Save Config Setting",
-      "description": "Write modified system configuration to local file, changes take effect immediately.",
+      "id": "click",
+      "name": "Click",
+      "description": "Activate the currently focused element or button."
+    },
+    {
+      "id": "select",
+      "name": "Select",
+      "description": "Select an item from a list or menu. No side effects."
+    },
+    {
+      "id": "input",
+      "name": "Input",
+      "description": "Enter text into the currently focused input area."
+    },
+    {
+      "id": "confirm",
+      "name": "Confirm",
+      "description": "Confirm a pending operation."
+    },
+    {
+      "id": "cancel",
+      "name": "Cancel",
+      "description": "Cancel the current operation or dismiss a dialog. No data is modified."
+    },
+    {
+      "id": "execute",
+      "name": "Execute",
+      "description": "Execute a registered command. May have side effects depending on the command."
+    },
+    {
+      "id": "reset_settings",
+      "name": "Reset Settings",
+      "description": "Restore all custom settings to factory defaults. This action cannot be undone and requires confirmation.",
       "parameters": {
         "type": "object",
         "properties": {
-          "config_key": {
-            "type": "string"
-          },
-          "config_value": {
-            "type": "string"
-          }
+          "confirm": { "type": "boolean", "description": "Explicit confirmation flag" }
         },
-        "required": ["config_key", "config_value"]
+        "required": ["confirm"]
       },
-      "security": {
-        "risk_level": "medium",
-        "requires_hitl": false,
-        "required_scopes": ["config:write"]
-      }
-    },
-    {
-      "id": "reset_all_settings",
-      "name": "Reset All Settings",
-      "description": "Restore all system configurations to factory defaults, all custom settings will be permanently lost and cannot be restored.",
       "security": {
         "risk_level": "high",
         "requires_hitl": true,
-        "required_scopes": ["admin:full"]
+        "required_scopes": ["admin:write"]
       }
     }
   ]
