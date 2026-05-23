@@ -10,7 +10,7 @@ Cellrix is the reference TUI implementation of the [Common Intents Specification
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-blue)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-48%2F48%20passed-green)](#)
+[![Tests](https://img.shields.io/badge/tests-55%2F55%20passed-green)](#)
 
 ---
 
@@ -151,6 +151,7 @@ See the [Common Intents Specification (CIS)](https://github.com/CommonIntents/CI
 | Agent API Implementation Guide | ✅ Complete |
 | Conformance Suite | ✅ 9 boundary tests |
 | CAP Endpoints (Manifest + Decisions) | ✅ Complete |
+| CIS Intent Registry | ✅ Complete |
 
 ## Quick Start
 

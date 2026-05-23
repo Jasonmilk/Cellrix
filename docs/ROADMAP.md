@@ -110,6 +110,27 @@
 
 ---
 
+## 三、Phase 2.7：CIS 意图注册表接入 (已完成)
+
+**目标**：Cellrix 可加载并校验符合 CIS v0.6.0 的意图注册表文件。  
+**风险**：低
+
+### ✅ P2.7a：意图注册表模型
+- **交付物**：Pydantic 模型 `CISRegistry`, `CISIntent`, `CISSecurity`, `CISBinding`
+- **功能**：严格校验注册表结构，对齐 CIS v0.6.0 规范。
+
+### ✅ P2.7b：注册表加载器
+- **交付物**：`core/cis/registry.py`
+- **功能**：从 JSON 文件加载注册表，Pydantic 严格模式拒绝非法数据。
+
+### ✅ P2.7c：静态映射表
+- **交付物**：`core/cis/static_map.py`
+- **功能**：声明式意图 → 动作处理器映射，支持 payload 传递。
+
+### ✅ P2.7d：Daemon 集成
+- **交付物**：`agent_routes.py` 生命周期加载注册表，CAP manifest 反映注册表状态。
+
+---
 ## 四、Phase 2.5：按需加载 Web UI 适配器
 
 **目标**：同一棵 ViewTree 和 SemanticTree 同时驱动终端和浏览器。严格按需加载，零运行时浪费。  
