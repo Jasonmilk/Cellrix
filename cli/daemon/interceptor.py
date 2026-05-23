@@ -30,19 +30,23 @@ class ActionInterceptor:
 
     def __init__(self, timeout: int = DEFAULT_HITL_TIMEOUT) -> None:
         self._timeout = timeout
-        # In-memory storage for pending approvals. Keyed by a unique token.
+        # In-memory storage for pending approvals. Keyed by action_name.
         self._pending: dict[str, ApprovalRequirement] = {}
+        # Trace IDs associated with pending actions
+        self._trace_ids: dict[str, str] = {}
 
     def evaluate(
         self,
         action_def: Optional[ActionDef],
         action_name: str,
+        trace_id: Optional[str] = None,
     ) -> InterceptResult:
         """Determine whether an action can proceed immediately or requires HITL.
 
         Args:
             action_def: The action definition from the manifest (may be None).
             action_name: The dispatched action name (for fallback logic).
+            trace_id: Optional trace ID from the originating request.
 
         Returns:
             APPROVED if the action may execute; CONFIRMATION_REQUIRED otherwise.
@@ -63,19 +67,46 @@ class ActionInterceptor:
             )
 
         if requires_approval is not None:
-            # Store the requirement for later approval/rejection.
             self._pending[action_name] = requires_approval
+            if trace_id:
+                self._trace_ids[action_name] = trace_id
             return InterceptResult.CONFIRMATION_REQUIRED
 
         return InterceptResult.APPROVED
 
     def approve(self, action_name: str) -> bool:
         """Simulate human approval for a pending action."""
-        return self._pending.pop(action_name, None) is not None
+        if action_name in self._pending:
+            del self._pending[action_name]
+            self._trace_ids.pop(action_name, None)
+            return True
+        return False
 
     def reject(self, action_name: str) -> str:
         """Simulate human rejection and return the fallback emit string."""
         requirement = self._pending.pop(action_name, None)
+        self._trace_ids.pop(action_name, None)
         if requirement is not None:
             return requirement.fallback_emit
         return "no_pending_action"
+
+    def generate_decision_id(self, action_name: str) -> str | None:
+        """Generate a unique decision ID if the action is pending approval."""
+        if action_name in self._pending:
+            # Simple ID generation, can be enhanced later
+            return f"decision_{action_name}_{len(self._pending)}"
+        return None
+
+    def query_decision(self, decision_id: str) -> dict:
+        """Return the status of a decision by its ID."""
+        if not decision_id.startswith("decision_"):
+            return {"status": "unknown"}
+        parts = decision_id[len("decision_"):].rsplit("_", 1)
+        if len(parts) != 2:
+            return {"status": "unknown"}
+        action_name = parts[0]
+        if action_name in self._pending:
+            return {"status": "pending"}
+        # Could be approved/rejected, but for now we only track pending state.
+        # Once removed from _pending, decision is considered completed.
+        return {"status": "unknown"}

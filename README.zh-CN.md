@@ -10,8 +10,7 @@ Cellrix 是 [通用意图规范 (CIS)](https://github.com/CommonIntents/CIS) 的
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
 [![Ruff](https://img.shields.io/badge/linter-Ruff-brightgreen)](https://github.com/astral-sh/ruff)
 [![Mypy](https://img.shields.io/badge/type--checker-Mypy-blue)](https://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-48%2F48%20passed-green)](#)
-
+[![Tests](https://img.shields.io/badge/tests-55%2F55%20passed-green)](#)
 ---
 
 ## 什么是 Cellrix？
@@ -152,6 +151,7 @@ Agent 无需 OCR 即可导航、滚动和切换面板——结构化 JSON、严�
 | CAP v0.2 规范 | ✅ 完成 |
 | 合规性套件 | ✅ 9 项边界测试 |
 | CAP协议接口 (Manifest + Decisions)  | ✅ 已完成 |
+| CIS 意图注册 | ✅ Complete |
 
 ## 快速开始
 

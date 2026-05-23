@@ -27,4 +27,24 @@ def test_cap_manifest_capabilities_flags(client):
     assert caps["snapshot"] is True
     assert caps["action"] is True
     assert caps["hitl"] is True
-    assert caps["decisions"] is False  # Not yet implemented
+    assert caps["decisions"] is True  # now implemented
+
+
+def test_decisions_submit_invalid_id(client):
+    response = client.post("/v1/cap/decisions", json={"decision_id": "bad", "approval": True})
+    assert response.status_code == 422
+
+
+def test_decisions_submit_unknown_action(client):
+    # No pending action, so approval should fail
+    response = client.post("/v1/cap/decisions", json={"decision_id": "decision_nonexist_1", "approval": True})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is False
+
+
+def test_decisions_status_unknown(client):
+    response = client.get("/v1/cap/decisions/decision_nonexist_1")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "unknown"
