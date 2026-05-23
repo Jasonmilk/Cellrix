@@ -2,7 +2,7 @@
 FastAPI application factory for Agent Accessibility endpoints.
 
 Provides GET /v1/agent/snapshot, POST /v1/agent/action,
-event‑driven WebSocket /v1/ws/view, and CAP manifest endpoint.
+event‑driven WebSocket /v1/ws/view, and CAP endpoints.
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ from core.schemas.agent import (
     ActionResponse,
     CapabilityManifest,
     CellEntity,
+    DecisionRequest,
+    DecisionStatusResponse,
     SnapshotResponse,
     ViewportMeta,
 )
@@ -37,13 +39,10 @@ _latest_manifest: dict | None = None
 _latest_viewport: tuple[int, int] = (80, 24)
 _loaded_cell_manifest = None
 _view_tree_cache: dict | None = None
-_view_tree_event = asyncio.Event()  # signals that new ViewTree data is available
+_view_tree_event = asyncio.Event()
 
 
 def _compute_and_cache_view_tree():
-    """Recompute ViewTree from the loaded manifest and update the cache.
-    Notifies all waiting WebSocket clients.
-    """
     global _view_tree_cache
     if _loaded_cell_manifest is None:
         _view_tree_cache = None
@@ -52,8 +51,8 @@ def _compute_and_cache_view_tree():
         height = int(os.getenv("CELLRIX_TERM_HEIGHT", "24"))
         view_tree = solve(_loaded_cell_manifest, terminal_width=width, terminal_height=height)
         _view_tree_cache = view_tree.to_dict()
-    _view_tree_event.set()       # wake up WebSocket waiters
-    _view_tree_event.clear()     # reset for next update
+    _view_tree_event.set()
+    _view_tree_event.clear()
 
 
 def set_daemon_context(manifest: dict, width: int, height: int) -> None:
@@ -137,15 +136,61 @@ def create_app() -> FastAPI:
 
     @app.get("/v1/cap/manifest", response_model=CapabilityManifest)
     async def get_capability_manifest() -> CapabilityManifest:
-        """Return the runtime's capability declaration."""
         return CapabilityManifest(
             version="0.2.0",
             capabilities={
                 "snapshot": True,
                 "action": True,
                 "hitl": True,
-                "decisions": False,  # coming in next step
+                "decisions": True,
             },
+        )
+
+    @app.post("/v1/cap/decisions", response_model=ActionResponse)
+    async def submit_decision(request: DecisionRequest) -> ActionResponse:
+        # Validate decision_id format before try-except to let HTTPException propagate correctly
+        decision_id = request.decision_id
+        if not decision_id.startswith("decision_"):
+            raise HTTPException(status_code=422, detail="Invalid decision_id format")
+        parts = decision_id[len("decision_"):].rsplit("_", 1)
+        if len(parts) != 2:
+            raise HTTPException(status_code=422, detail="Invalid decision_id")
+        action_name = parts[0]
+
+        try:
+            if request.approval:
+                if interceptor.approve(action_name):
+                    dispatch(action_name)
+                    return ActionResponse(
+                        success=True,
+                        message=f"Action '{action_name}' approved and executed.",
+                        action_taken=action_name,
+                    )
+                else:
+                    return ActionResponse(
+                        success=False,
+                        message=f"No pending decision found for action '{action_name}'.",
+                        action_taken=action_name,
+                    )
+            else:
+                fallback = interceptor.reject(action_name)
+                return ActionResponse(
+                    success=False,
+                    message=f"Action '{action_name}' rejected. Fallback: {fallback}",
+                    action_taken=action_name,
+                )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except Exception:
+            logger.exception("Decision submission error")
+            raise HTTPException(status_code=500, detail="Internal error")
+
+    @app.get("/v1/cap/decisions/{decision_id}", response_model=DecisionStatusResponse)
+    async def get_decision_status(decision_id: str) -> DecisionStatusResponse:
+        status_info = interceptor.query_decision(decision_id)
+        return DecisionStatusResponse(
+            decision_id=decision_id,
+            status=status_info["status"],
         )
 
     @app.websocket("/v1/ws/view")
@@ -153,11 +198,8 @@ def create_app() -> FastAPI:
         await websocket.accept()
         logger.info("WebSocket client connected")
         try:
-            # Send the current ViewTree immediately (if available)
             if _view_tree_cache is not None:
                 await websocket.send_text(json.dumps(_view_tree_cache))
-            # Now wait for updates.  The event is set whenever _compute_and_cache_view_tree() runs.
-            # In the current static manifest, no updates will occur, so the connection stays open silently.
             while True:
                 await _view_tree_event.wait()
                 if _view_tree_cache is not None:
@@ -166,6 +208,5 @@ def create_app() -> FastAPI:
             logger.info("WebSocket client disconnected")
         except Exception as e:
             logger.exception("WebSocket error: %s", e)
-        # No cleanup needed – connection closed automatically.
 
     return app
