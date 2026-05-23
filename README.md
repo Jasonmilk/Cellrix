@@ -150,7 +150,7 @@ See the [Common Intents Specification (CIS)](https://github.com/CommonIntents/CI
 | ActionInterceptor (HITL Gateway) | ✅ Complete |
 | Agent API Implementation Guide | ✅ Complete |
 | Conformance Suite | ✅ 9 boundary tests |
-
+| CAP Endpoints (Manifest + Decisions) | ✅ Complete |
 
 ## Quick Start
 

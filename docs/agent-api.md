@@ -70,3 +70,35 @@ Cellrix implements a complete HITL state machine, adhering to the security const
 - **Fail Fast**: Any input that does not conform to the Pydantic strict mode is immediately rejected with a 422 status.
 - **Zero Side-Effect Discovery**: The semantic snapshot endpoint never modifies internal state, allowing AI Agents to poll without limit.
 - **Least Privilege**: Agents can only execute actions declared in the Manifest's capability whitelist.
+
+## 6. CAP Endpoints (v0.2)
+
+Cellrix exposes the Capability Authentication Protocol endpoints as defined in [CommonIntents/CAP](https://github.com/CommonIntents/CAP).
+
+### 6.1 Capability Manifest
+- **Method**: `GET`
+- **Path**: `/v1/cap/manifest`
+- **Response**: `CapabilityManifest`
+  - `runtime`: `"Cellrix"`
+  - `version`: current runtime version
+  - `capabilities`: map of supported features (`snapshot`, `action`, `hitl`, `decisions`)
+  - `trace_id_support`: `true`
+
+### 6.2 Submit Decision
+- **Method**: `POST`
+- **Path**: `/v1/cap/decisions`
+- **Request**: `DecisionRequest`
+  - `decision_id`: string (format `decision_{action}_{num}`)
+  - `approval`: boolean
+  - `trace_id`: optional string
+- **Response**: `ActionResponse` indicating execution or rejection.
+
+### 6.3 Query Decision Status
+- **Method**: `GET`
+- **Path**: `/v1/cap/decisions/{decision_id}`
+- **Response**: `DecisionStatusResponse`
+  - `decision_id`: string
+  - `status`: `"pending"` | `"unknown"`
+  - `trace_id`: optional string
+
+The decision queue is in-memory and tied to the daemon lifecycle. See `cli/daemon/interceptor.py` for implementation.

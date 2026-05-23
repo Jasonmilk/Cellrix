@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `stations/night-blue-pro/`: full example station (manifest + theme + intents).
 - Auto-discovery of station presets from `stations/` directory.
 - `--theme` option on `cellrix preview` for runtime theme switching.
+- CAP Manifest endpoint (`GET /v1/cap/manifest`).
+- CAP Decision endpoints (`POST /v1/cap/decisions`, `GET /v1/cap/decisions/{id}`).
+- Decision ID generation and status query in ActionInterceptor.
 
 ### Changed
 - Refactored `cli/runtime.py` — all hard‑coded key handling moved into `actions` and `InputRouter`.

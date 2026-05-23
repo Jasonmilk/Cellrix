@@ -92,6 +92,22 @@
 - **功能**：测试高危操作触发 → 状态挂起 → 模态确认 → 超时/回退的完整链路。必须用自动化测试覆盖所有状态迁移。
 - **新增代码量**：~60 行 Python
 
+## 三、Phase 2.6：CAP 能力端点 (已完成)
+
+**目标**：实现 CommonIntents/CAP 规范要求的能力声明与异步 HITL 决策端点。  
+**风险**：低
+
+### ✅ P2.6a：CAP Manifest 端点
+- **交付物**：`GET /v1/cap/manifest`
+- **功能**：返回 Cellrix 运行时能力声明（snapshot, action, hitl, decisions）。
+
+### ✅ P2.6b：CAP 异步决策队列
+- **交付物**：`POST /v1/cap/decisions` + `GET /v1/cap/decisions/{id}`
+- **功能**：Agent 提交异步 HITL 决策；查询决策状态。内存队列，支持 trace_id 透传。
+
+### ✅ P2.6c：HITL 状态机扩展
+- **交付物**：扩展 `ActionInterceptor` 支持决策 ID 生成与状态查询。
+
 ---
 
 ## 四、Phase 2.5：按需加载 Web UI 适配器
