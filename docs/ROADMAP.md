@@ -84,7 +84,7 @@
 - **功能**：Agent 触发危险操作 → 协议层挂起 → Modal 确认 → 回传事件。复用 Manifest 已有的 `securityClass`、`requiresApproval` 机制。CRITICAL 级别操作自动触发 HITL。
 
 ### ✅ P2c：协议规范 v0.2
-- **交付物**：`docs/CAP.md` + `docs/CAP.zh-CN.md`（Cellrix Agent Protocol 规范）
+- **交付物**：`docs/agent-api.md` + `docs/agent-api.zh-CN.md`（Agent API 实现指南）
 - **功能**：参数化动作契约、ActionInterceptor 事件流、错误码映射、版本对齐。
 
 ### ✅ P2d：ActionInterceptor 状态机一致性测试

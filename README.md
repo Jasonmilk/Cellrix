@@ -114,7 +114,7 @@ Launches a local HTTP server that exposes the current UI state to AI agents:
 | `GET /v1/agent/snapshot` | Read‑only semantic tree + viewport metadata |
 | `POST /v1/agent/action` | Execute a registered action (e.g. `focus_next`) |
 
-Agents can navigate, scroll, and toggle panels without OCR — structured JSON, strict Pydantic contracts, P99 < 10ms latency. High‑risk actions are gated by the **ActionInterceptor** (human approval loop). See `docs/CAP.md` for the full protocol specification.
+Agents can navigate, scroll, and toggle panels without OCR — structured JSON, strict Pydantic contracts, P99 < 10ms latency. High‑risk actions are gated by the **ActionInterceptor** (human approval loop). See `docs/agent-api.md` for the runtime interface specification. For the authoritative Capability Authentication Protocol standard, see [CommonIntents/CAP](https://github.com/CommonIntents/CAP).
 
 ## Interactive Workbench
 
@@ -148,7 +148,7 @@ See the [Common Intents Specification (CIS)](https://github.com/CommonIntents/CI
 | Semantic widgets (progress, table, list) | ✅ Complete |
 | Agent API daemon (P1a/P1b) | ✅ Complete |
 | ActionInterceptor (HITL Gateway) | ✅ Complete |
-| CAP v0.2 Specification | ✅ Complete |
+| Agent API Implementation Guide | ✅ Complete |
 | Conformance Suite | ✅ 9 boundary tests |
 
 
