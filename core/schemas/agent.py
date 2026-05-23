@@ -74,3 +74,70 @@ class CapabilityManifest(BaseModel):
     version: str
     capabilities: dict[str, bool]
     trace_id_support: bool = True
+
+
+class DecisionRequest(BaseModel):
+    """Request body for POST /v1/cap/decisions."""
+
+    model_config = ConfigDict(strict=True)
+
+    decision_id: str
+    approval: bool
+    trace_id: str | None = None
+
+
+class DecisionStatusResponse(BaseModel):
+    """Response for GET /v1/cap/decisions/{id}."""
+
+    model_config = ConfigDict(strict=True)
+
+    decision_id: str
+    status: str  # "pending", "approved", "rejected", "unknown"
+    trace_id: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# CIS intent registry models (aligned with CIS v0.6.0)
+# ---------------------------------------------------------------------------
+
+class CISSecurity(BaseModel):
+    """Security constraints for a CIS intent."""
+
+    model_config = ConfigDict(strict=True)
+
+    risk_level: Literal["low", "medium", "high", "critical"] = "low"
+    requires_hitl: bool = False
+    required_scopes: list[str] = Field(default_factory=list)
+
+
+class CISBinding(BaseModel):
+    """Binding declaration for a CIS intent."""
+
+    model_config = ConfigDict(strict=True)
+
+    type: str = "ui_element"
+    target_id: str
+
+
+class CISIntent(BaseModel):
+    """A single intent in the registry."""
+
+    model_config = ConfigDict(strict=True)
+
+    id: str
+    name: str
+    description: str
+    parameters: dict | None = None  # Raw JSON Schema, never parsed further
+    security: CISSecurity | None = None
+    bindings: list[CISBinding] | None = None
+
+
+class CISRegistry(BaseModel):
+    """Root object of a CIS intent registry file."""
+
+    model_config = ConfigDict(strict=True)
+
+    schema_: str | None = Field(default=None, alias="$schema")
+    cis_version: str = "0.6"
+    interface_id: str | None = None
+    intents: list[CISIntent] = Field(default_factory=list)

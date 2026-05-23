@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CAP Manifest endpoint (`GET /v1/cap/manifest`).
 - CAP Decision endpoints (`POST /v1/cap/decisions`, `GET /v1/cap/decisions/{id}`).
 - Decision ID generation and status query in ActionInterceptor.
+- CIS intent registry loader and static mapping module (`core/cis/`).
+- Pydantic models for CISRegistry, CISIntent, CISSecurity, CISBinding.
+- Intent registry capability flag in CAP manifest.
 
 ### Changed
 - Refactored `cli/runtime.py` — all hard‑coded key handling moved into `actions` and `InputRouter`.

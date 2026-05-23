@@ -33,6 +33,9 @@ from core.manifest.parser import parse_manifest
 from cli.actions import dispatch, register, FOCUS_NEXT, FOCUS_PREV, TOGGLE_HELP, QUIT
 from cli.daemon.interceptor import ActionInterceptor, InterceptResult
 
+# CIS intent registry support
+from core.cis.registry import load_registry
+
 logger = logging.getLogger(__name__)
 
 _latest_manifest: dict | None = None
@@ -41,8 +44,14 @@ _loaded_cell_manifest = None
 _view_tree_cache: dict | None = None
 _view_tree_event = asyncio.Event()
 
+# CIS intent registry (optional)
+_intent_registry = None
+
 
 def _compute_and_cache_view_tree():
+    """Recompute ViewTree from the loaded manifest and update the cache.
+    Notifies all waiting WebSocket clients.
+    """
     global _view_tree_cache
     if _loaded_cell_manifest is None:
         _view_tree_cache = None
@@ -79,12 +88,15 @@ def _build_snapshot() -> SnapshotResponse:
 
 @asynccontextmanager
 async def daemon_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    global _loaded_cell_manifest
+    global _loaded_cell_manifest, _intent_registry
     logger.info("Daemon lifespan started – initializing core state.")
+
     register(FOCUS_NEXT, lambda **kwargs: None)
     register(FOCUS_PREV, lambda **kwargs: None)
     register(TOGGLE_HELP, lambda **kwargs: None)
     register(QUIT, lambda **kwargs: None)
+
+    # Load manifest
     manifest_path = os.getenv("CELLRIX_MANIFEST", "examples/hello.json")
     try:
         _loaded_cell_manifest = parse_manifest(Path(manifest_path))
@@ -92,12 +104,23 @@ async def daemon_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning("Could not load manifest from %s: %s. Using placeholder.", manifest_path, e)
         _loaded_cell_manifest = None
+
+    # Load CIS intent registry (optional)
+    registry_path = os.getenv("CELLRIX_INTENT_REGISTRY", "")
+    if registry_path:
+        try:
+            _intent_registry = load_registry(registry_path)
+            logger.info("Intent registry loaded with %d intents", len(_intent_registry.intents))
+        except Exception as e:
+            logger.warning("Could not load intent registry from %s: %s", registry_path, e)
+
     _compute_and_cache_view_tree()
     set_daemon_context({"version": "1.0", "type": "cellrix"}, 80, 24)
     yield
     logger.info("Daemon shutting down – releasing resources.")
     set_daemon_context(None, 0, 0)
     _loaded_cell_manifest = None
+    _intent_registry = None
 
 
 def create_app() -> FastAPI:
@@ -136,19 +159,21 @@ def create_app() -> FastAPI:
 
     @app.get("/v1/cap/manifest", response_model=CapabilityManifest)
     async def get_capability_manifest() -> CapabilityManifest:
+        caps = {
+            "snapshot": True,
+            "action": True,
+            "hitl": True,
+            "decisions": True,
+        }
+        if _intent_registry is not None:
+            caps["intent_registry"] = True
         return CapabilityManifest(
             version="0.2.0",
-            capabilities={
-                "snapshot": True,
-                "action": True,
-                "hitl": True,
-                "decisions": True,
-            },
+            capabilities=caps,
         )
 
     @app.post("/v1/cap/decisions", response_model=ActionResponse)
     async def submit_decision(request: DecisionRequest) -> ActionResponse:
-        # Validate decision_id format before try-except to let HTTPException propagate correctly
         decision_id = request.decision_id
         if not decision_id.startswith("decision_"):
             raise HTTPException(status_code=422, detail="Invalid decision_id format")
