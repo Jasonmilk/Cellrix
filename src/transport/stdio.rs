@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
+use std::path::Path;
 use super::super::cap_client::CapTransport;
 
 pub struct StdioTransport {
@@ -13,16 +14,24 @@ pub struct StdioTransport {
 impl StdioTransport {
     pub async fn new(command: &str) -> Result<Self, String> {
         let mut parts = command.split_whitespace();
-        let cmd = parts.next().unwrap_or("anaphase");
+        let cmd = parts.next().ok_or("Empty command string".to_string())?;
         let args: Vec<&str> = parts.collect();
-        
+
+        // Validate executable existence with user-friendly error
+        if !Path::new(cmd).exists() {
+            return Err(format!(
+                "Executable not found: '{}'. Make sure the path is correct and the binary is built (try 'cargo build' first).",
+                cmd
+            ));
+        }
+
         let mut process = Command::new(cmd)
             .args(&args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Failed to start process '{}': {}", cmd, e))?;
 
         let stdin = process.stdin.take().ok_or("Failed to capture stdin".to_string())?;
         let stdout = process.stdout.take().ok_or("Failed to capture stdout".to_string())?;
