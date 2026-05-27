@@ -1,11 +1,22 @@
-use crate::cap_client::Snapshot;
+use serde_json::Value;
 
-/// Thread-safe shared UI state for asynchronous rendering
-/// Stores agent connection status and last received CAP snapshot
+pub type Snapshot = Value;
+
+/// Focused panel enum
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum Panel {
+    StateTree,
+    Metrics,
+}
+
 pub struct ShadowUiState {
     pub agent_connected: bool,
     pub is_dirty: bool,
     pub last_snapshot: Option<Snapshot>,
+    pub active_panel: Panel,
+    // Scroll offset for panels
+    pub state_tree_scroll: u16,
+    pub metrics_scroll: u16,
 }
 
 impl Default for ShadowUiState {
@@ -14,6 +25,9 @@ impl Default for ShadowUiState {
             agent_connected: false,
             is_dirty: false,
             last_snapshot: None,
+            active_panel: Panel::StateTree,
+            state_tree_scroll: 0,
+            metrics_scroll: 0,
         }
     }
 }
