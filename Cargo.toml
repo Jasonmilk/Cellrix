@@ -2,33 +2,53 @@
 name = "cellrix"
 version = "0.1.0"
 edition = "2021"
+description = "Universal Agent UI runtime"
+license = "MIT"
 
 [dependencies]
-# Async runtime for Rust
+# Async Runtime
 tokio = { version = "1", features = ["full"] }
 
-# Core TUI (Terminal UI) framework
+# TUI Core
 ratatui = "0.26"
 crossterm = "0.27"
 
-# Layout engine for isomorphic TUI/Web rendering
+# Layout Engine
 taffy = "0.4"
 
-# HTTP client for CAP protocol communication
+# HTTP Client (CAP Protocol)
 reqwest = { version = "0.12", features = ["json"] }
 
-# Async trait support
+# Async Traits
 async-trait = "0.1"
 
-# Thread communication
+# Thread Communication
 crossbeam-channel = "0.5"
 
-# Serialization/deserialization framework
+# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Utility libraries
+# Utilities
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+# CLI Parser
+argh = "0.1"
+
+# Syntax Highlighting
+syntect = "5.0"
+
+# Multi-line Input
+tui-textarea = { version = "0.4", optional = true }
+
+# UI Transitions (Optional)
+tachyonfx = { version = "0.2", optional = true }
+
+[features]
+default = ["smooth-transitions"]
+smooth-transitions = ["dep:tachyonfx"]
+rich-input = ["dep:tui-textarea"]
+full-ux = ["smooth-transitions", "rich-input"]

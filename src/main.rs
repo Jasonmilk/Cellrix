@@ -1,68 +1,105 @@
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph, BorderType},
+    widgets::{Block, Borders, Paragraph},
 };
 use std::io;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use argh::FromArgs;
+use std::env;
 
-// Core modules
+// Core Modules
 mod cap_client;
 mod app;
-mod layout;
-mod widgets;
-mod theme;
-// Transport layer
 mod transport;
+mod theme;
 
-// Import types
-use app::{ShadowUiState, Panel};
+// Import Core Types
+use app::{ShadowUiState, Panel, AestheticLevel};
 use cap_client::{CapTransport, start_async_cap_listener};
 use transport::{tcp::TcpTransport, stdio::StdioTransport, uds::UdsTransport};
+use theme::Nord;
+
+/// Cellrix: Universal Agent UI runtime
+#[derive(FromArgs)]
+struct Cli {
+    /// agent endpoint (tcp://host:port, uds://path, http://host:port)
+    #[argh(option)]
+    connect: Option<String>,
+
+    /// command to launch agent (STDIO mode)
+    #[argh(option)]
+    exec: Option<String>,
+
+    /// override UI aesthetic level (discrete, reactive, continuous)
+    #[argh(option)]
+    aesthetic: Option<String>,
+}
+
+/// Auto-detect optimal aesthetic level based on environment
+fn detect_aesthetic_level(args: &Cli) -> AestheticLevel {
+    // CLI argument override (highest priority)
+    if let Some(ref val) = args.aesthetic {
+        match val.to_lowercase().as_str() {
+            "discrete" => return AestheticLevel::Discrete,
+            "reactive" => return AestheticLevel::Reactive,
+            "continuous" => return AestheticLevel::Continuous,
+            _ => eprintln!("Unknown aesthetic level '{}', using auto-detect", val),
+        }
+    }
+
+    // Environment variable override
+    if let Ok(val) = env::var("CELLRIX_AESTHETIC") {
+        match val.to_lowercase().as_str() {
+            "discrete" => return AestheticLevel::Discrete,
+            "reactive" => return AestheticLevel::Reactive,
+            "continuous" => return AestheticLevel::Continuous,
+            _ => eprintln!("Invalid CELLRIX_AESTHETIC value, falling back"),
+        }
+    }
+
+    // Heuristic environment detection
+    let is_remote_session = env::var("SSH_TTY").is_ok() || env::var("SSH_CONNECTION").is_ok();
+    let has_true_color = env::var("COLORTERM")
+        .map(|v| v == "truecolor" || v == "24bit")
+        .unwrap_or(false);
+    let is_gpu_terminal = env::var("TERM")
+        .map(|t| matches!(t.as_str(), "alacritty" | "kitty" | "wezterm"))
+        .unwrap_or(false);
+
+    if is_remote_session || !has_true_color {
+        AestheticLevel::Discrete
+    } else if is_gpu_terminal {
+        AestheticLevel::Continuous
+    } else {
+        AestheticLevel::Reactive
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Parse command line arguments
-    let args: Vec<String> = std::env::args().collect();
-    let mut connect_target: Option<String> = None;
-    let mut exec_target: Option<String> = None;
-    let mut i = 1;
-    
-    while i < args.len() {
-        match args[i].as_str() {
-            "--connect" => {
-                i += 1;
-                if i < args.len() {
-                    connect_target = Some(args[i].clone());
-                }
-            }
-            "--exec" => {
-                i += 1;
-                if i < args.len() {
-                    exec_target = Some(args[i].clone());
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
+    // Parse CLI arguments
+    let cli: Cli = argh::from_env();
+    let aesthetic_level = detect_aesthetic_level(&cli);
 
     // Initialize logging
     tracing_subscriber::fmt::init();
 
-    // Shared UI state
-    let ui_state = Arc::new(RwLock::new(ShadowUiState::default()));
+    // Initialize shared UI state with detected aesthetic level
+    let mut ui_state = ShadowUiState::default();
+    ui_state.aesthetic_level = aesthetic_level;
+    let ui_state = Arc::new(RwLock::new(ui_state));
 
-    // Build transport layer
-    let transport: Arc<tokio::sync::Mutex<Box<dyn CapTransport>>> = if let Some(cmd) = exec_target {
+    // Transport layer initialization
+    let transport: Arc<tokio::sync::Mutex<Box<dyn CapTransport>>> = if let Some(cmd) = cli.exec {
         let stdio_transport = StdioTransport::new(&cmd).await?;
         Arc::new(tokio::sync::Mutex::new(Box::new(stdio_transport)))
-    } else if let Some(target) = connect_target {
+    } else if let Some(target) = cli.connect {
         if target.starts_with("tcp://") {
             let tcp_transport = TcpTransport::new(&target[6..]);
             Arc::new(tokio::sync::Mutex::new(Box::new(tcp_transport)))
@@ -74,15 +111,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::new(tokio::sync::Mutex::new(Box::new(tcp_transport)))
         }
     } else {
-        println!("Starting in Noop mode (no agent connected). Use --connect or --exec to attach.");
+        println!("Noop mode: No agent connected. Use --connect or --exec");
         return Ok(());
     };
 
-    // Start network listener task
+    // Start background network listener
     let state_clone = ui_state.clone();
-    let transport_clone = transport.clone();
     tokio::spawn(async move {
-        start_async_cap_listener(state_clone, transport_clone).await;
+        start_async_cap_listener(state_clone, transport).await;
     });
 
     // Terminal initialization
@@ -92,67 +128,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // UI render loop
+    // UI render loop configuration
     let tick_rate = Duration::from_millis(33);
-    let mut last_tick = Instant::now();
+    let mut last_tick = std::time::Instant::now();
 
+    // Main event loop
     loop {
-        let should_draw = {
-            if let Ok(mut state) = ui_state.write() {
-                let dirty = state.is_dirty;
-                state.is_dirty = false;
-                dirty
-            } else {
-                false
-            }
-        };
+        let state = ui_state.read().unwrap();
+        terminal.draw(|f| ui(f, &state))?;
+        drop(state);
 
-        if should_draw || last_tick.elapsed() >= tick_rate {
-            terminal.draw(|f| {
-                ui(f, &ui_state.read().unwrap());
-            })?;
-            last_tick = Instant::now();
-        }
-
-        // Input handling
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or(Duration::from_secs(0));
-
-        if event::poll(timeout)? {
+        // Input event handling
+        if crossterm::event::poll(tick_rate - last_tick.elapsed())? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
-                    KeyCode::Tab => {
-                        if let Ok(mut state) = ui_state.write() {
-                            state.active_panel = match state.active_panel {
-                                Panel::StateTree => Panel::Metrics,
-                                Panel::Metrics => Panel::StateTree,
-                            };
-                            state.is_dirty = true;
-                        }
+                    // Quit application
+                    KeyCode::Esc | KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        break;
                     }
+
+                    // Switch active panel
+                    KeyCode::Tab => {
+                        let mut state = ui_state.write().unwrap();
+                        state.active_panel = match state.active_panel {
+                            Panel::StateTree => Panel::Metrics,
+                            Panel::Metrics => Panel::StateTree,
+                        };
+                        state.is_dirty = true;
+                    }
+
+                    // Scroll controls
                     KeyCode::Up => {
-                        if let Ok(mut state) = ui_state.write() {
-                            match state.active_panel {
-                                Panel::StateTree => state.state_tree_scroll = state.state_tree_scroll.saturating_sub(1),
-                                Panel::Metrics => state.metrics_scroll = state.metrics_scroll.saturating_sub(1),
-                            };
-                            state.is_dirty = true;
-                        }
+                        let mut state = ui_state.write().unwrap();
+                        state.state_tree_scroll = state.state_tree_scroll.saturating_sub(1);
+                        state.is_dirty = true;
                     }
                     KeyCode::Down => {
-                        if let Ok(mut state) = ui_state.write() {
-                            match state.active_panel {
-                                Panel::StateTree => state.state_tree_scroll += 1,
-                                Panel::Metrics => state.metrics_scroll += 1,
-                            };
-                            state.is_dirty = true;
-                        }
+                        let mut state = ui_state.write().unwrap();
+                        state.state_tree_scroll += 1;
+                        state.is_dirty = true;
                     }
+
                     _ => {}
                 }
             }
+        }
+
+        // Render loop throttling
+        if last_tick.elapsed() >= tick_rate {
+            last_tick = std::time::Instant::now();
         }
     }
 
@@ -166,139 +190,94 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Main UI rendering function
 fn ui(f: &mut Frame, state: &ShadowUiState) {
-    let bg = theme::Nord::background();
-    f.render_widget(Paragraph::new("").style(Style::default().bg(bg)), f.size());
-
-    let size = f.size();
-
-    // Layout configuration
+    // Root layout (fixed f.area() → f.size())
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
             Constraint::Min(0),
-            Constraint::Length(1),
         ])
-        .split(size);
+        .split(f.size());
 
     // Status bar
     let status_text = format!(
-        " Cellrix v0.1.0 | Agent: {} | Tab:Switch | ↑↓:Scroll | q:Quit",
-        if state.agent_connected { "Online" } else { "Waiting" }
+        "Cellrix | Agent: {} | Tab: Switch | ↑↓: Scroll",
+        if state.agent_connected { "ONLINE" } else { "WAITING" }
     );
     f.render_widget(
-        Paragraph::new(status_text).style(Style::default().fg(theme::Nord::text_primary())),
+        Paragraph::new(status_text).style(Nord::status_bar()),
         chunks[0],
     );
 
-    // Main content split
-    let main_chunks = Layout::default()
+    // Content split
+    let content_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[1]);
 
-    let snapshot = &state.last_snapshot;
+    // State Tree Panel
+    let tree_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" 🧠 Cognitive State Tree ")
+        .border_style(
+            if state.active_panel == Panel::StateTree {
+                Nord::active_border()
+            } else {
+                Nord::inactive_border()
+            },
+        );
+    let tree_area = tree_block.inner(content_chunks[0]);
+    f.render_widget(tree_block, content_chunks[0]);
 
-    // State tree rendering
-    let tree_nodes: Vec<(String, String)> = snapshot
-        .as_ref()
-        .and_then(|s| s.get("semantic_tree"))
-        .and_then(|t| t.as_array())
-        .map(|arr| {
-            arr.iter()
-                .map(|node| {
-                    let label = node["label"].as_str().unwrap_or("").to_string();
-                    let content = node["content"].as_str().unwrap_or("").to_string();
-                    (label, content)
+    let tree_content = if let Some(snapshot) = &state.last_snapshot {
+        if let Some(nodes) = snapshot["semantic_tree"].as_array() {
+            nodes
+                .iter()
+                .map(|n| {
+                    format!(
+                        "• {}: {}",
+                        n["label"].as_str().unwrap_or(""),
+                        n["content"].as_str().unwrap_or("")
+                    )
                 })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let tree_rendered = render_swimlane(&tree_nodes);
-    let left_focused = state.active_panel == Panel::StateTree;
-
-    // Left panel style
-    let left_border = if left_focused { theme::Nord::border_active() } else { theme::Nord::border_inactive() };
-    let left_title = if left_focused {
-        Style::default().fg(theme::Nord::text_primary()).add_modifier(Modifier::BOLD)
+                .collect::<Vec<_>>()
+                .join("\n")
+        } else {
+            "No state data available".to_string()
+        }
     } else {
-        Style::default().fg(theme::Nord::text_secondary())
+        "Waiting for agent data...".to_string()
     };
 
-    let left_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(left_border))
-        .title(" ⏳ STATE TREE ")
-        .title_style(left_title);
-    f.render_widget(left_block, main_chunks[0]);
-
-    // Scrollable content
-    let inner_left = main_chunks[0].inner(&Margin::new(2, 1));
-    let lines_left: Vec<&str> = tree_rendered.lines().collect();
-    let scroll_left = state.state_tree_scroll as usize;
-    let visible_left: Vec<&str> = lines_left.iter().skip(scroll_left).take(inner_left.height as usize).cloned().collect();
-    
     f.render_widget(
-        Paragraph::new(visible_left.join("\n"))
-            .style(if left_focused { Style::default().fg(theme::Nord::text_primary()) } else { Style::default().fg(theme::Nord::text_secondary()) }),
-        inner_left,
+        Paragraph::new(tree_content)
+            .scroll((state.state_tree_scroll as u16, 0))
+            .style(Nord::text_primary()),
+        tree_area,
     );
 
-    // Metrics rendering
-    let metrics_text = snapshot
-        .as_ref()
-        .and_then(|s| s.get("metrics"))
-        .and_then(|m| serde_json::to_string_pretty(m).ok())
-        .unwrap_or_else(|| "No metrics data".to_string());
+    // Metrics Panel
+    let metrics_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" 📊 Metrics ")
+        .border_style(
+            if state.active_panel == Panel::Metrics {
+                Nord::active_border()
+            } else {
+                Nord::inactive_border()
+            },
+        );
+    let metrics_area = metrics_block.inner(content_chunks[1]);
+    f.render_widget(metrics_block, content_chunks[1]);
 
-    let right_focused = state.active_panel == Panel::Metrics;
-    // Right panel style
-    let right_border = if right_focused { theme::Nord::border_active() } else { theme::Nord::border_inactive() };
-    let right_title = if right_focused {
-        Style::default().fg(theme::Nord::text_primary()).add_modifier(Modifier::BOLD)
+    let metrics_content = if let Some(snapshot) = &state.last_snapshot {
+        format!("{:#?}", snapshot["metrics"])
     } else {
-        Style::default().fg(theme::Nord::text_secondary())
+        "No metrics available".to_string()
     };
 
-    let right_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(right_border))
-        .title(" 📊 METRICS ")
-        .title_style(right_title);
-    f.render_widget(right_block, main_chunks[1]);
-
-    // Scrollable content
-    let inner_right = main_chunks[1].inner(&Margin::new(2, 1));
-    let lines_right: Vec<&str> = metrics_text.lines().collect();
-    let scroll_right = state.metrics_scroll as usize;
-    let visible_right: Vec<&str> = lines_right.iter().skip(scroll_right).take(inner_right.height as usize).cloned().collect();
-    
     f.render_widget(
-        Paragraph::new(visible_right.join("\n"))
-            .style(if right_focused { Style::default().fg(theme::Nord::text_primary()) } else { Style::default().fg(theme::Nord::text_secondary()) }),
-        inner_right,
+        Paragraph::new(metrics_content).style(Nord::text_secondary()),
+        metrics_area,
     );
-
-    // Footer
-    f.render_widget(
-        Paragraph::new("[q] Quit  [Tab] Switch  [↑↓] Scroll")
-            .style(Style::default().fg(theme::Nord::text_secondary())),
-        chunks[2],
-    );
-}
-
-/// Render Unicode swimlane diagram
-fn render_swimlane(nodes: &[(String, String)]) -> String {
-    if nodes.is_empty() {
-        return "No state tree data".to_string();
-    }
-    let mut out = String::new();
-    for (i, (label, content)) in nodes.iter().enumerate() {
-        let branch = if i == nodes.len() - 1 { "└─" } else { "├─" };
-        out.push_str(&format!("{} {}: {}\n", branch, label, content));
-    }
-    out
 }
