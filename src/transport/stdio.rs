@@ -66,22 +66,20 @@ impl CapTransport for StdioTransport {
     }
 
     async fn send_action(&mut self, action: &str, params: Value) -> Result<String, String> {
-        let msg = serde_json::json!({
+        let cmd = serde_json::json!({
             "type": "action",
             "action": action,
             "params": params
         });
-        let msg_str = serde_json::to_string(&msg).map_err(|e| e.to_string())?;
-        
-        self.stdin.write_all(msg_str.as_bytes()).await.map_err(|e| e.to_string())?;
+        let cmd_str = serde_json::to_string(&cmd).map_err(|e| e.to_string())?;
+        self.stdin.write_all(cmd_str.as_bytes()).await.map_err(|e| e.to_string())?;
         self.stdin.write_all(b"\n").await.map_err(|e| e.to_string())?;
         self.stdin.flush().await.map_err(|e| e.to_string())?;
-
+        
         if let Some(line) = self.stdout_lines.next_line().await.map_err(|e| e.to_string())? {
-            let resp: Value = serde_json::from_str(&line).map_err(|e| e.to_string())?;
-            Ok(resp["message"].as_str().unwrap_or("No response").to_string())
+            Ok(line)
         } else {
-            Err("No response to action".to_string())
+            Err("No response from agent".to_string())
         }
     }
 }
