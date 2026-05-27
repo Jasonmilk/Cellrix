@@ -11,6 +11,7 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, BorderType},
 };
+use serde_json::json;
 
 mod app;
 mod cap_client;
@@ -26,7 +27,6 @@ use transport::stdio::StdioTransport;
 use transport::uds::UdsTransport;
 use theme::Nord;
 
-/// Detect environment and return initial aesthetic mode
 fn detect_aesthetic_level() -> AestheticLevel {
     if let Ok(val) = std::env::var("CELLRIX_AESTHETIC") {
         match val.to_lowercase().as_str() {
@@ -82,7 +82,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui_state.aesthetic_level = aesthetic;
     let ui_state = Arc::new(RwLock::new(ui_state));
 
-    // Initialize transport layer
     let transport: Option<Arc<tokio::sync::Mutex<Box<dyn CapTransport>>>> = if let Some(cmd) = exec_target {
         let stdio = StdioTransport::new(&cmd).await?;
         Some(Arc::new(tokio::sync::Mutex::new(Box::new(stdio))))
@@ -101,7 +100,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    // Start background network listener task
     if let Some(transport) = transport.clone() {
         let state_clone = ui_state.clone();
         tokio::spawn(async move {
@@ -128,7 +126,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // Terminal initialization
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -160,7 +157,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut state = ui_state.write().unwrap();
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => {
-                        // Clear input if not empty, else quit
                         if state.input_buffer.is_empty() {
                             break;
                         } else {
@@ -191,12 +187,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         state.is_dirty = true;
                     }
+                    // 架构师修复1：修复消息发送，使用 send_message 并解析响应
                     KeyCode::Enter => {
                         let msg = state.input_buffer.trim().to_string();
                         if !msg.is_empty() {
                             state.chat_history.push(format!("You: {}", msg));
                             state.input_buffer.clear();
-                            // TODO: Send message to agent and get response
+
+                            if let Some(ref transport) = transport {
+                                let mut t = transport.lock().await;
+                                let params = serde_json::json!({"message": msg});
+                                match t.send_action("send_message", params).await {
+                                    Ok(response) => {
+                                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
+                                            let content = json["content"].as_str().unwrap_or("No response");
+                                            state.chat_history.push(format!("Helix: {}", content));
+                                        } else {
+                                            state.chat_history.push(format!("Helix: {}", response));
+                                        }
+                                    }
+                                    Err(_) => {
+                                        state.chat_history.push("Helix: (offline - no response)".to_string());
+                                    }
+                                }
+                            } else {
+                                state.chat_history.push("Helix: (offline - no agent connected)".to_string());
+                            }
                             state.is_dirty = true;
                         }
                     }
@@ -220,21 +236,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Main UI rendering function
 fn ui(f: &mut Frame, state: &ShadowUiState) {
     let size = f.size();
     f.render_widget(Paragraph::new("").style(Style::default().bg(Nord::bg())), size);
 
+    // 架构师修复2：修改输入框高度为 3，解决截断问题
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(1),
+            Constraint::Min(3),
+            Constraint::Length(3),
         ])
         .split(size);
 
-    // Status bar
     let status_text = format!(
         " Cellrix v0.1.0 | Agent: {} | Mode: {:?} | Tab: switch, ↑↓: scroll, Enter: send, q: quit",
         if state.agent_connected { "Online" } else { "Offline" },
@@ -250,7 +265,6 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[1]);
 
-    // Left: State Tree Panel
     let snapshot = &state.last_snapshot;
     let tree_text = snapshot
         .as_ref()
@@ -285,7 +299,6 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         main_chunks[0].inner(&Margin::new(2, 1)),
     );
 
-    // Right: Chat Panel
     let right_focused = state.active_panel == Panel::Chat || state.active_panel == Panel::Metrics;
     let right_border = if right_focused { Nord::active_border() } else { Nord::inactive_border() };
     f.render_widget(
@@ -298,7 +311,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
     );
     let chat_text = state.chat_history.join("\n");
     let display_text = if chat_text.is_empty() {
-        "Welcome to Cellrix\n\nType your message and press Enter to send.\nPress Tab to switch panels.".to_string()
+        "Welcome to Cellrix\n\nType your message and press Enter to send.".to_string()
     } else {
         chat_text
     };
@@ -309,12 +322,17 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         main_chunks[1].inner(&Margin::new(2, 1)),
     );
 
-    // Bottom input bar
-    let input_text = format!("> {}", state.input_buffer);
+    let input_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Nord::inactive_border())
+        .title(" INPUT (Enter to send, Esc to clear, q to quit) ")
+        .title_style(Nord::text_secondary());
+    let input_area = input_block.inner(chunks[2]);
+    f.render_widget(input_block, chunks[2]);
     f.render_widget(
-        Paragraph::new(input_text)
-            .style(Nord::text_secondary())
-            .block(Block::default().borders(Borders::ALL).title(" INPUT ")),
-        chunks[2],
+        Paragraph::new(format!("> {}", state.input_buffer))
+            .style(Nord::text_primary()),
+        input_area,
     );
 }
