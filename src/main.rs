@@ -18,20 +18,32 @@ mod widgets;
 mod theme;
 
 use app::ShadowUiState;
-use cap_client::start_async_cap_listener;
+use cap_client::{start_async_cap_listener, RealCapClient, NoopCapClient, CapClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Parse command line arguments for connection target
+    let args: Vec<String> = std::env::args().collect();
+    let connect_target = args.iter().position(|a| a == "--connect").and_then(|i| args.get(i + 1));
+
     // Initialize logging subsystem
     tracing_subscriber::fmt::init();
 
     // Create thread-safe shared UI state
     let ui_state = Arc::new(RwLock::new(ShadowUiState::default()));
 
-    // Spawn async network listener thread (Noop simulation)
+    // Select CAP client based on command line arguments
+    let cap_client: Arc<dyn CapClient + Send + Sync> = if let Some(target) = connect_target {
+        Arc::new(RealCapClient::new(target))
+    } else {
+        Arc::new(NoopCapClient)
+    };
+
+    // Spawn async network listener thread
     let state_clone = ui_state.clone();
+    let client_clone = cap_client.clone();
     tokio::spawn(async move {
-        start_async_cap_listener(state_clone).await;
+        start_async_cap_listener(state_clone, client_clone).await;
     });
 
     // Initialize terminal configuration
@@ -91,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Main UI rendering function (Nord theme + monastic design)
+/// Main UI rendering function (Nord theme + dynamic CAP data rendering)
 fn ui(f: &mut Frame, state: &ShadowUiState) {
     let bg = theme::Nord::background();
     f.render_widget(Paragraph::new("").style(Style::default().bg(bg)), f.size());
@@ -108,7 +120,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         ])
         .split(size);
 
-    // Status bar
+    // Status bar (English only)
     let status_text = format!(
         " Cellrix v0.1.0 | Agent: {} | Press q to exit",
         if state.agent_connected { "Online" } else { "Waiting for connection" }
@@ -125,7 +137,24 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[1]);
 
-    // Left panel: State Tree
+    // Left panel: Dynamic Semantic Tree Rendering
+    let snapshot = &state.last_snapshot;
+    let tree_text = snapshot
+        .as_ref()
+        .and_then(|s| s.get("semantic_tree"))
+        .and_then(|t| t.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|node| {
+                    let label = node["label"].as_str().unwrap_or("Unknown Node");
+                    let content = node["content"].as_str().unwrap_or("No content");
+                    format!("{}: {}", label, content)
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_else(|| "No state tree data\n\nWaiting for Agent connection...".to_string());
+
     let left_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -133,31 +162,31 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         .title(" ⏳ STATE TREE ")
         .title_style(Style::default().fg(theme::Nord::text_secondary()));
     f.render_widget(left_block, main_chunks[0]);
-    
-    // Left panel placeholder content
     f.render_widget(
-        Paragraph::new("No state tree data\n\nWaiting for Agent connection...")
-            .style(Style::default().fg(theme::Nord::text_secondary())),
+        Paragraph::new(tree_text).style(Style::default().fg(theme::Nord::text_secondary())),
         main_chunks[0].inner(&Margin::new(2, 1)),
     );
 
-    // Right panel: Chat / Logs
+    // Right panel: Dynamic Agent Metrics Rendering
+    let metrics_text = snapshot
+        .as_ref()
+        .and_then(|s| s.get("metrics"))
+        .and_then(|m| serde_json::to_string_pretty(m).ok())
+        .unwrap_or_else(|| "No metrics data".to_string());
+
     let right_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(theme::Nord::border_inactive()))
-        .title(" 💬 CHAT / LOGS ")
+        .title(" 📊 METRICS ")
         .title_style(Style::default().fg(theme::Nord::text_secondary()));
     f.render_widget(right_block, main_chunks[1]);
-    
-    // Right panel placeholder content
     f.render_widget(
-        Paragraph::new("Welcome to Cellrix\n\nUniversal UI Standard for Agent Systems")
-            .style(Style::default().fg(theme::Nord::text_secondary())),
+        Paragraph::new(metrics_text).style(Style::default().fg(theme::Nord::text_primary())),
         main_chunks[1].inner(&Margin::new(2, 1)),
     );
 
-    // Footer action hints
+    // Footer action hints (English only)
     f.render_widget(
         Paragraph::new("[q] Exit  [Tab] Switch Focus (Pending)")
             .style(Style::default().fg(theme::Nord::text_secondary())),
