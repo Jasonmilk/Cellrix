@@ -1,80 +1,53 @@
+use std::io;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+
 use crossterm::{
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, BorderType},
 };
-use std::io;
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
-use argh::FromArgs;
-use std::env;
 
-// Core Modules
-mod cap_client;
 mod app;
+mod cap_client;
+mod layout;
 mod transport;
 mod theme;
+mod widgets;
 
-// Import Core Types
-use app::{ShadowUiState, Panel, AestheticLevel};
-use cap_client::{CapTransport, start_async_cap_listener};
-use transport::{tcp::TcpTransport, stdio::StdioTransport, uds::UdsTransport};
+use app::{AestheticLevel, Panel, ShadowUiState};
+use cap_client::CapTransport;
+use transport::tcp::TcpTransport;
+use transport::stdio::StdioTransport;
+use transport::uds::UdsTransport;
 use theme::Nord;
 
-/// Cellrix: Universal Agent UI runtime
-#[derive(FromArgs)]
-struct Cli {
-    /// agent endpoint (tcp://host:port, uds://path, http://host:port)
-    #[argh(option)]
-    connect: Option<String>,
-
-    /// command to launch agent (STDIO mode)
-    #[argh(option)]
-    exec: Option<String>,
-
-    /// override UI aesthetic level (discrete, reactive, continuous)
-    #[argh(option)]
-    aesthetic: Option<String>,
-}
-
-/// Auto-detect optimal aesthetic level based on environment
-fn detect_aesthetic_level(args: &Cli) -> AestheticLevel {
-    // CLI argument override (highest priority)
-    if let Some(ref val) = args.aesthetic {
+/// Detect environment and return initial aesthetic mode
+fn detect_aesthetic_level() -> AestheticLevel {
+    if let Ok(val) = std::env::var("CELLRIX_AESTHETIC") {
         match val.to_lowercase().as_str() {
             "discrete" => return AestheticLevel::Discrete,
             "reactive" => return AestheticLevel::Reactive,
             "continuous" => return AestheticLevel::Continuous,
-            _ => eprintln!("Unknown aesthetic level '{}', using auto-detect", val),
+            _ => {}
         }
     }
 
-    // Environment variable override
-    if let Ok(val) = env::var("CELLRIX_AESTHETIC") {
-        match val.to_lowercase().as_str() {
-            "discrete" => return AestheticLevel::Discrete,
-            "reactive" => return AestheticLevel::Reactive,
-            "continuous" => return AestheticLevel::Continuous,
-            _ => eprintln!("Invalid CELLRIX_AESTHETIC value, falling back"),
-        }
-    }
-
-    // Heuristic environment detection
-    let is_remote_session = env::var("SSH_TTY").is_ok() || env::var("SSH_CONNECTION").is_ok();
-    let has_true_color = env::var("COLORTERM")
+    let is_remote = std::env::var("SSH_TTY").is_ok() || std::env::var("SSH_CONNECTION").is_ok();
+    let has_true_color = std::env::var("COLORTERM")
         .map(|v| v == "truecolor" || v == "24bit")
         .unwrap_or(false);
-    let is_gpu_terminal = env::var("TERM")
-        .map(|t| matches!(t.as_str(), "alacritty" | "kitty" | "wezterm"))
+    let is_gpu_accelerated = std::env::var("TERM")
+        .map(|term| matches!(term.as_str(), "alacritty" | "kitty" | "wezterm"))
         .unwrap_or(false);
 
-    if is_remote_session || !has_true_color {
+    if is_remote || !has_true_color {
         AestheticLevel::Discrete
-    } else if is_gpu_terminal {
+    } else if is_gpu_accelerated {
         AestheticLevel::Continuous
     } else {
         AestheticLevel::Reactive
@@ -83,43 +56,77 @@ fn detect_aesthetic_level(args: &Cli) -> AestheticLevel {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Parse CLI arguments
-    let cli: Cli = argh::from_env();
-    let aesthetic_level = detect_aesthetic_level(&cli);
-
-    // Initialize logging
     tracing_subscriber::fmt::init();
 
-    // Initialize shared UI state with detected aesthetic level
+    let args: Vec<String> = std::env::args().collect();
+    let mut connect_target: Option<String> = None;
+    let mut exec_target: Option<String> = None;
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--connect" => {
+                i += 1;
+                if i < args.len() { connect_target = Some(args[i].clone()); }
+            }
+            "--exec" => {
+                i += 1;
+                if i < args.len() { exec_target = Some(args[i].clone()); }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    let aesthetic = detect_aesthetic_level();
     let mut ui_state = ShadowUiState::default();
-    ui_state.aesthetic_level = aesthetic_level;
+    ui_state.aesthetic_level = aesthetic;
     let ui_state = Arc::new(RwLock::new(ui_state));
 
-    // Transport layer initialization
-    let transport: Arc<tokio::sync::Mutex<Box<dyn CapTransport>>> = if let Some(cmd) = cli.exec {
-        let stdio_transport = StdioTransport::new(&cmd).await?;
-        Arc::new(tokio::sync::Mutex::new(Box::new(stdio_transport)))
-    } else if let Some(target) = cli.connect {
+    // Initialize transport layer
+    let transport: Option<Arc<tokio::sync::Mutex<Box<dyn CapTransport>>>> = if let Some(cmd) = exec_target {
+        let stdio = StdioTransport::new(&cmd).await?;
+        Some(Arc::new(tokio::sync::Mutex::new(Box::new(stdio))))
+    } else if let Some(target) = connect_target {
         if target.starts_with("tcp://") {
-            let tcp_transport = TcpTransport::new(&target[6..]);
-            Arc::new(tokio::sync::Mutex::new(Box::new(tcp_transport)))
+            let tcp = TcpTransport::new(&target[6..]);
+            Some(Arc::new(tokio::sync::Mutex::new(Box::new(tcp))))
         } else if target.starts_with("uds://") {
-            let uds_transport = UdsTransport::new(&target[6..]);
-            Arc::new(tokio::sync::Mutex::new(Box::new(uds_transport)))
+            let uds = UdsTransport::new(&target[6..]);
+            Some(Arc::new(tokio::sync::Mutex::new(Box::new(uds))))
         } else {
-            let tcp_transport = TcpTransport::new(&target);
-            Arc::new(tokio::sync::Mutex::new(Box::new(tcp_transport)))
+            let tcp = TcpTransport::new(&target);
+            Some(Arc::new(tokio::sync::Mutex::new(Box::new(tcp))))
         }
     } else {
-        println!("Noop mode: No agent connected. Use --connect or --exec");
-        return Ok(());
+        None
     };
 
-    // Start background network listener
-    let state_clone = ui_state.clone();
-    tokio::spawn(async move {
-        start_async_cap_listener(state_clone, transport).await;
-    });
+    // Start background network listener task
+    if let Some(transport) = transport.clone() {
+        let state_clone = ui_state.clone();
+        tokio::spawn(async move {
+            loop {
+                let snapshot = {
+                    let mut t = transport.lock().await;
+                    t.get_snapshot().await
+                };
+                match snapshot {
+                    Ok(snapshot) => {
+                        let mut state = state_clone.write().unwrap();
+                        state.agent_connected = true;
+                        state.last_snapshot = Some(snapshot);
+                        state.is_dirty = true;
+                    }
+                    Err(_) => {
+                        let mut state = state_clone.write().unwrap();
+                        state.agent_connected = false;
+                        state.is_dirty = true;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(1000)).await;
+            }
+        });
+    }
 
     // Terminal initialization
     enable_raw_mode()?;
@@ -128,156 +135,186 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // UI render loop configuration
     let tick_rate = Duration::from_millis(33);
-    let mut last_tick = std::time::Instant::now();
+    let mut last_tick = Instant::now();
 
-    // Main event loop
     loop {
-        let state = ui_state.read().unwrap();
-        terminal.draw(|f| ui(f, &state))?;
-        drop(state);
+        let should_draw = {
+            let mut state = ui_state.write().unwrap();
+            let dirty = state.is_dirty;
+            state.is_dirty = false;
+            dirty
+        };
 
-        // Input event handling
-        if crossterm::event::poll(tick_rate - last_tick.elapsed())? {
+        if should_draw || last_tick.elapsed() >= tick_rate {
+            terminal.draw(|f| ui(f, &ui_state.read().unwrap()))?;
+            last_tick = Instant::now();
+        }
+
+        let timeout = tick_rate
+            .checked_sub(last_tick.elapsed())
+            .unwrap_or(Duration::from_secs(0));
+
+        if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
+                let mut state = ui_state.write().unwrap();
                 match key.code {
-                    // Quit application
-                    KeyCode::Esc | KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        break;
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        // Clear input if not empty, else quit
+                        if state.input_buffer.is_empty() {
+                            break;
+                        } else {
+                            state.input_buffer.clear();
+                        }
                     }
-
-                    // Switch active panel
                     KeyCode::Tab => {
-                        let mut state = ui_state.write().unwrap();
                         state.active_panel = match state.active_panel {
-                            Panel::StateTree => Panel::Metrics,
+                            Panel::StateTree => Panel::Chat,
+                            Panel::Chat => Panel::Metrics,
                             Panel::Metrics => Panel::StateTree,
                         };
                         state.is_dirty = true;
                     }
-
-                    // Scroll controls
                     KeyCode::Up => {
-                        let mut state = ui_state.write().unwrap();
-                        state.state_tree_scroll = state.state_tree_scroll.saturating_sub(1);
+                        match state.active_panel {
+                            Panel::Chat => state.chat_scroll = state.chat_scroll.saturating_sub(1),
+                            Panel::StateTree => state.state_tree_scroll = state.state_tree_scroll.saturating_sub(1),
+                            _ => {}
+                        }
                         state.is_dirty = true;
                     }
                     KeyCode::Down => {
-                        let mut state = ui_state.write().unwrap();
-                        state.state_tree_scroll += 1;
+                        match state.active_panel {
+                            Panel::Chat => state.chat_scroll += 1,
+                            Panel::StateTree => state.state_tree_scroll += 1,
+                            _ => {}
+                        }
                         state.is_dirty = true;
                     }
-
+                    KeyCode::Enter => {
+                        let msg = state.input_buffer.trim().to_string();
+                        if !msg.is_empty() {
+                            state.chat_history.push(format!("You: {}", msg));
+                            state.input_buffer.clear();
+                            // TODO: Send message to agent and get response
+                            state.is_dirty = true;
+                        }
+                    }
+                    KeyCode::Char(c) => {
+                        state.input_buffer.push(c);
+                        state.is_dirty = true;
+                    }
+                    KeyCode::Backspace => {
+                        state.input_buffer.pop();
+                        state.is_dirty = true;
+                    }
                     _ => {}
                 }
             }
         }
-
-        // Render loop throttling
-        if last_tick.elapsed() >= tick_rate {
-            last_tick = std::time::Instant::now();
-        }
     }
 
-    // Terminal cleanup
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
-
     Ok(())
 }
 
 /// Main UI rendering function
 fn ui(f: &mut Frame, state: &ShadowUiState) {
-    // Root layout (fixed f.area() → f.size())
+    let size = f.size();
+    f.render_widget(Paragraph::new("").style(Style::default().bg(Nord::bg())), size);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
             Constraint::Min(0),
+            Constraint::Length(1),
         ])
-        .split(f.size());
+        .split(size);
 
     // Status bar
     let status_text = format!(
-        "Cellrix | Agent: {} | Tab: Switch | ↑↓: Scroll",
-        if state.agent_connected { "ONLINE" } else { "WAITING" }
+        " Cellrix v0.1.0 | Agent: {} | Mode: {:?} | Tab: switch, ↑↓: scroll, Enter: send, q: quit",
+        if state.agent_connected { "Online" } else { "Offline" },
+        state.aesthetic_level
     );
     f.render_widget(
         Paragraph::new(status_text).style(Nord::status_bar()),
         chunks[0],
     );
 
-    // Content split
-    let content_chunks = Layout::default()
+    let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[1]);
 
-    // State Tree Panel
-    let tree_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" 🧠 Cognitive State Tree ")
-        .border_style(
-            if state.active_panel == Panel::StateTree {
-                Nord::active_border()
-            } else {
-                Nord::inactive_border()
-            },
-        );
-    let tree_area = tree_block.inner(content_chunks[0]);
-    f.render_widget(tree_block, content_chunks[0]);
-
-    let tree_content = if let Some(snapshot) = &state.last_snapshot {
-        if let Some(nodes) = snapshot["semantic_tree"].as_array() {
-            nodes
-                .iter()
-                .map(|n| {
-                    format!(
-                        "• {}: {}",
-                        n["label"].as_str().unwrap_or(""),
-                        n["content"].as_str().unwrap_or("")
-                    )
+    // Left: State Tree Panel
+    let snapshot = &state.last_snapshot;
+    let tree_text = snapshot
+        .as_ref()
+        .and_then(|s| s.get("semantic_tree"))
+        .and_then(|t| t.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|node| {
+                    let label = node["label"].as_str().unwrap_or("");
+                    let content = node["content"].as_str().unwrap_or("");
+                    format!("├─ {}: {}", label, content)
                 })
                 .collect::<Vec<_>>()
                 .join("\n")
-        } else {
-            "No state data available".to_string()
-        }
-    } else {
-        "Waiting for agent data...".to_string()
-    };
+        })
+        .unwrap_or_else(|| "No data".to_string());
 
+    let left_focused = state.active_panel == Panel::StateTree;
+    let left_border = if left_focused { Nord::active_border() } else { Nord::inactive_border() };
     f.render_widget(
-        Paragraph::new(tree_content)
-            .scroll((state.state_tree_scroll as u16, 0))
-            .style(Nord::text_primary()),
-        tree_area,
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(left_border)
+            .title(" ⏳ STATE TREE "),
+        main_chunks[0],
+    );
+    f.render_widget(
+        Paragraph::new(tree_text)
+            .style(if left_focused { Nord::text_primary() } else { Nord::text_secondary() })
+            .scroll((state.state_tree_scroll as u16, 0)),
+        main_chunks[0].inner(&Margin::new(2, 1)),
     );
 
-    // Metrics Panel
-    let metrics_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" 📊 Metrics ")
-        .border_style(
-            if state.active_panel == Panel::Metrics {
-                Nord::active_border()
-            } else {
-                Nord::inactive_border()
-            },
-        );
-    let metrics_area = metrics_block.inner(content_chunks[1]);
-    f.render_widget(metrics_block, content_chunks[1]);
-
-    let metrics_content = if let Some(snapshot) = &state.last_snapshot {
-        format!("{:#?}", snapshot["metrics"])
-    } else {
-        "No metrics available".to_string()
-    };
-
+    // Right: Chat Panel
+    let right_focused = state.active_panel == Panel::Chat || state.active_panel == Panel::Metrics;
+    let right_border = if right_focused { Nord::active_border() } else { Nord::inactive_border() };
     f.render_widget(
-        Paragraph::new(metrics_content).style(Nord::text_secondary()),
-        metrics_area,
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(right_border)
+            .title(" 💬 CHAT "),
+        main_chunks[1],
+    );
+    let chat_text = state.chat_history.join("\n");
+    let display_text = if chat_text.is_empty() {
+        "Welcome to Cellrix\n\nType your message and press Enter to send.\nPress Tab to switch panels.".to_string()
+    } else {
+        chat_text
+    };
+    f.render_widget(
+        Paragraph::new(display_text)
+            .style(Nord::text_primary())
+            .scroll((state.chat_scroll as u16, 0)),
+        main_chunks[1].inner(&Margin::new(2, 1)),
+    );
+
+    // Bottom input bar
+    let input_text = format!("> {}", state.input_buffer);
+    f.render_widget(
+        Paragraph::new(input_text)
+            .style(Nord::text_secondary())
+            .block(Block::default().borders(Borders::ALL).title(" INPUT ")),
+        chunks[2],
     );
 }
