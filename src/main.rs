@@ -11,42 +11,88 @@ use std::io;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
+// Core modules
 mod cap_client;
 mod app;
 mod layout;
 mod widgets;
 mod theme;
+// Transport layer
+mod transport;
 
+// Import types
 use app::{ShadowUiState, Panel};
-use cap_client::{start_async_cap_listener, RealCapClient, NoopCapClient, CapClient};
+use cap_client::{CapTransport, start_async_cap_listener};
+use transport::{tcp::TcpTransport, stdio::StdioTransport, uds::UdsTransport};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
-    let connect_target = args.iter().position(|a| a == "--connect").and_then(|i| args.get(i + 1));
+    let mut connect_target: Option<String> = None;
+    let mut exec_target: Option<String> = None;
+    let mut i = 1;
+    
+    while i < args.len() {
+        match args[i].as_str() {
+            "--connect" => {
+                i += 1;
+                if i < args.len() {
+                    connect_target = Some(args[i].clone());
+                }
+            }
+            "--exec" => {
+                i += 1;
+                if i < args.len() {
+                    exec_target = Some(args[i].clone());
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
 
+    // Initialize logging
     tracing_subscriber::fmt::init();
 
+    // Shared UI state
     let ui_state = Arc::new(RwLock::new(ShadowUiState::default()));
 
-    let cap_client: Arc<dyn CapClient + Send + Sync> = if let Some(target) = connect_target {
-        Arc::new(RealCapClient::new(target))
+    // Build transport layer
+    let transport: Arc<tokio::sync::Mutex<Box<dyn CapTransport>>> = if let Some(cmd) = exec_target {
+        let stdio_transport = StdioTransport::new(&cmd).await?;
+        Arc::new(tokio::sync::Mutex::new(Box::new(stdio_transport)))
+    } else if let Some(target) = connect_target {
+        if target.starts_with("tcp://") {
+            let tcp_transport = TcpTransport::new(&target[6..]);
+            Arc::new(tokio::sync::Mutex::new(Box::new(tcp_transport)))
+        } else if target.starts_with("uds://") {
+            let uds_transport = UdsTransport::new(&target[6..]);
+            Arc::new(tokio::sync::Mutex::new(Box::new(uds_transport)))
+        } else {
+            let tcp_transport = TcpTransport::new(&target);
+            Arc::new(tokio::sync::Mutex::new(Box::new(tcp_transport)))
+        }
     } else {
-        Arc::new(NoopCapClient)
+        println!("Starting in Noop mode (no agent connected). Use --connect or --exec to attach.");
+        return Ok(());
     };
 
+    // Start network listener task
     let state_clone = ui_state.clone();
-    let client_clone = cap_client.clone();
+    let transport_clone = transport.clone();
     tokio::spawn(async move {
-        start_async_cap_listener(state_clone, client_clone).await;
+        start_async_cap_listener(state_clone, transport_clone).await;
     });
 
+    // Terminal initialization
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // UI render loop
     let tick_rate = Duration::from_millis(33);
     let mut last_tick = Instant::now();
 
@@ -68,6 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             last_tick = Instant::now();
         }
 
+        // Input handling
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
             .unwrap_or(Duration::from_secs(0));
@@ -109,6 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Terminal cleanup
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
@@ -116,12 +164,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Main UI rendering function
 fn ui(f: &mut Frame, state: &ShadowUiState) {
     let bg = theme::Nord::background();
     f.render_widget(Paragraph::new("").style(Style::default().bg(bg)), f.size());
 
     let size = f.size();
 
+    // Layout configuration
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -131,6 +181,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         ])
         .split(size);
 
+    // Status bar
     let status_text = format!(
         " Cellrix v0.1.0 | Agent: {} | Tab:Switch | ↑↓:Scroll | q:Quit",
         if state.agent_connected { "Online" } else { "Waiting" }
@@ -140,6 +191,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         chunks[0],
     );
 
+    // Main content split
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
@@ -147,6 +199,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
 
     let snapshot = &state.last_snapshot;
 
+    // State tree rendering
     let tree_nodes: Vec<(String, String)> = snapshot
         .as_ref()
         .and_then(|s| s.get("semantic_tree"))
@@ -165,6 +218,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
     let tree_rendered = render_swimlane(&tree_nodes);
     let left_focused = state.active_panel == Panel::StateTree;
 
+    // Left panel style
     let left_border = if left_focused { theme::Nord::border_active() } else { theme::Nord::border_inactive() };
     let left_title = if left_focused {
         Style::default().fg(theme::Nord::text_primary()).add_modifier(Modifier::BOLD)
@@ -180,6 +234,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         .title_style(left_title);
     f.render_widget(left_block, main_chunks[0]);
 
+    // Scrollable content
     let inner_left = main_chunks[0].inner(&Margin::new(2, 1));
     let lines_left: Vec<&str> = tree_rendered.lines().collect();
     let scroll_left = state.state_tree_scroll as usize;
@@ -191,6 +246,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         inner_left,
     );
 
+    // Metrics rendering
     let metrics_text = snapshot
         .as_ref()
         .and_then(|s| s.get("metrics"))
@@ -198,6 +254,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         .unwrap_or_else(|| "No metrics data".to_string());
 
     let right_focused = state.active_panel == Panel::Metrics;
+    // Right panel style
     let right_border = if right_focused { theme::Nord::border_active() } else { theme::Nord::border_inactive() };
     let right_title = if right_focused {
         Style::default().fg(theme::Nord::text_primary()).add_modifier(Modifier::BOLD)
@@ -213,6 +270,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         .title_style(right_title);
     f.render_widget(right_block, main_chunks[1]);
 
+    // Scrollable content
     let inner_right = main_chunks[1].inner(&Margin::new(2, 1));
     let lines_right: Vec<&str> = metrics_text.lines().collect();
     let scroll_right = state.metrics_scroll as usize;
@@ -224,6 +282,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         inner_right,
     );
 
+    // Footer
     f.render_widget(
         Paragraph::new("[q] Quit  [Tab] Switch  [↑↓] Scroll")
             .style(Style::default().fg(theme::Nord::text_secondary())),
@@ -231,6 +290,7 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
     );
 }
 
+/// Render Unicode swimlane diagram
 fn render_swimlane(nodes: &[(String, String)]) -> String {
     if nodes.is_empty() {
         return "No state tree data".to_string();
