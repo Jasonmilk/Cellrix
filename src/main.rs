@@ -257,25 +257,58 @@ fn ui(f: &mut Frame, state: &ShadowUiState) {
         main_chunks[0].inner(&Margin::new(2, 1)),
     );
 
-    // Right panel - CHAT
+    // Right chat area (with bubble separation)
     let right_focused = state.active_panel == Panel::Chat;
     let right_border = if right_focused { Nord::active_border() } else { Nord::inactive_border() };
-    f.render_widget(
-        Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(right_border).title(" 💬 CHAT "),
-        main_chunks[1],
-    );
-    let chat_text = state.chat_history.join("\n");
-    let display_text = if chat_text.is_empty() { "Welcome to Cellrix\n\nType your message and press Enter to send.".to_string() } else { chat_text };
-    f.render_widget(
-        Paragraph::new(display_text).style(Nord::text_primary()).scroll((state.chat_scroll as u16, 0)),
-        main_chunks[1].inner(&Margin::new(2, 1)),
-    );
+    let right_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(right_border)
+        .title(" 💬 CHAT ")
+        .style(Style::default().bg(Nord::chat_bg()));
+    f.render_widget(right_block, main_chunks[1]);
 
-    // Bottom input bar
-    let input_block = Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(Nord::inactive_border()).title(" INPUT (Enter to send) ");
+    let chat_area = main_chunks[1].inner(&Margin::new(1, 1));
+    let mut lines: Vec<Line<'_>> = Vec::new();
+
+    for (i, msg) in state.chat_history.iter().enumerate() {
+        // Add empty line between messages (skip for first message)
+        if i > 0 {
+            lines.push(Line::from(""));
+        }
+
+        if let Some(content) = msg.strip_prefix("You: ") {
+            lines.push(Line::from(vec![
+                Span::styled("▎ ", Nord::user_message()),
+                Span::styled(content, Nord::text_primary()),
+            ]));
+        } else if let Some(content) = msg.strip_prefix("Helix: ") {
+            lines.push(Line::from(vec![
+                Span::styled("▎ ", Nord::helix_message()),
+                Span::styled(content, Nord::text_primary()),
+            ]));
+        } else {
+            lines.push(Line::from(Span::styled(msg.as_str(), Nord::text_secondary())));
+        }
+    }
+
+    let paragraph = Paragraph::new(lines)
+        .scroll((state.chat_scroll as u16, 0));
+    f.render_widget(paragraph, chat_area);
+
+    // Bottom input bar (with simulated cursor)
+    let input_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Nord::inactive_border())
+        .title(" INPUT (Enter to send) ");
     f.render_widget(input_block, chunks[2]);
+
+    // Static cursor symbol for visual feedback
+    let cursor = "▊";
+    let input_text = format!("> {}{}", state.input_buffer, cursor);
     f.render_widget(
-        Paragraph::new(format!("> {}", state.input_buffer)).style(Nord::text_primary()),
+        Paragraph::new(input_text).style(Nord::text_primary()),
         chunks[2].inner(&Margin::new(1, 1)),
     );
 }
