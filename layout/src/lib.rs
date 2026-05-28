@@ -4,11 +4,13 @@ mod layout_engine;
 mod slot_allocator;
 mod focus_manager;
 mod zen_mode;
+mod coords;
 
-pub use layout_engine::{LayoutEngine, LayoutRequest, LayoutOutput, LayoutRect};
+pub use layout_engine::{LayoutEngine, LayoutRequest, LayoutOutput};
 pub use slot_allocator::{SlotAllocator, SlotAssignment, SlotType};
 pub use focus_manager::FocusManager;
 pub use zen_mode::ZenMode;
+pub use coords::LayoutRect;
 
 /// Common error type for layout operations.
 #[derive(Debug, thiserror::Error)]

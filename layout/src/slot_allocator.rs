@@ -28,15 +28,16 @@ impl SlotAllocator {
         &self,
         total_width: u16,
         total_height: u16,
+        slot_ids: &[String],
         slot_types: &[SlotType],
         weights: &[f64],
     ) -> Result<Vec<(String, LayoutRect)>, LayoutError> {
-        if slot_types.is_empty() {
+        if slot_ids.is_empty() || slot_types.is_empty() {
             return Err(LayoutError::NoSpace);
         }
-        if slot_types.len() != weights.len() {
+        if slot_types.len() != weights.len() || slot_types.len() != slot_ids.len() {
             return Err(LayoutError::InvalidGrid(
-                "slot_types and weights length mismatch".to_string(),
+                "slot_ids, slot_types and weights length mismatch".to_string(),
             ));
         }
 
@@ -47,7 +48,7 @@ impl SlotAllocator {
 
         // First pass: allocate fixed and min slots.
         for (idx, slot_type) in slot_types.iter().enumerate() {
-            let slot_id = format!("slot_{}", idx);
+            let slot_id = &slot_ids[idx];
             match slot_type {
                 SlotType::FixedLines(lines) => {
                     let height = *lines;
@@ -55,7 +56,7 @@ impl SlotAllocator {
                         return Err(LayoutError::NoSpace);
                     }
                     results.push((
-                        slot_id,
+                        slot_id.clone(),
                         LayoutRect {
                             x: 0,
                             y,
@@ -71,10 +72,10 @@ impl SlotAllocator {
                     if remaining_height < height as i32 {
                         return Err(LayoutError::NoSpace);
                     }
-                    flexible.push((idx, slot_id, height as i32));
+                    flexible.push((idx, slot_id.clone(), height as i32));
                 }
                 SlotType::Percentage(_) => {
-                    flexible.push((idx, slot_id, 0));
+                    flexible.push((idx, slot_id.clone(), 0));
                 }
             }
         }
