@@ -136,7 +136,7 @@ impl LayoutEngine {
 
     fn build_zen_layout(&self, req: &LayoutRequest, focus_id: &str) -> (Vec<SlotType>, Vec<f64>) {
         let target_slot = self.find_slot_for_node(req, focus_id);
-        let (mut slots, mut weights) = self.build_implicit_layout(req);
+        let (slots, mut weights) = self.build_implicit_layout(req);
         let target_index = self.find_slot_index_by_id(&slots, &target_slot);
         for i in 0..weights.len() {
             weights[i] = if i == target_index { 1.0 } else { 0.0 };
