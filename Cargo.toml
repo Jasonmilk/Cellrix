@@ -5,6 +5,8 @@ members = [
     "layout",
     "transport",
     "ui",
+    "cli",
+    "mock-agent",
 ]
 
 [workspace.package]

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use tokio::net::UnixStream;
-use tokio::io::{BufReader, BufWriter, AsyncBufReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
+use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
 use crate::cap_transport::{CapTransport, TransportError};
 use crate::protocol::{WireFormat, handshake_client, send_message, recv_message, DEFAULT_TIMEOUT_MS};
 use cellrix_protocol::{CapabilityManifest, SemanticSnapshot, ActionRequest, ActionResponse};

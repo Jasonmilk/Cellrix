@@ -1,6 +1,5 @@
 use crate::{LayoutError, LayoutRect};
 
-/// Type of slot constraint.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SlotType {
     Percentage(f64),
@@ -8,7 +7,6 @@ pub enum SlotType {
     Min(u16),
 }
 
-/// Assignment of a slot to a physical rectangle.
 #[derive(Debug, Clone)]
 pub struct SlotAssignment {
     pub slot_id: String,
@@ -16,7 +14,6 @@ pub struct SlotAssignment {
     pub node_ids: Vec<String>,
 }
 
-/// Allocates screen space to slots.
 pub struct SlotAllocator;
 
 impl SlotAllocator {
