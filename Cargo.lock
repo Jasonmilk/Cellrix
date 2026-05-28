@@ -3,12 +3,33 @@
 version = 4
 
 [[package]]
+name = "cellrix-layout"
+version = "0.1.0"
+dependencies = [
+ "cellrix-protocol",
+]
+
+[[package]]
 name = "cellrix-protocol"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "cellrix-transport"
+version = "0.1.0"
+dependencies = [
+ "cellrix-protocol",
+]
+
+[[package]]
+name = "cellrix-ui"
+version = "0.1.0"
+dependencies = [
+ "cellrix-protocol",
 ]
 
 [[package]]

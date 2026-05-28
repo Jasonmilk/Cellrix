@@ -1,15 +1,11 @@
-//! # cellrix-protocol — Physical binding for CommonIntents protocol stack
+//! # cellrix-protocol — CommonIntents 协议栈的物理绑定
 //!
-//! This crate provides capabilities for the entire Helix ecosystem:
-//! - CIS (Structured Intent Description Language) data types: `CapabilityManifest`, `SemanticSnapshot`
-//! - CAP (Consensus Acknowledgment Protocol) data types: `ActionRequest`, `ActionResponse`
-//! - Interface definition for view hash (actual algorithm implemented by upper layer)
-//! - Tolerant parser: single corrupted node will not break the whole snapshot
-//! - UI-agnostic universal coordinate system (`LayoutRect`, u16 precision)
-//!
-//! # Zero extra dependency rule
-//! No runtime dependencies except `serde` / `serde_json` / `thiserror`.
-//! Can be compiled to WASM and safely referenced by other crates.
+//! 本crate为整个Helix生态提供：
+//! - CIS (结构化意图描述语言) 的数据类型：`CapabilityManifest`, `SemanticSnapshot`
+//! - CAP (共识确认协议) 的数据类型：`ActionRequest`, `ActionResponse`
+//! - 视图哈希的接口定义（实际算法由上层实现）
+//! - 宽容解析器：单个节点损坏不影响整体快照
+//! - 与UI库解耦的通用坐标系（`LayoutRect`, u16精度）
 
 mod manifest;
 mod snapshot;
@@ -18,7 +14,6 @@ mod view_hash;
 mod parser;
 mod coords;
 
-// Public exports
 pub use manifest::*;
 pub use snapshot::*;
 pub use action::*;
@@ -26,18 +21,18 @@ pub use view_hash::*;
 pub use parser::*;
 pub use coords::*;
 
-/// Unified error type for this crate
+/// 本crate统一的错误类型
 #[derive(Debug, thiserror::Error)]
 pub enum ProtocolError {
-    #[error("JSON parse failed: {0}")]
+    #[error("JSON解析失败: {0}")]
     JsonParse(#[from] serde_json::Error),
 
-    #[error("Node parse failed, fallback to Unknown: {0}")]
+    #[error("节点解析失败，已降级为Unknown: {0}")]
     NodeFallback(String),
 
-    #[error("Required field missing: {0}")]
+    #[error("缺少必要字段: {0}")]
     MissingField(&'static str),
 
-    #[error("View hash calculation failed: {0}")]
+    #[error("视图哈希计算错误: {0}")]
     HashError(String),
 }

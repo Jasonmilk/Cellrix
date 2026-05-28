@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "protocol",
+    "layout",
+    "transport",
+    "ui",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+authors = ["Anaphase-Helix Team"]
+repository = "https://github.com/Jasonmilk/Cellrix"

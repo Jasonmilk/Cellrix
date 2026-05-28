@@ -1,4 +1,4 @@
-/// Universal coordinate system, decoupled from any UI library. Use u16 for integer precision.
+/// 通用坐标系：与任何UI库解耦，使用u16保证整数精度
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LayoutRect {
     pub x: u16,
