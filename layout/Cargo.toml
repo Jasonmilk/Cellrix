@@ -4,7 +4,12 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Cellrix layout engine module"
+description = "Dual-track layout solver for Cellrix: explicit grid + implicit heuristics, semantic focus, zen mode"
 
 [dependencies]
+cellrix-protocol = { path = "../protocol" }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[dev-dependencies]
 cellrix-protocol = { path = "../protocol" }
