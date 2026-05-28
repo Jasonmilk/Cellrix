@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+    "protocol",
+    "layout",
+    "ui",
+    "transport",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MI"
+authors = ["Helix Team"]

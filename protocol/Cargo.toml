@@ -1,0 +1,15 @@
+[package]
+name = "cellrix-protocol"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Rust implementation for CommonIntents protocol stack: CIS/CIB/CAP data structures and tolerant parser"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
