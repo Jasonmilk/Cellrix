@@ -71,7 +71,8 @@ impl Renderer {
 
         let buffer = frame.buffer_mut();
         // Only render the active node in each slot to avoid overlapping.
-        for (slot_id, active_node_id) in &layout_output.active_node_per_slot {
+        // 核心修改：slot_id → _slot_id，消除未使用变量警告
+        for (_slot_id, active_node_id) in &layout_output.active_node_per_slot {
             if let Some(rect) = layout_output
                 .node_rects
                 .iter()

@@ -1,5 +1,9 @@
 //! # cellrix-ui — TUI renderer for Cellrix
 
+use cellrix_layout::LayoutError;
+use cellrix_transport::TransportError;
+use thiserror::Error;
+
 mod app;
 mod renderer;
 mod widgets;
@@ -17,14 +21,23 @@ pub use energy::EnergyMode;
 pub use cellrix_layout::FocusManager;
 
 /// Common UI error type.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub enum UiError {
-    #[error("Terminal initialization failed: {0}")]
-    TerminalInit(String),
+    #[error("Normal exit")]
+    NormalExit,
+
     #[error("Layout error: {0}")]
-    Layout(#[from] cellrix_layout::LayoutError),
+    Layout(#[from] LayoutError),
+
     #[error("Transport error: {0}")]
-    Transport(#[from] cellrix_transport::TransportError),
+    TransportError(#[from] TransportError),
+
+    #[error("Request timeout")]
+    RequestTimeout,
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Application error: {0}")]
+    Other(String),
 }

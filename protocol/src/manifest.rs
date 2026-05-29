@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Agent 的能力声明（CAP协议 manifest端点）
+/// Agent capability declaration (CAP protocol manifest endpoint)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityManifest {
     pub agent_name: String,
@@ -9,17 +9,21 @@ pub struct CapabilityManifest {
     pub layout_hints: Option<LayoutHints>,
 }
 
-/// 一个可被用户触发的动作
+/// A single triggerable action
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Action {
     pub id: String,
     pub label: String,
     pub security_class: SecurityClass,
-    /// JSON Schema 描述参数结构
+    /// HITL approval window duration in milliseconds.
+    /// Present means lease extension is enabled.
+    pub lease_ms: Option<u64>,
+    /// JSON Schema defining the parameter structure
     pub parameters: serde_json::Value,
 }
 
-/// 安全等级：区分普通动作与需要显式确认的关键动作
+/// Security classification: distinguish normal actions and critical actions
+/// that require explicit human confirmation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SecurityClass {
@@ -27,20 +31,20 @@ pub enum SecurityClass {
     Critical,
 }
 
-/// 布局提示（可选，优先于隐式启发）
+/// Layout hints (optional, higher priority than implicit heuristics)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutHints {
     pub preferred_panels: Vec<String>,
     pub grid: Option<GridDefinition>,
 }
 
-/// 显式栅格定义
+/// Explicit grid layout definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GridDefinition {
     pub rows: Vec<GridSlot>,
 }
 
-/// 单个槽位
+/// Single layout slot
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GridSlot {
     pub id: String,

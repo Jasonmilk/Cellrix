@@ -24,6 +24,8 @@ pub struct LayoutOutput {
     pub slot_rects: Vec<(String, LayoutRect)>,
     /// Currently visible node per slot (slot_id -> node_id).
     pub active_node_per_slot: HashMap<String, String>,
+    /// All node IDs in each slot.
+    pub slot_nodes: HashMap<String, Vec<String>>,
 }
 
 /// Lightweight layout specification extracted from either overrides or hints.
@@ -101,10 +103,12 @@ impl LayoutEngine {
             }
         }
 
+        // ========== 此处为唯一修改点：补充 slot_nodes 字段 ==========
         Ok(LayoutOutput {
             node_rects,
             slot_rects: slots,
             active_node_per_slot,
+            slot_nodes,
         })
     }
 

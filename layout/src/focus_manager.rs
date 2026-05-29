@@ -1,7 +1,5 @@
-//! # FocusManager — 纯焦点状态机
-//! 负责追踪和切换当前聚焦的节点ID。
-//! 由 App 事件循环直接驱动，与渲染器解耦。
-
+/// FocusManager maintains an ordered list of focusable node IDs and a cursor.
+/// The list is rebuilt externally whenever the UI structure changes.
 pub struct FocusManager {
     focusable_ids: Vec<String>,
     current_idx: usize,
@@ -15,17 +13,22 @@ impl FocusManager {
         }
     }
 
-    /// 更新可聚焦的节点列表并重置焦点。
-    pub fn rebuild_order(&mut self, node_ids: &[String]) {
-        self.focusable_ids = node_ids.to_vec();
-        self.current_idx = if self.focusable_ids.is_empty() {
-            0
-        } else {
-            0
-        };
+    /// Replace the entire focusable list and reset cursor to the given node (or first).
+    pub fn rebuild(&mut self, ids: Vec<String>, focus_target: Option<&str>) {
+        self.focusable_ids = ids;
+        if self.focusable_ids.is_empty() {
+            self.current_idx = 0;
+            return;
+        }
+        if let Some(target) = focus_target {
+            if let Some(pos) = self.focusable_ids.iter().position(|id| id == target) {
+                self.current_idx = pos;
+                return;
+            }
+        }
+        self.current_idx = 0;
     }
 
-    /// 尝试将焦点移动到下一个节点。
     pub fn focus_next(&mut self) -> Option<String> {
         if self.focusable_ids.is_empty() {
             return None;
@@ -34,7 +37,6 @@ impl FocusManager {
         Some(self.focusable_ids[self.current_idx].clone())
     }
 
-    /// 尝试将焦点移动到上一个节点。
     pub fn focus_prev(&mut self) -> Option<String> {
         if self.focusable_ids.is_empty() {
             return None;
@@ -47,7 +49,6 @@ impl FocusManager {
         Some(self.focusable_ids[self.current_idx].clone())
     }
 
-    /// 获取当前焦点的节点ID。
     pub fn current_focus(&self) -> Option<&str> {
         if self.focusable_ids.is_empty() {
             None
@@ -56,14 +57,11 @@ impl FocusManager {
         }
     }
 
-    /// 检查特定节点是否处于焦点。
     pub fn is_focused(&self, node_id: &str) -> bool {
         self.current_focus() == Some(node_id)
     }
-}
 
-impl Default for FocusManager {
-    fn default() -> Self {
-        Self::new()
+    pub fn focusable_ids(&self) -> &[String] {
+        &self.focusable_ids
     }
 }

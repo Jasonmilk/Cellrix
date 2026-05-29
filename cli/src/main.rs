@@ -5,8 +5,9 @@ use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use cellrix_protocol::{ActionRequest, ViewHash};
 use cellrix_layout::{LayoutEngine, LayoutRequest, FocusManager};
-use cellrix_transport::{CapTransport, StdioTransport, UdsTransport};
+use cellrix_transport::{CapTransport, StdioTransport, UdsTransport, AgentEvent};
 use std::path::PathBuf;
+use tokio_stream::StreamExt;
 
 #[derive(Parser)]
 #[command(name = "cellrix-cli")]
@@ -78,10 +79,9 @@ async fn main() -> anyhow::Result<()> {
             let (_manifest, mut stream) = transport.connect().await?;
 
             // Try to read the first Snapshot event from the stream
-            use tokio_stream::StreamExt;
             let snapshot = loop {
                 match stream.next().await {
-                    Some(Ok(cellrix_transport::AgentEvent::Snapshot(snap))) => break snap,
+                    Some(Ok(AgentEvent::Snapshot(snap))) => break snap,
                     Some(Ok(_)) => continue, // skip heartbeats, etc.
                     Some(Err(e)) => anyhow::bail!("Stream error: {}", e),
                     None => anyhow::bail!("Stream ended before snapshot"),
@@ -116,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
             // Test focus manager
             let mut focus = FocusManager::new();
             let node_ids: Vec<String> = snapshot.semantic_tree.iter().map(|n| n.id.clone()).collect();
-            focus.rebuild_order(&node_ids);
+            focus.rebuild(node_ids, None);
             if let Some(focused) = focus.current_focus() {
                 println!("\nFocus: {}", focused);
             }

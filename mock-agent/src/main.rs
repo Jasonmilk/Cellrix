@@ -2,11 +2,11 @@
 //! Actively pushes manifest, snapshot and heartbeat event streams after connection.
 
 use clap::Parser;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, AsyncReadExt, BufReader, BufWriter, split};
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::UnixListener;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
-use std::sync::Arc;
 use cellrix_protocol::{
     CapabilityManifest, Action, SecurityClass,
     SemanticSnapshot, SemanticNode, NodeType,
@@ -47,91 +47,12 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Run agent over standard input/output stream
 async fn run_stdio() -> anyhow::Result<()> {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    // Split stream for separate read/write tasks
-    let (read_half, write_half) = split((stdin, stdout));
-    let mut reader = BufReader::new(read_half);
-    let writer = BufWriter::new(write_half);
-    // Wrap writer with Arc<Mutex> for shared usage across tasks
-    let shared_writer = Arc::new(Mutex::new(writer));
-
-    // CIB handshake: negotiate transport format
-    let mut handshake_line = String::new();
-    reader.read_line(&mut handshake_line).await?;
-    if !handshake_line.starts_with("CIB/1.0") {
-        anyhow::bail!("Invalid CIB handshake header");
-    }
-    shared_writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
-    shared_writer.lock().await.flush().await?;
-
-    // 1. Immediately push manifest/update event after handshake
-    let manifest = make_manifest();
-    write_event(&shared_writer, "manifest/update", &manifest).await?;
-
-    // 2. Spawn background heartbeat task (interval: 5 seconds)
-    let heartbeat_writer = Arc::clone(&shared_writer);
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
-        loop {
-            interval.tick().await;
-            let epoch = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            let heartbeat_data = json!({ "epoch": epoch });
-            if let Err(e) = write_event(&heartbeat_writer, "heartbeat", &heartbeat_data).await {
-                eprintln!("Heartbeat send failed: {}", e);
-                break;
-            }
-        }
-    });
-
-    // 3. Spawn snapshot push loop (interval: 200ms)
-    let snapshot_writer = Arc::clone(&shared_writer);
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(200));
-        loop {
-            interval.tick().await;
-            let snapshot = make_snapshot();
-            if let Err(e) = write_event(&snapshot_writer, "snapshot/update", &snapshot).await {
-                eprintln!("Snapshot send failed: {}", e);
-                break;
-            }
-        }
-    });
-
-    // 4. Main read loop: handle incoming client requests
-    loop {
-        match read_frame(&mut reader).await? {
-            Some(Frame::Action(action)) => {
-                let response = handle_action(action);
-                write_frame(&shared_writer, &response).await?;
-            }
-            None => break,
-            _ => {}
-        }
-    }
-
-    Ok(())
-}
-
-/// Run agent over Unix Domain Socket
-async fn run_uds(path: &str) -> anyhow::Result<()> {
-    // Clean up stale socket file
-    let _ = std::fs::remove_file(path);
-    let listener = UnixListener::bind(path)?;
-    println!("Mock agent listening on UDS: {}", path);
-
-    let (stream, _) = listener.accept().await?;
-    let (read_half, write_half) = split(stream);
-    let mut reader = BufReader::new(read_half);
-    let writer = BufWriter::new(write_half);
-    // Wrap writer with Arc<Mutex> for shared usage across tasks
-    let shared_writer = Arc::new(Mutex::new(writer));
+    let mut reader = BufReader::new(stdin);
+    let writer = Arc::new(Mutex::new(BufWriter::new(stdout)));
 
     // CIB handshake
     let mut handshake_line = String::new();
@@ -139,15 +60,15 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     if !handshake_line.starts_with("CIB/1.0") {
         anyhow::bail!("Invalid CIB handshake header");
     }
-    shared_writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
-    shared_writer.lock().await.flush().await?;
+    writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
+    writer.lock().await.flush().await?;
 
-    // 1. Push manifest/update immediately after handshake
+    // 1. Push manifest/update immediately
     let manifest = make_manifest();
-    write_event(&shared_writer, "manifest/update", &manifest).await?;
+    write_event(&writer, "manifest/update", &manifest).await?;
 
-    // 2. Background heartbeat task (5s interval)
-    let heartbeat_writer = Arc::clone(&shared_writer);
+    // 2. Spawn heartbeat task (every 5s)
+    let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(5));
         loop {
@@ -164,8 +85,8 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
-    // 3. Snapshot push loop (200ms interval)
-    let snapshot_writer = Arc::clone(&shared_writer);
+    // 3. Spawn snapshot push loop (every 200ms)
+    let snapshot_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
         loop {
@@ -178,18 +99,79 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
-    // 4. Main read loop for client requests
+    // 4. Main loop: read incoming ActionRequests and send responses
     loop {
         match read_frame(&mut reader).await? {
             Some(Frame::Action(action)) => {
                 let response = handle_action(action);
-                write_frame(&shared_writer, &response).await?;
+                write_frame(&writer, &response).await?;
             }
             None => break,
-            _ => {}
         }
     }
+    Ok(())
+}
 
+async fn run_uds(path: &str) -> anyhow::Result<()> {
+    let _ = std::fs::remove_file(path);
+    let listener = UnixListener::bind(path)?;
+    println!("Mock agent listening on UDS: {}", path);
+
+    let (stream, _) = listener.accept().await?;
+    let (read_half, write_half) = tokio::io::split(stream);  // split is fine for UnixStream
+    let mut reader = BufReader::new(read_half);
+    let writer = Arc::new(Mutex::new(BufWriter::new(write_half)));
+
+    let mut handshake_line = String::new();
+    reader.read_line(&mut handshake_line).await?;
+    if !handshake_line.starts_with("CIB/1.0") {
+        anyhow::bail!("Invalid CIB handshake header");
+    }
+    writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
+    writer.lock().await.flush().await?;
+
+    let manifest = make_manifest();
+    write_event(&writer, "manifest/update", &manifest).await?;
+
+    let heartbeat_writer = Arc::clone(&writer);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            let epoch = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let heartbeat_data = json!({ "epoch": epoch });
+            if let Err(e) = write_event(&heartbeat_writer, "heartbeat", &heartbeat_data).await {
+                eprintln!("Heartbeat send failed: {}", e);
+                break;
+            }
+        }
+    });
+
+    let snapshot_writer = Arc::clone(&writer);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(200));
+        loop {
+            interval.tick().await;
+            let snapshot = make_snapshot();
+            if let Err(e) = write_event(&snapshot_writer, "snapshot/update", &snapshot).await {
+                eprintln!("Snapshot send failed: {}", e);
+                break;
+            }
+        }
+    });
+
+    loop {
+        match read_frame(&mut reader).await? {
+            Some(Frame::Action(action)) => {
+                let response = handle_action(action);
+                write_frame(&writer, &response).await?;
+            }
+            None => break,
+        }
+    }
     Ok(())
 }
 
@@ -212,14 +194,6 @@ where
     let mut data = vec![0u8; len];
     reader.read_exact(&mut data).await?;
 
-    // Decode with msgpack first, fallback to JSON
-    let msg: serde_json::Value = if let Ok(v) = from_slice(&data) {
-        v
-    } else {
-        serde_json::from_slice(&data)?
-    };
-
-    // Parse ActionRequest from incoming request
     let action: ActionRequest = if let Ok(a) = from_slice(&data) {
         a
     } else {
@@ -229,7 +203,7 @@ where
     Ok(Some(Frame::Action(action)))
 }
 
-/// Write raw CIB frame (for normal request/response)
+/// Write a raw CIB frame (used for request/response).
 async fn write_frame<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, msg: &T) -> anyhow::Result<()>
 where
     W: AsyncWriteExt + Unpin,
@@ -237,21 +211,19 @@ where
 {
     let data = to_vec(msg)?;
     let len = data.len() as u32;
-    let mut w = writer.lock().await;
-    w.write_all(&len.to_le_bytes()).await?;
-    w.write_all(&data).await?;
-    w.flush().await?;
+    let mut guard = writer.lock().await;
+    guard.write_all(&len.to_le_bytes()).await?;
+    guard.write_all(&data).await?;
+    guard.flush().await?;
     Ok(())
 }
 
-/// Write CIB standard event frame with envelope wrapper
-/// Envelope format: { "type": "event", "id": "", "body": { "event": $event_name, "data": $payload } }
+/// Write a CIB event frame (envelope wrapped).
 async fn write_event<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, event_name: &str, payload: &T) -> anyhow::Result<()>
 where
     W: AsyncWriteExt + Unpin,
     T: Serialize,
 {
-    // Build CIB envelope structure following protocol spec
     let envelope = json!({
         "type": "event",
         "id": "",
@@ -261,20 +233,15 @@ where
         }
     });
 
-    // Serialize envelope to msgpack (primary format)
     let data = to_vec(&envelope)?;
     let len = data.len() as u32;
-
-    // Write CIB frame header (4-byte little-endian length) + payload
-    let mut w = writer.lock().await;
-    w.write_all(&len.to_le_bytes()).await?;
-    w.write_all(&data).await?;
-    w.flush().await?;
-
+    let mut guard = writer.lock().await;
+    guard.write_all(&len.to_le_bytes()).await?;
+    guard.write_all(&data).await?;
+    guard.flush().await?;
     Ok(())
 }
 
-/// Build sample CapabilityManifest for mock agent
 fn make_manifest() -> CapabilityManifest {
     CapabilityManifest {
         agent_name: "mock-agent".into(),
@@ -299,7 +266,6 @@ fn make_manifest() -> CapabilityManifest {
     }
 }
 
-/// Build dynamic SemanticSnapshot for mock agent
 fn make_snapshot() -> SemanticSnapshot {
     SemanticSnapshot {
         epoch_time: std::time::SystemTime::now()
@@ -339,7 +305,6 @@ fn make_snapshot() -> SemanticSnapshot {
     }
 }
 
-/// Handle incoming ActionRequest and generate ActionResponse
 fn handle_action(action: ActionRequest) -> ActionResponse {
     eprintln!("Received action request: {:?}", action);
     ActionResponse::Success {
