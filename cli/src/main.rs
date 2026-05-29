@@ -2,9 +2,10 @@
 //! Tests transport, layout, and protocol end-to-end.
 
 use clap::{Parser, Subcommand};
+use std::collections::HashMap;
 use cellrix_protocol::{ActionRequest, ViewHash};
-use cellrix_layout::{LayoutEngine, LayoutRequest, FocusManager};  // remove ZenMode
-use cellrix_transport::{CapTransport, StdioTransport, UdsTransport};  // remove TransportError
+use cellrix_layout::{LayoutEngine, LayoutRequest, FocusManager};
+use cellrix_transport::{CapTransport, StdioTransport, UdsTransport};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -17,7 +18,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Test manifest fetch
+    /// Test manifest fetch (via connect)
     Manifest {
         #[arg(short, long)]
         mode: TransportMode,
@@ -26,7 +27,7 @@ enum Command {
         #[arg(long, help = "UDS socket path")]
         socket: Option<PathBuf>,
     },
-    /// Test snapshot fetch and layout
+    /// Test snapshot fetch and layout (via connect)
     Snapshot {
         #[arg(short, long)]
         mode: TransportMode,
@@ -39,7 +40,7 @@ enum Command {
         #[arg(long, default_value = "24", help = "Terminal height for layout")]
         height: u16,
     },
-    /// Test action sending
+    /// Test action sending (via connect then send_action)
     Action {
         #[arg(short, long)]
         mode: TransportMode,
@@ -69,12 +70,24 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Command::Manifest { mode, exec, socket } => {
             let mut transport = create_transport(mode, exec, socket).await?;
-            let manifest = transport.fetch_manifest().await?;
+            let (manifest, _stream) = transport.connect().await?;
             println!("{:#?}", manifest);
         }
         Command::Snapshot { mode, exec, socket, width, height } => {
             let mut transport = create_transport(mode, exec, socket).await?;
-            let snapshot = transport.fetch_snapshot().await?;
+            let (_manifest, mut stream) = transport.connect().await?;
+
+            // Try to read the first Snapshot event from the stream
+            use tokio_stream::StreamExt;
+            let snapshot = loop {
+                match stream.next().await {
+                    Some(Ok(cellrix_transport::AgentEvent::Snapshot(snap))) => break snap,
+                    Some(Ok(_)) => continue, // skip heartbeats, etc.
+                    Some(Err(e)) => anyhow::bail!("Stream error: {}", e),
+                    None => anyhow::bail!("Stream ended before snapshot"),
+                }
+            };
+
             println!("=== Snapshot ===");
             println!("Status: {}", snapshot.status);
             println!("Epoch: {}", snapshot.epoch_time);
@@ -84,19 +97,20 @@ async fn main() -> anyhow::Result<()> {
             let mut layout_engine = LayoutEngine::new();
             let req = LayoutRequest {
                 snapshot: snapshot.clone(),
-                manifest: None, // we didn't fetch manifest, but layout can use implicit
+                manifest: None,
                 terminal_width: width,
                 terminal_height: height,
                 zen_focus_node_id: None,
+                active_overrides: HashMap::new(),
             };
             let layout_output = layout_engine.compute(&req)?;
             println!("\n=== Layout ===");
             for (node_id, rect) in &layout_output.node_rects {
                 println!("  {} -> x={}, y={}, w={}, h={}", node_id, rect.x, rect.y, rect.width, rect.height);
             }
-            println!("\nSlot assignments:");
-            for assign in &layout_output.slot_assignments {
-                println!("  slot {}: nodes {:?} at {:?}", assign.slot_id, assign.node_ids, assign.rect);
+            println!("\nSlot active nodes:");
+            for (slot_id, active) in &layout_output.active_node_per_slot {
+                println!("  {}: {}", slot_id, active);
             }
 
             // Test focus manager
@@ -109,6 +123,8 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::Action { mode, exec, socket, action_id, params, view_hash } => {
             let mut transport = create_transport(mode, exec, socket).await?;
+            let (_manifest, _stream) = transport.connect().await?;
+
             let params_value: serde_json::Value = serde_json::from_str(&params)?;
             let view_hash_bytes = if let Some(hash_hex) = view_hash {
                 let bytes = hex::decode(&hash_hex)
@@ -142,7 +158,7 @@ async fn create_transport(
     match mode {
         TransportMode::Stdio => {
             let cmd = exec.ok_or_else(|| anyhow::anyhow!("--exec required for stdio mode"))?;
-            let args: Vec<String> = vec![]; // can be extended
+            let args: Vec<String> = vec![];
             let transport = StdioTransport::new(&cmd, &args).await?;
             Ok(Box::new(transport))
         }

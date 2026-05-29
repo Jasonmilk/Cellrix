@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use ratatui::{layout::Rect, Frame};
 use ratatui::widgets::Widget;
 use cellrix_protocol::{SemanticSnapshot, CapabilityManifest, NodeType};
-use cellrix_layout::{LayoutEngine, LayoutRequest, LayoutOutput};
+use cellrix_layout::{LayoutEngine, LayoutRequest, LayoutOutput, LayoutError};
 use crate::{
     widgets::{
         StateTreeWidget, TextPanelWidget, ActionButtonWidget,
@@ -36,6 +38,8 @@ impl Renderer {
         self.energy_mode = mode;
     }
 
+    /// Render the current snapshot with given layout overrides.
+    /// Returns the computed layout output for further processing (e.g., tab switching).
     pub fn render(
         &mut self,
         frame: &mut Frame,
@@ -43,13 +47,15 @@ impl Renderer {
         manifest: Option<&CapabilityManifest>,
         terminal_size: (u16, u16),
         focus_manager: &FocusManager,
-    ) -> Result<(), cellrix_layout::LayoutError> {
+        active_overrides: HashMap<String, String>,
+    ) -> Result<LayoutOutput, LayoutError> {
         let layout_req = LayoutRequest {
             snapshot: snapshot.clone(),
             manifest: manifest.cloned(),
             terminal_width: terminal_size.0,
             terminal_height: terminal_size.1,
             zen_focus_node_id: None,
+            active_overrides,
         };
         let layout_output = self.layout_engine.compute(&layout_req)?;
         self.last_layout = Some(layout_output.clone());
@@ -64,42 +70,50 @@ impl Renderer {
         };
 
         let buffer = frame.buffer_mut();
-        for (node_id, rect) in &layout_output.node_rects {
-            if let Some(node) = snapshot.semantic_tree.iter().find(|n| n.id == *node_id) {
-                let area = Rect::new(rect.x, rect.y, rect.width, rect.height);
-                match node.node_type {
-                    NodeType::StateTree => {
-                        let widget = StateTreeWidget::new(node, &ctx);
-                        Widget::render(widget, area, buffer);
-                    }
-                    NodeType::TextPanel => {
-                        let widget = TextPanelWidget::new(node, &ctx);
-                        Widget::render(widget, area, buffer);
-                    }
-                    NodeType::ActionButton => {
-                        let widget = ActionButtonWidget::new(node, &ctx);
-                        Widget::render(widget, area, buffer);
-                    }
-                    NodeType::ProgressBar => {
-                        let widget = ProgressBarWidget::new(node, &ctx);
-                        Widget::render(widget, area, buffer);
-                    }
-                    NodeType::CodeDiff => {
-                        let widget = CodeDiffWidget::new(node, &ctx);
-                        Widget::render(widget, area, buffer);
-                    }
-                    NodeType::Metrics => {
-                        let widget = MetricsWidget::new(node, &ctx);
-                        Widget::render(widget, area, buffer);
-                    }
-                    NodeType::Unknown => {
-                        let widget = FallbackWidget::new(node, &ctx);
-                        Widget::render(widget, area, buffer);
+        // Only render the active node in each slot to avoid overlapping.
+        for (slot_id, active_node_id) in &layout_output.active_node_per_slot {
+            if let Some(rect) = layout_output
+                .node_rects
+                .iter()
+                .find(|(nid, _)| nid == active_node_id)
+                .map(|(_, r)| *r)
+            {
+                if let Some(node) = snapshot.semantic_tree.iter().find(|n| n.id == *active_node_id) {
+                    let area = Rect::new(rect.x, rect.y, rect.width, rect.height);
+                    match node.node_type {
+                        NodeType::StateTree => {
+                            let widget = StateTreeWidget::new(node, &ctx);
+                            Widget::render(widget, area, buffer);
+                        }
+                        NodeType::TextPanel => {
+                            let widget = TextPanelWidget::new(node, &ctx);
+                            Widget::render(widget, area, buffer);
+                        }
+                        NodeType::ActionButton => {
+                            let widget = ActionButtonWidget::new(node, &ctx);
+                            Widget::render(widget, area, buffer);
+                        }
+                        NodeType::ProgressBar => {
+                            let widget = ProgressBarWidget::new(node, &ctx);
+                            Widget::render(widget, area, buffer);
+                        }
+                        NodeType::CodeDiff => {
+                            let widget = CodeDiffWidget::new(node, &ctx);
+                            Widget::render(widget, area, buffer);
+                        }
+                        NodeType::Metrics => {
+                            let widget = MetricsWidget::new(node, &ctx);
+                            Widget::render(widget, area, buffer);
+                        }
+                        NodeType::Unknown => {
+                            let widget = FallbackWidget::new(node, &ctx);
+                            Widget::render(widget, area, buffer);
+                        }
                     }
                 }
             }
         }
-        Ok(())
+        Ok(layout_output)
     }
 
     pub fn handle_mouse_event(&mut self, event: crossterm::event::MouseEvent) -> Option<String> {

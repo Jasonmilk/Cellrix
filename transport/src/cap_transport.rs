@@ -1,26 +1,24 @@
 use async_trait::async_trait;
-use cellrix_protocol::{CapabilityManifest, SemanticSnapshot, ActionRequest, ActionResponse};
-use thiserror::Error;
+use tokio_stream::Stream;
+use std::pin::Pin;
+use cellrix_protocol::{CapabilityManifest, ActionRequest, ActionResponse};
+pub use crate::error::TransportError;   // Re-export for external use
 
-#[derive(Debug, Error)]
-pub enum TransportError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Serialization error: {0}")]
-    Serialization(String),
-    #[error("Protocol error: {0}")]
-    Protocol(String),
-    #[error("Remote error: {0}")]
-    Remote(String),
-    #[error("Not implemented: {0}")]
-    NotImplemented(String),
-    #[error("Timeout after {0} ms")]
-    Timeout(u64),
+/// Events pushed from Agent to Cellrix.
+#[derive(Debug)]
+pub enum AgentEvent {
+    Manifest(CapabilityManifest),
+    Snapshot(cellrix_protocol::SemanticSnapshot),
+    Heartbeat { epoch: u64 },
+    StreamError(String),
 }
 
+/// Stream of agent events.
+pub type TransportStream = Pin<Box<dyn Stream<Item = Result<AgentEvent, TransportError>> + Send>>;
+
+/// The core transport trait for Cellrix (CIB v0.1.0 compliant).
 #[async_trait]
 pub trait CapTransport: Send + Sync {
-    async fn fetch_manifest(&mut self) -> Result<CapabilityManifest, TransportError>;
-    async fn fetch_snapshot(&mut self) -> Result<SemanticSnapshot, TransportError>;
-    async fn send_action(&mut self, action: ActionRequest) -> Result<ActionResponse, TransportError>;
+    async fn connect(&mut self) -> Result<(CapabilityManifest, TransportStream), TransportError>;
+    async fn send_action(&mut self, request: ActionRequest) -> Result<ActionResponse, TransportError>;
 }
