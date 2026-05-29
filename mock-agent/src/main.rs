@@ -95,14 +95,22 @@ async fn run_stdio() -> anyhow::Result<()> {
         }
     });
 
-    // 4. Main loop: read incoming ActionRequests and send responses
+    // 4. Main loop: read incoming ActionRequests
     loop {
-        match read_frame(&mut reader).await? {
-            Some(Frame::Action(action)) => {
+        match read_frame(&mut reader).await {
+            Ok(Some(Frame::Action(action))) => {
                 let response = handle_action(action);
                 write_frame(&writer, &response).await?;
             }
-            None => break,
+            Ok(None) => {
+                // Stdin/stream closed, keep agent running to push events
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+            Err(e) => {
+                eprintln!("Read error: {}", e);
+                break;
+            }
         }
     }
     Ok(())
@@ -126,10 +134,9 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    // 1. Push manifest/update event
+    let manifest = make_manifest();
     write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
-    // 2. Spawn heartbeat task (every 5s)
     let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(5));
@@ -146,7 +153,6 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
-    // 3. Spawn snapshot push loop (every 200ms)
     let snapshot_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
@@ -159,14 +165,22 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
-    // 4. Main loop: read incoming ActionRequests and send responses
+    // 4. Main loop: read incoming ActionRequests
     loop {
-        match read_frame(&mut reader).await? {
-            Some(Frame::Action(action)) => {
+        match read_frame(&mut reader).await {
+            Ok(Some(Frame::Action(action))) => {
                 let response = handle_action(action);
                 write_frame(&writer, &response).await?;
             }
-            None => break,
+            Ok(None) => {
+                // Stream closed, keep agent running to push events
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+            Err(e) => {
+                eprintln!("Read error: {}", e);
+                break;
+            }
         }
     }
     Ok(())
@@ -200,7 +214,7 @@ where
     Ok(Some(Frame::Action(action)))
 }
 
-/// Write raw CIB frame for request/response messages
+/// Write a raw CIB frame (used for request/response).
 async fn write_frame<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, msg: &T) -> anyhow::Result<()>
 where
     W: AsyncWriteExt + Unpin,
@@ -215,7 +229,7 @@ where
     Ok(())
 }
 
-/// Write CIB event frame: directly serialize AgentEvent (protocol standard)
+/// Write a CIB event frame: directly serialize AgentEvent (protocol standard)
 async fn write_event<W: AsyncWriteExt + Unpin>(
     writer: &Arc<Mutex<BufWriter<W>>>,
     event: AgentEvent,
