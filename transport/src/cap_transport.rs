@@ -1,11 +1,13 @@
 use async_trait::async_trait;
 use tokio_stream::Stream;
 use std::pin::Pin;
+use serde::Deserialize;
+
 use cellrix_protocol::{CapabilityManifest, ActionRequest, ActionResponse};
 pub use crate::error::TransportError;   // Re-export for external use
 
 /// Events pushed from Agent to Cellrix.
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub enum AgentEvent {
     Manifest(CapabilityManifest),
     Snapshot(cellrix_protocol::SemanticSnapshot),
