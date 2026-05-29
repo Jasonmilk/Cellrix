@@ -13,6 +13,7 @@ mod action;
 mod view_hash;
 mod parser;
 mod coords;
+mod agent_event;
 
 pub use manifest::*;
 pub use snapshot::*;
@@ -20,6 +21,7 @@ pub use action::*;
 pub use view_hash::*;
 pub use parser::*;
 pub use coords::*;
+pub use agent_event::AgentEvent;
 
 /// 本crate统一的错误类型
 #[derive(Debug, thiserror::Error)]

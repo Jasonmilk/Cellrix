@@ -158,7 +158,7 @@ async fn create_transport(
     match mode {
         TransportMode::Stdio => {
             let cmd = exec.ok_or_else(|| anyhow::anyhow!("--exec required for stdio mode"))?;
-            let args: Vec<String> = vec![];
+            let args: Vec<String> = vec!["--mode".into(), "stdio".into()];
             let transport = StdioTransport::new(&cmd, &args).await?;
             Ok(Box::new(transport))
         }

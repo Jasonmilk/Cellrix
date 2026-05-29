@@ -10,11 +10,10 @@ use tokio::time::Duration;
 use cellrix_protocol::{
     CapabilityManifest, Action, SecurityClass,
     SemanticSnapshot, SemanticNode, NodeType,
-    ActionRequest, ActionResponse
+    ActionRequest, ActionResponse, AgentEvent
 };
 use rmp_serde::{to_vec, from_slice};
 use serde::Serialize;
-use serde_json::json;
 
 const PREFERRED_FORMAT: &str = "CIB/1.0 MSGPACK\n";
 
@@ -63,9 +62,8 @@ async fn run_stdio() -> anyhow::Result<()> {
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    // 1. Push manifest/update immediately
-    let manifest = make_manifest();
-    write_event(&writer, "manifest/update", &manifest).await?;
+    // 1. Push manifest/update event
+    write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
     // 2. Spawn heartbeat task (every 5s)
     let heartbeat_writer = Arc::clone(&writer);
@@ -77,8 +75,7 @@ async fn run_stdio() -> anyhow::Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            let heartbeat_data = json!({ "epoch": epoch });
-            if let Err(e) = write_event(&heartbeat_writer, "heartbeat", &heartbeat_data).await {
+            if let Err(e) = write_event(&heartbeat_writer, AgentEvent::Heartbeat { epoch }).await {
                 eprintln!("Heartbeat send failed: {}", e);
                 break;
             }
@@ -91,8 +88,7 @@ async fn run_stdio() -> anyhow::Result<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
         loop {
             interval.tick().await;
-            let snapshot = make_snapshot();
-            if let Err(e) = write_event(&snapshot_writer, "snapshot/update", &snapshot).await {
+            if let Err(e) = write_event(&snapshot_writer, AgentEvent::Snapshot(make_snapshot())).await {
                 eprintln!("Snapshot send failed: {}", e);
                 break;
             }
@@ -118,7 +114,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     println!("Mock agent listening on UDS: {}", path);
 
     let (stream, _) = listener.accept().await?;
-    let (read_half, write_half) = tokio::io::split(stream);  // split is fine for UnixStream
+    let (read_half, write_half) = tokio::io::split(stream);
     let mut reader = BufReader::new(read_half);
     let writer = Arc::new(Mutex::new(BufWriter::new(write_half)));
 
@@ -130,9 +126,10 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    let manifest = make_manifest();
-    write_event(&writer, "manifest/update", &manifest).await?;
+    // 1. Push manifest/update event
+    write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
+    // 2. Spawn heartbeat task (every 5s)
     let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(5));
@@ -142,27 +139,27 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            let heartbeat_data = json!({ "epoch": epoch });
-            if let Err(e) = write_event(&heartbeat_writer, "heartbeat", &heartbeat_data).await {
+            if let Err(e) = write_event(&heartbeat_writer, AgentEvent::Heartbeat { epoch }).await {
                 eprintln!("Heartbeat send failed: {}", e);
                 break;
             }
         }
     });
 
+    // 3. Spawn snapshot push loop (every 200ms)
     let snapshot_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
         loop {
             interval.tick().await;
-            let snapshot = make_snapshot();
-            if let Err(e) = write_event(&snapshot_writer, "snapshot/update", &snapshot).await {
+            if let Err(e) = write_event(&snapshot_writer, AgentEvent::Snapshot(make_snapshot())).await {
                 eprintln!("Snapshot send failed: {}", e);
                 break;
             }
         }
     });
 
+    // 4. Main loop: read incoming ActionRequests and send responses
     loop {
         match read_frame(&mut reader).await? {
             Some(Frame::Action(action)) => {
@@ -203,7 +200,7 @@ where
     Ok(Some(Frame::Action(action)))
 }
 
-/// Write a raw CIB frame (used for request/response).
+/// Write raw CIB frame for request/response messages
 async fn write_frame<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, msg: &T) -> anyhow::Result<()>
 where
     W: AsyncWriteExt + Unpin,
@@ -218,22 +215,12 @@ where
     Ok(())
 }
 
-/// Write a CIB event frame (envelope wrapped).
-async fn write_event<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, event_name: &str, payload: &T) -> anyhow::Result<()>
-where
-    W: AsyncWriteExt + Unpin,
-    T: Serialize,
-{
-    let envelope = json!({
-        "type": "event",
-        "id": "",
-        "body": {
-            "event": event_name,
-            "data": payload
-        }
-    });
-
-    let data = to_vec(&envelope)?;
+/// Write CIB event frame: directly serialize AgentEvent (protocol standard)
+async fn write_event<W: AsyncWriteExt + Unpin>(
+    writer: &Arc<Mutex<BufWriter<W>>>,
+    event: AgentEvent,
+) -> anyhow::Result<()> {
+    let data = to_vec(&event)?;
     let len = data.len() as u32;
     let mut guard = writer.lock().await;
     guard.write_all(&len.to_le_bytes()).await?;

@@ -5,8 +5,6 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, AsyncReadExt};
 use rmp_serde::{encode, decode};
 use serde::{Serialize, Deserialize};
 use std::time::Duration;
-use serde_json::Value;
-use cellrix_protocol::{CapabilityManifest, SemanticSnapshot};
 
 pub const DEFAULT_TIMEOUT_MS: u64 = 5000;
 
@@ -31,14 +29,6 @@ impl WireFormat {
             _ => None,
         }
     }
-}
-
-/// CIB standard envelope structure for all frames
-#[derive(Debug, Deserialize)]
-struct CibEnvelope {
-    r#type: String,
-    id: String,
-    body: Value,
 }
 
 /// Perform raw-text handshake (no CIB framing).
