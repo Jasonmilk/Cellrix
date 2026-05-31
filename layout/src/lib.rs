@@ -5,12 +5,14 @@ mod slot_allocator;
 mod focus_manager;
 mod zen_mode;
 mod coords;
+mod mouse_selector; // 仅在此处声明一次模块，不重复 pub mod
 
 pub use layout_engine::{LayoutEngine, LayoutRequest, LayoutOutput};
 pub use slot_allocator::{SlotAllocator, SlotAssignment, SlotType};
 pub use focus_manager::FocusManager;
 pub use zen_mode::ZenMode;
 pub use coords::LayoutRect;
+pub use mouse_selector::MouseSelector; // 重导出以供 ui 与 cli 模块跨 crate 引用
 
 /// Common error type for layout operations.
 #[derive(Debug, thiserror::Error)]

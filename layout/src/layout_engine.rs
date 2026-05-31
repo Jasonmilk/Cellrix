@@ -48,7 +48,9 @@ impl LayoutEngine {
     /// Higher priority sources completely override lower ones.
     pub fn compute(&mut self, req: &LayoutRequest) -> Result<LayoutOutput, LayoutError> {
         let spec = Self::select_spec(&req.snapshot, req.manifest.as_ref())?;
-        let slots = match spec {
+        
+        // 允许 slots 可变以便于注入禅修（Zen Mode）状态
+        let mut slots = match spec {
             LayoutSpec::Explicit(grid) => Self::build_slots_from_grid(
                 &grid,
                 req.terminal_width,
@@ -63,6 +65,31 @@ impl LayoutEngine {
 
         // Map nodes to slots (by slot_binding or type heuristic).
         let node_to_slot = Self::assign_nodes_to_slots(&req.snapshot.semantic_tree, &slots);
+
+        // ==================== 禅修模式（Zen Mode）拦截适配 ====================
+        // 如果激活了禅修模式，找到聚焦节点所属的槽位，将其尺寸提升为 100%，其他槽位收缩为 0。
+        if let Some(ref zen_node_id) = req.zen_focus_node_id {
+            if let Some(zen_slot_id) = node_to_slot.get(zen_node_id).cloned() {
+                for (slot_id, rect) in &mut slots {
+                    if *slot_id == zen_slot_id {
+                        *rect = LayoutRect {
+                            x: 0,
+                            y: 0,
+                            width: req.terminal_width,
+                            height: req.terminal_height,
+                        };
+                    } else {
+                        *rect = LayoutRect {
+                            x: 0,
+                            y: 0,
+                            width: 0,
+                            height: 0,
+                        };
+                    }
+                }
+            }
+        }
+        // ====================================================================
 
         // Build slot_id -> sorted list of node IDs.
         let mut slot_nodes: HashMap<String, Vec<String>> = HashMap::new();
@@ -96,6 +123,7 @@ impl LayoutEngine {
         }
 
         // Build rectangles for all nodes (each node gets its slot rectangle).
+        // 禅修模式下，非活跃槽位内的节点会自动继承宽度和高度为 0 的 LayoutRect，阻断视觉绘制
         let mut node_rects = Vec::new();
         for (node_id, slot_id) in &node_to_slot {
             if let Some(rect) = slots.iter().find(|(id, _)| id == slot_id).map(|(_, r)| *r) {
@@ -103,7 +131,6 @@ impl LayoutEngine {
             }
         }
 
-        // ========== 此处为唯一修改点：补充 slot_nodes 字段 ==========
         Ok(LayoutOutput {
             node_rects,
             slot_rects: slots,
