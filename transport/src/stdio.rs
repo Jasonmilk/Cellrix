@@ -87,6 +87,8 @@ impl CapTransport for StdioTransport {
         });
 
         self.stdin = Some(writer);
+        self.child = Some(child); // 👈 核心修复点：将所有权安然送回 self，延续 Agent 子进程的生命周期！
+        
         let stream: TransportStream = Box::pin(UnboundedReceiverStream::new(rx));
         Ok((manifest, stream))
     }

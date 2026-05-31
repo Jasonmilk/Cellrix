@@ -12,7 +12,7 @@ use cellrix_protocol::{
     SemanticSnapshot, SemanticNode, NodeType,
     ActionRequest, ActionResponse, AgentEvent
 };
-use rmp_serde::{to_vec, from_slice};
+use rmp_serde::from_slice;
 use serde::Serialize;
 
 const PREFERRED_FORMAT: &str = "CIB/1.0 MSGPACK\n";
@@ -134,7 +134,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    let manifest = make_manifest();
+    // 已清理残留的 let manifest = make_manifest()，保持编译 0 Warning
     write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
     let heartbeat_writer = Arc::clone(&writer);
@@ -220,7 +220,11 @@ where
     W: AsyncWriteExt + Unpin,
     T: Serialize,
 {
-    let data = to_vec(msg)?;
+    // 强制使用 with_struct_map，序列化为带键名的标准 Map，拒绝序列/Sequence
+    let mut data = Vec::new();
+    let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
+    msg.serialize(&mut serializer)?;
+
     let len = data.len() as u32;
     let mut guard = writer.lock().await;
     guard.write_all(&len.to_le_bytes()).await?;
@@ -234,7 +238,11 @@ async fn write_event<W: AsyncWriteExt + Unpin>(
     writer: &Arc<Mutex<BufWriter<W>>>,
     event: AgentEvent,
 ) -> anyhow::Result<()> {
-    let data = to_vec(&event)?;
+    // 强制使用 with_struct_map，对齐客户端反序列化器，保护 Enum 内的结构体变体
+    let mut data = Vec::new();
+    let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
+    event.serialize(&mut serializer)?;
+
     let len = data.len() as u32;
     let mut guard = writer.lock().await;
     guard.write_all(&len.to_le_bytes()).await?;
