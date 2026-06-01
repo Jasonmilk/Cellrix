@@ -1,8 +1,11 @@
+// protocol/src/parser.rs
 use serde_json::Value;
 use crate::{SemanticSnapshot, SemanticNode, NodeType, ProtocolError};
 
 /// Tolerant parser: parses a JSON string into SemanticSnapshot,
 /// degrading individual malformed nodes to Unknown without panicking.
+/// 
+/// 升级对齐 C03 物理防爆规范：强制进行 256 节点截断，并对超出 1MB 的 content 实施强硬降级，杜绝客户端 OOM。
 pub fn parse_snapshot_gracefully(raw_json: &str) -> Result<SemanticSnapshot, ProtocolError> {
     let v: Value = serde_json::from_str(raw_json)?;
 
@@ -22,10 +25,28 @@ pub fn parse_snapshot_gracefully(raw_json: &str) -> Result<SemanticSnapshot, Pro
         .get("semantic_tree")
         .and_then(Value::as_array)
         .unwrap_or(&empty_vec);
-    let mut fixed_nodes = Vec::with_capacity(nodes_array.len());
-    for node_val in nodes_array {
+    
+    // C03 物理规范一：节点数量强制截断至 256，丢弃多余节点，保障高能效与内存安全
+    let mut fixed_nodes = Vec::with_capacity(nodes_array.len().min(256));
+    
+    for (idx, node_val) in nodes_array.iter().enumerate() {
+        if idx >= 256 {
+            eprintln!("[WARN] DDoS safety: semantic_tree exceeded 256 nodes, truncating remaining.");
+            break;
+        }
+
         match serde_json::from_value::<SemanticNode>(node_val.clone()) {
-            Ok(node) => fixed_nodes.push(node),
+            Ok(mut node) => {
+                // C03 物理规范二：当单个内容体积大于 1MB 时，执行阻断截断
+                let content_size = serde_json::to_string(&node.content).map(|s| s.len()).unwrap_or(0);
+                if content_size > 1024 * 1024 {
+                    node.content = serde_json::json!({
+                        "error": "Truncated: Content size exceeded 1MB budget",
+                        "limit_violated": true
+                    });
+                }
+                fixed_nodes.push(node);
+            }
             Err(e) => {
                 let id = node_val
                     .get("id")
@@ -37,11 +58,22 @@ pub fn parse_snapshot_gracefully(raw_json: &str) -> Result<SemanticSnapshot, Pro
                     .and_then(|v| v.as_str())
                     .unwrap_or("Corrupted Node")
                     .to_string();
+                
+                // 恶意节点即使解析失败，其 content 依然需要经过 1MB 资源限制校验
+                let mut content = node_val.clone();
+                let content_size = serde_json::to_string(&content).map(|s| s.len()).unwrap_or(0);
+                if content_size > 1024 * 1024 {
+                    content = serde_json::json!({
+                        "error": "Truncated: Content size exceeded 1MB budget",
+                        "limit_violated": true
+                    });
+                }
+
                 fixed_nodes.push(SemanticNode {
                     id,
                     node_type: NodeType::Unknown,
                     label,
-                    content: node_val.clone(),
+                    content,
                     slot_binding: None,
                     focused: false,
                 });
@@ -71,7 +103,10 @@ fn reconstruct_snapshot_manually(v: &Value) -> Result<SemanticSnapshot, Protocol
 
     let mut semantic_tree = Vec::new();
     if let Some(nodes) = v.get("semantic_tree").and_then(Value::as_array) {
-        for node_val in nodes {
+        for (idx, node_val) in nodes.iter().enumerate() {
+            if idx >= 256 {
+                break;
+            }
             if let Ok(node) = serde_json::from_value(node_val.clone()) {
                 semantic_tree.push(node);
             } else {

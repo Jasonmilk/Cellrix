@@ -1,3 +1,4 @@
+// ui/src/app.rs
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::collections::HashMap;
@@ -5,11 +6,63 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_stream::StreamExt;
+use std::io::Write;
 
 use cellrix_protocol::{ActionRequest, ActionResponse, SemanticSnapshot, NodeType};
 use cellrix_transport::{AgentEvent, CapTransport, TransportStream};
 
 use crate::{FocusManager, Renderer, UiError};
+
+/// Zero-dependency high-performance pure Rust Base64 encoder.
+/// Enables 100% reliable OSC 52 physical bypass copying over headless remote SSH sessions.
+pub fn base64_encode(data: &[u8]) -> String {
+    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b = match chunk.len() {
+            3 => ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8) | (chunk[2] as u32),
+            2 => ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8),
+            1 => (chunk[0] as u32) << 16,
+            _ => unreachable!(),
+        };
+        result.push(CHARSET[((b >> 18) & 63) as usize] as char);
+        result.push(CHARSET[((b >> 12) & 63) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARSET[((b >> 6) & 63) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARSET[(b & 63) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyMap {
+    pub exit: (KeyCode, KeyModifiers),
+    pub zen_toggle: (KeyCode, KeyModifiers),
+    pub focus_next: (KeyCode, KeyModifiers),
+    pub focus_prev: (KeyCode, KeyModifiers),
+    pub tab_next: (KeyCode, KeyModifiers),
+    pub tab_prev: (KeyCode, KeyModifiers),
+}
+
+impl Default for KeyMap {
+    fn default() -> Self {
+        Self {
+            exit: (KeyCode::Char('c'), KeyModifiers::CONTROL),       // ^C
+            zen_toggle: (KeyCode::Char('o'), KeyModifiers::CONTROL), // ^O
+            focus_next: (KeyCode::Tab, KeyModifiers::NONE),          // Tab
+            focus_prev: (KeyCode::Tab, KeyModifiers::SHIFT),         // Shift+Tab
+            tab_next: (KeyCode::Right, KeyModifiers::ALT),           // Alt+Right
+            tab_prev: (KeyCode::Left, KeyModifiers::ALT),            // Alt+Left
+        }
+    }
+}
 
 pub struct App {
     transport: Box<dyn CapTransport>,
@@ -23,6 +76,9 @@ pub struct App {
     req_map: Arc<Mutex<HashMap<String, oneshot::Sender<ActionResponse>>>>,
     slot_nodes: HashMap<String, Vec<String>>,
     active_slot_nodes: HashMap<String, String>,
+    is_zen_mode: bool,
+    mouse_capture: bool,
+    pub key_map: KeyMap,
 }
 
 impl App {
@@ -55,20 +111,36 @@ impl App {
             req_map,
             slot_nodes: HashMap::new(),
             active_slot_nodes: HashMap::new(),
+            is_zen_mode: false,
+            mouse_capture: true, // Default to true to enable click-to-focus and custom spatial selection
+            key_map: KeyMap::default(),
         })
     }
 
     pub async fn run(&mut self) -> Result<(), UiError> {
         crossterm::terminal::enable_raw_mode()?;
         let mut stdout = std::io::stdout();
-        crossterm::execute!(stdout, crossterm::event::EnableMouseCapture)?;
+        
+        crossterm::execute!(
+            stdout, 
+            crossterm::terminal::EnterAlternateScreen,
+            crossterm::event::EnableMouseCapture
+        )?;
+        let _ = stdout.flush();
+        
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
 
         let result = self.run_loop(&mut terminal).await;
 
-        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+        let mut stdout = std::io::stdout();
+        let _ = crossterm::execute!(
+            stdout,
+            crossterm::event::DisableMouseCapture,
+            crossterm::terminal::LeaveAlternateScreen
+        );
+        let _ = stdout.flush();
         crossterm::terminal::disable_raw_mode()?;
         result
     }
@@ -94,7 +166,16 @@ impl App {
                             let focusable_ids: Vec<String> = snap
                                 .semantic_tree
                                 .iter()
-                                .filter(|n| n.node_type == NodeType::ActionButton)
+                                .filter(|n| {
+                                    matches!(
+                                        n.node_type,
+                                        NodeType::StateTree
+                                            | NodeType::TextPanel
+                                            | NodeType::ActionButton
+                                            | NodeType::CodeDiff
+                                            | NodeType::Unknown
+                                    )
+                                })
                                 .map(|n| n.id.clone())
                                 .collect();
 
@@ -118,10 +199,46 @@ impl App {
                 }
 
                 key_event = self.key_rx.recv() => {
-                    if let Some(Event::Key(key)) = key_event {
-                        if key.kind == KeyEventKind::Press {
-                            self.handle_key_press(key.code, key.modifiers).await?;
+                    match key_event {
+                        Some(Event::Key(key)) => {
+                            if key.kind == KeyEventKind::Press {
+                                self.handle_key_press(key.code, key.modifiers).await?;
+                            }
                         }
+                        Some(Event::Mouse(mouse)) => {
+                            if self.mouse_capture {
+                                match mouse.kind {
+                                    crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                                        self.renderer.clear_selection();
+
+                                        if let Some(clicked_node_id) = self.renderer.hit_test(mouse.column, mouse.row) {
+                                            self.focus_manager.active_focus_id = Some(clicked_node_id);
+                                        }
+                                        if mouse.modifiers.contains(crossterm::event::KeyModifiers::ALT) {
+                                            let _ = self.renderer.handle_mouse_event(mouse);
+                                        }
+                                    }
+                                    _ => {
+                                        if self.renderer.is_selection_dragging() {
+                                            if let Some(copied_text) = self.renderer.handle_mouse_event(mouse) {
+                                                // Convert copied text to base64 and write using OSC 52 ANSI escape sequences
+                                                let b64 = base64_encode(copied_text.as_bytes());
+                                                let osc52_sequence = format!("\x1b]52;c;{}\x07", b64);
+                                                let mut stdout = std::io::stdout();
+                                                let _ = stdout.write_all(osc52_sequence.as_bytes());
+                                                let _ = stdout.flush();
+
+                                                // Fallback: Also set the local clipboard via arboard
+                                                if let Ok(mut ctx) = arboard::Clipboard::new() {
+                                                    let _ = ctx.set_text(copied_text);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -129,9 +246,17 @@ impl App {
             terminal.draw(|f| {
                 if let Some(snap) = &self.snapshot {
                     let size = f.size();
+                    
+                    let zen_node_id = if self.is_zen_mode {
+                        self.focus_manager.current_focus()
+                    } else {
+                        None
+                    };
+
                     match self.renderer.render(
                         f, snap, None, (size.width, size.height), &self.focus_manager,
-                        self.active_slot_nodes.clone(),
+                        self.active_slot_nodes.clone(), zen_node_id.as_deref(),
+                        self.mouse_capture, // 8-parameter alignment
                     ) {
                         Ok(layout_output) => {
                             if self.slot_nodes.is_empty() {
@@ -164,18 +289,44 @@ impl App {
     }
 
     async fn handle_key_press(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<(), UiError> {
+        let key = (code, modifiers);
+
+        if key == self.key_map.exit {
+            return Err(UiError::NormalExit);
+        }
+        if key == self.key_map.zen_toggle {
+            self.is_zen_mode = !self.is_zen_mode;
+            return Ok(());
+        }
+        if key == self.key_map.focus_next {
+            self.focus_manager.next();
+            return Ok(());
+        }
+        if key == self.key_map.focus_prev {
+            self.focus_manager.prev();
+            return Ok(());
+        }
+        if key == self.key_map.tab_next {
+            self.cycle_slot_active_node(1);
+            return Ok(());
+        }
+        if key == self.key_map.tab_prev {
+            self.cycle_slot_active_node(-1);
+            return Ok(());
+        }
+
         match code {
-            KeyCode::Char('c') if modifiers == KeyModifiers::CONTROL => {
-                return Err(UiError::NormalExit);
+            KeyCode::Esc => {
+                self.renderer.clear_selection();
             }
-            KeyCode::Tab if modifiers == KeyModifiers::SHIFT => {
-                self.cycle_slot_active_node(-1);
-            }
-            KeyCode::Tab if modifiers.is_empty() => {
-                self.focus_manager.focus_next();
-            }
-            KeyCode::Tab if modifiers == KeyModifiers::CONTROL => {
-                self.cycle_slot_active_node(1);
+            KeyCode::Char('t') if modifiers == KeyModifiers::CONTROL => {
+                self.mouse_capture = !self.mouse_capture;
+                let mut stdout = std::io::stdout();
+                if self.mouse_capture {
+                    let _ = crossterm::execute!(stdout, crossterm::event::EnableMouseCapture);
+                } else {
+                    let _ = crossterm::execute!(stdout, crossterm::event::DisableMouseCapture);
+                }
             }
             KeyCode::Enter => {
                 if let Some(focused_id) = self.focus_manager.current_focus() {
@@ -240,8 +391,19 @@ impl App {
         self.active_slot_nodes.insert(slot_id, new_active.clone());
 
         if let Some(snap) = &self.snapshot {
-            let focusable_ids: Vec<String> = snap.semantic_tree.iter()
-                .filter(|n| n.node_type == NodeType::ActionButton)
+            let focusable_ids: Vec<String> = snap
+                .semantic_tree
+                .iter()
+                .filter(|n| {
+                    matches!(
+                        n.node_type,
+                        NodeType::StateTree
+                            | NodeType::TextPanel
+                            | NodeType::ActionButton
+                            | NodeType::CodeDiff
+                            | NodeType::Unknown
+                    )
+                })
                 .map(|n| n.id.clone())
                 .collect();
 
@@ -268,7 +430,6 @@ impl App {
         Ok(response)
     }
 
-    /// 已替换为新实现：使用 StreamExt::next() 读取流
     async fn background_dispatch(
         mut stream: TransportStream,
         event_tx: mpsc::Sender<AgentEvent>,

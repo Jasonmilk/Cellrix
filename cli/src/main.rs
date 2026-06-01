@@ -1,11 +1,10 @@
-//! CLI debug tool for Cellrix pipeline.
-//! Tests transport, layout, and protocol end-to-end.
-
+// cli/src/main.rs (已修正 NormalExit 拦截)
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use cellrix_protocol::{ActionRequest, ViewHash};
 use cellrix_layout::{LayoutEngine, LayoutRequest, FocusManager};
 use cellrix_transport::{CapTransport, StdioTransport, UdsTransport, AgentEvent};
+use cellrix_ui::App;
 use std::path::PathBuf;
 use tokio_stream::StreamExt;
 
@@ -19,6 +18,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Run the full interactive Terminal UI (TUI) with Agent loop
+    Run {
+        #[arg(short, long)]
+        mode: TransportMode,
+        #[arg(long, help = "Command to execute for stdio mode")]
+        exec: Option<String>,
+        #[arg(long, help = "UDS socket path")]
+        socket: Option<PathBuf>,
+    },
     /// Test manifest fetch (via connect)
     Manifest {
         #[arg(short, long)]
@@ -69,6 +77,19 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Command::Run { mode, exec, socket } => {
+            let transport = create_transport(mode, exec, socket).await?;
+            let mut app = App::new(transport).await?;
+            // 核心修复点一：拦截并静默处理 NormalExit 错误，防止打印 "Error: Normal exit"
+            if let Err(e) = app.run().await {
+                match e {
+                    cellrix_ui::UiError::NormalExit => {
+                        // Exit silently and restore terminal
+                    }
+                    other => return Err(other.into()),
+                }
+            }
+        }
         Command::Manifest { mode, exec, socket } => {
             let mut transport = create_transport(mode, exec, socket).await?;
             let (manifest, _stream) = transport.connect().await?;

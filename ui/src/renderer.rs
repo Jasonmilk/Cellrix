@@ -1,7 +1,11 @@
+// ui/src/renderer.rs
 use std::collections::HashMap;
 
 use ratatui::{layout::Rect, Frame};
-use ratatui::widgets::Widget;
+use ratatui::widgets::{Widget, Paragraph};
+use ratatui::text::{Line, Span};
+use ratatui::style::{Style, Color, Modifier};
+
 use cellrix_protocol::{SemanticSnapshot, CapabilityManifest, NodeType};
 use cellrix_layout::{LayoutEngine, LayoutRequest, LayoutOutput, LayoutError};
 use crate::{
@@ -38,8 +42,31 @@ impl Renderer {
         self.energy_mode = mode;
     }
 
-    /// Render the current snapshot with given layout overrides.
-    /// Returns the computed layout output for further processing (e.g., tab switching).
+    /// Clear the selection highlight (called dynamically by App)
+    pub fn clear_selection(&mut self) {
+        self.selection.clear();
+    }
+
+    /// Check if the selection drag is actively started
+    pub fn is_selection_dragging(&self) -> bool {
+        self.selection.is_dragging()
+    }
+
+    /// Perform physical hit testing: find which semantic node contains the mouse coordinate (col, row)
+    pub fn hit_test(&self, col: u16, row: u16) -> Option<String> {
+        let layout = self.last_layout.as_ref()?;
+        for (node_id, rect) in &layout.node_rects {
+            if col >= rect.x
+                && col < rect.x + rect.width
+                && row >= rect.y
+                && row < rect.y + rect.height
+            {
+                return Some(node_id.clone());
+            }
+        }
+        None
+    }
+
     pub fn render(
         &mut self,
         frame: &mut Frame,
@@ -48,13 +75,18 @@ impl Renderer {
         terminal_size: (u16, u16),
         focus_manager: &FocusManager,
         active_overrides: HashMap<String, String>,
+        zen_focus_node_id: Option<&str>,
+        _mouse_capture_active: bool, // 👈 核心修复三：加下划线，彻底消除编译 Unused Warning 
     ) -> Result<LayoutOutput, LayoutError> {
+        // Reserve the bottom-most 1 row for the self-documenting TUI help legend bar
+        let layout_height = terminal_size.1.saturating_sub(1);
+
         let layout_req = LayoutRequest {
             snapshot: snapshot.clone(),
             manifest: manifest.cloned(),
             terminal_width: terminal_size.0,
-            terminal_height: terminal_size.1,
-            zen_focus_node_id: None,
+            terminal_height: layout_height,
+            zen_focus_node_id: zen_focus_node_id.map(|s| s.to_string()),
             active_overrides,
         };
         let layout_output = self.layout_engine.compute(&layout_req)?;
@@ -65,13 +97,12 @@ impl Renderer {
             theme: &self.theme,
             snapshot,
             layout: &layout_output,
-            is_zen: false,
+            is_zen: zen_focus_node_id.is_some(),
             focus_manager,
         };
 
         let buffer = frame.buffer_mut();
         // Only render the active node in each slot to avoid overlapping.
-        // 核心修改：slot_id → _slot_id，消除未使用变量警告
         for (_slot_id, active_node_id) in &layout_output.active_node_per_slot {
             if let Some(rect) = layout_output
                 .node_rects
@@ -114,6 +145,71 @@ impl Renderer {
                 }
             }
         }
+
+        // ==================== 强制渲染：在底层物理 Buffer 单元上绘制蓝色拖拽选区 ====================
+        if let Some(((x1, y1), (x2, y2))) = self.selection.get_range() {
+            let min_x = x1.min(x2);
+            let max_x = x1.max(x2);
+            let min_y = y1.min(y2);
+            let max_y = y1.max(y2);
+
+            let buffer = frame.buffer_mut();
+            for y in min_y..=max_y {
+                for x in min_x..=max_x {
+                    if x < buffer.area.width && y < buffer.area.height {
+                        let cell = buffer.get_mut(x, y);
+                        cell.set_style(
+                            Style::default()
+                                .bg(Color::Rgb(91, 95, 199)) // 选中背景：深邃蓝
+                                .fg(Color::Rgb(228, 228, 231)) // 选中前景：纸白
+                        );
+                    }
+                }
+            }
+        }
+
+        // ==================== Somatic Help Legend (Alt/Opt Dual-Key Prompting) ====================
+        let key_style = Style::default().fg(Color::Rgb(91, 95, 199)).add_modifier(Modifier::BOLD); // Monastic Indigo Blue
+        let desc_style = Style::default().fg(Color::Rgb(113, 113, 122)); // slate gray
+        let separator_style = Style::default().fg(Color::Rgb(63, 63, 70)); // dark gray boundary
+
+        let legend_line = Line::from(vec![
+            Span::styled(" ^C ", key_style),
+            Span::styled("Exit  ", desc_style),
+            Span::styled("│", separator_style),
+            Span::styled(" Tab ", key_style),
+            Span::styled("Focus  ", desc_style),
+            Span::styled("│", separator_style),
+            Span::styled(" Alt+←/→ ", key_style),
+            Span::styled("Tabs  ", desc_style),
+            Span::styled("│", separator_style),
+            // Mac-Compatible self-documenting legend: clearly points out Option/Alt key usage
+            Span::styled(" Alt/Opt+Drag ", key_style),
+            Span::styled("Copy  ", desc_style),
+            Span::styled("│", separator_style),
+            // Added Shift+Drag OS-Bypass legend to guide Mac users on native copy (Pillar B aligned)
+            Span::styled(" Shift+Drag ", key_style),
+            Span::styled("OS  ", desc_style),
+            Span::styled("│", separator_style),
+            if zen_focus_node_id.is_some() {
+                Span::styled(" ^O ", Style::default().fg(Color::Rgb(208, 135, 112)).add_modifier(Modifier::BOLD)) // alert amber
+            } else {
+                Span::styled(" ^O ", key_style)
+            },
+            if zen_focus_node_id.is_some() {
+                Span::styled("Exit Zen  ", desc_style)
+            } else {
+                Span::styled("Zen  ", desc_style)
+            },
+        ]);
+
+        let legend_paragraph = Paragraph::new(legend_line)
+            .style(Style::default().bg(Color::Rgb(24, 24, 26))); // volcano background
+        
+        let legend_area = Rect::new(0, terminal_size.1.saturating_sub(1), terminal_size.0, 1);
+        frame.render_widget(legend_paragraph, legend_area);
+        // =========================================================================================
+
         Ok(layout_output)
     }
 

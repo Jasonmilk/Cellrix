@@ -134,7 +134,6 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    // 已清理残留的 let manifest = make_manifest()，保持编译 0 Warning
     write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
     let heartbeat_writer = Arc::clone(&writer);
@@ -197,8 +196,9 @@ where
     let mut len_buf = [0u8; 4];
     match reader.read_exact(&mut len_buf).await {
         Ok(_) => (),
-        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
-        Err(e) => return Err(e.into()),
+        // Core Fix: Treat any read errors (BrokenPipe, ConnectionReset, UnexpectedEof) on stdin as Ok(None).
+        // This keeps the agent's event-pushing loops alive under terminal raw-mode transitions!
+        Err(_) => return Ok(None),
     };
 
     let len = u32::from_le_bytes(len_buf) as usize;
@@ -220,7 +220,6 @@ where
     W: AsyncWriteExt + Unpin,
     T: Serialize,
 {
-    // 强制使用 with_struct_map，序列化为带键名的标准 Map，拒绝序列/Sequence
     let mut data = Vec::new();
     let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
     msg.serialize(&mut serializer)?;
@@ -238,7 +237,6 @@ async fn write_event<W: AsyncWriteExt + Unpin>(
     writer: &Arc<Mutex<BufWriter<W>>>,
     event: AgentEvent,
 ) -> anyhow::Result<()> {
-    // 强制使用 with_struct_map，对齐客户端反序列化器，保护 Enum 内的结构体变体
     let mut data = Vec::new();
     let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
     event.serialize(&mut serializer)?;

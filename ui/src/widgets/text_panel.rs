@@ -1,3 +1,4 @@
+// ui/src/widgets/text_panel.rs
 use ratatui::widgets::{Block, Borders, Paragraph, Widget};
 use ratatui::text::Text;
 use cellrix_protocol::SemanticNode;
@@ -19,10 +20,29 @@ impl<'a> Widget for TextPanelWidget<'a> {
         let text = self.node.content.get("text")
             .and_then(|v| v.as_str())
             .unwrap_or(&self.node.label);
+
+        // Query the focused state dynamically
+        let is_focused = self.ctx.focus_manager.is_focused(&self.node.id);
+
+        // 核心解耦点二：完全交由 Theme 统一审美驱动，告别硬编码！
+        let border_style = if is_focused {
+            self.ctx.theme.style_focus()
+        } else {
+            self.ctx.theme.style_secondary()
+        };
+
+        // Render localized indicators based on focus state
+        let title = if is_focused {
+            format!(" ● {} ", self.node.label)
+        } else {
+            format!(" 📖 {} ", self.node.label)
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
-            .title(self.node.label.as_str())
-            .border_style(self.ctx.theme.style_secondary());
+            .title(title)
+            .border_style(border_style);
+            
         let para = Paragraph::new(Text::from(text))
             .block(block)
             .style(self.ctx.theme.style_default());

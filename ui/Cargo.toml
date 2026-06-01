@@ -30,6 +30,7 @@ serde_json = "1.0"
 
 # Request ID generation
 rand = "0.10.1"
+arboard = "3.6.1"
 
 # Optional components (enable later as needed)
 # tui-markdown = "0.4"

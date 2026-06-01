@@ -1,6 +1,15 @@
+// ui/src/theme.rs
 //! Somatic monasticism theme: colors only represent state, never decoration.
 
 use ratatui::style::{Color, Modifier, Style};
+
+/// Somatic Grid Density: representing physical spacing and font-density scales
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SomaticDensity {
+    Compact,   // Low padding, tight spacing (for high-DPI or small terminal windows)
+    Balanced,  // Standard optimized spacing
+    Spacious,  // Large margins, generous padding (for spacious monastic grids)
+}
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -11,6 +20,9 @@ pub struct Theme {
     pub alert: Color,          // Amber for high-risk / HITL
     pub success: Color,        // Green, transient flash
     pub deprecated: Style,     // Strikethrough + gray
+    
+    // Somatic spacing scale
+    pub density: SomaticDensity,
 }
 
 impl Default for Theme {
@@ -25,6 +37,7 @@ impl Default for Theme {
             deprecated: Style::default()
                 .fg(Color::Rgb(113, 113, 122))
                 .add_modifier(Modifier::CROSSED_OUT),
+            density: SomaticDensity::Balanced,        // 默认间距
         }
     }
 }
@@ -48,5 +61,15 @@ impl Theme {
 
     pub fn style_success(&self) -> Style {
         Style::default().fg(self.success).bg(self.background)
+    }
+
+    /// 核心升级一：聚焦高亮模板（Somatic Focus Highlight）
+    /// 
+    /// 彻底废除硬编码！
+    pub fn style_focus(&self) -> Style {
+        Style::default()
+            .fg(self.reasoning) // Monastic Indigo Blue
+            .bg(self.background)
+            .add_modifier(Modifier::BOLD)
     }
 }

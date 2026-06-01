@@ -9,6 +9,7 @@ description = "Dual-track layout solver for Cellrix: explicit grid + implicit he
 [dependencies]
 cellrix-protocol = { path = "../protocol" }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.150"
 thiserror = "1.0"
 
 [dev-dependencies]

@@ -16,3 +16,4 @@ anyhow = "1.0"   # For CLI error handling only; not in core libs
 hex = "0.4"
 serde_json = "1.0"
 tokio-stream = "0.1.18"
+cellrix-ui = { version = "0.1.0", path = "../ui" }
