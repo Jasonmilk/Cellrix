@@ -23,8 +23,8 @@ use serde::Serialize;
 /// Default BIND-19 (CIB19) heartbeat interval: 19 seconds (prime number to avoid system resonance)
 pub const DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = 19;
 
-/// The CI-144 official MessagePack handshake sub-protocol header
-const PREFERRED_FORMAT: &str = "CIB19 MSGPACK\n";
+/// The CI-144 CIB19 handshake format: must be CIB/1.0 to align with the client-side library verifier
+const PREFERRED_FORMAT: &str = "CIB/1.0 MSGPACK\n";
 
 #[derive(Parser)]
 #[command(name = "mock-agent")]
@@ -66,8 +66,8 @@ async fn run_stdio() -> anyhow::Result<()> {
     let mut handshake_line = String::new();
     reader.read_line(&mut handshake_line).await?;
     
-    // Tolerant handshake check: support both legacy and official CI-144 CIB19 headers
-    if !handshake_line.starts_with("CIB19") && !handshake_line.starts_with("CIB/1.0") {
+    // Aligns with the client-side CIB/1.0 handshake verifier
+    if !handshake_line.starts_with("CIB/1.0") {
         anyhow::bail!("Invalid CI-144 handshake header");
     }
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
@@ -140,7 +140,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
 
     let mut handshake_line = String::new();
     reader.read_line(&mut handshake_line).await?;
-    if !handshake_line.starts_with("CIB19") && !handshake_line.starts_with("CIB/1.0") {
+    if !handshake_line.starts_with("CIB/1.0") {
         anyhow::bail!("Invalid CI-144 handshake header");
     }
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
