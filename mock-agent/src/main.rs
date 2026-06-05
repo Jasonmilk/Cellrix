@@ -1,5 +1,10 @@
-//! Mock agent that implements CIB protocol over STDIO or UDS.
-//! Actively pushes manifest, snapshot and heartbeat event streams after connection.
+// mock-agent/src/main.rs
+//! Mock agent implementing the CI-144 protocol family over STDIO or UDS.
+//! 
+//! Aligned with:
+//! - CIN7: Intent specification (7 core semantic fields)
+//! - CIC13: Capability credential (13-byte salt entropy)
+//! - CIB19: Binding transmission (19s prime-number anti-resonance heartbeat)
 
 use clap::Parser;
 use std::sync::Arc;
@@ -15,11 +20,15 @@ use cellrix_protocol::{
 use rmp_serde::from_slice;
 use serde::Serialize;
 
-const PREFERRED_FORMAT: &str = "CIB/1.0 MSGPACK\n";
+/// Default BIND-19 (CIB19) heartbeat interval: 19 seconds (prime number to avoid system resonance)
+pub const DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = 19;
+
+/// The CI-144 official MessagePack handshake sub-protocol header
+const PREFERRED_FORMAT: &str = "CIB19 MSGPACK\n";
 
 #[derive(Parser)]
 #[command(name = "mock-agent")]
-#[command(about = "Mock Anaphase agent for Cellrix protocol testing")]
+#[command(about = "Mock agent for CI-144 protocol family testing")]
 struct Cli {
     #[arg(short, long)]
     mode: Mode,
@@ -53,22 +62,25 @@ async fn run_stdio() -> anyhow::Result<()> {
     let mut reader = BufReader::new(stdin);
     let writer = Arc::new(Mutex::new(BufWriter::new(stdout)));
 
-    // CIB handshake
+    // CI-144 CIB19 handshake pipeline
     let mut handshake_line = String::new();
     reader.read_line(&mut handshake_line).await?;
-    if !handshake_line.starts_with("CIB/1.0") {
-        anyhow::bail!("Invalid CIB handshake header");
+    
+    // Tolerant handshake check: support both legacy and official CI-144 CIB19 headers
+    if !handshake_line.starts_with("CIB19") && !handshake_line.starts_with("CIB/1.0") {
+        anyhow::bail!("Invalid CI-144 handshake header");
     }
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    // 1. Push manifest/update event
+    // 1. Push manifest/update event (Aligns with CIN7 / CIC13 specs)
     write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
-    // 2. Spawn heartbeat task (every 5s)
+    // 2. Spawn heartbeat task (strictly aligned with BIND-19 19s prime number interval)
     let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        // Aligned with CIB19 standard default interval
+        let mut interval = tokio::time::interval(Duration::from_secs(DEFAULT_HEARTBEAT_INTERVAL_SECS));
         loop {
             interval.tick().await;
             let epoch = std::time::SystemTime::now()
@@ -82,7 +94,7 @@ async fn run_stdio() -> anyhow::Result<()> {
         }
     });
 
-    // 3. Spawn snapshot push loop (every 200ms)
+    // 3. Spawn snapshot push loop (monastic refresh interval: 200ms)
     let snapshot_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
@@ -103,7 +115,7 @@ async fn run_stdio() -> anyhow::Result<()> {
                 write_frame(&writer, &response).await?;
             }
             Ok(None) => {
-                // Stdin/stream closed, keep agent running to push events
+                // Stdin/stream closed, keep agent running to push events natively
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 continue;
             }
@@ -128,8 +140,8 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
 
     let mut handshake_line = String::new();
     reader.read_line(&mut handshake_line).await?;
-    if !handshake_line.starts_with("CIB/1.0") {
-        anyhow::bail!("Invalid CIB handshake header");
+    if !handshake_line.starts_with("CIB19") && !handshake_line.starts_with("CIB/1.0") {
+        anyhow::bail!("Invalid CI-144 handshake header");
     }
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
@@ -138,7 +150,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
 
     let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        let mut interval = tokio::time::interval(Duration::from_secs(DEFAULT_HEARTBEAT_INTERVAL_SECS));
         loop {
             interval.tick().await;
             let epoch = std::time::SystemTime::now()
@@ -172,7 +184,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
                 write_frame(&writer, &response).await?;
             }
             Ok(None) => {
-                // Stream closed, keep agent running to push events
+                // Stream closed, keep agent running to push events natively
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 continue;
             }
@@ -196,8 +208,7 @@ where
     let mut len_buf = [0u8; 4];
     match reader.read_exact(&mut len_buf).await {
         Ok(_) => (),
-        // Core Fix: Treat any read errors (BrokenPipe, ConnectionReset, UnexpectedEof) on stdin as Ok(None).
-        // This keeps the agent's event-pushing loops alive under terminal raw-mode transitions!
+        // Broad anti-vibration read error recovery: prevent agent crash on any pipe jitter
         Err(_) => return Ok(None),
     };
 
@@ -214,12 +225,13 @@ where
     Ok(Some(Frame::Action(action)))
 }
 
-/// Write a raw CIB frame (used for request/response).
+/// Write a raw CI-144 frame (used for request/response).
 async fn write_frame<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, msg: &T) -> anyhow::Result<()>
 where
     W: AsyncWriteExt + Unpin,
     T: Serialize,
 {
+    // Serialize with struct_map to ensure string-keyed dictionary formatting (WASM compatible)
     let mut data = Vec::new();
     let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
     msg.serialize(&mut serializer)?;
@@ -232,11 +244,12 @@ where
     Ok(())
 }
 
-/// Write a CIB event frame: directly serialize AgentEvent (protocol standard)
+/// Write a CI-144 event frame: directly serialize AgentEvent (CIB19 standard)
 async fn write_event<W: AsyncWriteExt + Unpin>(
     writer: &Arc<Mutex<BufWriter<W>>>,
     event: AgentEvent,
 ) -> anyhow::Result<()> {
+    // Serialize with struct_map to align with the client deserializer constraints
     let mut data = Vec::new();
     let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
     event.serialize(&mut serializer)?;
@@ -265,7 +278,7 @@ fn make_manifest() -> CapabilityManifest {
                 id: "critical_action".into(),
                 label: "Delete File".into(),
                 security_class: SecurityClass::Critical,
-                lease_ms: Some(30000),
+                lease_ms: Some(30000), // Aligned with CIC13 verification timeout lease
                 parameters: serde_json::json!({ "path": { "type": "string" } }),
             },
         ],

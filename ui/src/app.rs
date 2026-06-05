@@ -1,4 +1,10 @@
 // ui/src/app.rs
+//! TUI application orchestrator for Cellrix.
+//! 
+//! Aligned with:
+//! - CI-144 Protocol Family
+//! - CIB19 (BIND-19) standard heartbeats and timeouts (no hardcoding)
+
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::collections::HashMap;
@@ -13,8 +19,10 @@ use cellrix_transport::{AgentEvent, CapTransport, TransportStream};
 
 use crate::{FocusManager, Renderer, UiError};
 
-/// Zero-dependency high-performance pure Rust Base64 encoder.
-/// Enables 100% reliable OSC 52 physical bypass copying over headless remote SSH sessions.
+/// Default BIND-19 (CIB19) heartbeat timeout: 40 seconds (2 * 19s heartbeat interval + 2s buffer)
+pub const DEFAULT_HEARTBEAT_TIMEOUT_SECS: u64 = 40;
+
+/// Pure Rust high-performance Base64 encoder for OSC 52 physical bypass copying over SSH
 pub fn base64_encode(data: &[u8]) -> String {
     const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
@@ -79,6 +87,9 @@ pub struct App {
     is_zen_mode: bool,
     mouse_capture: bool,
     pub key_map: KeyMap,
+    
+    // Core Upgrade: Configurable heartbeat timeout field instead of hardcoded literals!
+    pub heartbeat_timeout: Duration,
 }
 
 impl App {
@@ -112,8 +123,11 @@ impl App {
             slot_nodes: HashMap::new(),
             active_slot_nodes: HashMap::new(),
             is_zen_mode: false,
-            mouse_capture: true, // Default to true to enable click-to-focus and custom spatial selection
+            mouse_capture: true, // Permanent mouse tracking for seamless hit-testing and custom copy-paste
             key_map: KeyMap::default(),
+            
+            // Initialized with CIB19 default 40s timeout (fully open to overrides!)
+            heartbeat_timeout: Duration::from_secs(DEFAULT_HEARTBEAT_TIMEOUT_SECS),
         })
     }
 
@@ -149,11 +163,10 @@ impl App {
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), UiError> {
-        const HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(10);
-
         loop {
-            if self.last_heartbeat.elapsed() > HEARTBEAT_TIMEOUT {
-                self.error = Some("Connection lost: No heartbeat received for 10 seconds".to_string());
+            // Evaluates timeout against the configurable self.heartbeat_timeout
+            if self.last_heartbeat.elapsed() > self.heartbeat_timeout {
+                self.error = Some("Connection lost: No heartbeat received within the timeout budget".to_string());
             }
 
             tokio::select! {
@@ -256,7 +269,7 @@ impl App {
                     match self.renderer.render(
                         f, snap, None, (size.width, size.height), &self.focus_manager,
                         self.active_slot_nodes.clone(), zen_node_id.as_deref(),
-                        self.mouse_capture, // 8-parameter alignment
+                        self.mouse_capture, // Aligned 8-parameter render
                     ) {
                         Ok(layout_output) => {
                             if self.slot_nodes.is_empty() {
