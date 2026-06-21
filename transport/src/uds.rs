@@ -4,7 +4,7 @@ pub mod server;
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::Ordering; // 完美修复：精确补全无锁原子的 Ordering 导入！
+use std::sync::atomic::Ordering;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::time::Duration;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
@@ -116,13 +116,14 @@ impl UdsTransport {
 
         // Register the first client under its bootstrap identity
         let client_ns = manifest.agent_name.clone();
-        let is_active = self.registry.register(&client_ns);
+        let (is_active, action_rx) = self.registry.register(&client_ns);
 
         // 9. Spawn dedicated UdsSession task to handle the first client's stream
         let session = UdsSession {
             framed: first_framed,
             is_active,
             tx: tx.clone(),
+            action_rx,
             registry: self.registry.clone(),
             agent_name: client_ns,
         };
@@ -179,17 +180,31 @@ impl CapTransport for UdsTransport {
         }
     }
 
-    /// Mechanism is separate from Policy. The UI sends a focus_swap action request,
-    /// and the transport layer intercepts it, updating lock-free atomics to drive conditional parsing.
+    /// Intercepts focus swap requests, updates local atomic states, 
+    /// and actively pushes CIB-compliant downsteam actions to swap clients' throttling modes.
     async fn send_action(&mut self, request: ActionRequest) -> Result<ActionResponse, TransportError> {
         if request.action_id == "sys_focus_swap" {
             if let Some(target_ns) = request.parameters.get("namespace").and_then(|v| v.as_str()) {
                 let clients = self.registry.clients.lock().unwrap();
-                for (ns, is_active) in clients.iter() {
+                
+                // 1. Swap atomic flags and push downstream commands
+                for (ns, meta) in clients.iter() {
                     if ns == target_ns {
-                        is_active.store(true, Ordering::Release);
+                        // Activate new focus and tell the client to resume full speed
+                        meta.is_active.store(true, Ordering::Release);
+                        let _ = meta.action_tx.send(ActionRequest {
+                            action_id: "sys_resume".to_string(),
+                            parameters: serde_json::Value::Null,
+                            view_hash: None,
+                        });
                     } else {
-                        is_active.store(false, Ordering::Release);
+                        // Deactivate old focus and tell the client to suspend/throttle
+                        meta.is_active.store(false, Ordering::Release);
+                        let _ = meta.action_tx.send(ActionRequest {
+                            action_id: "sys_suspend".to_string(),
+                            parameters: serde_json::Value::Null,
+                            view_hash: None,
+                        });
                     }
                 }
                 return Ok(ActionResponse::Success { message: "focus swapped".to_string() });

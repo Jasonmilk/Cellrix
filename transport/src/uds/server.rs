@@ -7,13 +7,19 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use tokio_stream::{Stream, StreamExt};
 
 use crate::cap_transport::TransportError;
-use cellrix_protocol::{CapabilityManifest, AgentEvent};
+use cellrix_protocol::{CapabilityManifest, AgentEvent, ActionRequest};
 use super::config::CellrixDaemonConfig;
 use super::session::UdsSession;
 
-/// Central registry mapping connected client names to their lock-free focus states.
+/// Metadata holding the client's focus state and downstream control pipeline.
+pub struct ClientMetadata {
+    pub is_active: Arc<AtomicBool>,
+    pub action_tx: tokio::sync::mpsc::UnboundedSender<ActionRequest>,
+}
+
+/// Central registry mapping connected client names to their state metadata.
 pub struct ClientRegistry {
-    pub clients: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
+    pub clients: std::sync::Mutex<HashMap<String, ClientMetadata>>,
 }
 
 impl ClientRegistry {
@@ -23,11 +29,23 @@ impl ClientRegistry {
         }
     }
 
-    pub fn register(&self, agent_name: &str) -> Arc<AtomicBool> {
+    pub fn register(
+        &self, 
+        agent_name: &str
+    ) -> (Arc<AtomicBool>, tokio::sync::mpsc::UnboundedReceiver<ActionRequest>) {
         let mut clients = self.clients.lock().unwrap();
+        
+        let (action_tx, action_rx) = tokio::sync::mpsc::unbounded_channel::<ActionRequest>();
         let is_active = Arc::new(AtomicBool::new(clients.is_empty()));
-        clients.insert(agent_name.to_string(), is_active.clone());
-        is_active
+        
+        clients.insert(
+            agent_name.to_string(),
+            ClientMetadata {
+                is_active: is_active.clone(),
+                action_tx,
+            },
+        );
+        (is_active, action_rx)
     }
 
     pub fn unregister(&self, agent_name: &str) {
@@ -36,7 +54,6 @@ impl ClientRegistry {
     }
 }
 
-/// Symmetrical adapter to map Tokio's UnboundedReceiver directly to a CapTransport-compliant Stream.
 pub struct ReceiverStream {
     pub inner: tokio::sync::mpsc::UnboundedReceiver<Result<AgentEvent, TransportError>>,
 }
@@ -103,12 +120,13 @@ impl UdsServer {
                         if let Some(Ok(first_frame)) = framed.next().await {
                             if let Ok(manifest) = rmp_serde::from_slice::<CapabilityManifest>(&first_frame) {
                                 let agent_name = manifest.agent_name.clone();
-                                let is_active = registry_client.register(&agent_name);
+                                let (is_active, action_rx) = registry_client.register(&agent_name);
 
                                 let session = UdsSession {
                                     framed,
                                     is_active,
                                     tx: tx_client,
+                                    action_rx,
                                     registry: registry_client,
                                     agent_name,
                                 };
