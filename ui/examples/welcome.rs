@@ -1,10 +1,11 @@
+// ui/examples/welcome.rs
 //! Welcome demo for Cellrix UI.
 //! Connects to a mock-agent (via UDS or STDIO) and renders the semantic snapshot.
 
 use std::path::PathBuf;
 use clap::Parser;
 use cellrix_ui::App;
-use cellrix_transport::{StdioTransport, UdsTransport};
+use cellrix_transport::{CapTransport, StdioTransport, UdsTransport};
 
 #[derive(Parser)]
 #[command(name = "cellrix-welcome")]
@@ -45,12 +46,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cmd = cli.exec.expect("--exec required for stdio mode");
             let args: Vec<String> = vec![];
             let transport = StdioTransport::new(&cmd, &args).await?;
-            Box::new(transport) as Box<dyn cellrix_transport::CapTransport>
+            Box::new(transport) as Box<dyn CapTransport>
         }
         Mode::Uds => {
-            let path = cli.socket.to_str().expect("Invalid socket path");
-            let transport = UdsTransport::connect(path).await?;
-            Box::new(transport)
+            // Polymorphically invoke the new clean client-side constructor
+            let transport = UdsTransport::new_client(cli.socket.clone()).await?;
+            Box::new(transport) as Box<dyn CapTransport>
         }
     };
 

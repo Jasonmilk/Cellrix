@@ -1,0 +1,95 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::net::UnixStream;
+use tokio_util::codec::{Framed, LengthDelimitedCodec};
+use tokio_stream::StreamExt;
+use tokio::io::AsyncWriteExt;
+use tokio::time::Duration;
+
+use crate::cap_transport::TransportError;
+use cellrix_protocol::{AgentEvent, ActionRequest};
+use super::server::ClientRegistry;
+use super::config::CellrixDaemonConfig;
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "event", content = "data", rename_all = "snake_case")]
+enum AgentEventTag {
+    Manifest(serde::de::IgnoredAny),
+    Snapshot(serde::de::IgnoredAny),
+    Heartbeat {
+        #[allow(dead_code)]
+        epoch: u64,
+    },
+    StreamError(String),
+}
+
+pub struct UdsSession {
+    pub framed: Framed<UnixStream, LengthDelimitedCodec>,
+    pub is_active: Arc<AtomicBool>,
+    pub tx: tokio::sync::mpsc::UnboundedSender<Result<AgentEvent, TransportError>>,
+    pub action_rx: tokio::sync::mpsc::UnboundedReceiver<ActionRequest>,
+    pub registry: Arc<ClientRegistry>,
+    pub agent_name: String,
+    pub config: Arc<CellrixDaemonConfig>,
+}
+
+impl UdsSession {
+    pub fn spawn_run(self) {
+        let mut framed = self.framed;
+        let mut action_rx = self.action_rx;
+        let is_active = self.is_active;
+        let tx = self.tx;
+        let registry = self.registry;
+        let agent_name = self.agent_name;
+        
+        let timeout_duration = Duration::from_secs(self.config.heartbeat_timeout_seconds);
+
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    result = tokio::time::timeout(timeout_duration, framed.next()) => {
+                        match result {
+                            Ok(Some(Ok(bytes))) => {
+                                if is_active.load(Ordering::Acquire) {
+                                    if let Ok(event) = rmp_serde::from_slice::<AgentEvent>(&bytes) {
+                                        let _ = tx.send(Ok(event));
+                                    }
+                                } else {
+                                    if let Ok(tag) = rmp_serde::from_slice::<AgentEventTag>(&bytes) {
+                                        if let AgentEventTag::StreamError(err) = tag {
+                                            let _ = tx.send(Ok(AgentEvent::StreamError(err)));
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(Some(Err(e))) => {
+                                let _ = tx.send(Err(TransportError::Io(e)));
+                                break;
+                            }
+                            Ok(None) => break,
+                            Err(_) => {
+                                eprintln!("CIB19 Watchdog: Client '{}' timed out. Purging connection.", agent_name);
+                                let _ = tx.send(Ok(AgentEvent::StreamError(format!(
+                                    "Client '{}' disconnected due to CIB19 heartbeat timeout", agent_name
+                                ))));
+                                break;
+                            }
+                        }
+                    }
+                    Some(action) = action_rx.recv() => {
+                        if let Ok(action_bytes) = rmp_serde::to_vec(&action) {
+                            // Aligned with the standard network Big-Endian format
+                            let len_bytes = (action_bytes.len() as u32).to_be_bytes();
+                            let raw_stream = framed.get_mut();
+                            
+                            if raw_stream.write_all(&len_bytes).await.is_err() { break; }
+                            if raw_stream.write_all(&action_bytes).await.is_err() { break; }
+                            if raw_stream.flush().await.is_err() { break; }
+                        }
+                    }
+                }
+            }
+            registry.unregister(&agent_name);
+        });
+    }
+}

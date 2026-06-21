@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "CommonIntents协议栈的Rust实现：CIS/CIB/CAP数据结构与宽容解析器"
+description = "Rust implementation of the CommonIntents protocol stack: CIN7 and CIC13 data structures with fault-tolerant parsers under BIND-19 (CIB19) standard"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -12,5 +12,4 @@ serde_json = "1.0"
 thiserror = "1.0"
 
 [dev-dependencies]
-# 用于测试
 serde_json = "1.0"

@@ -1,9 +1,8 @@
-// cli/src/main.rs (已修正 NormalExit 拦截)
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use cellrix_protocol::{ActionRequest, ViewHash};
-use cellrix_layout::{LayoutEngine, LayoutRequest, FocusManager};
-use cellrix_transport::{CapTransport, StdioTransport, UdsTransport, AgentEvent};
+use cellrix_layout::{LayoutEngine, LayoutRequest, FocusManager, LayoutConfig};
+use cellrix_transport::{CapTransport, StdioTransport, UdsTransport, UdsRole, AgentEvent};
 use cellrix_ui::App;
 use std::path::PathBuf;
 use tokio_stream::StreamExt;
@@ -78,32 +77,29 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Command::Run { mode, exec, socket } => {
-            let transport = create_transport(mode, exec, socket).await?;
+            let transport = create_transport(mode, exec, socket, UdsRole::Server).await?;
             let mut app = App::new(transport).await?;
-            // 核心修复点一：拦截并静默处理 NormalExit 错误，防止打印 "Error: Normal exit"
             if let Err(e) = app.run().await {
                 match e {
                     cellrix_ui::UiError::NormalExit => {
-                        // Exit silently and restore terminal
                     }
                     other => return Err(other.into()),
                 }
             }
         }
         Command::Manifest { mode, exec, socket } => {
-            let mut transport = create_transport(mode, exec, socket).await?;
+            let mut transport = create_transport(mode, exec, socket, UdsRole::Client).await?;
             let (manifest, _stream) = transport.connect().await?;
             println!("{:#?}", manifest);
         }
         Command::Snapshot { mode, exec, socket, width, height } => {
-            let mut transport = create_transport(mode, exec, socket).await?;
+            let mut transport = create_transport(mode, exec, socket, UdsRole::Client).await?;
             let (_manifest, mut stream) = transport.connect().await?;
 
-            // Try to read the first Snapshot event from the stream
             let snapshot = loop {
                 match stream.next().await {
                     Some(Ok(AgentEvent::Snapshot(snap))) => break snap,
-                    Some(Ok(_)) => continue, // skip heartbeats, etc.
+                    Some(Ok(_)) => continue,
                     Some(Err(e)) => anyhow::bail!("Stream error: {}", e),
                     None => anyhow::bail!("Stream ended before snapshot"),
                 }
@@ -114,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
             println!("Epoch: {}", snapshot.epoch_time);
             println!("Nodes: {}", snapshot.semantic_tree.len());
 
-            // Run layout engine
+            // Run layout engine with explicit Config Injection to prevent hardcoding
             let mut layout_engine = LayoutEngine::new();
             let req = LayoutRequest {
                 snapshot: snapshot.clone(),
@@ -123,6 +119,7 @@ async fn main() -> anyhow::Result<()> {
                 terminal_height: height,
                 zen_focus_node_id: None,
                 active_overrides: HashMap::new(),
+                config: LayoutConfig::default(), // Config injected natively!
             };
             let layout_output = layout_engine.compute(&req)?;
             println!("\n=== Layout ===");
@@ -134,7 +131,6 @@ async fn main() -> anyhow::Result<()> {
                 println!("  {}: {}", slot_id, active);
             }
 
-            // Test focus manager
             let mut focus = FocusManager::new();
             let node_ids: Vec<String> = snapshot.semantic_tree.iter().map(|n| n.id.clone()).collect();
             focus.rebuild(node_ids, None);
@@ -143,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Command::Action { mode, exec, socket, action_id, params, view_hash } => {
-            let mut transport = create_transport(mode, exec, socket).await?;
+            let mut transport = create_transport(mode, exec, socket, UdsRole::Client).await?;
             let (_manifest, _stream) = transport.connect().await?;
 
             let params_value: serde_json::Value = serde_json::from_str(&params)?;
@@ -175,6 +171,7 @@ async fn create_transport(
     mode: TransportMode,
     exec: Option<String>,
     socket: Option<PathBuf>,
+    role: UdsRole,
 ) -> Result<Box<dyn CapTransport>, anyhow::Error> {
     match mode {
         TransportMode::Stdio => {
@@ -185,7 +182,12 @@ async fn create_transport(
         }
         TransportMode::Uds => {
             let path = socket.ok_or_else(|| anyhow::anyhow!("--socket required for uds mode"))?;
-            let transport = UdsTransport::connect(path.to_str().unwrap()).await?;
+            let transport = match role {
+                UdsRole::Server => UdsTransport::new_server(path).await?,
+                UdsRole::Client => {
+                    UdsTransport::new_client(path).await?
+                }
+            };
             Ok(Box::new(transport))
         }
     }

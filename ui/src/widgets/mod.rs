@@ -20,6 +20,9 @@ pub use code_diff::CodeDiffWidget;
 pub use metrics::MetricsWidget;
 pub use fallback::FallbackWidget;
 
+/// Allow dead code here as these context fields are reserved for 
+/// downstream widget rendering modules in the UI lifecycle.
+#[allow(dead_code)]
 pub struct WidgetContext<'a> {
     pub theme: &'a Theme,
     pub snapshot: &'a cellrix_protocol::SemanticSnapshot,
@@ -28,6 +31,9 @@ pub struct WidgetContext<'a> {
     pub focus_manager: &'a FocusManager,
 }
 
+/// Allow dead code here as this factory function is a public API 
+/// designed to be consumed by external widget instantiations.
+#[allow(dead_code)]
 pub fn create_widget<'a>(node: &'a SemanticNode, ctx: &'a WidgetContext) -> Box<dyn Widget + 'a> {
     match node.node_type {
         NodeType::StateTree => Box::new(StateTreeWidget::new(node, ctx)),

@@ -5,14 +5,14 @@ mod slot_allocator;
 mod focus_manager;
 mod zen_mode;
 mod coords;
-mod mouse_selector; // 仅在此处声明一次模块，不重复 pub mod
+mod mouse_selector;
 
-pub use layout_engine::{LayoutEngine, LayoutRequest, LayoutOutput};
+pub use layout_engine::{LayoutEngine, LayoutRequest, LayoutOutput, LayoutConfig, DefaultSlotIds};
 pub use slot_allocator::{SlotAllocator, SlotAssignment, SlotType};
 pub use focus_manager::FocusManager;
 pub use zen_mode::ZenMode;
 pub use coords::LayoutRect;
-pub use mouse_selector::MouseSelector; // 重导出以供 ui 与 cli 模块跨 crate 引用
+pub use mouse_selector::MouseSelector;
 
 /// Common error type for layout operations.
 #[derive(Debug, thiserror::Error)]
@@ -26,3 +26,8 @@ pub enum LayoutError {
     #[error("Zen mode error: {0}")]
     ZenModeError(String),
 }
+
+// Conditional compilation block. 
+// Protects the native compiler from loading WASM dependencies.
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
