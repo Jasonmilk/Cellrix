@@ -11,13 +11,11 @@ use cellrix_protocol::{CapabilityManifest, AgentEvent, ActionRequest};
 use super::config::CellrixDaemonConfig;
 use super::session::UdsSession;
 
-/// Metadata holding the client's focus state and downstream control pipeline.
 pub struct ClientMetadata {
     pub is_active: Arc<AtomicBool>,
     pub action_tx: tokio::sync::mpsc::UnboundedSender<ActionRequest>,
 }
 
-/// Central registry mapping connected client names to their state metadata.
 pub struct ClientRegistry {
     pub clients: std::sync::Mutex<HashMap<String, ClientMetadata>>,
 }
@@ -66,7 +64,6 @@ impl Stream for ReceiverStream {
     }
 }
 
-/// Static, thread-safe peer credentials auditor to verify UNIX process identities.
 pub fn verify_peer_credentials_static(stream: &UnixStream, config: &CellrixDaemonConfig) -> Result<(), TransportError> {
     if !config.enable_peer_verification {
         return Ok(());
@@ -97,7 +94,6 @@ pub struct UdsServer {
 }
 
 impl UdsServer {
-    /// Spawns the background accept loop.
     pub fn spawn_run(self) {
         let listener_arc = Arc::new(self.listener);
         let config = self.config;
@@ -116,10 +112,8 @@ impl UdsServer {
                     let config_client = config.clone();
 
                     tokio::spawn(async move {
-                        let mut framed = Framed::new(
-                            stream, 
-                            LengthDelimitedCodec::builder().little_endian().new_codec()
-                        );
+                        // Aligned with the standard Big-Endian network codec
+                        let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
                         if let Some(Ok(first_frame)) = framed.next().await {
                             if let Ok(manifest) = rmp_serde::from_slice::<CapabilityManifest>(&first_frame) {
                                 let agent_name = manifest.agent_name.clone();
@@ -132,7 +126,7 @@ impl UdsServer {
                                     action_rx,
                                     registry: registry_client,
                                     agent_name,
-                                    config: config_client, // 完美修复：补全并发连接的 config 引用传递！
+                                    config: config_client,
                                 };
                                 session.spawn_run();
                             }

@@ -4,7 +4,7 @@ use tokio::net::UnixStream;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use tokio_stream::StreamExt;
 use tokio::io::AsyncWriteExt;
-use tokio::time::Duration; // Timeout helper
+use tokio::time::Duration;
 
 use crate::cap_transport::TransportError;
 use cellrix_protocol::{AgentEvent, ActionRequest};
@@ -23,7 +23,6 @@ enum AgentEventTag {
     StreamError(String),
 }
 
-/// Dedicated, isolated Session task to handle a single client socket lifecycle.
 pub struct UdsSession {
     pub framed: Framed<UnixStream, LengthDelimitedCodec>,
     pub is_active: Arc<AtomicBool>,
@@ -31,11 +30,10 @@ pub struct UdsSession {
     pub action_rx: tokio::sync::mpsc::UnboundedReceiver<ActionRequest>,
     pub registry: Arc<ClientRegistry>,
     pub agent_name: String,
-    pub config: Arc<CellrixDaemonConfig>, // Configured timeouts (0 hardcoding)
+    pub config: Arc<CellrixDaemonConfig>,
 }
 
 impl UdsSession {
-    /// Spawns the session handler with embedded BIND-19 asynchronous watchdog.
     pub fn spawn_run(self) {
         let mut framed = self.framed;
         let mut action_rx = self.action_rx;
@@ -49,10 +47,8 @@ impl UdsSession {
         tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    // 1. Upstream processing: Wrapped inside the CIB19 heartbeat timeout
                     result = tokio::time::timeout(timeout_duration, framed.next()) => {
                         match result {
-                            // Frame arrived in time: reset the watchdog
                             Ok(Some(Ok(bytes))) => {
                                 if is_active.load(Ordering::Acquire) {
                                     if let Ok(event) = rmp_serde::from_slice::<AgentEvent>(&bytes) {
@@ -70,12 +66,9 @@ impl UdsSession {
                                 let _ = tx.send(Err(TransportError::Io(e)));
                                 break;
                             }
-                            Ok(None) => break, // Client disconnected gracefully
+                            Ok(None) => break,
                             Err(_) => {
-                                // CIB19 Watchdog triggered! Silent client detected.
                                 eprintln!("CIB19 Watchdog: Client '{}' timed out. Purging connection.", agent_name);
-                                
-                                // Send standard StreamError with single-quoted name to trigger UI self-healing
                                 let _ = tx.send(Ok(AgentEvent::StreamError(format!(
                                     "Client '{}' disconnected due to CIB19 heartbeat timeout", agent_name
                                 ))));
@@ -83,9 +76,9 @@ impl UdsSession {
                             }
                         }
                     }
-                    // 2. Downstream processing
                     Some(action) = action_rx.recv() => {
                         if let Ok(action_bytes) = rmp_serde::to_vec(&action) {
+                            // Aligned with the standard network Big-Endian format
                             let len_bytes = (action_bytes.len() as u32).to_be_bytes();
                             let raw_stream = framed.get_mut();
                             

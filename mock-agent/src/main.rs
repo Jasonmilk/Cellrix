@@ -13,7 +13,7 @@ use tokio::net::UnixStream;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 use cellrix_protocol::{
-    CapabilityManifest, Action, SecurityClass,
+    CapabilityManifest, Action,
     SemanticSnapshot, SemanticNode, NodeType,
     ActionRequest, ActionResponse, AgentEvent
 };
@@ -126,20 +126,15 @@ async fn run_stdio() -> anyhow::Result<()> {
 }
 
 async fn run_uds(path: &str) -> anyhow::Result<()> {
-    // MODIFIED: In the Wayland display-server paradigm, the Agent is a Client actively connecting to UdsTransport
     let stream = UnixStream::connect(path).await?;
     let (read_half, write_half) = tokio::io::split(stream);
     let mut reader = BufReader::new(read_half);
     let writer = Arc::new(Mutex::new(BufWriter::new(write_half)));
 
-    // Active client-side handshake bypasses raw line negotiations over UDS, 
-    // directly pushing the CapabilityManifest as the first framed packet
     write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
-    // Per-client adaptive throttling state
     let is_suspended = Arc::new(AtomicBool::new(false));
 
-    // 1. Spawn heartbeat task (strictly aligned with BIND-19 19s prime number interval, stays alive even when suspended!)
     let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(DEFAULT_HEARTBEAT_INTERVAL_SECS));
@@ -156,14 +151,12 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
-    // 2. Spawn snapshot push loop with adaptive throttling
     let snapshot_writer = Arc::clone(&writer);
     let is_suspended_clone = is_suspended.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
         loop {
             interval.tick().await;
-            // Adaptive throttling: Skip Snapshot frames if suspended in the background
             if is_suspended_clone.load(Ordering::Acquire) {
                 continue;
             }
@@ -174,7 +167,6 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
-    // 3. Main loop: read incoming ActionRequests and handle adaptive suspend/resume
     loop {
         match read_frame(&mut reader).await {
             Ok(Some(Frame::Action(action))) => {
@@ -220,8 +212,7 @@ where
         Err(_) => return Ok(None),
     };
 
-    // Aligned with the length prefix format
-    let len = u32::from_le_bytes(len_buf) as usize;
+    let len = u32::from_be_bytes(len_buf) as usize;
     let mut data = vec![0u8; len];
     reader.read_exact(&mut data).await?;
 
@@ -245,7 +236,7 @@ where
 
     let len = data.len() as u32;
     let mut guard = writer.lock().await;
-    guard.write_all(&len.to_le_bytes()).await?;
+    guard.write_all(&len.to_be_bytes()).await?;
     guard.write_all(&data).await?;
     guard.flush().await?;
     Ok(())
@@ -261,7 +252,7 @@ async fn write_event<W: AsyncWriteExt + Unpin>(
 
     let len = data.len() as u32;
     let mut guard = writer.lock().await;
-    guard.write_all(&len.to_le_bytes()).await?;
+    guard.write_all(&len.to_be_bytes()).await?;
     guard.write_all(&data).await?;
     guard.flush().await?;
     Ok(())
@@ -275,14 +266,14 @@ fn make_manifest() -> CapabilityManifest {
             Action {
                 id: "scrape".into(),
                 label: "Scrape URL".into(),
-                security_class: SecurityClass::Normal,
+                security_class: cellrix_protocol::SecurityClass::Normal,
                 lease_ms: None,
                 parameters: serde_json::json!({ "url": { "type": "string" } }),
             },
             Action {
                 id: "critical_action".into(),
                 label: "Delete File".into(),
-                security_class: SecurityClass::Critical,
+                security_class: cellrix_protocol::SecurityClass::Critical,
                 lease_ms: Some(30000),
                 parameters: serde_json::json!({ "path": { "type": "string" } }),
             },

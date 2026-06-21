@@ -100,7 +100,7 @@ impl UdsTransport {
         // 5. Audit first peer identity
         self.verify_peer_credentials(&first_stream)?;
 
-        // 6. Wrap first stream into length-delimited codec
+        // 6. Wrap first stream into standard Big-Endian length-delimited codec
         let mut first_framed = Framed::new(first_stream, LengthDelimitedCodec::new());
 
         // 7. Read CapabilityManifest as the first frame
@@ -126,7 +126,7 @@ impl UdsTransport {
             action_rx,
             registry: self.registry.clone(),
             agent_name: client_ns,
-            config: self.config.clone(), // 完美修复：补全第一路会话的 config 引用传递！
+            config: self.config.clone(),
         };
         session.spawn_run();
 
@@ -151,6 +151,7 @@ impl UdsTransport {
 
         self.verify_peer_credentials(&stream)?;
 
+        // Aligned with the standard Big-Endian network codec
         let framed = Framed::new(stream, LengthDelimitedCodec::new());
         let mut framed = Box::pin(framed);
         let first_frame = framed.next().await
