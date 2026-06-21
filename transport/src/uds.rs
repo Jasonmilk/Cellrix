@@ -100,8 +100,11 @@ impl UdsTransport {
         // 5. Audit first peer identity
         self.verify_peer_credentials(&first_stream)?;
 
-        // 6. Wrap first stream into length-delimited codec
-        let mut first_framed = Framed::new(first_stream, LengthDelimitedCodec::new());
+        // 6. Wrap first stream into length-delimited codec using Little-Endian format
+        let mut first_framed = Framed::new(
+            first_stream, 
+            LengthDelimitedCodec::builder().little_endian().new_codec()
+        );
 
         // 7. Read CapabilityManifest as the first frame
         let first_frame = first_framed.next().await
@@ -150,7 +153,11 @@ impl UdsTransport {
 
         self.verify_peer_credentials(&stream)?;
 
-        let framed = Framed::new(stream, LengthDelimitedCodec::new());
+        // Aligned with the display host's little endian codec constraints
+        let framed = Framed::new(
+            stream, 
+            LengthDelimitedCodec::builder().little_endian().new_codec()
+        );
         let mut framed = Box::pin(framed);
         let first_frame = framed.next().await
             .ok_or_else(|| TransportError::Protocol("Host disconnected before handshake".into()))?
@@ -180,14 +187,14 @@ impl CapTransport for UdsTransport {
         }
     }
 
-    /// Intercepts focus swap requests, updates local atomic states, 
-    /// and actively pushes CIB-compliant downsteam actions to swap clients' throttling modes.
+    /// Mechanism is separate from Policy. The UI sends a focus_swap action request,
+    /// and the transport layer intercepts it, updating lock-free atomics to drive conditional parsing.
     async fn send_action(&mut self, request: ActionRequest) -> Result<ActionResponse, TransportError> {
         if request.action_id == "sys_focus_swap" {
             if let Some(target_ns) = request.parameters.get("namespace").and_then(|v| v.as_str()) {
                 let clients = self.registry.clients.lock().unwrap();
                 
-                // 1. Swap atomic flags and push downstream commands
+                // Swap atomic flags and push downstream commands
                 for (ns, meta) in clients.iter() {
                     if ns == target_ns {
                         // Activate new focus and tell the client to resume full speed

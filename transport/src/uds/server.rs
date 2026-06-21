@@ -89,7 +89,6 @@ pub fn verify_peer_credentials_static(stream: &UnixStream, config: &CellrixDaemo
     Ok(())
 }
 
-/// Dedicated background Listener to accept and dispatch multiple client connections.
 pub struct UdsServer {
     pub listener: UnixListener,
     pub registry: Arc<ClientRegistry>,
@@ -116,7 +115,11 @@ impl UdsServer {
                     let registry_client = registry.clone();
 
                     tokio::spawn(async move {
-                        let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
+                        // Aligned with the client-side little endian constraint
+                        let mut framed = Framed::new(
+                            stream, 
+                            LengthDelimitedCodec::builder().little_endian().new_codec()
+                        );
                         if let Some(Ok(first_frame)) = framed.next().await {
                             if let Ok(manifest) = rmp_serde::from_slice::<CapabilityManifest>(&first_frame) {
                                 let agent_name = manifest.agent_name.clone();

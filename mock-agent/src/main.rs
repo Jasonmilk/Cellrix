@@ -1,4 +1,3 @@
-// mock-agent/src/main.rs
 //! Mock agent implementing the CI-144 protocol family over STDIO or UDS.
 //! 
 //! Aligned with:
@@ -8,8 +7,9 @@
 
 use clap::Parser;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
-use tokio::net::UnixListener;
+use tokio::net::UnixStream;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 use cellrix_protocol::{
@@ -66,20 +66,18 @@ async fn run_stdio() -> anyhow::Result<()> {
     let mut handshake_line = String::new();
     reader.read_line(&mut handshake_line).await?;
     
-    // Aligns with the client-side CIB/1.0 handshake verifier
     if !handshake_line.starts_with("CIB/1.0") {
         anyhow::bail!("Invalid CI-144 handshake header");
     }
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    // 1. Push manifest/update event (Aligns with CIN7 / CIC13 specs)
+    // 1. Push manifest
     write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
-    // 2. Spawn heartbeat task (strictly aligned with BIND-19 19s prime number interval)
+    // 2. Spawn heartbeat task (BIND-19 19s prime number interval)
     let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
-        // Aligned with CIB19 standard default interval
         let mut interval = tokio::time::interval(Duration::from_secs(DEFAULT_HEARTBEAT_INTERVAL_SECS));
         loop {
             interval.tick().await;
@@ -115,7 +113,6 @@ async fn run_stdio() -> anyhow::Result<()> {
                 write_frame(&writer, &response).await?;
             }
             Ok(None) => {
-                // Stdin/stream closed, keep agent running to push events natively
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 continue;
             }
@@ -129,25 +126,20 @@ async fn run_stdio() -> anyhow::Result<()> {
 }
 
 async fn run_uds(path: &str) -> anyhow::Result<()> {
-    let _ = std::fs::remove_file(path);
-    let listener = UnixListener::bind(path)?;
-    println!("Mock agent listening on UDS: {}", path);
-
-    let (stream, _) = listener.accept().await?;
+    // MODIFIED: In the Wayland display-server paradigm, the Agent is a Client actively connecting to UdsTransport
+    let stream = UnixStream::connect(path).await?;
     let (read_half, write_half) = tokio::io::split(stream);
     let mut reader = BufReader::new(read_half);
     let writer = Arc::new(Mutex::new(BufWriter::new(write_half)));
 
-    let mut handshake_line = String::new();
-    reader.read_line(&mut handshake_line).await?;
-    if !handshake_line.starts_with("CIB/1.0") {
-        anyhow::bail!("Invalid CI-144 handshake header");
-    }
-    writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
-    writer.lock().await.flush().await?;
-
+    // Active client-side handshake bypasses raw line negotiations over UDS, 
+    // directly pushing the CapabilityManifest as the first framed packet
     write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
 
+    // Per-client adaptive throttling state
+    let is_suspended = Arc::new(AtomicBool::new(false));
+
+    // 1. Spawn heartbeat task (strictly aligned with BIND-19 19s prime number interval, stays alive even when suspended!)
     let heartbeat_writer = Arc::clone(&writer);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(DEFAULT_HEARTBEAT_INTERVAL_SECS));
@@ -164,11 +156,17 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
+    // 2. Spawn snapshot push loop with adaptive throttling
     let snapshot_writer = Arc::clone(&writer);
+    let is_suspended_clone = is_suspended.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
         loop {
             interval.tick().await;
+            // Adaptive throttling: Skip Snapshot frames if suspended in the background
+            if is_suspended_clone.load(Ordering::Acquire) {
+                continue;
+            }
             if let Err(e) = write_event(&snapshot_writer, AgentEvent::Snapshot(make_snapshot())).await {
                 eprintln!("Snapshot send failed: {}", e);
                 break;
@@ -176,15 +174,26 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
         }
     });
 
-    // 4. Main loop: read incoming ActionRequests
+    // 3. Main loop: read incoming ActionRequests and handle adaptive suspend/resume
     loop {
         match read_frame(&mut reader).await {
             Ok(Some(Frame::Action(action))) => {
-                let response = handle_action(action);
-                write_frame(&writer, &response).await?;
+                match action.action_id.as_str() {
+                    "sys_suspend" => {
+                        is_suspended.store(true, Ordering::Release);
+                        eprintln!("Mock Agent: Throttled to background sleep mode.");
+                    }
+                    "sys_resume" => {
+                        is_suspended.store(false, Ordering::Release);
+                        eprintln!("Mock Agent: Resumed to foreground active mode.");
+                    }
+                    _ => {
+                        let response = handle_action(action);
+                        write_frame(&writer, &response).await?;
+                    }
+                }
             }
             Ok(None) => {
-                // Stream closed, keep agent running to push events natively
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 continue;
             }
@@ -208,10 +217,10 @@ where
     let mut len_buf = [0u8; 4];
     match reader.read_exact(&mut len_buf).await {
         Ok(_) => (),
-        // Broad anti-vibration read error recovery: prevent agent crash on any pipe jitter
         Err(_) => return Ok(None),
     };
 
+    // Aligned with the length prefix format
     let len = u32::from_le_bytes(len_buf) as usize;
     let mut data = vec![0u8; len];
     reader.read_exact(&mut data).await?;
@@ -225,13 +234,11 @@ where
     Ok(Some(Frame::Action(action)))
 }
 
-/// Write a raw CI-144 frame (used for request/response).
 async fn write_frame<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, msg: &T) -> anyhow::Result<()>
 where
     W: AsyncWriteExt + Unpin,
     T: Serialize,
 {
-    // Serialize with struct_map to ensure string-keyed dictionary formatting (WASM compatible)
     let mut data = Vec::new();
     let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
     msg.serialize(&mut serializer)?;
@@ -244,12 +251,10 @@ where
     Ok(())
 }
 
-/// Write a CI-144 event frame: directly serialize AgentEvent (CIB19 standard)
 async fn write_event<W: AsyncWriteExt + Unpin>(
     writer: &Arc<Mutex<BufWriter<W>>>,
     event: AgentEvent,
 ) -> anyhow::Result<()> {
-    // Serialize with struct_map to align with the client deserializer constraints
     let mut data = Vec::new();
     let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
     event.serialize(&mut serializer)?;
@@ -278,7 +283,7 @@ fn make_manifest() -> CapabilityManifest {
                 id: "critical_action".into(),
                 label: "Delete File".into(),
                 security_class: SecurityClass::Critical,
-                lease_ms: Some(30000), // Aligned with CIC13 verification timeout lease
+                lease_ms: Some(30000),
                 parameters: serde_json::json!({ "path": { "type": "string" } }),
             },
         ],
