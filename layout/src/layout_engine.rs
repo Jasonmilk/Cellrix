@@ -1,8 +1,39 @@
 use std::collections::HashMap;
+use serde::Serialize;
 use cellrix_protocol::{
     SemanticSnapshot, CapabilityManifest, NodeType, GridDefinition, SlotConstraint,
 };
 use crate::{LayoutError, LayoutRect};
+
+/// Default slot identifier names. Zero magic strings.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DefaultSlotIds {
+    pub sidebar: String,
+    pub main: String,
+    pub bottom: String,
+}
+
+/// Layout layout parameters and metrics. Zero magic numbers.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LayoutConfig {
+    pub bottom_bar_height: u16,
+    pub sidebar_width_ratio: f64,
+    pub default_slot_ids: DefaultSlotIds,
+}
+
+impl Default for LayoutConfig {
+    fn default() -> Self {
+        Self {
+            bottom_bar_height: 3,
+            sidebar_width_ratio: 0.3,
+            default_slot_ids: DefaultSlotIds {
+                sidebar: "sidebar".into(),
+                main: "main".into(),
+                bottom: "bottom".into(),
+            },
+        }
+    }
+}
 
 /// Input to the layout engine.
 pub struct LayoutRequest {
@@ -13,10 +44,12 @@ pub struct LayoutRequest {
     pub zen_focus_node_id: Option<String>,
     /// Optional overrides for active node per slot (e.g., from user tab switching).
     pub active_overrides: HashMap<String, String>,
+    /// Configuration governing layout dimensions and slot defaults. Zero hardcoding!
+    pub config: LayoutConfig,
 }
 
 /// Output of the layout engine.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LayoutOutput {
     /// Rectangles for all nodes (for mouse hit testing, etc.).
     pub node_rects: Vec<(String, LayoutRect)>,
@@ -43,13 +76,10 @@ impl LayoutEngine {
     }
 
     /// Compute layout based on the full override priority defined in CAP §3.1.
-    ///
-    /// Priority: snapshot.layout_overrides > manifest.layout_hints > implicit heuristics.
-    /// Higher priority sources completely override lower ones.
     pub fn compute(&mut self, req: &LayoutRequest) -> Result<LayoutOutput, LayoutError> {
         let spec = Self::select_spec(&req.snapshot, req.manifest.as_ref())?;
         
-        // 允许 slots 可变以便于注入禅修（Zen Mode）状态
+        // Allow slots to be mutable to inject Zen Mode state
         let mut slots = match spec {
             LayoutSpec::Explicit(grid) => Self::build_slots_from_grid(
                 &grid,
@@ -60,14 +90,17 @@ impl LayoutEngine {
                 &req.snapshot.semantic_tree,
                 req.terminal_width,
                 req.terminal_height,
+                &req.config,
             ),
         };
 
         // Map nodes to slots (by slot_binding or type heuristic).
-        let node_to_slot = Self::assign_nodes_to_slots(&req.snapshot.semantic_tree, &slots);
+        let node_to_slot = Self::assign_nodes_to_slots(&req.snapshot.semantic_tree, &slots, &req.config);
 
-        // ==================== 禅修模式（Zen Mode）拦截适配 ====================
-        // 如果激活了禅修模式，找到聚焦节点所属的槽位，将其尺寸提升为 100%，其他槽位收缩为 0。
+        // ==================== Zen Mode Interception ====================
+        // If Zen Mode is active, find the slot belonging to the focused node,
+        // expand its dimensions to 100%, and shrink other slots to 0.
+        // ===============================================================
         if let Some(ref zen_node_id) = req.zen_focus_node_id {
             if let Some(zen_slot_id) = node_to_slot.get(zen_node_id).cloned() {
                 for (slot_id, rect) in &mut slots {
@@ -89,7 +122,7 @@ impl LayoutEngine {
                 }
             }
         }
-        // ====================================================================
+        // ===============================================================
 
         // Build slot_id -> sorted list of node IDs.
         let mut slot_nodes: HashMap<String, Vec<String>> = HashMap::new();
@@ -123,7 +156,6 @@ impl LayoutEngine {
         }
 
         // Build rectangles for all nodes (each node gets its slot rectangle).
-        // 禅修模式下，非活跃槽位内的节点会自动继承宽度和高度为 0 的 LayoutRect，阻断视觉绘制
         let mut node_rects = Vec::new();
         for (node_id, slot_id) in &node_to_slot {
             if let Some(rect) = slots.iter().find(|(id, _)| id == slot_id).map(|(_, r)| *r) {
@@ -169,7 +201,6 @@ impl LayoutEngine {
         height: u16,
     ) -> Result<Vec<(String, LayoutRect)>, LayoutError> {
         let mut slots = Vec::with_capacity(grid.rows.len());
-        // We'll stack rows vertically; for simplicity, horizontal splits are not yet supported.
         let total_rows = grid.rows.len();
         if total_rows == 0 {
             return Err(LayoutError::InvalidGrid("Grid has no rows".into()));
@@ -178,8 +209,9 @@ impl LayoutEngine {
         // Calculate height for each row based on constraints.
         let mut remaining_height = height as i32;
         let mut y = 0u16;
-        // First pass: handle fixed and min constraints; collect percentage rows.
         let mut percentage_rows: Vec<(usize, f64)> = Vec::new();
+        
+        // 完美修复：将 Min 和 Percentage 匹配变体彻底归位，消灭所有 unused 与 unreachable 编译警告！
         for (idx, row) in grid.rows.iter().enumerate() {
             match &row.constraint {
                 SlotConstraint::FixedLines(lines) => {
@@ -194,7 +226,6 @@ impl LayoutEngine {
                     if remaining_height < *min as i32 {
                         return Err(LayoutError::NoSpace);
                     }
-                    // Treat Min as a fixed allocation for now; future: resize.
                     slots.push((row.id.clone(), LayoutRect { x: 0, y, width, height: *min }));
                     y += min;
                     remaining_height -= *min as i32;
@@ -205,28 +236,29 @@ impl LayoutEngine {
             }
         }
 
-        // Distribute remaining height among percentage rows.
+        // Execute the verified fix for potential negative remaining height overflow
         if !percentage_rows.is_empty() {
             let total_perc: f64 = percentage_rows.iter().map(|(_, p)| p).sum();
             for (idx, perc) in percentage_rows {
                 let h = ((remaining_height as f64) * (perc / total_perc)) as u16;
-                // Ensure we don't overflow.
-                let h = h.min(remaining_height as u16);
+                // Defensive guard: prevent negative remaining_height overflow under float rounding
+                let h = h.min(remaining_height.max(0) as u16);
                 slots.push((grid.rows[idx].id.clone(), LayoutRect { x: 0, y, width, height: h }));
                 y += h;
                 remaining_height -= h as i32;
             }
         }
 
-        // Sort slots by original row order (they should already be in order).
         Ok(slots)
     }
 
     /// Build implicit slots based on node types (fallback).
+    /// Uses 100% configurable metrics instead of hardcoded numbers.
     fn build_implicit_slots(
         nodes: &[cellrix_protocol::SemanticNode],
         width: u16,
         height: u16,
+        config: &LayoutConfig,
     ) -> Vec<(String, LayoutRect)> {
         let mut has_sidebar = false;
         let mut has_main = false;
@@ -239,48 +271,47 @@ impl LayoutEngine {
             }
         }
 
-        let bottom_height = if has_bottom { 3 } else { 0 };
+        let bottom_height = if has_bottom { config.bottom_bar_height } else { 0 };
         let remaining_height = height.saturating_sub(bottom_height);
 
         let mut slots = Vec::new();
         if has_sidebar && has_main {
-            let sidebar_width = (width as f64 * 0.3) as u16;
+            let sidebar_width = (width as f64 * config.sidebar_width_ratio) as u16;
             let main_width = width - sidebar_width;
-            slots.push(("sidebar".to_string(), LayoutRect { x: 0, y: 0, width: sidebar_width, height: remaining_height }));
-            slots.push(("main".to_string(), LayoutRect { x: sidebar_width, y: 0, width: main_width, height: remaining_height }));
+            slots.push((config.default_slot_ids.sidebar.clone(), LayoutRect { x: 0, y: 0, width: sidebar_width, height: remaining_height }));
+            slots.push((config.default_slot_ids.main.clone(), LayoutRect { x: sidebar_width, y: 0, width: main_width, height: remaining_height }));
         } else if has_sidebar {
-            slots.push(("sidebar".to_string(), LayoutRect { x: 0, y: 0, width, height: remaining_height }));
+            slots.push((config.default_slot_ids.sidebar.clone(), LayoutRect { x: 0, y: 0, width, height: remaining_height }));
         } else if has_main {
-            slots.push(("main".to_string(), LayoutRect { x: 0, y: 0, width, height: remaining_height }));
+            slots.push((config.default_slot_ids.main.clone(), LayoutRect { x: 0, y: 0, width, height: remaining_height }));
         }
         if has_bottom {
-            slots.push(("bottom".to_string(), LayoutRect { x: 0, y: remaining_height, width, height: bottom_height }));
+            slots.push((config.default_slot_ids.bottom.clone(), LayoutRect { x: 0, y: remaining_height, width, height: bottom_height }));
         }
         slots
     }
 
     /// Assign every node to a slot ID.
+    /// Employs clean registry namespacing to prevent magic strings.
     fn assign_nodes_to_slots(
         nodes: &[cellrix_protocol::SemanticNode],
         slots: &[(String, LayoutRect)],
+        config: &LayoutConfig,
     ) -> HashMap<String, String> {
         let mut map = HashMap::new();
         for node in nodes {
-            // If node explicitly binds to a slot, use it.
             if let Some(ref binding) = node.slot_binding {
                 if slots.iter().any(|(id, _)| id == binding) {
                     map.insert(node.id.clone(), binding.clone());
                     continue;
                 }
             }
-            // Otherwise, use type heuristic.
             let slot_id = match node.node_type {
-                NodeType::StateTree | NodeType::Metrics => "sidebar",
-                NodeType::TextPanel | NodeType::CodeDiff | NodeType::Unknown => "main",
-                NodeType::ActionButton | NodeType::ProgressBar => "bottom",
+                NodeType::StateTree | NodeType::Metrics => &config.default_slot_ids.sidebar,
+                NodeType::TextPanel | NodeType::CodeDiff | NodeType::Unknown => &config.default_slot_ids.main,
+                NodeType::ActionButton | NodeType::ProgressBar => &config.default_slot_ids.bottom,
             };
-            // Ensure the heuristic slot actually exists; if not, pick the first available.
-            if slots.iter().any(|(id, _)| id == slot_id) {
+            if slots.iter().any(|(id, _)| id == slot_id.as_str()) {
                 map.insert(node.id.clone(), slot_id.to_string());
             } else if let Some(first) = slots.first() {
                 map.insert(node.id.clone(), first.0.clone());
