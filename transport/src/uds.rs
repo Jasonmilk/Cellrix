@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::pin::Pin;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::time::Duration;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
@@ -24,7 +26,6 @@ impl CellrixDaemonConfig {
     pub fn load_layered() -> Result<Self, TransportError> {
         let mut config = Self::default();
 
-        // 1. Resolve socket permissions mask from environment (e.g. "0600")
         if let Ok(env_val) = std::env::var("CELLRIX_SOCKET_PERMISSIONS") {
             if let Ok(parsed) = u32::from_str_radix(&env_val, 8) {
                 config.socket_permissions = parsed;
@@ -35,7 +36,6 @@ impl CellrixDaemonConfig {
             }
         }
 
-        // 2. Resolve idle shutdown timeout
         if let Ok(env_val) = std::env::var("CELLRIX_IDLE_TIMEOUT") {
             if let Ok(parsed) = env_val.parse::<u64>() {
                 config.idle_shutdown_seconds = parsed;
@@ -46,7 +46,6 @@ impl CellrixDaemonConfig {
             }
         }
 
-        // 3. Resolve peer verification flag
         if let Ok(env_val) = std::env::var("CELLRIX_PEER_VERIFY") {
             if env_val.to_lowercase() == "false" || env_val == "0" {
                 config.enable_peer_verification = false;
@@ -73,6 +72,47 @@ pub enum UdsRole {
     Server,
     /// Client mode: actively connects to an existing daemon (debugging tools style)
     Client,
+}
+
+/// Lightweight proxy enum designed for zero-heap-allocation tag peeking.
+/// Matches the external tag format of AgentEvent perfectly while discarding heavy payloads.
+#[derive(serde::Deserialize)]
+#[serde(tag = "event", content = "data", rename_all = "snake_case")]
+enum AgentEventTag {
+    Manifest(serde::de::IgnoredAny),
+    Snapshot(serde::de::IgnoredAny),
+    Heartbeat {
+        #[allow(dead_code)]
+        epoch: u64,
+    },
+    StreamError(String),
+}
+
+/// Central registry mapping connected client names to their lock-free focus states.
+pub struct ClientRegistry {
+    clients: std::sync::Mutex<HashMap<String, Arc<AtomicBool>>>,
+}
+
+impl ClientRegistry {
+    fn new() -> Self {
+        Self {
+            clients: std::sync::Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn register(&self, agent_name: &str) -> Arc<AtomicBool> {
+        let mut clients = self.clients.lock().unwrap();
+        
+        // If this is the first client connecting, we make it active by default
+        let is_active = Arc::new(AtomicBool::new(clients.is_empty()));
+        clients.insert(agent_name.to_string(), is_active.clone());
+        is_active
+    }
+
+    fn unregister(&self, agent_name: &str) {
+        let mut clients = self.clients.lock().unwrap();
+        clients.remove(agent_name);
+    }
 }
 
 /// Symmetrical adapter to map Tokio's UnboundedReceiver directly to a CapTransport-compliant Stream,
@@ -118,6 +158,7 @@ pub struct UdsTransport {
     role: UdsRole,
     socket_path: PathBuf,
     config: Arc<CellrixDaemonConfig>,
+    registry: Arc<ClientRegistry>,
 }
 
 impl UdsTransport {
@@ -127,6 +168,7 @@ impl UdsTransport {
             role: UdsRole::Server,
             socket_path,
             config: Arc::new(CellrixDaemonConfig::load_layered()?),
+            registry: Arc::new(ClientRegistry::new()),
         })
     }
 
@@ -136,6 +178,7 @@ impl UdsTransport {
             role: UdsRole::Client,
             socket_path,
             config: Arc::new(CellrixDaemonConfig::load_layered()?),
+            registry: Arc::new(ClientRegistry::new()),
         })
     }
 
@@ -197,14 +240,32 @@ impl UdsTransport {
         // 8. Create central event multiplexing channel
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<AgentEvent, TransportError>>();
 
+        // Register the first client under its bootstrap identity
+        let client_ns = manifest.agent_name.clone();
+        let is_active = self.registry.register(&client_ns);
+
         // 9. Spawn thread-safe task to route first client's telemetry stream
         let tx_first = tx.clone();
+        let registry_clone = self.registry.clone();
+        let client_ns_clone = client_ns.clone();
+        
         tokio::spawn(async move {
             while let Some(result) = first_framed.next().await {
                 match result {
                     Ok(bytes) => {
-                        if let Ok(event) = rmp_serde::from_slice::<AgentEvent>(&bytes) {
-                            let _ = tx_first.send(Ok(event));
+                        // ON-DEMAND PROCESSING: Only deserialize on-demand (when active)
+                        if is_active.load(Ordering::Acquire) {
+                            if let Ok(event) = rmp_serde::from_slice::<AgentEvent>(&bytes) {
+                                let _ = tx_first.send(Ok(event));
+                            }
+                        } else {
+                            // Backpressured/Throttled: Peek tag and drop heavy payload instantly!
+                            if let Ok(tag) = rmp_serde::from_slice::<AgentEventTag>(&bytes) {
+                                if let AgentEventTag::StreamError(err) = tag {
+                                    // Forward only critical background errors
+                                    let _ = tx_first.send(Ok(AgentEvent::StreamError(err)));
+                                }
+                            }
                         }
                     }
                     Err(e) => {
@@ -213,12 +274,14 @@ impl UdsTransport {
                     }
                 }
             }
+            registry_clone.unregister(&client_ns_clone);
         });
 
         // 10. Spawn background dispatcher to handle MULTIPLE subsequent connections concurrently
         let tx_subsequent = tx.clone();
         let config_clone = self.config.clone();
         let listener_arc = Arc::new(listener);
+        let registry_sub = self.registry.clone();
         
         tokio::spawn(async move {
             loop {
@@ -228,15 +291,28 @@ impl UdsTransport {
                     }
 
                     let tx_client = tx_subsequent.clone();
+                    let registry_client = registry_sub.clone();
+                    
                     tokio::spawn(async move {
                         let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
                         if let Some(Ok(first_frame)) = framed.next().await {
-                            if let Ok(_manifest) = rmp_serde::from_slice::<CapabilityManifest>(&first_frame) {
+                            if let Ok(manifest) = rmp_serde::from_slice::<CapabilityManifest>(&first_frame) {
+                                let client_ns = manifest.agent_name.clone();
+                                let is_active = registry_client.register(&client_ns);
+                                
                                 while let Some(result) = framed.next().await {
                                     match result {
                                         Ok(bytes) => {
-                                            if let Ok(event) = rmp_serde::from_slice::<AgentEvent>(&bytes) {
-                                                let _ = tx_client.send(Ok(event));
+                                            if is_active.load(Ordering::Acquire) {
+                                                if let Ok(event) = rmp_serde::from_slice::<AgentEvent>(&bytes) {
+                                                    let _ = tx_client.send(Ok(event));
+                                                }
+                                            } else {
+                                                if let Ok(tag) = rmp_serde::from_slice::<AgentEventTag>(&bytes) {
+                                                    if let AgentEventTag::StreamError(err) = tag {
+                                                        let _ = tx_client.send(Ok(AgentEvent::StreamError(err)));
+                                                    }
+                                                }
                                             }
                                         }
                                         Err(e) => {
@@ -245,6 +321,7 @@ impl UdsTransport {
                                         }
                                     }
                                 }
+                                registry_client.unregister(&client_ns);
                             }
                         }
                     });
@@ -258,18 +335,13 @@ impl UdsTransport {
 
     /// Client mode: actively connects to host, verifies identity, reads manifest
     async fn run_client_handshake(&self) -> Result<(CapabilityManifest, TransportStream), TransportError> {
-        // 1. Establish socket connection to the active host daemon
         let stream = UnixStream::connect(&self.socket_path)
             .await
             .map_err(|e| TransportError::Io(e))?;
 
-        // 2. Audit host identity for safety
         self.verify_peer_credentials(&stream)?;
 
-        // 3. Wrap stream into framed codec
         let framed = Framed::new(stream, LengthDelimitedCodec::new());
-
-        // 4. CIB Handshake Step 1: Client also reads the host's capabilities or state
         let mut framed = Box::pin(framed);
         let first_frame = framed.next().await
             .ok_or_else(|| TransportError::Protocol("Host disconnected before handshake".into()))?
@@ -278,7 +350,6 @@ impl UdsTransport {
         let manifest: CapabilityManifest = rmp_serde::from_slice(&first_frame)
             .map_err(|e| TransportError::Serialization(format!("Manifest decode failed: {}", e)))?;
 
-        // 5. Map subsequent frames to TransportStream
         let mapped_stream = framed.map(|item| {
             item.map_err(|e| TransportError::Io(e))
                 .and_then(|bytes| {
@@ -293,7 +364,6 @@ impl UdsTransport {
 
 #[async_trait]
 impl CapTransport for UdsTransport {
-    /// Unified entry point matching CIB v0.1.0 and CapTransport trait contract.
     async fn connect(&mut self) -> Result<(CapabilityManifest, TransportStream), TransportError> {
         match self.role {
             UdsRole::Server => self.run_server_handshake().await,
@@ -301,8 +371,22 @@ impl CapTransport for UdsTransport {
         }
     }
 
-    async fn send_action(&mut self, _request: ActionRequest) -> Result<ActionResponse, TransportError> {
-        // [To be fully implemented in Milestone 2 (downstream action routing)]
+    /// Mechanism is separate from Policy. The UI sends a focus_swap action request,
+    /// and the transport layer intercepts it, updating lock-free atomics to drive conditional parsing.
+    async fn send_action(&mut self, request: ActionRequest) -> Result<ActionResponse, TransportError> {
+        if request.action_id == "sys_focus_swap" {
+            if let Some(target_ns) = request.parameters.get("namespace").and_then(|v| v.as_str()) {
+                let clients = self.registry.clients.lock().unwrap();
+                for (ns, is_active) in clients.iter() {
+                    if ns == target_ns {
+                        is_active.store(true, Ordering::Release);
+                    } else {
+                        is_active.store(false, Ordering::Release);
+                    }
+                }
+                return Ok(ActionResponse::Success { message: "focus swapped".to_string() });
+            }
+        }
         Err(TransportError::NotImplemented("Action routing not yet available in UDS".into()))
     }
 }

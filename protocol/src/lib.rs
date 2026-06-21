@@ -1,11 +1,11 @@
-//! # cellrix-protocol — CommonIntents 协议栈的物理绑定
+//! # cellrix-protocol — Physical Bindings for the CommonIntents Protocol Stack
 //!
-//! 本crate为整个Helix生态提供：
-//! - CIS (结构化意图描述语言) 的数据类型：`CapabilityManifest`, `SemanticSnapshot`
-//! - CAP (共识确认协议) 的数据类型：`ActionRequest`, `ActionResponse`
-//! - 视图哈希的接口定义（实际算法由上层实现）
-//! - 宽容解析器：单个节点损坏不影响整体快照
-//! - 与UI库解耦的通用坐标系（`LayoutRect`, u16精度）
+//! This crate provides core data structures and interfaces aligned with the BIND-19 (CIB19) standard:
+//! - INTENT-7 (CIN7) specifications: `CapabilityManifest`, `SemanticSnapshot`
+//! - CAPABILITY-13 (CIC13) specifications: `ActionRequest`, `ActionResponse`
+//! - View hashing interfaces (actual implementation deferred to upper layers)
+//! - Fault-tolerant parser: isolated node corruption does not invalidate the entire snapshot
+//! - Universal grid system decoupled from UI renderers (`LayoutRect` with u16 precision)
 
 mod manifest;
 mod snapshot;
@@ -23,18 +23,18 @@ pub use parser::*;
 pub use coords::*;
 pub use agent_event::AgentEvent;
 
-/// 本crate统一的错误类型
+/// Unified error types for this crate.
 #[derive(Debug, thiserror::Error)]
 pub enum ProtocolError {
-    #[error("JSON解析失败: {0}")]
+    #[error("JSON parsing failed: {0}")]
     JsonParse(#[from] serde_json::Error),
 
-    #[error("节点解析失败，已降级为Unknown: {0}")]
+    #[error("Node parsing failed, downgraded to Unknown: {0}")]
     NodeFallback(String),
 
-    #[error("缺少必要字段: {0}")]
+    #[error("Missing required field: {0}")]
     MissingField(&'static str),
 
-    #[error("视图哈希计算错误: {0}")]
+    #[error("View hash calculation failed: {0}")]
     HashError(String),
 }
