@@ -6,7 +6,7 @@ mod tcp;
 pub mod protocol;
 
 pub use cap_transport::{CapTransport, TransportStream, TransportError};
-pub use cellrix_protocol::AgentEvent;  // 统一从协议层对外导出
+pub use cellrix_protocol::AgentEvent;  // Unified export from protocol layer
 pub use stdio::StdioTransport;
-pub use uds::UdsTransport;
+pub use uds::{UdsTransport, UdsRole}; // Unified export of both Transport and its Role
 pub use tcp::TcpTransport;

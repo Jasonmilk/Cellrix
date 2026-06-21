@@ -1,9 +1,8 @@
-// cli/src/main.rs (已修正 NormalExit 拦截)
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use cellrix_protocol::{ActionRequest, ViewHash};
 use cellrix_layout::{LayoutEngine, LayoutRequest, FocusManager};
-use cellrix_transport::{CapTransport, StdioTransport, UdsTransport, AgentEvent};
+use cellrix_transport::{CapTransport, StdioTransport, UdsTransport, UdsRole, AgentEvent};
 use cellrix_ui::App;
 use std::path::PathBuf;
 use tokio_stream::StreamExt;
@@ -78,9 +77,9 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Command::Run { mode, exec, socket } => {
-            let transport = create_transport(mode, exec, socket).await?;
+            // UI Host acts as the Server awaiting connections
+            let transport = create_transport(mode, exec, socket, UdsRole::Server).await?;
             let mut app = App::new(transport).await?;
-            // 核心修复点一：拦截并静默处理 NormalExit 错误，防止打印 "Error: Normal exit"
             if let Err(e) = app.run().await {
                 match e {
                     cellrix_ui::UiError::NormalExit => {
@@ -91,12 +90,14 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Command::Manifest { mode, exec, socket } => {
-            let mut transport = create_transport(mode, exec, socket).await?;
+            // Client test tool connects to daemon actively
+            let mut transport = create_transport(mode, exec, socket, UdsRole::Client).await?;
             let (manifest, _stream) = transport.connect().await?;
             println!("{:#?}", manifest);
         }
         Command::Snapshot { mode, exec, socket, width, height } => {
-            let mut transport = create_transport(mode, exec, socket).await?;
+            // Client test tool connects to daemon actively
+            let mut transport = create_transport(mode, exec, socket, UdsRole::Client).await?;
             let (_manifest, mut stream) = transport.connect().await?;
 
             // Try to read the first Snapshot event from the stream
@@ -143,7 +144,8 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Command::Action { mode, exec, socket, action_id, params, view_hash } => {
-            let mut transport = create_transport(mode, exec, socket).await?;
+            // Client test tool connects to daemon actively
+            let mut transport = create_transport(mode, exec, socket, UdsRole::Client).await?;
             let (_manifest, _stream) = transport.connect().await?;
 
             let params_value: serde_json::Value = serde_json::from_str(&params)?;
@@ -175,6 +177,7 @@ async fn create_transport(
     mode: TransportMode,
     exec: Option<String>,
     socket: Option<PathBuf>,
+    role: UdsRole, // Unified role router
 ) -> Result<Box<dyn CapTransport>, anyhow::Error> {
     match mode {
         TransportMode::Stdio => {
@@ -185,7 +188,11 @@ async fn create_transport(
         }
         TransportMode::Uds => {
             let path = socket.ok_or_else(|| anyhow::anyhow!("--socket required for uds mode"))?;
-            let transport = UdsTransport::connect(path.to_str().unwrap()).await?;
+            // Polymorphic routing based on current execution CLI mode
+            let transport = match role {
+                UdsRole::Server => UdsTransport::new_server(path).await?,
+                UdsRole::Client => UdsTransport::new_client(path).await?,
+            };
             Ok(Box::new(transport))
         }
     }
