@@ -100,11 +100,8 @@ impl UdsTransport {
         // 5. Audit first peer identity
         self.verify_peer_credentials(&first_stream)?;
 
-        // 6. Wrap first stream into length-delimited codec using Little-Endian format
-        let mut first_framed = Framed::new(
-            first_stream, 
-            LengthDelimitedCodec::builder().little_endian().new_codec()
-        );
+        // 6. Wrap first stream into length-delimited codec
+        let mut first_framed = Framed::new(first_stream, LengthDelimitedCodec::new());
 
         // 7. Read CapabilityManifest as the first frame
         let first_frame = first_framed.next().await
@@ -129,6 +126,7 @@ impl UdsTransport {
             action_rx,
             registry: self.registry.clone(),
             agent_name: client_ns,
+            config: self.config.clone(), // 完美修复：补全第一路会话的 config 引用传递！
         };
         session.spawn_run();
 
@@ -153,11 +151,7 @@ impl UdsTransport {
 
         self.verify_peer_credentials(&stream)?;
 
-        // Aligned with the display host's little endian codec constraints
-        let framed = Framed::new(
-            stream, 
-            LengthDelimitedCodec::builder().little_endian().new_codec()
-        );
+        let framed = Framed::new(stream, LengthDelimitedCodec::new());
         let mut framed = Box::pin(framed);
         let first_frame = framed.next().await
             .ok_or_else(|| TransportError::Protocol("Host disconnected before handshake".into()))?
@@ -193,11 +187,8 @@ impl CapTransport for UdsTransport {
         if request.action_id == "sys_focus_swap" {
             if let Some(target_ns) = request.parameters.get("namespace").and_then(|v| v.as_str()) {
                 let clients = self.registry.clients.lock().unwrap();
-                
-                // Swap atomic flags and push downstream commands
                 for (ns, meta) in clients.iter() {
                     if ns == target_ns {
-                        // Activate new focus and tell the client to resume full speed
                         meta.is_active.store(true, Ordering::Release);
                         let _ = meta.action_tx.send(ActionRequest {
                             action_id: "sys_resume".to_string(),
@@ -205,7 +196,6 @@ impl CapTransport for UdsTransport {
                             view_hash: None,
                         });
                     } else {
-                        // Deactivate old focus and tell the client to suspend/throttle
                         meta.is_active.store(false, Ordering::Release);
                         let _ = meta.action_tx.send(ActionRequest {
                             action_id: "sys_suspend".to_string(),

@@ -113,9 +113,9 @@ impl UdsServer {
 
                     let tx_client = tx.clone();
                     let registry_client = registry.clone();
+                    let config_client = config.clone();
 
                     tokio::spawn(async move {
-                        // Aligned with the client-side little endian constraint
                         let mut framed = Framed::new(
                             stream, 
                             LengthDelimitedCodec::builder().little_endian().new_codec()
@@ -132,6 +132,7 @@ impl UdsServer {
                                     action_rx,
                                     registry: registry_client,
                                     agent_name,
+                                    config: config_client, // 完美修复：补全并发连接的 config 引用传递！
                                 };
                                 session.spawn_run();
                             }

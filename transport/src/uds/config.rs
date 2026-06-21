@@ -5,6 +5,7 @@ use crate::cap_transport::TransportError;
 pub struct CellrixDaemonConfig {
     pub socket_permissions: u32,
     pub idle_shutdown_seconds: u64,
+    pub heartbeat_timeout_seconds: u64, // 1. 手术刀：补全 CIB19 质数超时配置
     pub enable_peer_verification: bool,
 }
 
@@ -33,6 +34,17 @@ impl CellrixDaemonConfig {
             }
         }
 
+        // 2. Resolve CIB19 heartbeat timeout from environment (Zero magic numbers)
+        if let Ok(env_val) = std::env::var("CELLRIX_HEARTBEAT_TIMEOUT") {
+            if let Ok(parsed) = env_val.parse::<u64>() {
+                config.heartbeat_timeout_seconds = parsed;
+            } else {
+                return Err(TransportError::Protocol(format!(
+                    "Invalid integer for CELLRIX_HEARTBEAT_TIMEOUT: {}", env_val
+                )));
+            }
+        }
+
         if let Ok(env_val) = std::env::var("CELLRIX_PEER_VERIFY") {
             if env_val.to_lowercase() == "false" || env_val == "0" {
                 config.enable_peer_verification = false;
@@ -46,6 +58,7 @@ impl CellrixDaemonConfig {
         Self {
             socket_permissions: 0o600,
             idle_shutdown_seconds: 5,
+            heartbeat_timeout_seconds: 40, // Default CIB19 prime budget (19s * 2 + 2s buffer)
             enable_peer_verification: true,
         }
     }
