@@ -16,6 +16,7 @@ mod coords;
 mod agent_event;
 mod pfp;
 mod sap;
+mod tuck_audit;
 
 pub use manifest::*;
 pub use snapshot::*;
@@ -26,6 +27,7 @@ pub use coords::*;
 pub use agent_event::AgentEvent;
 pub use pfp::*;
 pub use sap::*;
+pub use tuck_audit::*;
 
 /// Unified error types for this crate.
 #[derive(Debug, thiserror::Error)]
