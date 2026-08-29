@@ -16,6 +16,7 @@ mod pfp_widget;
 mod security_notification;
 mod helix_mind_widget;
 mod anaphase_widget;
+mod tentacle_widget;
 
 pub use state_tree::StateTreeWidget;
 pub use text_panel::TextPanelWidget;
@@ -35,6 +36,9 @@ pub use helix_mind_widget::{
 };
 pub use anaphase_widget::{
     CognitivePhaseIndicator, TaskDagWidget, HITLWidget, LifecycleWidget, AnaphaseSnapshotWidget,
+};
+pub use tentacle_widget::{
+    ToolExecutionWidget, PluginAuditWidget, ToolCallChainWidget, TentacleSnapshotWidget,
 };
 
 /// Allow dead code here as these context fields are reserved for 
