@@ -15,6 +15,7 @@ mod parser;
 mod coords;
 mod agent_event;
 mod pfp;
+mod sap;
 
 pub use manifest::*;
 pub use snapshot::*;
@@ -24,6 +25,7 @@ pub use parser::*;
 pub use coords::*;
 pub use agent_event::AgentEvent;
 pub use pfp::*;
+pub use sap::*;
 
 /// Unified error types for this crate.
 #[derive(Debug, thiserror::Error)]
