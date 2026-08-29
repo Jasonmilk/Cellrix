@@ -13,6 +13,7 @@ mod metrics;
 mod fallback;
 mod audit;
 mod pfp_widget;
+mod security_notification;
 
 pub use state_tree::StateTreeWidget;
 pub use text_panel::TextPanelWidget;
@@ -23,6 +24,10 @@ pub use metrics::MetricsWidget;
 pub use fallback::FallbackWidget;
 pub use audit::{AuditLogState, AuditLogWidget, AuditStatsWidget, AuditDetailWidget, AuditFilter};
 pub use pfp_widget::{PFPWidget, RiskLevelIndicator, PFPStatusBar};
+pub use security_notification::{
+    SecurityEvent, SecurityEventType, SecurityEventStatus, SecurityEventQueue,
+    NotificationBanner, ConfirmDialog, ConfirmOption, EmergencyOverlay,
+};
 
 /// Allow dead code here as these context fields are reserved for 
 /// downstream widget rendering modules in the UI lifecycle.
