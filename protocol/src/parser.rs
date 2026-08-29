@@ -139,5 +139,7 @@ fn reconstruct_snapshot_manually(v: &Value) -> Result<SemanticSnapshot, Protocol
         semantic_tree,
         active_focus,
         layout_overrides,
+        pfp: None,
+        sap: None,
     })
 }

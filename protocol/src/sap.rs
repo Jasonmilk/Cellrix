@@ -226,7 +226,6 @@ mod tests {
 
     #[test]
     fn test_from_slice_valid() {
-        let data = vec![0u8; 32];
         // 手动构造有效的 SAP 头部
         let mut sap_data = [0u8; SAP_SIZE];
         sap_data[0..2].copy_from_slice(&0xCF14u16.to_be_bytes());

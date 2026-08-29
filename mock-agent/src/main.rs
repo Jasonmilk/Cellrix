@@ -318,6 +318,8 @@ fn make_snapshot() -> SemanticSnapshot {
         ],
         active_focus: Some("text_1".into()),
         layout_overrides: None,
+        pfp: None,
+        sap: None,
     }
 }
 
