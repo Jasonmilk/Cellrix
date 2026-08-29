@@ -2,11 +2,34 @@
 
 > **An Intent-Driven, Deterministic, Spatial-Semantic Terminal UI Protocol and High-Performance Runtime.**
 > Aligned with the **CommonIntents-144 (`CI-144`)** Protocol Family.
+> **Ecosystem Integrated**: Tuck (Security) + Helix-Mind (Memory/Cognition) + Anaphase (Orchestration)
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
-[![Protocol](https://img.shields.io/badge/Protocol-CI--144-blue.svg)]()
+[![Protocol](https://img.shields.io/badge/Protocol-CI--144%20v2.0-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
+[![Tests](https://img.shields.io/badge/tests-156-green.svg)]()
+[![Phases](https://img.shields.io/badge/phases-P0--P3%20complete-5B5FC7.svg)]()
+
+---
+
+## 0. Project Status (2026-08-30)
+
+| Phase | Content | Status |
+|---|---|---|
+| **P0** | Methodology Init + Code Audit | ✅ Complete |
+| **P1** | CI-144 v2.0 Alignment (PFP + SAP) | ✅ Complete |
+| **P2** | Tuck Integration (Audit Log + Security Events) | ✅ Complete |
+| **P3** | Helix-Mind Integration (Semantic Snapshot + Cognitive Craft) | ✅ Complete |
+| **P4** | Anaphase Integration (Orchestration + HITL) | ⏳ Next |
+| **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ⏳ Planned |
+| **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ⏳ Planned |
+
+**Test Coverage**: 156 tests (from original 4, **39x growth**)
+- `cellrix-protocol`: 78 tests
+- `cellrix-ui`: 57 tests
+- `cellrix-transport`: 17 tests
+- Other: 4 tests
 
 ---
 
@@ -35,13 +58,50 @@ By treating the terminal screen not as a raw canvas, but as a **grid of determin
 
 ---
 
-## 2. CI-144 Protocol Family Compliance
+## 2. CI-144 Protocol Family Compliance (v2.0)
 
-Cellrix is the official reference implementation of the **CommonIntents-144 (CI-144)** protocol family:
+Cellrix is the official reference implementation of the **CommonIntents-144 (CI-144)** protocol family, now upgraded to **v2.0** with the Physical Anchor Layer:
+
+### 2.1 Core Protocols (v1.0)
 
 *   **`CIN7` (INTENT-7)**: Defines the intent schema, structuring snapshots into 7 core semantic fields. It mandates a hard safety limit of **256 nodes** and **1MB content** per node to prevent DDoS and memory exhaustion (OOM) on resource-constrained devices.
 *   **`CIC13` (CAPABILITY-13)**: Governs capability authorization and confirmation. The Display Server intercepts focus switches and routes downstream `sys_suspend` and `sys_resume` commands, allowing agents to execute local self-throttling.
 *   **`CIB19` (BIND-19)**: Establishes the transmission binding, mandating a prime-number heartbeat interval of **19 seconds** (to prevent multi-agent network resonance) and a client timeout threshold of **40 seconds**.
+
+### 2.2 v2.0 Physical Anchor Layer (PFP + SAP)
+
+*   **`PFP-xCF14` (Physical Feature Protocol)**: 4-byte fixed-offset header carrying physical context for hard real-time security decisions.
+    - Fields: Modality (COGNITIVE/RENDER/EXECUTIVE/SENSOR_FEED), Risk-Level (LOW/MEDIUM/CRITICAL/CATASTROPHIC), Body-Stance, Proximity-Edge, Output-Dest, Override-Flag, Replay-Enable
+    - Magic number: `0xCF14` (2 bytes) + 1 byte protocol ID + 1 byte data
+    - Tuck reads only PFP for sub-millisecond security decisions — no decryption required
+*   **`SAP-xCF14` (Security Attestation Protocol)**: 28-byte optional security layer loaded on-demand.
+    - Fields: Seq-Counter (16-bit anti-replay), PAH-Hash (112-bit SHA-256 truncated), PAH-Signature (64-bit ECC truncated)
+    - Rule 6: Replay-Enable=0 forces Risk-Level downgrade to MEDIUM + mandatory PAH verification
+    - Dual-layer security: 64-bit fast verification (Tuck real-time) + 512-bit full verification (post-hoc audit)
+
+---
+
+## 2.5 Ecosystem Integration
+
+Cellrix is the **semantic projection terminal** for the Helix ecosystem, integrating with all core components:
+
+| Component | Role | Integration Status |
+|---|---|---|
+| **Tuck** | Immune System (Security Gate) | ✅ Audit log consumption + security event visualization |
+| **Helix-Mind** | Memory & Cognition (Brain) | ✅ Semantic snapshot + cognitive craft + metabolism display |
+| **Anaphase** | Orchestration (Torso) | ⏳ P4: Task queue + HITL interaction |
+| **Tentacle** | Tool Execution (Hands) | ⏳ P5: Tool status + plugin audit |
+
+### Tuck Integration (P2 Complete)
+- **Audit Log Reader**: Consumes Tuck's chain-HMAC tamper-proof audit logs (JSON Lines format)
+- **Security Event System**: 5-level priority queue (Info/Pass/Reject/HITL/HardOverride) with notification banners, confirm dialogs, and emergency full-screen overlays
+- **PFP Visualization**: 7-field color-coded physical feature display with risk-level progress bars and Rule 6 downgrade support
+
+### Helix-Mind Integration (P3 Complete)
+- **Cognitive Craft Display**: Real-time visualization of CognitiveMode (Skilled/Anchor/Imagination), impasse level (0-5), stages attempted, suggested actions, and activation vectors
+- **Memory Metabolism Display**: Phase state indicator (Gas/Liquid/Crystal ●/○), heat/tension progress bars, concentration (Dissolved/Colloidal), generation count
+- **Knowledge Graph Display**: Node/edge lists with heat-based color coding, phase state tags, and relation type visualization
+- **Client Trait + Mock**: `HelixMindClient` trait with 7 methods (query/remember/forget/helix_query/consolidate/get_snapshot/health_check) + `MockHelixMindClient` for testing and development
 
 ---
 
@@ -134,6 +194,17 @@ cargo run --release -p mock-agent -- --mode uds --socket /tmp/cellrix.sock
 
 Following Google’s strict hermetic testing conventions, all integration tests are isolated inside crate-level `tests/` directories.
 
+### 7.1 Test Coverage (156 tests total)
+
+| Crate | Tests | Coverage |
+|---|---|---|
+| `cellrix-protocol` | 78 | PFP/SAP parser, snapshot, helix_mind data structures, tuck_audit |
+| `cellrix-ui` | 57 | State tree, text panel, audit widgets, PFP widgets, security notifications, helix_mind widgets |
+| `cellrix-transport` | 17 | UDS multiplexing, helix_mind client (trait + mock) |
+| Other | 4 | Integration tests |
+
+### 7.2 Run Specific Test Suites
+
 To run the robust, panic-prevention test suite for the `cellrix-protocol` parser (covering corrupted JSON recovery and DDoS payload truncations):
 ```bash
 cargo test -p cellrix-protocol --test parser_test
@@ -144,8 +215,73 @@ To run the UDS integration tests verifying **CIB19 heartbeat watchdog self-heali
 cargo test -p cellrix-transport --test uds_test
 ```
 
+To run PFP/SAP protocol parser tests (CI-144 v2.0 alignment):
+```bash
+cargo test -p cellrix-protocol pfp
+cargo test -p cellrix-protocol sap
+```
+
+To run Helix-Mind integration tests (data structures + client + UI widgets):
+```bash
+cargo test -p cellrix-protocol helix_mind
+cargo test -p cellrix-transport helix_mind
+cargo test -p cellrix-ui helix_mind
+```
+
+To run Tuck integration tests (audit log + security events + PFP visualization):
+```bash
+cargo test -p cellrix-protocol tuck_audit
+cargo test -p cellrix-ui audit
+cargo test -p cellrix-ui pfp
+cargo test -p cellrix-ui security
+```
+
+To run the full workspace test suite:
+```bash
+cargo test --workspace
+```
+
 ---
 
-## 8. License
+## 8. Methodology: phyt-DNA v1.0
+
+Cellrix follows the **phyt-DNA** (Plant DNA) self-growth methodology, ensuring knowledge doesn't腐化, growth paths stay clear, decisions are traceable, and documentation lifecycle is managed:
+
+| Component | Purpose | Path |
+|---|---|---|
+| **VISION** | North Star vision document | `docs/VISION.md` |
+| **DNA** | Core philosophy & principles | `docs/DNA.md` |
+| **RNA** | Standard Operating Procedures (SOP) | `docs/RNA.md` |
+| **SPEC** | Technical specification (5 volumes) | `docs/SPEC.md` + `docs/spec/` |
+| **PLAN** | Current phase navigation card | `docs/PLAN.md` |
+| **GROWTH** | Last 3 health snapshots | `docs/GROWTH.md` |
+| **DEPRECATE** | Deprecated features & migration | `docs/DEPRECATE.md` |
+| **ADR** | Architecture Decision Records | `docs/decisions/ADR-XXXX-*.md` |
+| **Archive** | Archived growth snapshots | `docs/archive/growth/` |
+
+### Architecture Decision Records (ADR)
+
+| ADR | Title | Status |
+|---|---|---|
+| ADR-0001 | Methodology Initialization | ✅ Adopted |
+| ADR-0002 | CI-144 v2.0 Alignment (PFP+SAP) | ✅ Adopted |
+| ADR-0003 | Tuck Integration Architecture | ✅ Adopted |
+| ADR-0004 | CPPC v1.1.0 as v2.0 Vision | ✅ Adopted |
+| ADR-0005 | Helix-Mind Integration Architecture | ✅ Adopted |
+
+### CPPC v1.1.0 Vision (Cellrix Physical Protocol Charter)
+
+The **Cellrix Physical Protocol Charter (CPPC) v1.1.0** defines the long-term vision for Cellrix v2.0:
+- **Three Physical Laws**: Pure Symbolic Contract + Logical State Determinism + Physical Layer Sovereignty
+- **Dual Universe Architecture**: Logic Universe (pure symbols) + Physical Universe (native rendering)
+- **12 Core Reserved Tokens**: 6 structure types + 5 spatial layout + 1 interaction trigger
+- **Patch Algebra**: INSERT/DELETE/UPDATE/REPLACE/TAKE/PLACE (MOVE abolished)
+- **Full-Incremental Dual Track**: Initial full snapshot + steady-state incremental patches + logical checkpoints (100 patches / 5 minutes)
+
+See `docs/vision/cppc-v1.1.0.md` for the full charter.
+
+---
+
+## 9. License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
