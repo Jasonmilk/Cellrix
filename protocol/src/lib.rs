@@ -16,7 +16,7 @@ mod coords;
 mod agent_event;
 mod pfp;
 mod sap;
-mod tuck_audit;
+pub mod tuck_audit;
 
 pub use manifest::*;
 pub use snapshot::*;
