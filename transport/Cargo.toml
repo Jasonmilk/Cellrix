@@ -16,6 +16,7 @@ serde = { version = "1.0", features = ["derive"] }   # ADDED
 thiserror = "1.0"
 async-trait = "0.1"
 tokio-stream = "0.1.18"
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 tempfile = "3"
