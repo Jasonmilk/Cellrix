@@ -17,6 +17,7 @@ mod agent_event;
 pub mod pfp;
 pub mod sap;
 pub mod tuck_audit;
+pub mod helix_mind;
 
 pub use manifest::*;
 pub use snapshot::*;
@@ -28,6 +29,7 @@ pub use agent_event::AgentEvent;
 pub use pfp::*;
 pub use sap::*;
 pub use tuck_audit::*;
+pub use helix_mind::*;
 
 /// Unified error types for this crate.
 #[derive(Debug, thiserror::Error)]
