@@ -19,6 +19,7 @@ pub mod sap;
 pub mod tuck_audit;
 pub mod helix_mind;
 pub mod anaphase;
+pub mod tentacle;
 
 pub use manifest::*;
 pub use snapshot::*;
@@ -32,6 +33,7 @@ pub use sap::*;
 pub use tuck_audit::*;
 pub use helix_mind::*;
 pub use anaphase::*;
+pub use tentacle::*;
 
 /// Unified error types for this crate.
 #[derive(Debug, thiserror::Error)]
