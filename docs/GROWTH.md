@@ -7,6 +7,50 @@
 
 ---
 
+## 健康快照 #6：P4 完成 — Anaphase 联调（编排状态展示 + HITL 交互）
+
+**日期**：2026-08-30
+**阶段**：P4 完成
+**状态**：🌿 幼苗生长，Anaphase 编排中枢已接入
+
+### 关键事件
+- Anaphase 数据结构完成（CognitivePhase + TaskDag + HITL + Lifecycle + AnaphaseState + 22 个测试）
+- Anaphase UI 展示组件完成（CognitivePhaseIndicator + TaskDagWidget + HITLWidget + LifecycleWidget + AnaphaseSnapshotWidget + 12 个测试）
+- Anaphase 客户端完成（AnaphaseClient trait + MockAnaphaseClient + 12 个测试）
+- ADR-0006 创建（Anaphase 联调架构决策）
+- 测试覆盖率从 156 个提升到 202 个（增长 29%）
+
+### P4 完成内容
+| 子任务 | 内容 | 测试数 |
+|---|---|---|
+| T1 | Anaphase 数据结构（CognitivePhase 7状态 + TaskNodeKind/TaskStatus + TaskNode/TaskEdge/TaskDagSnapshot + RiskLevel + HITLRequest/HITLStatus + LifecyclePhase/LifecycleStatus + AnaphaseState） | 22 |
+| T2 | Anaphase UI 展示组件（CognitivePhaseIndicator + TaskDagWidget + HITLWidget + LifecycleWidget + AnaphaseSnapshotWidget） | 12 |
+| T3 | Anaphase 客户端（AnaphaseClient trait + MockAnaphaseClient + get_state/get_task_dag/get_hitl_status/get_hitl_requests/approve_request/reject_request/get_lifecycle/health_check） | 12 |
+
+### 与 Anaphase 对齐
+- 认知阶段与 Anaphase 的 HelixState 一致（7 状态 DAG：Perception/PreAssessment/MemoryRetrieval/Reasoning/ReflexCheck/Execution/Reflection）
+- 任务 DAG 与 Anaphase 的 TaskDag 一致（TaskNodeKind: TaskRoot/SubTask/Leaf）
+- HITL 与 Anaphase 的 HITLApprover 一致（高风险判定：写操作/网络请求/凭证使用，fail-closed）
+- 生命周期与 Anaphase 的 lifecycle.rs 一致（Initializing/Running/Paused/Stopping/Stopped/Error）
+- 心跳间隔 19 秒与 CIB19 一致
+- 双模式对接：Mock 实现（当前）+ gRPC 实现（可选 feature，未来接入真实 Anaphase）
+
+### 核心特性
+- **白盒可观测**: 将 Anaphase 的"编排过程"（任务 DAG + HITL + 生命周期 + 认知阶段）以可视化方式展示
+- **极致解耦**: 数据结构和客户端只依赖 cellrix-protocol，不依赖 Anaphase crate
+- **按需加载**: 客户端是惰性的，只有调用方法时才建立连接
+- **HITL 交互**: 支持在 Cellrix 中直接批准/拒绝 HITL 请求，关联任务状态自动更新
+- **颜色编码体系**: 覆盖 CognitivePhase(7种)/TaskStatus(6种)/TaskNodeKind(3种)/RiskLevel(4种)/HITLRequestStatus(4种)/LifecyclePhase(6种)
+- **认知阶段指示器**: 7 状态 DAG 可视化，当前阶段高亮，已完成阶段灰色，未开始阶段浅灰
+
+### 下一步
+- P5：Tentacle 联调（工具执行状态 + 插件审计展示）
+- 消费 Tentacle 的工具执行状态
+- 展示插件审计和权限状态
+- 展示工具调用链和依赖关系
+
+---
+
 ## 健康快照 #5：P3 完成 — Helix-Mind 联调（语义快照 + 认知工艺展示）
 
 **日期**：2026-08-30
@@ -97,39 +141,4 @@
 
 ---
 
-## 健康快照 #3：P1 完成 — CI-144 v2.0 对齐
-
-**日期**：2026-08-30
-**阶段**：P1 完成
-**状态**：🌿 幼苗生长，CI-144 v2.0 协议家族已接入
-
-### 关键事件
-- PFP-xCF14 解析器完成（4 字节零拷贝，22 个测试）
-- SAP-xCF14 解析器完成（28 字节零拷贝，20 个测试）
-- SemanticSnapshot 嵌入 PFP/SAP 字段（向后兼容，10 个测试）
-- 测试覆盖率从 4 个提升到 56 个（目标 50 个，超额 12%）
-- ADR-0002 创建（CI-144 v2.0 对齐决策）
-
-### P1 完成内容
-| 子任务 | 内容 | 测试数 |
-|---|---|---|
-| T1 | PFP-xCF14 解析器（4 字节，7 枚举，PFPBuilder） | 22 |
-| T2 | SAP-xCF14 解析器（28 字节，Seq-Counter/PAH-Hash/PAH-Signature） | 20 |
-| T3 | SemanticSnapshot 嵌入 PFP/SAP（向后兼容，serde skip_none） | 10 |
-| T4 | 测试覆盖率补充（目标 ≥50，实际 56） | - |
-
-### 与 BIND-19 v2.0-alpha 对齐
-- PFP 结构完全一致（4 字节，0xCF14 魔数，相同位布局）
-- SAP 结构完全一致（28 字节，Protocol-ID=0x01，相同字段偏移）
-- Rule 6（Replay-Enable=0 强制降级为 Medium）已实现
-- Rule 1（CATASTROPHIC + HardOverride）已实现
-- 零依赖：不引入 BIND-19 crate，保持 cellrix-protocol 的 100% WASM 兼容
-
-### 下一步
-- P2：Tuck 对接（审计日志 + 安全事件展示）
-- 消费 Tuck 的 /audit/query、/health、/metrics API
-- 在 UI 中可视化展示 PFP 物理特征和安全事件
-
----
-
-*最近 3 次健康快照：3/3（已满，下次需归档最旧的 #3）*
+*最近 3 次健康快照：3/3（已满，下次需归档最旧的 #4）*
