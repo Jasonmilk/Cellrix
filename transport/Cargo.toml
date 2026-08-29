@@ -19,5 +19,13 @@ tokio-stream = "0.1.18"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 toml = "0.8"
 
+# 可选的日志支持
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "json"] }
+
+[features]
+default = []
+tracing = ["dep:tracing", "dep:tracing-subscriber"]
+
 [dev-dependencies]
 tempfile = "3"

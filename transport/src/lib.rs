@@ -8,6 +8,7 @@ pub mod helix_mind_client;
 pub mod anaphase_client;
 pub mod tentacle_client;
 pub mod config;
+pub mod logging;
 
 pub use cap_transport::{CapTransport, TransportStream, TransportError};
 pub use cellrix_protocol::AgentEvent;  // Unified export from protocol layer
