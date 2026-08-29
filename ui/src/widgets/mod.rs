@@ -15,6 +15,7 @@ mod audit;
 mod pfp_widget;
 mod security_notification;
 mod helix_mind_widget;
+mod anaphase_widget;
 
 pub use state_tree::StateTreeWidget;
 pub use text_panel::TextPanelWidget;
@@ -31,6 +32,9 @@ pub use security_notification::{
 };
 pub use helix_mind_widget::{
     CognitiveStatusWidget, MetabolismStatusWidget, KnowledgeGraphWidget, HelixSnapshotWidget,
+};
+pub use anaphase_widget::{
+    CognitivePhaseIndicator, TaskDagWidget, HITLWidget, LifecycleWidget, AnaphaseSnapshotWidget,
 };
 
 /// Allow dead code here as these context fields are reserved for 
