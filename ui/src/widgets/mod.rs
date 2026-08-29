@@ -12,6 +12,7 @@ mod code_diff;
 mod metrics;
 mod fallback;
 mod audit;
+mod pfp_widget;
 
 pub use state_tree::StateTreeWidget;
 pub use text_panel::TextPanelWidget;
@@ -21,6 +22,7 @@ pub use code_diff::CodeDiffWidget;
 pub use metrics::MetricsWidget;
 pub use fallback::FallbackWidget;
 pub use audit::{AuditLogState, AuditLogWidget, AuditStatsWidget, AuditDetailWidget, AuditFilter};
+pub use pfp_widget::{PFPWidget, RiskLevelIndicator, PFPStatusBar};
 
 /// Allow dead code here as these context fields are reserved for 
 /// downstream widget rendering modules in the UI lifecycle.

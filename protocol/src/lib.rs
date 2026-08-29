@@ -14,8 +14,8 @@ mod view_hash;
 mod parser;
 mod coords;
 mod agent_event;
-mod pfp;
-mod sap;
+pub mod pfp;
+pub mod sap;
 pub mod tuck_audit;
 
 pub use manifest::*;
