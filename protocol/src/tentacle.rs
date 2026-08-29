@@ -23,6 +23,16 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static EXECUTION_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+/// 生成执行 ID（时间戳 + 计数器，保证进程重启后也不重复）
+fn generate_execution_id() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let seq = EXECUTION_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+    format!("exec-{}-{}", secs, seq)
+}
+
 // ============================================================================
 // Tool Execution
 // ============================================================================
@@ -110,9 +120,8 @@ pub struct ToolExecution {
 impl ToolExecution {
     /// 创建新的工具执行记录
     pub fn new(tool_name: &str) -> Self {
-        let id = EXECUTION_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
         Self {
-            id: format!("exec-{}", id),
+            id: generate_execution_id(),
             tool_name: tool_name.to_string(),
             status: ToolExecutionStatus::Pending,
             start_time: None,
