@@ -29,6 +29,7 @@
 - `cellrix-protocol`: 133 tests
 - `cellrix-ui`: 88 tests
 - cockpit live roundtrip: `transport/tests/anaphase_live.rs` (#[ignore], needs live Anaphase)
+- cockpit TUI (real render): `cellrix-cli run --mode stdio --exec ./target/debug/mock-agent --anaphase-endpoint http://127.0.0.1:50061`
 - `cellrix-transport`: 85 tests
 - Other: 5 tests
 

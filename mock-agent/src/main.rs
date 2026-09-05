@@ -72,8 +72,8 @@ async fn run_stdio() -> anyhow::Result<()> {
     writer.lock().await.write_all(PREFERRED_FORMAT.as_bytes()).await?;
     writer.lock().await.flush().await?;
 
-    // 1. Push manifest
-    write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
+    // 1. Push manifest (stdio contract: little-endian + AgentEvent)
+    write_event(&writer, AgentEvent::Manifest(make_manifest()), Endian::Le).await?;
 
     // 2. Spawn heartbeat task (BIND-19 19s prime number interval)
     let heartbeat_writer = Arc::clone(&writer);
@@ -85,7 +85,7 @@ async fn run_stdio() -> anyhow::Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            if let Err(e) = write_event(&heartbeat_writer, AgentEvent::Heartbeat { epoch }).await {
+            if let Err(e) = write_event(&heartbeat_writer, AgentEvent::Heartbeat { epoch }, Endian::Le).await {
                 eprintln!("Heartbeat send failed: {}", e);
                 break;
             }
@@ -98,7 +98,7 @@ async fn run_stdio() -> anyhow::Result<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(200));
         loop {
             interval.tick().await;
-            if let Err(e) = write_event(&snapshot_writer, AgentEvent::Snapshot(make_snapshot())).await {
+            if let Err(e) = write_event(&snapshot_writer, AgentEvent::Snapshot(make_snapshot()), Endian::Le).await {
                 eprintln!("Snapshot send failed: {}", e);
                 break;
             }
@@ -107,10 +107,10 @@ async fn run_stdio() -> anyhow::Result<()> {
 
     // 4. Main loop: read incoming ActionRequests
     loop {
-        match read_frame(&mut reader).await {
+        match read_frame(&mut reader, Endian::Le).await {
             Ok(Some(Frame::Action(action))) => {
                 let response = handle_action(action);
-                write_frame(&writer, &response).await?;
+                write_frame(&writer, &response, Endian::Le).await?;
             }
             Ok(None) => {
                 tokio::time::sleep(Duration::from_secs(1)).await;
@@ -131,7 +131,10 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     let mut reader = BufReader::new(read_half);
     let writer = Arc::new(Mutex::new(BufWriter::new(write_half)));
 
-    write_event(&writer, AgentEvent::Manifest(make_manifest())).await?;
+    // UDS contract (transport/src/uds.rs): first frame is a BARE CapabilityManifest
+    // (big-endian length via tokio LengthDelimitedCodec, default rmp encoding),
+    // subsequent frames are AgentEvent (big-endian length).
+    write_frame(&writer, &make_manifest(), Endian::Be).await?;
 
     let is_suspended = Arc::new(AtomicBool::new(false));
 
@@ -144,7 +147,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            if let Err(e) = write_event(&heartbeat_writer, AgentEvent::Heartbeat { epoch }).await {
+            if let Err(e) = write_event(&heartbeat_writer, AgentEvent::Heartbeat { epoch }, Endian::Be).await {
                 eprintln!("Heartbeat send failed: {}", e);
                 break;
             }
@@ -160,7 +163,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
             if is_suspended_clone.load(Ordering::Acquire) {
                 continue;
             }
-            if let Err(e) = write_event(&snapshot_writer, AgentEvent::Snapshot(make_snapshot())).await {
+            if let Err(e) = write_event(&snapshot_writer, AgentEvent::Snapshot(make_snapshot()), Endian::Be).await {
                 eprintln!("Snapshot send failed: {}", e);
                 break;
             }
@@ -168,7 +171,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
     });
 
     loop {
-        match read_frame(&mut reader).await {
+        match read_frame(&mut reader, Endian::Be).await {
             Ok(Some(Frame::Action(action))) => {
                 match action.action_id.as_str() {
                     "sys_suspend" => {
@@ -181,7 +184,7 @@ async fn run_uds(path: &str) -> anyhow::Result<()> {
                     }
                     _ => {
                         let response = handle_action(action);
-                        write_frame(&writer, &response).await?;
+                        write_frame(&writer, &response, Endian::Be).await?;
                     }
                 }
             }
@@ -202,7 +205,31 @@ enum Frame {
     Action(ActionRequest),
 }
 
-async fn read_frame<R>(reader: &mut R) -> anyhow::Result<Option<Frame>>
+/// Wire endianness per transport contract (physical fact, 2026-09-06):
+/// - stdio: little-endian (cellrix-transport protocol.rs `send_message`)
+/// - uds: big-endian (tokio LengthDelimitedCodec default framing)
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Endian {
+    Le,
+    Be,
+}
+
+impl Endian {
+    fn encode_len(self, len: u32) -> [u8; 4] {
+        match self {
+            Endian::Le => len.to_le_bytes(),
+            Endian::Be => len.to_be_bytes(),
+        }
+    }
+    fn decode_len(self, buf: [u8; 4]) -> u32 {
+        match self {
+            Endian::Le => u32::from_le_bytes(buf),
+            Endian::Be => u32::from_be_bytes(buf),
+        }
+    }
+}
+
+async fn read_frame<R>(reader: &mut R, endian: Endian) -> anyhow::Result<Option<Frame>>
 where
     R: AsyncReadExt + AsyncBufReadExt + Unpin,
 {
@@ -212,7 +239,7 @@ where
         Err(_) => return Ok(None),
     };
 
-    let len = u32::from_be_bytes(len_buf) as usize;
+    let len = endian.decode_len(len_buf) as usize;
     let mut data = vec![0u8; len];
     reader.read_exact(&mut data).await?;
 
@@ -225,37 +252,46 @@ where
     Ok(Some(Frame::Action(action)))
 }
 
-async fn write_frame<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, msg: &T) -> anyhow::Result<()>
+/// Map-form rmp encoding (matches transport decode: `rmp_serde::from_slice`
+/// expects struct-variant maps; the plain `to_vec` array form is asymmetric).
+fn encode_msg<T: Serialize>(msg: &T) -> anyhow::Result<Vec<u8>> {
+    let mut data = Vec::new();
+    let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
+    msg.serialize(&mut serializer)?;
+    Ok(data)
+}
+
+async fn write_len_prefixed<W>(
+    writer: &Arc<Mutex<BufWriter<W>>>,
+    data: &[u8],
+    endian: Endian,
+) -> anyhow::Result<()>
+where
+    W: AsyncWriteExt + Unpin,
+{
+    let len = data.len() as u32;
+    let mut guard = writer.lock().await;
+    guard.write_all(&endian.encode_len(len)).await?;
+    guard.write_all(data).await?;
+    guard.flush().await?;
+    Ok(())
+}
+
+async fn write_frame<W, T>(writer: &Arc<Mutex<BufWriter<W>>>, msg: &T, endian: Endian) -> anyhow::Result<()>
 where
     W: AsyncWriteExt + Unpin,
     T: Serialize,
 {
-    let mut data = Vec::new();
-    let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
-    msg.serialize(&mut serializer)?;
-
-    let len = data.len() as u32;
-    let mut guard = writer.lock().await;
-    guard.write_all(&len.to_be_bytes()).await?;
-    guard.write_all(&data).await?;
-    guard.flush().await?;
-    Ok(())
+    let data = encode_msg(msg)?;
+    write_len_prefixed(writer, &data, endian).await
 }
 
 async fn write_event<W: AsyncWriteExt + Unpin>(
     writer: &Arc<Mutex<BufWriter<W>>>,
     event: AgentEvent,
+    endian: Endian,
 ) -> anyhow::Result<()> {
-    let mut data = Vec::new();
-    let mut serializer = rmp_serde::Serializer::new(&mut data).with_struct_map();
-    event.serialize(&mut serializer)?;
-
-    let len = data.len() as u32;
-    let mut guard = writer.lock().await;
-    guard.write_all(&len.to_be_bytes()).await?;
-    guard.write_all(&data).await?;
-    guard.flush().await?;
-    Ok(())
+    write_frame(writer, &event, endian).await
 }
 
 fn make_manifest() -> CapabilityManifest {

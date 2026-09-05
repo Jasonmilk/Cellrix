@@ -127,3 +127,4 @@
 6. **live 验证**：真实 Anaphase（cap_http 50061）↔ HttpAnaphaseClient 真实 roundtrip 解析成功（anaphase_live.rs #[ignore]）；serde 契约不一致（mode PascalCase vs snake_case）由 live 抓到并修正——物理事实优先
 **状态**：✅ 完成（316 tests：307 + 9；cli: `run --mode stdio --exec <agent> --anaphase-endpoint http://127.0.0.1:50061`）
 **物理验证（2026-09-06 实测）**：数据链路全真跑通——mock reasoning → 真实 Tentacle（--plugins-dir ./fixtures，numbers 真实执行）→ 真实 MET ledger（check_reports 三判据全过，evidence run-8bba24c5ee368a4a#0）→ /v1/agent/snapshot 真实返回。**发现存量缺口**：StdioTransport 读 Manifest 超时 / UdsTransport decode 失败（transport 无真实集成测试），TUI 渲染被挡 → G-3
+**G-3 修复（同日，ADR-0010）**：根因 = mock-agent 字节序（BE）与 transport stdio（LE）错位 + UDS 首帧包装错位 + rmp enum 编码不对称。修复 = mock-agent 参数化 Endian（stdio=LE/uds=BE）+ map-form rmp + UDS 裸 Manifest。**驾驶舱 TUI 双通道实测渲染通过**：`[PARTNER] state=Perception episode: no active episode` + `MET run-8bba24c5ee368a4a (trace=run-8bba24c5ee368a4a)`——真实 ledger 白盒投影成立。316 tests 全绿无回归。

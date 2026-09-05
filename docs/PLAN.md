@@ -34,15 +34,16 @@
 | G-T4 | CockpitWidget（模式栏+经历+ledger 审查）+ AppState.cockpit + renderer strip + attach_cockpit + cli --anaphase-endpoint | ✅ |
 | G-T5 | live 联调（真实 Anaphase 50061 ↔ HttpAnaphaseClient）+ serde 契约修正（snake_case） | ✅ |
 | G-T6 | ADR-0009 + PLAN + GROWTH + README | ✅ |
+| G-3 | transport 帧契约对齐（mock-agent 双通道字节序/编码/UDS 裸 Manifest，ADR-0010） | ✅ |
 
 **双端策略**：snapshot HTTP JSON 是唯一数据协议（TUI/Web 共享）；TUI 先行，Web 面板（G2）后续低摩擦接入。
 
 **运行方式**：`cellrix-cli run --mode stdio --exec <agent> --anaphase-endpoint http://127.0.0.1:50061`（--mode 为传输模式 stdio/uds，非认知模式；Anaphase 需 cap_http_enabled）
 
-**⚠️ 已知缺口（2026-09-06 物理验证发现，存量非候选 G 引入）**：
-- StdioTransport：握手成功但读 Manifest 帧超时（transport 无真实集成测试，仅 mock 级单测）
-- UdsTransport：Manifest decode failed: missing field `agent_name`（mock-agent ↔ transport 协议错位）
-- 驾驶舱**数据链路已验证**（mock reasoning → 真实 Tentacle 执行 numbers → 真实 MET ledger → snapshot 端点真实返回）；TUI 完整渲染被上述 transport 缺口挡住 → 列入候选 G-3（transport 真实联调修复）
+**✅ G-3 已修复（2026-09-06，ADR-0010）**：mock-agent 帧契约对齐双通道字节序
+（stdio=LE / uds=BE + map-form rmp + UDS 裸 Manifest）——驾驶舱 TUI 双通道实测渲染通过
+（模式栏/经历/真实 MET ledger 投影），316 测试全绿无回归。
+**遗留**：transport 两套字节序未统一（物理事实保留，重构项）；transport 真实集成测试未自动化（手动 pty 实测覆盖）。
 
 ---
 
