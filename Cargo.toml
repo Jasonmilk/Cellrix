@@ -7,6 +7,7 @@ members = [
     "ui",
     "cli",
     "mock-agent",
+    "web",
 ]
 
 [workspace.package]

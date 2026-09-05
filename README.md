@@ -218,6 +218,21 @@ cargo run --bin up -- --cockpit   # in anaphase-helix: tentacle + anaphase + coc
 
 ---
 
+
+### Web 面板（Web Panel）
+
+浏览器即开的 Anaphase 驾驶舱白盒窗口（ADR-0014）。与 TUI 共享同一
+snapshot 协议——模式 / 认知状态 / 经历 / ledger 逐条可查，自动刷新。
+
+```bash
+cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
+# --anaphase-endpoint 默认 http://127.0.0.1:50061（Anaphase cap_http 协议默认）
+# --port / WEB_PORT 默认 8080
+```
+
+零依赖（std-only HTTP + 单文件 HTML，无构建链）。先起 Anaphase
+（`cargo run --bin up`）再看面板；未起时页面显示离线。
+
 ## 7. Testing & Verification
 
 Following Google’s strict hermetic testing conventions, all integration tests are isolated inside crate-level `tests/` directories.

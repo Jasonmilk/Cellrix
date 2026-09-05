@@ -8,6 +8,17 @@
 
 ---
 
+## 健康快照 #10：Web 面板首拉（G2，ADR-0014，2026-09-06）
+
+**变异类型**：浏览器白盒窗口——用户（2026-09-06）"web面板先拉起来,再想优化!"
+
+- 新 crate `cellrix-web`（零依赖 std-only HTTP + 单文件内嵌 HTML + 原生 JS 轮询）
+- 同源代理 /api/snapshot → Anaphase /v1/agent/snapshot（规避 CORS，共享 ADR-0010 契约）
+- 路由白名单 + 真实状态码（404/502）；端点 --anaphase-endpoint/--port + env（零硬编码）
+- 实测全链路：mock reasoning → 真实 Tentacle numbers 执行 → 真实 MET ledger
+  （run-8bba24c5ee368a4a#0 三判据全过）→ Web 透传可见
+- Cellrix 316 → 319 全绿；React 孤儿组件（HolographicGrid 等）留待优化期
+
 ## 健康快照 #8：P6 完成 — 生产就绪（配置/日志/监控/部署）🎉 全部阶段完成
 
 **日期**：2026-08-30
