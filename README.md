@@ -29,7 +29,7 @@
 - `cellrix-protocol`: 133 tests
 - `cellrix-ui`: 88 tests
 - cockpit live roundtrip: `transport/tests/anaphase_live.rs` (#[ignore], needs live Anaphase)
-- cockpit TUI (real render): `cellrix-cli run --mode stdio --exec ./target/debug/mock-agent --anaphase-endpoint http://127.0.0.1:50061`
+- cockpit TUI (real render): see §6.4 (stdio/uds, verified 2026-09-06 both channels)
 - `cellrix-transport`: 85 tests
 - Other: 5 tests
 
@@ -187,14 +187,33 @@ cargo build --target wasm32-unknown-unknown -p cellrix-layout
 ```
 *(Alternatively, use `wasm-pack build layout --target web` to generate standard JS/TS glue bindings).*
 
-### 6.4 Run the Interactive TUI
-To launch the display server with the bundled mock-agent, run:
-```bash
-# 1. Start the TUI Display Server (Awaiting connections)
-cargo run --release -p cellrix-cli -- run --mode uds --socket /tmp/cellrix.sock
+### 6.4 Anaphase Cockpit (驾驶舱, candidate G, ADR-0009)
 
-# 2. In a separate terminal, launch the Mock Agent to connect and stream
-cargo run --release -p mock-agent -- --mode uds --socket /tmp/cellrix.sock
+The cockpit projects the Anaphase conscious-layer snapshot (mode / cognitive
+state / episode / ledger) — a white-box window into the agent. Point it at a
+running Anaphase (the `up` launcher in anaphase-helix starts one for you).
+
+**Two transports** (choose one; `--mode` is the transport, not the app mode):
+
+```bash
+# stdio: cockpit spawns the agent itself (single terminal, simplest)
+cellrix-cli run --mode stdio --exec ./target/debug/mock-agent --anaphase-endpoint http://127.0.0.1:50061
+
+# uds: cockpit is the display server, agent connects to the socket (two terminals)
+cellrix-cli run --mode uds --socket /tmp/cellrix.sock --anaphase-endpoint http://127.0.0.1:50061
+mock-agent --mode uds --socket /tmp/cellrix.sock
+```
+
+> Note: `--anaphase-endpoint` defaults to `http://127.0.0.1:50061` (Anaphase
+> cap_http). Override with `ANAPHASE_ENDPOINT` for live tests. The cockpit tab
+> shows: mode bar (`[DRIVE]/[PARTNER]/[SURVIVE]`), cognitive state, episode
+> status, and the real ledger entries (`MET/UNMET` with trace ids) — same
+> snapshot protocol the future Web panel (G2) will consume.
+
+**Easiest path**: build once, then run everything from anaphase-helix:
+
+```bash
+cargo run --bin up -- --cockpit   # in anaphase-helix: tentacle + anaphase + cockpit
 ```
 
 ---
