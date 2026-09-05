@@ -18,6 +18,9 @@ use cellrix_protocol::anaphase::{
     AnaphaseState, CognitivePhase, HITLRequest, HITLRequestStatus, HITLStatus, LifecyclePhase,
     LifecycleStatus, RiskLevel, TaskDagSnapshot, TaskEdge, TaskNode, TaskNodeKind, TaskStatus,
 };
+use cellrix_protocol::anaphase::{
+    AgentSnapshot, EpisodeView, InteractionMode, LedgerEntry, VerdictStatus,
+};
 use crate::helix_mind_client::ClientError;
 use std::sync::Mutex;
 use uuid::Uuid;
@@ -54,6 +57,15 @@ pub trait AnaphaseClient: Send + Sync {
 
     /// 获取生命周期状态
     async fn get_lifecycle(&self) -> Result<LifecycleStatus, ClientError>;
+
+    /// 获取交互模式（candidate G: Drive/Partner/Survive）
+    async fn get_mode(&self) -> Result<InteractionMode, ClientError>;
+
+    /// 获取经历时间线（活跃 episode，candidate G）
+    async fn get_episodes(&self) -> Result<Vec<EpisodeView>, ClientError>;
+
+    /// 获取 ledger 审查视图（candidate G: 白盒投影）
+    async fn get_ledger(&self) -> Result<Vec<LedgerEntry>, ClientError>;
 
     /// 健康检查
     async fn health_check(&self) -> Result<bool, ClientError>;
@@ -323,8 +335,176 @@ impl AnaphaseClient for MockAnaphaseClient {
         Ok(state.lifecycle.clone())
     }
 
+    async fn get_mode(&self) -> Result<InteractionMode, ClientError> {
+        if self.simulate_error {
+            return Err(ClientError::ServerError("模拟错误".to_string()));
+        }
+        Ok(InteractionMode::Partner)
+    }
+
+    async fn get_episodes(&self) -> Result<Vec<EpisodeView>, ClientError> {
+        if self.simulate_error {
+            return Err(ClientError::ServerError("模拟错误".to_string()));
+        }
+        Ok(vec![EpisodeView {
+            id: "ep-mock-0001".to_string(),
+            first_input: "hello".to_string(),
+            step: 3,
+        }])
+    }
+
+    async fn get_ledger(&self) -> Result<Vec<LedgerEntry>, ClientError> {
+        if self.simulate_error {
+            return Err(ClientError::ServerError("模拟错误".to_string()));
+        }
+        Ok(vec![
+            LedgerEntry::Verdict {
+                status: cellrix_protocol::anaphase::VerdictStatus::Met,
+                job_id: "job-1".to_string(),
+                retry_due: None,
+                parent_id: None,
+            },
+            LedgerEntry::Blocked {
+                job_id: "job-2".to_string(),
+                tool: "shutdown".to_string(),
+            },
+        ])
+    }
+
     async fn health_check(&self) -> Result<bool, ClientError> {
         Ok(!self.simulate_error)
+    }
+}
+
+// ============================================================================
+// HTTP Client (candidate G: consumes /v1/agent/snapshot)
+// ============================================================================
+
+/// HTTP Anaphase 客户端 — 消费 Anaphase 的 /v1/agent/snapshot 端点。
+/// 快照是共享投影（循环后刷新），客户端按需拉取；HTTP 层不触碰 agent 内部。
+pub struct HttpAnaphaseClient {
+    base_url: String,
+    client: reqwest::Client,
+}
+
+impl HttpAnaphaseClient {
+    /// 创建客户端（base_url 形如 `http://127.0.0.1:28330`）
+    pub fn new(base_url: impl Into<String>) -> Self {
+        HttpAnaphaseClient {
+            base_url: base_url.into(),
+            client: reqwest::Client::new(),
+        }
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    /// Parse the snapshot endpoint body (pure — deterministic, unit-testable).
+    /// `{"status":"booting"}` or a missing snapshot yields the empty snapshot.
+    pub fn parse_snapshot_body(body: &serde_json::Value) -> Result<AgentSnapshot, ClientError> {
+        match body.get("snapshot") {
+            Some(snap) => serde_json::from_value(snap.clone())
+                .map_err(|e| ClientError::ServerError(format!("snapshot parse: {e}"))),
+            None => Ok(AgentSnapshot::empty()),
+        }
+    }
+
+    /// 拉取共享快照（booting 状态返回空快照，不报错）
+    async fn fetch_snapshot(&self) -> Result<AgentSnapshot, ClientError> {
+        let url = format!("{}/v1/agent/snapshot", self.base_url);
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| ClientError::ConnectionFailed(e.to_string()))?;
+        if !resp.status().is_success() {
+            return Err(ClientError::ServerError(format!(
+                "snapshot endpoint returned {}",
+                resp.status()
+            )));
+        }
+        let body: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| ClientError::ServerError(e.to_string()))?;
+        Self::parse_snapshot_body(&body)
+    }
+}
+
+#[async_trait]
+impl AnaphaseClient for HttpAnaphaseClient {
+    async fn get_state(&self) -> Result<AnaphaseState, ClientError> {
+        Err(ClientError::Other(
+            "AnaphaseState is not served by the snapshot endpoint".to_string(),
+        ))
+    }
+
+    async fn get_task_dag(&self) -> Result<TaskDagSnapshot, ClientError> {
+        Err(ClientError::Other(
+            "TaskDagSnapshot is not served by the snapshot endpoint".to_string(),
+        ))
+    }
+
+    async fn get_hitl_status(&self) -> Result<HITLStatus, ClientError> {
+        Err(ClientError::Other(
+            "HITLStatus is not served by the snapshot endpoint".to_string(),
+        ))
+    }
+
+    async fn get_hitl_requests(&self) -> Result<Vec<HITLRequest>, ClientError> {
+        Err(ClientError::Other(
+            "HITL requests are not served by the snapshot endpoint".to_string(),
+        ))
+    }
+
+    async fn approve_request(&self, _request_id: &str, _approver: &str) -> Result<bool, ClientError> {
+        Err(ClientError::Other(
+            "HITL approval is not served by the snapshot endpoint".to_string(),
+        ))
+    }
+
+    async fn reject_request(
+        &self,
+        _request_id: &str,
+        _reason: &str,
+        _approver: &str,
+    ) -> Result<bool, ClientError> {
+        Err(ClientError::Other(
+            "HITL rejection is not served by the snapshot endpoint".to_string(),
+        ))
+    }
+
+    async fn get_lifecycle(&self) -> Result<LifecycleStatus, ClientError> {
+        Err(ClientError::Other(
+            "LifecycleStatus is not served by the snapshot endpoint".to_string(),
+        ))
+    }
+
+    async fn get_mode(&self) -> Result<InteractionMode, ClientError> {
+        Ok(self.fetch_snapshot().await?.mode)
+    }
+
+    async fn get_episodes(&self) -> Result<Vec<EpisodeView>, ClientError> {
+        Ok(self
+            .fetch_snapshot()
+            .await?
+            .episode
+            .map(|e| vec![e])
+            .unwrap_or_default())
+    }
+
+    async fn get_ledger(&self) -> Result<Vec<LedgerEntry>, ClientError> {
+        Ok(self.fetch_snapshot().await?.ledger)
+    }
+
+    async fn health_check(&self) -> Result<bool, ClientError> {
+        let url = format!("{}/v1/agent/snapshot", self.base_url);
+        match self.client.get(&url).send().await {
+            Ok(resp) => Ok(resp.status().is_success()),
+            Err(_) => Ok(false),
+        }
     }
 }
 
@@ -348,6 +528,65 @@ fn chrono_now() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_mock_snapshot_views() {
+        let client = MockAnaphaseClient::new();
+        assert_eq!(client.get_mode().await.unwrap(), InteractionMode::Partner);
+        let eps = client.get_episodes().await.unwrap();
+        assert_eq!(eps.len(), 1);
+        assert!(eps[0].id.starts_with("ep-"));
+        let ledger = client.get_ledger().await.unwrap();
+        assert_eq!(ledger.len(), 2);
+        assert!(matches!(ledger[0], LedgerEntry::Verdict { .. }));
+        assert!(matches!(ledger[1], LedgerEntry::Blocked { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_mock_snapshot_views_error() {
+        let client = MockAnaphaseClient { simulate_error: true, ..MockAnaphaseClient::new() };
+        assert!(client.get_mode().await.is_err());
+        assert!(client.get_episodes().await.is_err());
+        assert!(client.get_ledger().await.is_err());
+    }
+
+    #[test]
+    fn test_parse_snapshot_body_full() {
+        let body: serde_json::Value = serde_json::from_str(
+            r#"{"status":"Active","snapshot":{"mode":"Partner","state":"Reflection","episode":{"id":"ep-abc","first_input":"hello","step":2},"ledger":[{"record_type":"verdict","status":"MET","job_id":"job-1","retry_due":null,"parent_id":null},{"record_type":"blocked","job_id":"job-2","tool":"shutdown"}]}}"#,
+        )
+        .unwrap();
+        let snap = HttpAnaphaseClient::parse_snapshot_body(&body).unwrap();
+        assert_eq!(snap.mode, InteractionMode::Partner);
+        assert_eq!(snap.state, "Reflection");
+        let ep = snap.episode.unwrap();
+        assert_eq!(ep.id, "ep-abc");
+        assert_eq!(ep.step, 2);
+        assert_eq!(snap.ledger.len(), 2);
+        assert!(matches!(
+            &snap.ledger[0],
+            LedgerEntry::Verdict { status: VerdictStatus::Met, .. }
+        ));
+        assert!(matches!(
+            &snap.ledger[1],
+            LedgerEntry::Blocked { tool, .. } if tool == "shutdown"
+        ));
+    }
+
+    #[test]
+    fn test_parse_snapshot_body_booting_is_empty() {
+        let body: serde_json::Value = serde_json::from_str(r#"{"status":"booting"}"#).unwrap();
+        let snap = HttpAnaphaseClient::parse_snapshot_body(&body).unwrap();
+        assert!(snap.episode.is_none());
+        assert!(snap.ledger.is_empty());
+    }
+
+    #[test]
+    fn test_parse_snapshot_body_malformed() {
+        let body: serde_json::Value =
+            serde_json::from_str(r#"{"snapshot":{"mode":"Bogus"}}"#).unwrap();
+        assert!(HttpAnaphaseClient::parse_snapshot_body(&body).is_err());
+    }
 
     #[tokio::test]
     async fn test_mock_client_get_state() {

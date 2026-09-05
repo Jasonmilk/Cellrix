@@ -1174,3 +1174,76 @@ mod tests {
         assert_eq!(edge.edge_type, "depends_on");
     }
 }
+
+// ============================================================================
+// Interaction Mode + Agent Snapshot (candidate G: Anaphase cockpit)
+// ============================================================================
+
+/// Helix interaction mode (ADR-0006): Drive / Partner / Survive.
+/// Shape matches Anaphase `config::Mode` (PascalCase enum).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InteractionMode {
+    Drive,
+    Partner,
+    Survive,
+}
+
+/// Verdict status — matches Anaphase `ledger::VerdictStatus` (UPPERCASE).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum VerdictStatus {
+    Met,
+    Unmet,
+}
+
+/// One ledger record projection. Shape matches Anaphase `ledger::LedgerRecord`
+/// (serde tag = "record_type", snake_case). Unknown fields are ignored on
+/// read — the projection stays stable across Anaphase internals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "record_type", rename_all = "snake_case")]
+pub enum LedgerEntry {
+    Verdict {
+        status: VerdictStatus,
+        job_id: String,
+        #[serde(default)]
+        retry_due: Option<u64>,
+        #[serde(default)]
+        parent_id: Option<String>,
+    },
+    Blocked {
+        job_id: String,
+        #[serde(default)]
+        tool: String,
+    },
+}
+
+/// Episode projection — one experience boundary (id / anchor / progress).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EpisodeView {
+    pub id: String,
+    pub first_input: String,
+    pub step: usize,
+}
+
+/// Agent snapshot served by Anaphase /v1/agent/snapshot (candidate G).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AgentSnapshot {
+    pub mode: InteractionMode,
+    pub state: String,
+    #[serde(default)]
+    pub episode: Option<EpisodeView>,
+    #[serde(default)]
+    pub ledger: Vec<LedgerEntry>,
+}
+
+impl AgentSnapshot {
+    /// Empty snapshot (HTTP disabled or pre-boot).
+    pub fn empty() -> Self {
+        AgentSnapshot {
+            mode: InteractionMode::Drive,
+            state: String::new(),
+            episode: None,
+            ledger: Vec::new(),
+        }
+    }
+}
