@@ -37,7 +37,12 @@
 
 **双端策略**：snapshot HTTP JSON 是唯一数据协议（TUI/Web 共享）；TUI 先行，Web 面板（G2）后续低摩擦接入。
 
-**运行方式**：`cellrix-cli run --anaphase-endpoint http://127.0.0.1:50061`（Anaphase 需 cap_http_enabled）
+**运行方式**：`cellrix-cli run --mode stdio --exec <agent> --anaphase-endpoint http://127.0.0.1:50061`（--mode 为传输模式 stdio/uds，非认知模式；Anaphase 需 cap_http_enabled）
+
+**⚠️ 已知缺口（2026-09-06 物理验证发现，存量非候选 G 引入）**：
+- StdioTransport：握手成功但读 Manifest 帧超时（transport 无真实集成测试，仅 mock 级单测）
+- UdsTransport：Manifest decode failed: missing field `agent_name`（mock-agent ↔ transport 协议错位）
+- 驾驶舱**数据链路已验证**（mock reasoning → 真实 Tentacle 执行 numbers → 真实 MET ledger → snapshot 端点真实返回）；TUI 完整渲染被上述 transport 缺口挡住 → 列入候选 G-3（transport 真实联调修复）
 
 ---
 

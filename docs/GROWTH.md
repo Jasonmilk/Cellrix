@@ -125,4 +125,5 @@
 4. **一次拉全**：`AnaphaseClient::get_snapshot()` 聚合（每 tick 1 次 HTTP）；`attach_cockpit` 按需挂载
 5. **CockpitWidget**：模式栏（DRIVE/PARTNER/SURVIVE）+ 认知状态 + 经历时间线（ep- 锚点/步数）+ Ledger 审查视图（MET/UNMET/BLOCKED + trace/retry/parent）；renderer 摘要条（legend 上方）
 6. **live 验证**：真实 Anaphase（cap_http 50061）↔ HttpAnaphaseClient 真实 roundtrip 解析成功（anaphase_live.rs #[ignore]）；serde 契约不一致（mode PascalCase vs snake_case）由 live 抓到并修正——物理事实优先
-**状态**：✅ 完成（316 tests：307 + 9；cli: `run --anaphase-endpoint http://127.0.0.1:50061`）
+**状态**：✅ 完成（316 tests：307 + 9；cli: `run --mode stdio --exec <agent> --anaphase-endpoint http://127.0.0.1:50061`）
+**物理验证（2026-09-06 实测）**：数据链路全真跑通——mock reasoning → 真实 Tentacle（--plugins-dir ./fixtures，numbers 真实执行）→ 真实 MET ledger（check_reports 三判据全过，evidence run-8bba24c5ee368a4a#0）→ /v1/agent/snapshot 真实返回。**发现存量缺口**：StdioTransport 读 Manifest 超时 / UdsTransport decode 失败（transport 无真实集成测试），TUI 渲染被挡 → G-3
