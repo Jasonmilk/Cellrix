@@ -25,6 +25,8 @@ enum Command {
         exec: Option<String>,
         #[arg(long, help = "UDS socket path")]
         socket: Option<PathBuf>,
+        #[arg(long, help = "Anaphase snapshot endpoint (e.g. http://127.0.0.1:28330) to enable the cockpit")]
+        anaphase_endpoint: Option<String>,
     },
     /// Test manifest fetch (via connect)
     Manifest {
@@ -76,9 +78,16 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Run { mode, exec, socket } => {
+        Command::Run { mode, exec, socket, anaphase_endpoint } => {
             let transport = create_transport(mode, exec, socket, UdsRole::Server).await?;
             let mut app = App::new(transport).await?;
+            // Candidate G: attach the cockpit poller when an endpoint is given.
+            if let Some(ep) = anaphase_endpoint.as_deref().filter(|s| !s.is_empty()) {
+                app.attach_cockpit(
+                    std::sync::Arc::new(cellrix_transport::anaphase_client::HttpAnaphaseClient::new(ep)),
+                    std::time::Duration::from_secs(2),
+                );
+            }
             if let Err(e) = app.run().await {
                 match e {
                     cellrix_ui::UiError::NormalExit => {

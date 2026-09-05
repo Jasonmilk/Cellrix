@@ -16,6 +16,7 @@ mod pfp_widget;
 mod security_notification;
 mod helix_mind_widget;
 mod anaphase_widget;
+mod cockpit;
 mod tentacle_widget;
 
 pub use state_tree::StateTreeWidget;
@@ -37,6 +38,7 @@ pub use helix_mind_widget::{
 pub use anaphase_widget::{
     CognitivePhaseIndicator, TaskDagWidget, HITLWidget, LifecycleWidget, AnaphaseSnapshotWidget,
 };
+pub use cockpit::CockpitWidget;
 pub use tentacle_widget::{
     ToolExecutionWidget, PluginAuditWidget, ToolCallChainWidget, TentacleSnapshotWidget,
 };

@@ -58,6 +58,9 @@ pub trait AnaphaseClient: Send + Sync {
     /// 获取生命周期状态
     async fn get_lifecycle(&self) -> Result<LifecycleStatus, ClientError>;
 
+    /// 获取完整快照投影（candidate G: 一次拉全，极致节能）
+    async fn get_snapshot(&self) -> Result<AgentSnapshot, ClientError>;
+
     /// 获取交互模式（candidate G: Drive/Partner/Survive）
     async fn get_mode(&self) -> Result<InteractionMode, ClientError>;
 
@@ -335,6 +338,33 @@ impl AnaphaseClient for MockAnaphaseClient {
         Ok(state.lifecycle.clone())
     }
 
+    async fn get_snapshot(&self) -> Result<AgentSnapshot, ClientError> {
+        if self.simulate_error {
+            return Err(ClientError::ServerError("模拟错误".to_string()));
+        }
+        Ok(AgentSnapshot {
+            mode: InteractionMode::Partner,
+            state: "Reflection".to_string(),
+            episode: Some(EpisodeView {
+                id: "ep-mock-0001".to_string(),
+                first_input: "hello".to_string(),
+                step: 3,
+            }),
+            ledger: vec![
+                LedgerEntry::Verdict {
+                    status: VerdictStatus::Met,
+                    job_id: "job-1".to_string(),
+                    retry_due: None,
+                    parent_id: None,
+                },
+                LedgerEntry::Blocked {
+                    job_id: "job-2".to_string(),
+                    tool: "shutdown".to_string(),
+                },
+            ],
+        })
+    }
+
     async fn get_mode(&self) -> Result<InteractionMode, ClientError> {
         if self.simulate_error {
             return Err(ClientError::ServerError("模拟错误".to_string()));
@@ -480,6 +510,10 @@ impl AnaphaseClient for HttpAnaphaseClient {
         Err(ClientError::Other(
             "LifecycleStatus is not served by the snapshot endpoint".to_string(),
         ))
+    }
+
+    async fn get_snapshot(&self) -> Result<AgentSnapshot, ClientError> {
+        self.fetch_snapshot().await
     }
 
     async fn get_mode(&self) -> Result<InteractionMode, ClientError> {

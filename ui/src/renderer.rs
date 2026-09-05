@@ -1,6 +1,7 @@
 // ui/src/renderer.rs
 use std::collections::HashMap;
 
+use cellrix_protocol::anaphase::AgentSnapshot;
 use ratatui::{layout::Rect, Frame};
 use ratatui::widgets::{Widget, Paragraph};
 use ratatui::text::{Line, Span};
@@ -76,10 +77,12 @@ impl Renderer {
         focus_manager: &FocusManager,
         active_overrides: HashMap<String, String>,
         zen_focus_node_id: Option<&str>,
+        cockpit: Option<&AgentSnapshot>,
         _mouse_capture_active: bool, // Core Fix: Added underscore to completely eliminate unused variable compiler warnings
     ) -> Result<LayoutOutput, LayoutError> {
-        // Reserve the bottom-most 1 row for the self-documenting TUI help legend bar
-        let layout_height = terminal_size.1.saturating_sub(1);
+        // Reserve the bottom rows: 1 legend bar + (optional) cockpit strip.
+        let cockpit_h: u16 = if cockpit.is_some() { 5 } else { 0 };
+        let layout_height = terminal_size.1.saturating_sub(1).saturating_sub(cockpit_h);
 
         let layout_req = LayoutRequest {
             snapshot: snapshot.clone(),
@@ -209,6 +212,20 @@ impl Renderer {
         
         let legend_area = Rect::new(0, terminal_size.1.saturating_sub(1), terminal_size.0, 1);
         frame.render_widget(legend_paragraph, legend_area);
+
+        // Candidate G: Anaphase cockpit strip (mode / episode / ledger review).
+        if let Some(snap) = cockpit {
+            if terminal_size.1 >= 12 {
+                let cockpit_area = Rect::new(
+                    0,
+                    legend_area.y.saturating_sub(cockpit_h),
+                    terminal_size.0,
+                    cockpit_h,
+                );
+                let widget = crate::widgets::CockpitWidget::new(snap);
+                Widget::render(widget, cockpit_area, frame.buffer_mut());
+            }
+        }
         // =========================================================================================
 
         Ok(layout_output)

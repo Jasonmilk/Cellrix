@@ -18,6 +18,8 @@ use ratatui::Terminal; // 完美修复：精确补上丢失的 Terminal 命名�
 
 use cellrix_protocol::{AgentEvent, NodeType};
 use cellrix_transport::CapTransport;
+use cellrix_protocol::anaphase::AgentSnapshot;
+use cellrix_transport::anaphase_client::AnaphaseClient;
 
 use crate::{Renderer, UiError};
 use state::AppState;
@@ -36,6 +38,8 @@ pub struct App {
     req_map: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<cellrix_protocol::ActionResponse>>>>,
     pub key_map: KeyMap,
     pub heartbeat_timeout: Duration,
+    /// Candidate G: cockpit projection channel (poller -> UI).
+    cockpit_rx: Option<mpsc::Receiver<AgentSnapshot>>,
 }
 
 impl App {
@@ -57,6 +61,7 @@ impl App {
         });
 
         Ok(Self {
+            cockpit_rx: None,
             transport,
             renderer: Renderer::new(),
             event_rx,
@@ -66,6 +71,28 @@ impl App {
             key_map: KeyMap::default(),
             heartbeat_timeout: Duration::from_secs(DEFAULT_HEARTBEAT_TIMEOUT_SECS),
         })
+    }
+
+    /// Candidate G: attach the cockpit poller. A background task refreshes
+    /// the snapshot projection on a fixed interval (one HTTP fetch per tick);
+    /// the UI drains the latest value before each frame.
+    pub fn attach_cockpit(&mut self, client: Arc<dyn AnaphaseClient>, poll_interval: Duration) {
+        let (tx, rx) = mpsc::channel(8);
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(poll_interval);
+            loop {
+                tick.tick().await;
+                match client.get_snapshot().await {
+                    Ok(snap) => {
+                        if tx.send(snap).await.is_err() {
+                            break; // UI gone
+                        }
+                    }
+                    Err(_) => { /* transient — keep polling */ }
+                }
+            }
+        });
+        self.cockpit_rx = Some(rx);
     }
 
     pub async fn run(&mut self) -> Result<(), UiError> {
@@ -169,6 +196,13 @@ impl App {
                 }
             }
 
+            // Candidate G: drain the latest cockpit projection before drawing.
+            if let Some(rx) = &mut self.cockpit_rx {
+                while let Ok(snap) = rx.try_recv() {
+                    self.state.set_cockpit(snap);
+                }
+            }
+
             terminal.draw(|f| {
                 let size = f.size();
                 
@@ -193,6 +227,7 @@ impl App {
                     match self.renderer.render(
                         f, snap, None, (main_area.width, main_area.height), &self.state.focus_manager,
                         self.state.active_slot_nodes.clone(), zen_node_id.as_deref(),
+                        self.state.cockpit.as_ref(),
                         self.state.mouse_capture,
                     ) {
                         Ok(layout_output) => {
