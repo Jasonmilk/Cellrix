@@ -1180,8 +1180,9 @@ mod tests {
 // ============================================================================
 
 /// Helix interaction mode (ADR-0006): Drive / Partner / Survive.
-/// Shape matches Anaphase `config::Mode` (PascalCase enum).
+/// Shape matches Anaphase `config::Mode` (snake_case).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum InteractionMode {
     Drive,
     Partner,
