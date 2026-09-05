@@ -8,7 +8,7 @@
 [![Protocol](https://img.shields.io/badge/Protocol-CI--144%20v2.0-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
-[![Tests](https://img.shields.io/badge/tests-307-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-316-green.svg)]()
 [![Phases](https://img.shields.io/badge/phases-P0--P6%20complete-5B5FC7.svg)]()
 
 ---
@@ -25,9 +25,10 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-**Test Coverage**: 307 tests (from original 4, **76.75x growth**)
+**Test Coverage**: 316 tests (307 + 9 cockpit: widget 3 + AppState 1 + snapshot views 2 + parse 3)
 - `cellrix-protocol`: 133 tests
-- `cellrix-ui`: 84 tests
+- `cellrix-ui`: 88 tests
+- cockpit live roundtrip: `transport/tests/anaphase_live.rs` (#[ignore], needs live Anaphase)
 - `cellrix-transport`: 85 tests
 - Other: 5 tests
 

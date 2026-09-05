@@ -1,6 +1,7 @@
 # Cellrix 生长记录（GROWTH）
 
-> **版本**：v1.0
+> **版本**：v1.1
+> **日期**：2026-09-06
 > **日期**：2026-08-30
 > **所属方法论**：phyt-DNA v1.0
 > **性质**：本文件记录 Cellrix 的最近 3 次健康快照。超过 3 条时，最旧的移入 `archive/growth/`。
@@ -115,48 +116,13 @@
 
 ---
 
-## 健康快照 #6：P4 完成 — Anaphase 联调（编排状态展示 + HITL 交互）
-
-**日期**：2026-08-30
-**阶段**：P4 完成
-**状态**：🌿 幼苗生长，Anaphase 编排中枢已接入
-
-### 关键事件
-- Anaphase 数据结构完成（CognitivePhase + TaskDag + HITL + Lifecycle + AnaphaseState + 22 个测试）
-- Anaphase UI 展示组件完成（CognitivePhaseIndicator + TaskDagWidget + HITLWidget + LifecycleWidget + AnaphaseSnapshotWidget + 12 个测试）
-- Anaphase 客户端完成（AnaphaseClient trait + MockAnaphaseClient + 12 个测试）
-- ADR-0006 创建（Anaphase 联调架构决策）
-- 测试覆盖率从 156 个提升到 202 个（增长 29%）
-
-### P4 完成内容
-| 子任务 | 内容 | 测试数 |
-|---|---|---|
-| T1 | Anaphase 数据结构（CognitivePhase 7状态 + TaskNodeKind/TaskStatus + TaskNode/TaskEdge/TaskDagSnapshot + RiskLevel + HITLRequest/HITLStatus + LifecyclePhase/LifecycleStatus + AnaphaseState） | 22 |
-| T2 | Anaphase UI 展示组件（CognitivePhaseIndicator + TaskDagWidget + HITLWidget + LifecycleWidget + AnaphaseSnapshotWidget） | 12 |
-| T3 | Anaphase 客户端（AnaphaseClient trait + MockAnaphaseClient + get_state/get_task_dag/get_hitl_status/get_hitl_requests/approve_request/reject_request/get_lifecycle/health_check） | 12 |
-
-### 与 Anaphase 对齐
-- 认知阶段与 Anaphase 的 HelixState 一致（7 状态 DAG：Perception/PreAssessment/MemoryRetrieval/Reasoning/ReflexCheck/Execution/Reflection）
-- 任务 DAG 与 Anaphase 的 TaskDag 一致（TaskNodeKind: TaskRoot/SubTask/Leaf）
-- HITL 与 Anaphase 的 HITLApprover 一致（高风险判定：写操作/网络请求/凭证使用，fail-closed）
-- 生命周期与 Anaphase 的 lifecycle.rs 一致（Initializing/Running/Paused/Stopping/Stopped/Error）
-- 心跳间隔 19 秒与 CIB19 一致
-- 双模式对接：Mock 实现（当前）+ gRPC 实现（可选 feature，未来接入真实 Anaphase）
-
-### 核心特性
-- **白盒可观测**: 将 Anaphase 的"编排过程"（任务 DAG + HITL + 生命周期 + 认知阶段）以可视化方式展示
-- **极致解耦**: 数据结构和客户端只依赖 cellrix-protocol，不依赖 Anaphase crate
-- **按需加载**: 客户端是惰性的，只有调用方法时才建立连接
-- **HITL 交互**: 支持在 Cellrix 中直接批准/拒绝 HITL 请求，关联任务状态自动更新
-- **颜色编码体系**: 覆盖 CognitivePhase(7种)/TaskStatus(6种)/TaskNodeKind(3种)/RiskLevel(4种)/HITLRequestStatus(4种)/LifecyclePhase(6种)
-- **认知阶段指示器**: 7 状态 DAG 可视化，当前阶段高亮，已完成阶段灰色，未开始阶段浅灰
-
-### 下一步
-- P5：Tentacle 联调（工具执行状态 + 插件审计展示）
-- 消费 Tentacle 的工具执行状态
-- 展示插件审计和权限状态
-- 展示工具调用链和依赖关系
-
----
-
-*最近 3 次健康快照：3/3（已满，下次需归档最旧的 #6）*
+## 健康快照 #9：候选 G 完成 — Anaphase 驾驶舱（白盒驾驶舱）✅
+**变异类型**：展示器 → 驾驶舱（真实 Anaphase 状态投影）
+**关键决策与发现**：
+1. **正名**：Anaphase 驾驶舱（非 Helix 驾驶舱）——监控意识层；Helix-Mind 灵魂本体不驾驶
+2. **双端策略（ADR-0009 D1）**：snapshot HTTP JSON 唯一数据协议，TUI/Web 共享；TUI 先行（307 资产），Web 面板（G2）后续
+3. **协议契约 = serde 形状**：`AgentSnapshot`/`LedgerEntry`/`InteractionMode`（snake_case）/`VerdictStatus`（UPPERCASE）/ledger tag=`record_type`；未知字段忽略（容忍演进）
+4. **一次拉全**：`AnaphaseClient::get_snapshot()` 聚合（每 tick 1 次 HTTP）；`attach_cockpit` 按需挂载
+5. **CockpitWidget**：模式栏（DRIVE/PARTNER/SURVIVE）+ 认知状态 + 经历时间线（ep- 锚点/步数）+ Ledger 审查视图（MET/UNMET/BLOCKED + trace/retry/parent）；renderer 摘要条（legend 上方）
+6. **live 验证**：真实 Anaphase（cap_http 50061）↔ HttpAnaphaseClient 真实 roundtrip 解析成功（anaphase_live.rs #[ignore]）；serde 契约不一致（mode PascalCase vs snake_case）由 live 抓到并修正——物理事实优先
+**状态**：✅ 完成（316 tests：307 + 9；cli: `run --anaphase-endpoint http://127.0.0.1:50061`）

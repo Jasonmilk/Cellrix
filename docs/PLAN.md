@@ -7,9 +7,9 @@
 
 ---
 
-## 当前阶段：全部完成 🎉
+## 当前阶段：候选 G（Anaphase 驾驶舱）完成 ✅
 
-**状态**：✅ P0-P6 全部完成
+**状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
 
 **Cellrix 项目已完成所有规划阶段**，包括：
 - P0: 方法论初始化 + 现有代码审查
@@ -20,7 +20,24 @@
 - P5: Tentacle 联调（工具执行状态 + 插件审计展示）
 - P6: 生产就绪（配置/日志/监控/部署）
 
-**测试覆盖率**：307 个测试（从原来的 4 个提升到 307 个，76.75 倍增长）
+**测试覆盖率**：316 个测试（307 + 候选 G 新增 9：CockpitWidget 3 + AppState 1 + snapshot views 2 + parse 3）
+
+---
+
+## 候选 G：Anaphase 驾驶舱（ADR-0009）
+
+**目标**：Cellrix = Anaphase 意识层的白盒驾驶舱（正名：监控意识层，Helix-Mind 灵魂本体不驾驶）。
+
+| 任务 | 内容 | 状态 |
+|---|---|---|
+| G-T3 | protocol 快照结构 + AnaphaseClient get_snapshot（一次拉全）+ HttpAnaphaseClient | ✅ |
+| G-T4 | CockpitWidget（模式栏+经历+ledger 审查）+ AppState.cockpit + renderer strip + attach_cockpit + cli --anaphase-endpoint | ✅ |
+| G-T5 | live 联调（真实 Anaphase 50061 ↔ HttpAnaphaseClient）+ serde 契约修正（snake_case） | ✅ |
+| G-T6 | ADR-0009 + PLAN + GROWTH + README | ✅ |
+
+**双端策略**：snapshot HTTP JSON 是唯一数据协议（TUI/Web 共享）；TUI 先行，Web 面板（G2）后续低摩擦接入。
+
+**运行方式**：`cellrix-cli run --anaphase-endpoint http://127.0.0.1:50061`（Anaphase 需 cap_http_enabled）
 
 ---
 
@@ -35,6 +52,7 @@
 | **P4** | Anaphase 联调（编排状态展示 + HITL 交互） | ✅ 已完成 |
 | **P5** | Tentacle 联调（工具执行状态 + 插件审计展示） | ✅ 已完成 |
 | **P6** | 生产就绪（配置/日志/监控/部署） | ✅ 已完成 |
+| **候选 G** | Anaphase 驾驶舱（协议/渲染/live） | ✅ ADR-0009 |
 
 ---
 
@@ -59,4 +77,4 @@
 
 ---
 
-*《Cellrix 开发导航牌》v1.0 完。已完成的详细内容移入 GROWTH.md。*
+*《Cellrix 开发导航牌》v1.1（候选 G 完成：Anaphase 驾驶舱，2026-09-06）。*
