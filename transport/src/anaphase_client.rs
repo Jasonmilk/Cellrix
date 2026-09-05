@@ -587,7 +587,7 @@ mod tests {
     #[test]
     fn test_parse_snapshot_body_full() {
         let body: serde_json::Value = serde_json::from_str(
-            r#"{"status":"Active","snapshot":{"mode":"Partner","state":"Reflection","episode":{"id":"ep-abc","first_input":"hello","step":2},"ledger":[{"record_type":"verdict","status":"MET","job_id":"job-1","retry_due":null,"parent_id":null},{"record_type":"blocked","job_id":"job-2","tool":"shutdown"}]}}"#,
+            r#"{"status":"Active","snapshot":{"mode":"partner","state":"Reflection","episode":{"id":"ep-abc","first_input":"hello","step":2},"ledger":[{"record_type":"verdict","status":"MET","job_id":"job-1","retry_due":null,"parent_id":null},{"record_type":"blocked","job_id":"job-2","tool":"shutdown"}]}}"#,
         )
         .unwrap();
         let snap = HttpAnaphaseClient::parse_snapshot_body(&body).unwrap();
