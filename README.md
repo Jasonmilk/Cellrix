@@ -25,7 +25,7 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-**Test Coverage**: 316 tests (307 + 9 cockpit: widget 3 + AppState 1 + snapshot views 2 + parse 3)
+**Test Coverage**: 319 tests (实测 `cargo test --workspace`, 2026-09-06, 0 failed / 0 warnings)
 - `cellrix-protocol`: 133 tests
 - `cellrix-ui`: 88 tests
 - cockpit live roundtrip: `transport/tests/anaphase_live.rs` (#[ignore], needs live Anaphase)
@@ -232,6 +232,10 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 
 零依赖（std-only HTTP + 单文件 HTML，无构建链）。先起 Anaphase
 （`cargo run --bin up`）再看面板；未起时页面显示离线。
+
+**已验证**（2026-09-06）：`anaphase :50061 snapshot → cellrix-web :8080 代理`
+全链路实测通过——mode / state / episode / ledger / ecosystem 六组件点亮，
+2 秒轮询，`curl http://127.0.0.1:8080/api/snapshot` 返回真实快照。
 
 ## 7. Testing & Verification
 
