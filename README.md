@@ -204,6 +204,14 @@ cellrix-cli run --mode uds --socket /tmp/cellrix.sock --anaphase-endpoint http:/
 mock-agent --mode uds --socket /tmp/cellrix.sock
 ```
 
+> **Cockpit chat (verified 2026-09-06, real LLM round trip)**: a fixed
+> 3-row chat box is always visible at the bottom — press **Enter** (with no
+> action button selected) to focus it, type, **Enter** sends one cognitive
+> period (Mind retrieval → LLM reasoning → Tentacle execution → ledger),
+> **Esc** blurs (draft kept). The status row shows the result: green ✓ reply /
+> red ✗ failure; sending keeps focus for a continuous conversation. The
+> declarative `needs_input` action buttons work the same way.
+
 > **CI-144 stdio closed loop (ADR-0017, verified 2026-09-06)**: the stdio
 > transport speaks the full ecosystem dialect with the *real* Anaphase
 > binary — CIB/1.0 handshake → MessagePack frames → Manifest → snapshot

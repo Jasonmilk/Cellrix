@@ -242,12 +242,23 @@ fn index_html() -> String {
   var last = null;
   function esc(s) {{ return String(s).replace(/[&<>"']/g, function (c) {{ return {{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]; }}); }}
   function tick() {{
-    fetch('/api/snapshot').then(function (r) {{ return r.json(); }}).then(function (j) {{
+    fetch('/api/snapshot').then(function (r) {{
+      if (!r.ok) {{ throw new Error('proxy ' + r.status); }}
+      return r.json();
+    }}).then(function (j) {{
       var snap = j.snapshot || null;
       var mode = document.getElementById('mode');
       var st = document.getElementById('state');
       var conn = document.getElementById('conn');
-      if (!snap) {{ mode.textContent = 'NO SNAPSHOT'; st.textContent = j.status || '?'; conn.textContent = 'booting/未刷新'; conn.className = 'badge'; return; }}
+      var sub = document.getElementById('sub');
+      if (!snap) {{
+        mode.textContent = 'NO SNAPSHOT';
+        st.textContent = j.status || '?';
+        conn.textContent = '✗ 未就绪';
+        conn.className = 'badge';
+        sub.textContent = 'Anaphase 未提供快照（' + (j.error || j.status || '未知') + '）——检查 up 是否在运行';
+        return;
+      }}
       var m = snap.mode || '?';
       mode.textContent = m.toUpperCase();
       mode.className = 'badge ' + m;

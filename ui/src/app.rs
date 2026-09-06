@@ -206,18 +206,20 @@ impl App {
             terminal.draw(|f| {
                 let size = f.size();
                 
-                let input_row = if self.state.input_action.is_some() { 1 } else { 0 };
+                // Fixed 3-row chat box (title / input line / status line):
+                // always visible, so the driver can see where to type and
+                // whether the last send succeeded.
                 let chunks = ratatui::layout::Layout::default()
                     .direction(ratatui::layout::Direction::Vertical)
                     .constraints([
-                        ratatui::layout::Constraint::Length(input_row),
                         ratatui::layout::Constraint::Min(0),
+                        ratatui::layout::Constraint::Length(3),
                         ratatui::layout::Constraint::Length(1),
                     ].as_ref())
                     .split(size);
 
-                let input_area = chunks[0];
-                let main_area = chunks[1];
+                let main_area = chunks[0];
+                let input_area = chunks[1];
                 let status_area = chunks[2];
 
                 if let Some(snap) = &self.state.snapshot {
@@ -275,26 +277,50 @@ impl App {
                 let status_para = ratatui::widgets::Paragraph::new(ratatui::text::Line::from(status_spans));
                 f.render_widget(status_para, status_area);
 
-                if let Some(action_id) = &self.state.input_action {
-                    let prompt = format!(
-                        " ▶ {}: {}▌",
-                        action_id,
-                        self.state.input_buffer
-                    );
-                    let input_para = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
-                        prompt,
-                        ratatui::style::Style::default()
-                            .fg(ratatui::style::Color::Black)
-                            .bg(ratatui::style::Color::Rgb(82, 196, 26)),
-                    ));
-                    f.render_widget(input_para, input_area);
-                } else if let Some(resp) = &self.state.last_response {
-                    let reply_para = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
-                        format!(" ↩ Helix: {}", resp),
-                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(139, 200, 234)),
-                    ));
-                    f.render_widget(reply_para, input_area);
-                }
+                // Chat box: bordered 3 rows so it reads as a real input
+                // widget. Row 1 title, row 2 the prompt/cursor (or hint when
+                // blurred), row 3 the last send result (green ✓ / red ✗ /
+                // blue reply).
+                let title = if self.state.chat_focused {
+                    " [ Send message — Enter 发送 · Esc 退出 ] "
+                } else {
+                    " [ Send message — 按 Enter 开始输入 ] "
+                };
+                let title_style = if self.state.chat_focused {
+                    ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(82, 196, 26))
+                } else {
+                    ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(113, 113, 122))
+                };
+                let input_text = if self.state.chat_focused {
+                    format!("> {}{}", self.state.input_buffer, "▌")
+                } else {
+                    "> （未聚焦，按 Enter 后直接打字）".to_string()
+                };
+                let status_text = match &self.state.last_response {
+                    Some(r) if r.starts_with("✓") => r.clone(),
+                    Some(r) if r.starts_with("✗") => r.clone(),
+                    Some(r) => format!("Helix: {r}"),
+                    None => "（还没有对话，发第一句吧）".to_string(),
+                };
+                let status_style = match &self.state.last_response {
+                    Some(r) if r.starts_with("✓") => {
+                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(82, 196, 26))
+                    }
+                    Some(r) if r.starts_with("✗") => {
+                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(224, 108, 117))
+                    }
+                    _ => ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(139, 200, 234)),
+                };
+                let chat_lines = vec![
+                    ratatui::text::Line::from(ratatui::text::Span::styled(title, title_style)),
+                    ratatui::text::Line::from(ratatui::text::Span::raw(input_text)),
+                    ratatui::text::Line::from(ratatui::text::Span::styled(status_text, status_style)),
+                ];
+                let chat_box = ratatui::widgets::Block::default()
+                    .borders(ratatui::widgets::Borders::ALL)
+                    .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(91, 95, 199)));
+                let chat_para = ratatui::widgets::Paragraph::new(chat_lines).block(chat_box);
+                f.render_widget(chat_para, input_area);
             })?;
         }
         

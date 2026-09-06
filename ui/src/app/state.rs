@@ -25,6 +25,10 @@ pub struct AppState {
     /// target action id while typing, the typed buffer, and the last
     /// action response (the Helix reply) for display.
     pub input_action: Option<String>,
+    /// Chat box focus: Enter anywhere (no action button selected) opens it,
+    /// typed chars go to `input_buffer`, Enter sends, Esc blurs (draft kept).
+    /// Always rendered as a fixed 3-row box at the bottom.
+    pub chat_focused: bool,
     pub input_buffer: String,
     pub last_response: Option<String>,
 }
@@ -49,6 +53,7 @@ impl AppState {
             active_agents,
             current_agent,
             input_action: None,
+            chat_focused: false,
             input_buffer: String::new(),
             last_response: None,
         }
@@ -77,14 +82,20 @@ mod tests {
         let mut state = AppState::new("test-agent".to_string());
         // opening the input for an action + typing is pure field state
         state.input_action = Some("send_message".to_string());
+        state.chat_focused = true;
         state.input_buffer.push_str("hi helix");
         assert_eq!(state.input_action.as_deref(), Some("send_message"));
+        assert!(state.chat_focused);
         assert_eq!(state.input_buffer, "hi helix");
-        // send: take action + buffer, store the reply
-        state.input_action = None;
+        // send: keep focus for the conversation, store the reply
         state.input_buffer.clear();
-        state.last_response = Some("hello driver".to_string());
-        assert_eq!(state.last_response.as_deref(), Some("hello driver"));
+        state.last_response = Some("✓ hello driver".to_string());
+        assert!(state.chat_focused);
+        assert_eq!(state.last_response.as_deref(), Some("✓ hello driver"));
+        // blur: draft is kept, focus released
+        state.chat_focused = false;
+        state.input_action = None;
+        assert!(!state.chat_focused);
     }
 
     #[test]

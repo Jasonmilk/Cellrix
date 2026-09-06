@@ -93,34 +93,57 @@ impl InputHandler {
                     return Ok(None);
                 }
                 KeyCode::Enter => {
-                    let action_id = state.input_action.take().unwrap_or_default();
+                    let action_id = state.input_action.clone().unwrap_or_default();
                     let message = std::mem::take(&mut state.input_buffer);
                     let req = ActionRequest {
-                        action_id,
+                        action_id: action_id.clone(),
                         parameters: serde_json::json!({ "message": message }),
                         view_hash: None,
                     };
                     let response = Self::send_action_request(transport, req_map, req).await;
                     match response {
                         Ok(ActionResponse::Success { message }) => {
-                            state.last_response = Some(message);
+                            state.last_response = Some(format!("✓ {message}"));
                         }
                         Ok(ActionResponse::Failure { error, .. }) => {
-                            state.last_response = Some(format!("(action failed: {error})"));
+                            state.last_response = Some(format!("✗ 发送失败: {error}"));
                         }
                         Ok(ActionResponse::Pending { .. }) => {
-                            state.last_response = Some("(pending)".to_string());
+                            state.last_response = Some("… 处理中 (pending)".to_string());
                         }
-                        Err(_) => state.last_response = Some("(action failed)".to_string()),
+                        Err(_) => state.last_response = Some("✗ 发送失败 (无法连接 agent)".to_string()),
                     }
+                    // Stay focused: the next Enter sends the next message.
+                    state.input_action = Some(action_id);
+                    state.chat_focused = true;
                     return Ok(None);
                 }
                 KeyCode::Esc => {
+                    // Blur the box; keep the draft so Esc is not destructive.
                     state.input_action = None;
-                    state.input_buffer.clear();
+                    state.chat_focused = false;
                     return Ok(None);
                 }
                 _ => {}
+            }
+        }
+
+        // Enter with no input mode: a selected action button still activates;
+        // otherwise Enter opens the chat box (discoverable: press Enter, type).
+        if code == KeyCode::Enter && modifiers == KeyModifiers::NONE && !state.chat_focused {
+            let button_selected = match state.focus_manager.current_focus() {
+                Some(focused_id) => state
+                    .snapshot
+                    .as_ref()
+                    .and_then(|snap| snap.semantic_tree.iter().find(|n| n.id == focused_id))
+                    .map(|n| n.node_type == NodeType::ActionButton)
+                    .unwrap_or(false),
+                None => false,
+            };
+            if !button_selected {
+                state.input_action = Some("send_message".to_string());
+                state.chat_focused = true;
+                return Ok(None);
             }
         }
 
