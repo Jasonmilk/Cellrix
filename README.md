@@ -25,7 +25,7 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-**Test Coverage**: 319 tests (实测 `cargo test --workspace`, 2026-09-06, 0 failed / 0 warnings)
+**Test Coverage**: 321 tests (实测 `cargo test --workspace`, 2026-09-06, 0 failed / 0 warnings)
 - `cellrix-protocol`: 133 tests
 - `cellrix-ui`: 88 tests
 - cockpit live roundtrip: `transport/tests/anaphase_live.rs` (#[ignore], needs live Anaphase)

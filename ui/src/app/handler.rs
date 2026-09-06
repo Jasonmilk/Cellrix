@@ -77,6 +77,53 @@ impl InputHandler {
     ) -> Result<Option<UiError>, UiError> {
         let key = (code, modifiers);
 
+        // Text input mode (declarative `needs_input` action): typed chars,
+        // Backspace, Enter (send) and Esc (cancel) are consumed here; all
+        // other keys still fall through to the global keymap.
+        if state.input_action.is_some() {
+            match code {
+                KeyCode::Char(c)
+                    if modifiers == KeyModifiers::NONE
+                        || modifiers == KeyModifiers::SHIFT => {
+                    state.input_buffer.push(c);
+                    return Ok(None);
+                }
+                KeyCode::Backspace => {
+                    state.input_buffer.pop();
+                    return Ok(None);
+                }
+                KeyCode::Enter => {
+                    let action_id = state.input_action.take().unwrap_or_default();
+                    let message = std::mem::take(&mut state.input_buffer);
+                    let req = ActionRequest {
+                        action_id,
+                        parameters: serde_json::json!({ "message": message }),
+                        view_hash: None,
+                    };
+                    let response = Self::send_action_request(transport, req_map, req).await;
+                    match response {
+                        Ok(ActionResponse::Success { message }) => {
+                            state.last_response = Some(message);
+                        }
+                        Ok(ActionResponse::Failure { error, .. }) => {
+                            state.last_response = Some(format!("(action failed: {error})"));
+                        }
+                        Ok(ActionResponse::Pending { .. }) => {
+                            state.last_response = Some("(pending)".to_string());
+                        }
+                        Err(_) => state.last_response = Some("(action failed)".to_string()),
+                    }
+                    return Ok(None);
+                }
+                KeyCode::Esc => {
+                    state.input_action = None;
+                    state.input_buffer.clear();
+                    return Ok(None);
+                }
+                _ => {}
+            }
+        }
+
         if key == key_map.exit {
             return Ok(Some(UiError::NormalExit));
         }
@@ -133,13 +180,37 @@ impl InputHandler {
                                     .unwrap_or("unknown")
                                     .to_string();
 
+                                let needs_input = node.content
+                                    .get("needs_input")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
+                                if needs_input {
+                                    // Open the text input for this action;
+                                    // Enter there sends the typed message.
+                                    state.input_action = Some(action_id);
+                                    state.input_buffer.clear();
+                                    return Ok(None);
+                                }
+
                                 let req = ActionRequest {
                                     action_id,
                                     parameters: serde_json::json!({}),
                                     view_hash: None,
                                 };
 
-                                let _ = Self::send_action_request(transport, req_map, req).await;
+                                let response = Self::send_action_request(transport, req_map, req).await;
+                                match response {
+                                    Ok(ActionResponse::Success { message }) => {
+                                        state.last_response = Some(message);
+                                    }
+                                    Ok(ActionResponse::Failure { error, .. }) => {
+                                        state.last_response = Some(format!("(action failed: {error})"));
+                                    }
+                                    Ok(ActionResponse::Pending { .. }) => {
+                                        state.last_response = Some("(pending)".to_string());
+                                    }
+                                    Err(_) => state.last_response = Some("(action failed)".to_string()),
+                                }
                             }
                         }
                     }

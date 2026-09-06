@@ -206,16 +206,19 @@ impl App {
             terminal.draw(|f| {
                 let size = f.size();
                 
+                let input_row = if self.state.input_action.is_some() { 1 } else { 0 };
                 let chunks = ratatui::layout::Layout::default()
                     .direction(ratatui::layout::Direction::Vertical)
                     .constraints([
+                        ratatui::layout::Constraint::Length(input_row),
                         ratatui::layout::Constraint::Min(0),
                         ratatui::layout::Constraint::Length(1),
                     ].as_ref())
                     .split(size);
 
-                let main_area = chunks[0];
-                let status_area = chunks[1];
+                let input_area = chunks[0];
+                let main_area = chunks[1];
+                let status_area = chunks[2];
 
                 if let Some(snap) = &self.state.snapshot {
                     let zen_node_id = if self.state.is_zen_mode {
@@ -271,6 +274,27 @@ impl App {
                 }
                 let status_para = ratatui::widgets::Paragraph::new(ratatui::text::Line::from(status_spans));
                 f.render_widget(status_para, status_area);
+
+                if let Some(action_id) = &self.state.input_action {
+                    let prompt = format!(
+                        " ▶ {}: {}▌",
+                        action_id,
+                        self.state.input_buffer
+                    );
+                    let input_para = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
+                        prompt,
+                        ratatui::style::Style::default()
+                            .fg(ratatui::style::Color::Black)
+                            .bg(ratatui::style::Color::Rgb(82, 196, 26)),
+                    ));
+                    f.render_widget(input_para, input_area);
+                } else if let Some(resp) = &self.state.last_response {
+                    let reply_para = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
+                        format!(" ↩ Helix: {}", resp),
+                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(139, 200, 234)),
+                    ));
+                    f.render_widget(reply_para, input_area);
+                }
             })?;
         }
         

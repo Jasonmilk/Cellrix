@@ -21,6 +21,12 @@ pub struct AppState {
     pub mouse_capture: bool,
     pub active_agents: Vec<String>,
     pub current_agent: Option<String>,
+    /// Text input for a `needs_input` action (e.g. send_message): the
+    /// target action id while typing, the typed buffer, and the last
+    /// action response (the Helix reply) for display.
+    pub input_action: Option<String>,
+    pub input_buffer: String,
+    pub last_response: Option<String>,
 }
 
 impl AppState {
@@ -42,6 +48,9 @@ impl AppState {
             mouse_capture: true,
             active_agents,
             current_agent,
+            input_action: None,
+            input_buffer: String::new(),
+            last_response: None,
         }
     }
 
@@ -54,6 +63,29 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn input_fields_start_inert() {
+        let state = AppState::new("test-agent".to_string());
+        assert_eq!(state.input_action, None);
+        assert!(state.input_buffer.is_empty());
+        assert_eq!(state.last_response, None);
+    }
+
+    #[test]
+    fn input_lifecycle_is_plain_fields() {
+        let mut state = AppState::new("test-agent".to_string());
+        // opening the input for an action + typing is pure field state
+        state.input_action = Some("send_message".to_string());
+        state.input_buffer.push_str("hi helix");
+        assert_eq!(state.input_action.as_deref(), Some("send_message"));
+        assert_eq!(state.input_buffer, "hi helix");
+        // send: take action + buffer, store the reply
+        state.input_action = None;
+        state.input_buffer.clear();
+        state.last_response = Some("hello driver".to_string());
+        assert_eq!(state.last_response.as_deref(), Some("hello driver"));
+    }
 
     #[test]
     fn test_set_cockpit_updates_projection() {

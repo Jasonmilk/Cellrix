@@ -159,3 +159,23 @@ Cellrix 侧实测发现两个缺口：①`--exec` 启动约定追加 `--mode std
 - `cellrix-cli action ... --action-id status` → Success{mode=Partner state=Perception...} ✅
 - `cellrix-cli action ... --action-id send_message` → Success{真实 run_cycle 输出} ✅
 **状态**：✅ 完成（319 tests 全绿保持 + 1 live #[ignore] 新增）
+## 记录 29：驾驶舱对话——文本输入 + Helix 真实回复（2026-09-06）
+
+### 触发条件
+用户配好 LLM 后驾驶舱无输入框：UI 只渲染 ActionButton（空参数触发），Anaphase 投影无 action 节点、manifest 只暴露 status。驾驶舱无法对话。
+
+### 变更性质
+- **Anaphase（协议侧）**：manifest 暴露 `send_message`（声明参数 `message: string`）；snapshot 投影 semantic_tree 增加 ActionButton 节点（`send_message` 带 `needs_input: true` 声明、`status`）——UI 零 manifest 知识即可渲染输入（声明式协议扩展）
+- **Cellrix（UI 侧）**：AppState 增加 `input_action/input_buffer/last_response`；Enter 触发 `needs_input` action → 文本输入模式（字符/退格/Enter 发送/Esc 取消）；回复渲染在输入行；输入行动态布局（激活时 1 行）
+- **Anaphase（装配修复）**：`ANAPHASE_CONFIG` env 覆盖 config 路径——驾驶舱子进程从任意 cwd 加载同一 config（此前相对路径 → Cellrix 目录下 Noop 无 LLM）
+- **真实对话验证**：`send_message` 帧 → run_cycle → deepseek API 真实调用 → 回复 "我是 DeepSeek 的 AI 助手..."（非 mock 非 Noop）
+- **测试**：Cellrix 319→321（输入字段生命周期 2 测试）；Anaphase 206 不变；全生态 1420
+
+### 兼容性
+零破坏：needs_input 是声明式扩展（无该字段的 action 行为不变）；ANAPHASE_CONFIG 可选（默认相对路径保持 repo 行为）。
+
+### 验收
+README（输入 + 321）｜ GROWTH｜ ECOSYSTEM v1.56
+
+### 状态
+🧬 已完成
