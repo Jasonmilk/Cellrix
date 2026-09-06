@@ -184,9 +184,18 @@ async fn create_transport(
 ) -> Result<Box<dyn CapTransport>, anyhow::Error> {
     match mode {
         TransportMode::Stdio => {
-            let cmd = exec.ok_or_else(|| anyhow::anyhow!("--exec required for stdio mode"))?;
-            let args: Vec<String> = vec!["--mode".into(), "stdio".into()];
-            let transport = StdioTransport::new(&cmd, &args).await?;
+            let cmdline = exec.ok_or_else(|| anyhow::anyhow!("--exec required for stdio mode"))?;
+            // Split the exec line shell-style so `--exec "agent --flag"` works
+            // (the program path may carry its own args; transport-level flags
+            // are appended by the launcher, never by the user).
+            let words = shell_words::split(&cmdline)
+                .map_err(|e| anyhow::anyhow!("invalid --exec: {e}"))?;
+            let (cmd, mut args) = words
+                .split_first()
+                .ok_or_else(|| anyhow::anyhow!("--exec is empty"))?;
+            let mut args: Vec<String> = args.to_vec();
+            args.extend(vec!["--mode".into(), "stdio".into()]);
+            let transport = StdioTransport::new(cmd, &args).await?;
             Ok(Box::new(transport))
         }
         TransportMode::Uds => {
