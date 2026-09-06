@@ -12,7 +12,9 @@
 //! - `LoggingGuard`: 日志守卫（drop 时刷新日志）
 //! - `LogError`: 日志错误
 
-use crate::config::{LogConfig, LogFormat, LogLevel};
+use crate::config::LogConfig;
+#[cfg(test)]
+use crate::config::{LogFormat, LogLevel};
 use std::sync::Once;
 
 static LOG_INIT: Once = Once::new();

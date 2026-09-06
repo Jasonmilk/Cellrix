@@ -14,10 +14,12 @@
 
 use async_trait::async_trait;
 use cellrix_protocol::tentacle::{
-    PluginAuditAction, PluginAuditEntry, PluginInfo, PluginStatus, ToolCallChain,
+    PluginAuditAction, PluginAuditEntry, PluginInfo, ToolCallChain,
     ToolCallEdge, ToolCallNode, ToolCallRelation, ToolExecution, ToolExecutionStatus,
     TentacleState,
 };
+#[cfg(test)]
+use cellrix_protocol::tentacle::PluginStatus;
 use crate::helix_mind_client::ClientError;
 use std::sync::Mutex;
 

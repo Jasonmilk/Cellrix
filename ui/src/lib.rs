@@ -1,3 +1,12 @@
+// ADR-0014 cockpit TUI component library — the web panel (cellrix-web, G2)
+// landed first; the TUI cockpit entry (cli `run --anaphase-endpoint`) will
+// consume these widgets progressively. Until then the components are a
+// reserved library: dead-code and unused-import lints are expected and
+// annotated here instead of deleting working widgets (extreme reuse, no
+// premature entity removal). They dissolve naturally as the TUI cockpit
+// wires up.
+#![allow(dead_code)]
+#![allow(unused_imports)]
 //! # cellrix-ui — TUI renderer for Cellrix
 
 use cellrix_layout::LayoutError;

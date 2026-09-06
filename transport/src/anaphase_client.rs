@@ -15,15 +15,16 @@
 
 use async_trait::async_trait;
 use cellrix_protocol::anaphase::{
+    RiskLevel, // explicit path: anaphase domain (High/Medium variants), see protocol lib note
+
     AnaphaseState, CognitivePhase, HITLRequest, HITLRequestStatus, HITLStatus, LifecyclePhase,
-    LifecycleStatus, RiskLevel, TaskDagSnapshot, TaskEdge, TaskNode, TaskNodeKind, TaskStatus,
+    LifecycleStatus, TaskDagSnapshot, TaskEdge, TaskNode, TaskNodeKind, TaskStatus,
 };
 use cellrix_protocol::anaphase::{
     AgentSnapshot, EpisodeView, InteractionMode, LedgerEntry, VerdictStatus,
 };
 use crate::helix_mind_client::ClientError;
 use std::sync::Mutex;
-use uuid::Uuid;
 
 // ============================================================================
 // Client Trait

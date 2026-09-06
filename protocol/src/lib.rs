@@ -1,3 +1,11 @@
+// RiskLevel is deliberately defined in three domains (PFP physical risk,
+// Anaphase cognitive risk, Tuck audit risk) with different variants —
+// same name, different semantics. Glob re-exports make the name ambiguous
+// at the crate root; consumers must qualify the path explicitly
+// (e.g. `cellrix_protocol::tuck_audit::RiskLevel`), which is enforced by
+// the crate-level annotation below (deterministic paths over glob
+// convenience).
+#![allow(ambiguous_glob_reexports)]
 //! # cellrix-protocol — Physical Bindings for the CommonIntents Protocol Stack
 //!
 //! This crate provides core data structures and interfaces aligned with the BIND-19 (CIB19) standard:

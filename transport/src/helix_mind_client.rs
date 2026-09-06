@@ -19,7 +19,6 @@ use cellrix_protocol::helix_mind::{
     MetabolismStatus, PhaseState,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use uuid::Uuid;
 
 // ============================================================================
@@ -214,10 +213,10 @@ pub trait HelixMindClient: Send + Sync {
     async fn query(&self, request: QueryRequest) -> Result<QueryResult, ClientError>;
 
     /// 记忆新内容（Layer 1）
-    async fn remember(&self, request: RememberRequest) -> Result<RememberResult, ClientError>;
+    async fn remember(&self, _request: RememberRequest) -> Result<RememberResult, ClientError>;
 
     /// 遗忘内容（Layer 1）
-    async fn forget(&self, request: ForgetRequest) -> Result<ForgetResult, ClientError>;
+    async fn forget(&self, _request: ForgetRequest) -> Result<ForgetResult, ClientError>;
 
     /// 高级认知查询（Layer 3）
     async fn helix_query(&self, request: QueryRequest) -> Result<QueryResult, ClientError>;
@@ -430,7 +429,7 @@ impl HelixMindClient for MockHelixMindClient {
         })
     }
 
-    async fn remember(&self, request: RememberRequest) -> Result<RememberResult, ClientError> {
+    async fn remember(&self, _request: RememberRequest) -> Result<RememberResult, ClientError> {
         if self.simulate_error {
             return Err(ClientError::ServerError("模拟错误".to_string()));
         }
@@ -441,7 +440,7 @@ impl HelixMindClient for MockHelixMindClient {
         })
     }
 
-    async fn forget(&self, request: ForgetRequest) -> Result<ForgetResult, ClientError> {
+    async fn forget(&self, _request: ForgetRequest) -> Result<ForgetResult, ClientError> {
         if self.simulate_error {
             return Err(ClientError::ServerError("模拟错误".to_string()));
         }
