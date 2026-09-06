@@ -8,7 +8,7 @@
 [![Protocol](https://img.shields.io/badge/Protocol-CI--144%20v2.0-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
-[![Tests](https://img.shields.io/badge/tests-316-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-321-green.svg)]()
 [![Phases](https://img.shields.io/badge/phases-P0--P6%20complete-5B5FC7.svg)]()
 
 ---
@@ -24,6 +24,13 @@
 | **P4** | Anaphase Integration (Orchestration + HITL) | ✅ Complete |
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
+
+> **Status 2026-09-06**: cockpit real conversation is live — fixed chat box
+> (Enter to focus, Enter to send, Esc to blur), three-state feedback
+> (✓ reply / ✗ failure / pending), real LLM round trip through Anaphase
+> (`send_message` → run_cycle → DeepSeek → reply). Web panel (:8080) is a
+> white-box projection of the same snapshot protocol. **Next**: DSH-style
+> unified Web UI (chat + trajectory + white-box), TUI/Web parity.
 
 **Test Coverage**: 321 tests (实测 `cargo test --workspace`, 2026-09-06, 0 failed / 0 warnings)
 - `cellrix-protocol`: 133 tests
@@ -259,14 +266,14 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 
 Following Google’s strict hermetic testing conventions, all integration tests are isolated inside crate-level `tests/` directories.
 
-### 7.1 Test Coverage (156 tests total)
+### 7.1 Test Coverage (321 tests total, 2026-09-06)
 
 | Crate | Tests | Coverage |
 |---|---|---|
-| `cellrix-protocol` | 78 | PFP/SAP parser, snapshot, helix_mind data structures, tuck_audit |
-| `cellrix-ui` | 57 | State tree, text panel, audit widgets, PFP widgets, security notifications, helix_mind widgets |
-| `cellrix-transport` | 17 | UDS multiplexing, helix_mind client (trait + mock) |
-| Other | 4 | Integration tests |
+| `cellrix-protocol` | 133 | PFP/SAP parser, snapshot, action protocol, helix_mind data structures, tuck_audit |
+| `cellrix-ui` | 90 | State tree, chat input lifecycle, text panel, audit widgets, PFP widgets, security notifications, helix_mind widgets |
+| `cellrix-transport` | 85 | UDS multiplexing, stdio frames, action round trips, helix_mind client (trait + mock) |
+| Other | 13 | Integration tests |
 
 ### 7.2 Run Specific Test Suites
 
