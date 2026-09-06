@@ -197,12 +197,22 @@ running Anaphase (the `up` launcher in anaphase-helix starts one for you).
 
 ```bash
 # stdio: cockpit spawns the agent itself (single terminal, simplest)
-cellrix-cli run --mode stdio --exec ./target/debug/mock-agent --anaphase-endpoint http://127.0.0.1:50061
+cellrix-cli run --mode stdio --exec /path/to/anaphase --anaphase-endpoint http://127.0.0.1:50061
 
 # uds: cockpit is the display server, agent connects to the socket (two terminals)
 cellrix-cli run --mode uds --socket /tmp/cellrix.sock --anaphase-endpoint http://127.0.0.1:50061
 mock-agent --mode uds --socket /tmp/cellrix.sock
 ```
+
+> **CI-144 stdio closed loop (ADR-0017, verified 2026-09-06)**: the stdio
+> transport speaks the full ecosystem dialect with the *real* Anaphase
+> binary — CIB/1.0 handshake → MessagePack frames → Manifest → snapshot
+> push → `send_action` round trips. Anaphase accepts the launcher convention
+> `--mode stdio` (and its native `--stdio`); `StdioTransport::send_action`
+> routes ActionResponses through a dedicated channel (single background
+> reader owns stdout — no frame stealing). Verified live end to end:
+> `manifest` / `snapshot` / `action` subcommands against the real binary
+> (`transport/tests/ci144_anaphase_live.rs`, #[ignore]).
 
 > Note: `--anaphase-endpoint` defaults to `http://127.0.0.1:50061` (Anaphase
 > cap_http). Override with `ANAPHASE_ENDPOINT` for live tests. The cockpit tab

@@ -139,3 +139,23 @@
 **状态**：✅ 完成（316 tests：307 + 9；cli: `run --mode stdio --exec <agent> --anaphase-endpoint http://127.0.0.1:50061`）
 **物理验证（2026-09-06 实测）**：数据链路全真跑通——mock reasoning → 真实 Tentacle（--plugins-dir ./fixtures，numbers 真实执行）→ 真实 MET ledger（check_reports 三判据全过，evidence run-8bba24c5ee368a4a#0）→ /v1/agent/snapshot 真实返回。**发现存量缺口**：StdioTransport 读 Manifest 超时 / UdsTransport decode 失败（transport 无真实集成测试），TUI 渲染被挡 → G-3
 **G-3 修复（同日，ADR-0010）**：根因 = mock-agent 字节序（BE）与 transport stdio（LE）错位 + UDS 首帧包装错位 + rmp enum 编码不对称。修复 = mock-agent 参数化 Endian（stdio=LE/uds=BE）+ map-form rmp + UDS 裸 Manifest。**驾驶舱 TUI 双通道实测渲染通过**：`[PARTNER] state=Perception episode: no active episode` + `MET run-8bba24c5ee368a4a (trace=run-8bba24c5ee368a4a)`——真实 ledger 白盒投影成立。316 tests 全绿无回归。
+
+## 记录：CI-144 stdio 闭环——真实 Anaphase 全链路（2026-09-06，ADR-0017 跨仓库）
+**变异类型**：接口契约归位——驾驶舱对真实意识层闭环（Anaphase 侧 ADR-0017 传输层 + Cellrix 侧消费端补齐）
+**背景**：Anaphase 已实现 CI-144 传输层（vendored 协议 + 握手 + MessagePack 帧 + 1s 快照推流 + Action 响应）。
+Cellrix 侧实测发现两个缺口：①`--exec` 启动约定追加 `--mode stdio`，Anaphase 只认 `--stdio`；
+②`StdioTransport::send_action` 未实现（"Not implemented"）——写侧是洞。
+**关键决策**：
+1. **Anaphase 兼容生态启动约定**：main.rs 同时接受 `--stdio` 与 `--mode stdio`（Cellrix 对每个
+   stdio agent 说同一套启动参数——一个启动契约，人人会说）
+2. **send_action 落地 + 单 reader 分发**：background reader 独占 stdout，用 untagged `Incoming`
+   enum 把 AgentEvent 路由到事件流、ActionResponse 路由到专用响应通道——无帧竞争、无二 reader
+   （确定性）；send_action 写请求 → 等响应通道（5s 超时）
+3. **live 测试资产**：`transport/tests/ci144_anaphase_live.rs`（#[ignore]，ANAPHASE_BIN env 指向
+   真实二进制）：handshake → Manifest → 快照推流 → status/send_message/unknown 三动作全闭环
+**物理验证（2026-09-06 实测，真实二进制）**：
+- `cellrix-cli manifest --mode stdio --exec anaphase --stdio` → CapabilityManifest{anaphase-helix} ✅
+- `cellrix-cli snapshot ...` → Status: partner + 布局引擎消费 3 节点（state_tree/text_panel/metrics）✅
+- `cellrix-cli action ... --action-id status` → Success{mode=Partner state=Perception...} ✅
+- `cellrix-cli action ... --action-id send_message` → Success{真实 run_cycle 输出} ✅
+**状态**：✅ 完成（319 tests 全绿保持 + 1 live #[ignore] 新增）

@@ -190,7 +190,7 @@ async fn create_transport(
             // are appended by the launcher, never by the user).
             let words = shell_words::split(&cmdline)
                 .map_err(|e| anyhow::anyhow!("invalid --exec: {e}"))?;
-            let (cmd, mut args) = words
+            let (cmd, args) = words
                 .split_first()
                 .ok_or_else(|| anyhow::anyhow!("--exec is empty"))?;
             let mut args: Vec<String> = args.to_vec();

@@ -7,7 +7,7 @@
 
 ---
 
-## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉（cellrix-web，ADR-0014）——下一步 Web 优化（React 组件接入/up 菜单第 5 项）
+## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017：StdioTransport::send_action + 单 reader 分发 + 真实 Anaphase 二进制 manifest/snapshot/action 三通道实测通过）**——下一步 Web 优化（React 组件接入/up 菜单第 5 项）
 
 **状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
 
