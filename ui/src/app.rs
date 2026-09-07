@@ -178,6 +178,32 @@ impl App {
                             let current_focus = self.state.focus_manager.current_focus().map(|s| s.to_string());
                             let target = current_focus.as_deref();
                             self.state.focus_manager.rebuild(focusable_ids, target);
+
+                            // One-shot chat auto-open: on the first snapshot,
+                            // focus the agent-declared needs_input action
+                            // button (send_message) and open its input panel,
+                            // so the driver can type immediately. The action
+                            // id and label come from the node itself — the
+                            // UI derives, never hardcodes.
+                            if self.state.pending_chat {
+                                self.state.pending_chat = false;
+                                if let Some(node) = snap.semantic_tree.iter().find(|n| {
+                                    n.node_type == NodeType::ActionButton
+                                        && n.content.get("needs_input").and_then(|v| v.as_bool()).unwrap_or(false)
+                                }) {
+                                    let action_id = node
+                                        .content
+                                        .get("action_id")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    if !action_id.is_empty() {
+                                        self.state.focus_manager.active_focus_id = Some(node.id.clone());
+                                        self.state.input_action = Some(action_id);
+                                        self.state.chat_focused = true;
+                                    }
+                                }
+                            }
                         }
                         Some(AgentEvent::Heartbeat { .. }) => {
                             self.state.last_heartbeat = Instant::now();
@@ -256,7 +282,7 @@ impl App {
                     .direction(ratatui::layout::Direction::Vertical)
                     .constraints([
                         ratatui::layout::Constraint::Min(0),
-                        ratatui::layout::Constraint::Length(3),
+                        ratatui::layout::Constraint::Length(9),
                         ratatui::layout::Constraint::Length(1),
                     ].as_ref())
                     .split(size);
@@ -328,14 +354,25 @@ impl App {
                 let status_para = ratatui::widgets::Paragraph::new(ratatui::text::Line::from(status_spans));
                 f.render_widget(status_para, status_area);
 
-                // Chat box: bordered 3 rows so it reads as a real input
-                // widget. Row 1 title, row 2 the prompt/cursor (or hint when
-                // blurred), row 3 the last send result (green ✓ / red ✗ /
-                // blue reply).
+                // Chat panel: the same conversation semantics as the WebUI
+                // (who + timestamp + text), plus the input line and the
+                // last-send status. The title derives from the focused
+                // needs_input action button label — the tree declares it.
+                let focused_label = self.state.focus_manager.current_focus().and_then(|id| {
+                    self.state.snapshot.as_ref().and_then(|snap| {
+                        snap.semantic_tree
+                            .iter()
+                            .find(|n| n.id == id)
+                            .map(|n| n.label.clone())
+                    })
+                });
                 let title = if self.state.chat_focused {
-                    " [ Send message — Enter 发送 · Esc 退出 ] "
+                    format!(
+                        " [ {} — Enter 发送 · Esc 退出 ] ",
+                        focused_label.unwrap_or_else(|| "对话 Chat".to_string())
+                    )
                 } else {
-                    " [ Send message — 按 Enter 开始输入 ] "
+                    " [ 对话 Chat — 输入消息 ] ".to_string()
                 };
                 let title_style = if self.state.chat_focused {
                     ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(82, 196, 26))
@@ -345,28 +382,49 @@ impl App {
                 let input_text = if self.state.chat_focused {
                     format!("> {}{}", self.state.input_buffer, "▌")
                 } else {
-                    "> （未聚焦，按 Enter 后直接打字）".to_string()
+                    "> （按 Enter 开始输入）".to_string()
                 };
                 let status_text = match &self.state.last_response {
-                    Some(r) if r.starts_with("✓") => r.clone(),
                     Some(r) if r.starts_with("✗") => r.clone(),
                     Some(r) => format!("Helix: {r}"),
                     None => "（还没有对话，发第一句吧）".to_string(),
                 };
                 let status_style = match &self.state.last_response {
-                    Some(r) if r.starts_with("✓") => {
-                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(82, 196, 26))
-                    }
                     Some(r) if r.starts_with("✗") => {
                         ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(224, 108, 117))
                     }
                     _ => ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(139, 200, 234)),
                 };
-                let chat_lines = vec![
-                    ratatui::text::Line::from(ratatui::text::Span::styled(title, title_style)),
-                    ratatui::text::Line::from(ratatui::text::Span::raw(input_text)),
-                    ratatui::text::Line::from(ratatui::text::Span::styled(status_text, status_style)),
-                ];
+                let mut chat_lines: Vec<ratatui::text::Line> = Vec::new();
+                // Conversation record (isomorphic with the WebUI message
+                // flow): newest N entries, each who + HH:MM + text.
+                let tail: Vec<_> = self.state.chat_history.iter().rev().take(5).collect();
+                for entry in tail.iter().rev() {
+                    let who = match entry.who {
+                        super::app::state::ChatWho::Driver => "你",
+                        super::app::state::ChatWho::Helix => "Helix",
+                    };
+                    let who_style = match entry.who {
+                        super::app::state::ChatWho::Driver => {
+                            ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(139, 200, 234))
+                        }
+                        super::app::state::ChatWho::Helix => {
+                            ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(158, 172, 234))
+                        }
+                    };
+                    chat_lines.push(ratatui::text::Line::from(vec![
+                        ratatui::text::Span::styled(format!("{who} "), who_style),
+                        ratatui::text::Span::styled(
+                            entry.ts.clone(),
+                            ratatui::style::Style::default()
+                                .fg(ratatui::style::Color::Rgb(113, 113, 122)),
+                        ),
+                        ratatui::text::Span::raw("  "),
+                        ratatui::text::Span::raw(entry.text.clone()),
+                    ]));
+                }
+                chat_lines.push(ratatui::text::Line::from(ratatui::text::Span::raw(input_text)));
+                chat_lines.push(ratatui::text::Line::from(ratatui::text::Span::styled(status_text, status_style)));
                 let chat_box = ratatui::widgets::Block::default()
                     .borders(ratatui::widgets::Borders::ALL)
                     .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(91, 95, 199)));

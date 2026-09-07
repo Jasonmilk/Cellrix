@@ -263,6 +263,7 @@ dependencies = [
  "clap",
  "crossterm",
  "futures",
+ "libc",
  "rand",
  "ratatui",
  "serde_json",

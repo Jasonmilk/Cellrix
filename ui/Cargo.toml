@@ -15,6 +15,9 @@ cellrix-transport = { path = "../transport" }
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1"
 
+# Local clock (HH:MM for the conversation record)
+libc = "0.2"
+
 # Terminal UI
 ratatui = "0.26"
 crossterm = { version = "0.27", features = ["event-stream"] }

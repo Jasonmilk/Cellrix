@@ -36,6 +36,22 @@ pub fn base64_encode(data: &[u8]) -> String {
     result
 }
 
+/// Current local time as HH:MM (same rendering as the WebUI message ts).
+fn now_hhmm() -> String {
+    let d = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    // Local time via libc tm (chrono-free, zero extra deps).
+    let t = unsafe {
+        let mut t = d as i64;
+        let mut out = std::mem::zeroed::<libc::tm>();
+        libc::localtime_r(&t, &mut out);
+        out
+    };
+    format!("{:02}:{:02}", t.tm_hour, t.tm_min)
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct KeyMap {
     pub exit: (KeyCode, KeyModifiers),
@@ -106,6 +122,13 @@ impl InputHandler {
                         state.chat_focused = true;
                         return Ok(None);
                     }
+                    // Driver message enters the conversation record first
+                    // (isomorphic with the WebUI message flow).
+                    state.chat_history.push(super::state::ChatEntry {
+                        who: super::state::ChatWho::Driver,
+                        ts: now_hhmm(),
+                        text: message.clone(),
+                    });
                     let req = ActionRequest {
                         action_id: action_id.clone(),
                         parameters: serde_json::json!({ "message": message }),
@@ -114,9 +137,17 @@ impl InputHandler {
                     let response = Self::send_action_request(transport, req_map, req).await;
                     match response {
                         Ok(ActionResponse::Success { message }) => {
-                            state.last_response = Some(format!("✓ {message}"));
+                            state.last_response = Some(message.clone());
+                            state.chat_history.push(super::state::ChatEntry {
+                                who: super::state::ChatWho::Helix,
+                                ts: now_hhmm(),
+                                text: message,
+                            });
                         }
                         Ok(ActionResponse::Failure { error, .. }) => {
+                            // Transport/system errors stay in the status line
+                            // (red), never in the conversation flow — same
+                            // semantics as the WebUI toast.
                             state.last_response = Some(format!("✗ 发送失败: {error}"));
                         }
                         Ok(ActionResponse::Pending { .. }) => {
@@ -509,11 +540,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn prefocused_typing_sends_on_enter() {
-        // Startup is pre-focused: typing needs no Enter arm.
+    async fn chat_typing_records_conversation_and_sends() {
+        // Input mode (the chat panel opened for the needs_input action):
+        // typing needs no Enter arm.
         let mut state = AppState::new("t".to_string());
-        assert!(state.chat_focused);
-        assert_eq!(state.input_action.as_deref(), Some("send_message"));
+        state.input_action = Some("send_message".to_string());
+        state.chat_focused = true;
+        assert!(state.pending_chat);
         let sent = Arc::new(StdMutex::new(Vec::new()));
         let mut transport: Box<dyn CapTransport> = Box::new(RecordingTransport { sent: sent.clone() });
         let req_map = Arc::new(Mutex::new(HashMap::new()));
@@ -527,13 +560,19 @@ mod tests {
         }
         assert_eq!(state.input_buffer, "ping");
 
-        // Enter sends the draft and keeps the box focused.
+        // Enter sends the draft, records the conversation (driver + helix),
+        // and keeps the box focused.
         InputHandler::handle_key(&mut state, &mut transport, &req_map, &key_map, KeyCode::Enter, KeyModifiers::NONE)
             .await
             .unwrap();
         assert!(state.input_buffer.is_empty());
         assert!(state.chat_focused);
-        assert_eq!(state.last_response.as_deref(), Some("✓ ok"));
+        assert_eq!(state.chat_history.len(), 2);
+        assert_eq!(state.chat_history[0].who, crate::app::state::ChatWho::Driver);
+        assert_eq!(state.chat_history[0].text, "ping");
+        assert_eq!(state.chat_history[1].who, crate::app::state::ChatWho::Helix);
+        assert_eq!(state.chat_history[1].text, "ok");
+        assert_eq!(state.last_response.as_deref(), Some("ok"));
         assert_eq!(*sent.lock().unwrap(), vec!["ping"]);
     }
 }

@@ -323,8 +323,7 @@ pub fn post_stream(
             let size = usize::from_str_radix(size_text, 16)
                 .map_err(|_| format!("bad chunk size: {size_text}"))?;
             if size == 0 {
-                done = true; // terminal chunk; trailer (if any) is ignored
-                break;
+                break; // terminal chunk; trailer (if any) is ignored
             }
             // chunk payload
             let mut payload = Vec::with_capacity(size.min(65536));

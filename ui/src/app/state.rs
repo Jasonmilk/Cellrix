@@ -5,6 +5,21 @@ use cellrix_protocol::anaphase::AgentSnapshot;
 use cellrix_layout::FocusManager;
 use crate::widgets::engram::EngramViewState;
 
+/// One chat message in the conversation record. TUI and WebUI render the
+/// same conversation semantics: who, timestamp, text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatEntry {
+    pub who: ChatWho,
+    pub ts: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChatWho {
+    Driver,
+    Helix,
+}
+
 /// Top-level view the driver is looking at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveView {
@@ -40,12 +55,21 @@ pub struct AppState {
     /// target action id while typing, the typed buffer, and the last
     /// action response (the Helix reply) for display.
     pub input_action: Option<String>,
-    /// Chat box focus: Enter anywhere (no action button selected) opens it,
-    /// typed chars go to `input_buffer`, Enter sends, Esc blurs (draft kept).
-    /// Always rendered as a fixed 3-row box at the bottom.
+    /// Chat box focus: the input panel of the focused `needs_input` action
+    /// button (send_message). Typed chars go to `input_buffer`, Enter sends,
+    /// Esc blurs (draft kept). Always rendered as a fixed box at the bottom.
     pub chat_focused: bool,
     pub input_buffer: String,
+    /// Conversation record — the same message flow the WebUI renders
+    /// (who + timestamp + text), so TUI and WebUI stay isomorphic.
+    pub chat_history: Vec<ChatEntry>,
+    /// Last action response (the Helix reply) for the status line.
     pub last_response: Option<String>,
+    /// Set at startup: once the first semantic snapshot arrives, the UI
+    /// auto-focuses the agent-declared send_message button and opens its
+    /// input panel, so the driver can type immediately without knowing the
+    /// focus/Enter dance. Cleared after the first snapshot.
+    pub pending_chat: bool,
 }
 
 impl AppState {
@@ -69,14 +93,15 @@ impl AppState {
             mouse_capture: true,
             active_agents,
             current_agent,
-            // Pre-focused chat box: the driver opens the TUI and can type
-            // immediately (Enter is no longer needed to arm the box — a
-            // selected action button used to swallow Enter and confuse the
-            // "where do I type" flow). Tab still moves focus away.
-            input_action: Some("send_message".to_string()),
-            chat_focused: true,
+            input_action: None,
+            chat_focused: false,
             input_buffer: String::new(),
+            chat_history: Vec::new(),
             last_response: None,
+            // Auto-open the chat input once the agent's semantic tree
+            // arrives (derived from the send_message ActionButton — the UI
+            // never hardcodes the action id; the tree declares it).
+            pending_chat: true,
         }
     }
 
@@ -104,11 +129,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn input_fields_start_prefocused() {
+    fn input_starts_inert_but_pending_chat() {
         let state = AppState::new("test-agent".to_string());
-        assert_eq!(state.input_action.as_deref(), Some("send_message"));
-        assert!(state.chat_focused);
+        assert_eq!(state.input_action, None);
+        assert!(!state.chat_focused);
+        assert!(state.pending_chat);
         assert!(state.input_buffer.is_empty());
+        assert!(state.chat_history.is_empty());
         assert_eq!(state.last_response, None);
     }
 
@@ -124,9 +151,20 @@ mod tests {
         assert_eq!(state.input_buffer, "hi helix");
         // send: keep focus for the conversation, store the reply
         state.input_buffer.clear();
-        state.last_response = Some("✓ hello driver".to_string());
+        state.chat_history.push(ChatEntry {
+            who: ChatWho::Driver,
+            ts: "12:00".to_string(),
+            text: "hi helix".to_string(),
+        });
+        state.chat_history.push(ChatEntry {
+            who: ChatWho::Helix,
+            ts: "12:00".to_string(),
+            text: "hello driver".to_string(),
+        });
+        state.last_response = Some("hello driver".to_string());
         assert!(state.chat_focused);
-        assert_eq!(state.last_response.as_deref(), Some("✓ hello driver"));
+        assert_eq!(state.chat_history.len(), 2);
+        assert_eq!(state.last_response.as_deref(), Some("hello driver"));
         // blur: draft is kept, focus released
         state.chat_focused = false;
         state.input_action = None;
