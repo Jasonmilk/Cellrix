@@ -8,7 +8,7 @@
 [![Protocol](https://img.shields.io/badge/Protocol-CI--144%20v2.0-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
-[![Tests](https://img.shields.io/badge/tests-325-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-327-green.svg)]()
 [![Phases](https://img.shields.io/badge/phases-P0--P6%20complete-5B5FC7.svg)]()
 
 ---
@@ -37,7 +37,7 @@
 > **Next**: DSH-style unified Web UI (chat + trajectory + white-box),
 > TUI/Web parity.
 
-**Test Coverage**: 325 tests (实测 `cargo test --workspace --all-features`, 2026-09-07, 0 failed)
+**Test Coverage**: 327 tests (实测 `cargo test --workspace --all-features`, 2026-09-07, 0 failed)
 - `cellrix-protocol`: 137 tests (incl. `engram` real-chain shapes)
 - `cellrix-transport`: 95 tests (incl. `tuck_audit_client` e2e + live gateway)
 - `cellrix-ui`: 90 tests
@@ -272,7 +272,7 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 
 Following Google’s strict hermetic testing conventions, all integration tests are isolated inside crate-level `tests/` directories.
 
-### 7.1 Test Coverage (325 tests total, 2026-09-07, `--all-features`)
+### 7.1 Test Coverage (327 tests total, 2026-09-07, `--all-features`)
 
 | Crate | Tests | Coverage |
 |---|---|---|
