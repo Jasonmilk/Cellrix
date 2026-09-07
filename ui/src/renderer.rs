@@ -13,7 +13,7 @@ use crate::{
     widgets::{
         StateTreeWidget, TextPanelWidget, ActionButtonWidget,
         ProgressBarWidget, CodeDiffWidget, MetricsWidget, FallbackWidget,
-        WidgetContext,
+        InputBoxWidget, WidgetContext, ChatUiState,
     },
     Theme, EnergyMode, SelectionManager, FocusManager,
 };
@@ -79,6 +79,7 @@ impl Renderer {
         zen_focus_node_id: Option<&str>,
         cockpit: Option<&AgentSnapshot>,
         _mouse_capture_active: bool, // Core Fix: Added underscore to completely eliminate unused variable compiler warnings
+        chat: Option<&ChatUiState<'_>>,
     ) -> Result<LayoutOutput, LayoutError> {
         // Reserve the bottom rows: 1 legend bar + (optional) cockpit strip.
         let cockpit_h: u16 = if cockpit.is_some() { 5 } else { 0 };
@@ -103,6 +104,7 @@ impl Renderer {
             layout: &layout_output,
             is_zen: zen_focus_node_id.is_some(),
             focus_manager,
+            chat,
         };
 
         let buffer = frame.buffer_mut();
@@ -126,8 +128,27 @@ impl Renderer {
                             Widget::render(widget, area, buffer);
                         }
                         NodeType::ActionButton => {
-                            let widget = ActionButtonWidget::new(node, &ctx);
-                            Widget::render(widget, area, buffer);
+                            // Dynamic-attribute input box: an action button
+                            // that declares needs_input renders as the input
+                            // panel (conversation record + input line) in its
+                            // own grid slot. Ordinary buttons stay buttons.
+                            let needs_input = node
+                                .content
+                                .get("needs_input")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false);
+                            if needs_input {
+                                if let Some(chat) = ctx.chat {
+                                    let widget = InputBoxWidget::new(node, &ctx, chat);
+                                    Widget::render(widget, area, buffer);
+                                } else {
+                                    let widget = ActionButtonWidget::new(node, &ctx);
+                                    Widget::render(widget, area, buffer);
+                                }
+                            } else {
+                                let widget = ActionButtonWidget::new(node, &ctx);
+                                Widget::render(widget, area, buffer);
+                            }
                         }
                         NodeType::ProgressBar => {
                             let widget = ProgressBarWidget::new(node, &ctx);
@@ -260,5 +281,93 @@ impl Renderer {
 impl Default for Renderer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use cellrix_protocol::{SemanticSnapshot, SemanticNode, NodeType};
+    use cellrix_layout::LayoutConfig;
+    use crate::app::state::{ChatEntry, ChatWho};
+    use std::collections::HashMap;
+
+    fn tree() -> SemanticSnapshot {
+        let mut s = SemanticSnapshot::new(1, "ok".into());
+        s.semantic_tree = vec![
+            SemanticNode {
+                id: "ecosystem".into(),
+                node_type: NodeType::Metrics,
+                label: "Ecosystem".into(),
+                content: serde_json::json!({"up": 1, "total": 5}),
+                slot_binding: None,
+                focused: false,
+            },
+            SemanticNode {
+                id: "send_message".into(),
+                node_type: NodeType::ActionButton,
+                label: "Send message".into(),
+                content: serde_json::json!({
+                    "action_id": "send_message",
+                    "needs_input": true,
+                    "placeholder": "message to Helix...",
+                }),
+                slot_binding: None,
+                focused: false,
+            },
+        ];
+        s
+    }
+
+    #[test]
+    fn needs_input_action_renders_input_box_not_plain_button() {
+        let snapshot = tree();
+        let mut fm = FocusManager::new();
+        fm.active_focus_id = Some("send_message".into());
+
+        let chat = ChatUiState {
+            history: &[ChatEntry {
+                who: ChatWho::Driver,
+                ts: "20:00".into(),
+                text: "hi".into(),
+            }],
+            buffer: "hel",
+            last_response: Some("pong"),
+            input_active: true,
+        };
+
+        let mut renderer = Renderer::new();
+        let backend = TestBackend::new(100, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                renderer
+                    .render(
+                        f,
+                        &snapshot,
+                        None,
+                        (100, 24),
+                        &fm,
+                        HashMap::new(),
+                        None,
+                        None,
+                        false,
+                        Some(&chat),
+                    )
+                    .unwrap();
+            })
+            .unwrap();
+        let buf = terminal.backend().buffer();
+        let text: String = buf.content.iter().map(|c| c.symbol().to_string()).collect();
+
+        // The input panel renders: conversation record, typed buffer,
+        // reply status — NOT the plain button instruction.
+        assert!(text.contains("hi"), "conversation record missing: {text}");
+        assert!(text.contains("pong"), "reply status missing: {text}");
+        assert!(text.contains("> hel"), "typed buffer missing: {text}");
+        assert!(!text.contains("Click to execute"), "plain button leaked: {text}");
+        assert!(!text.contains("Press Enter to execute"), "plain button leaked: {text}");
     }
 }

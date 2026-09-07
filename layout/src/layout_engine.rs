@@ -17,6 +17,10 @@ pub struct DefaultSlotIds {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LayoutConfig {
     pub bottom_bar_height: u16,
+    /// Height of the bottom slot when an action button declares
+    /// needs_input=true (the input panel renders there). Larger than the
+    /// plain button bar so the conversation record + input line fit.
+    pub input_bar_height: u16,
     pub sidebar_width_ratio: f64,
     pub default_slot_ids: DefaultSlotIds,
 }
@@ -25,6 +29,7 @@ impl Default for LayoutConfig {
     fn default() -> Self {
         Self {
             bottom_bar_height: 3,
+            input_bar_height: 9,
             sidebar_width_ratio: 0.3,
             default_slot_ids: DefaultSlotIds {
                 sidebar: "sidebar".into(),
@@ -151,8 +156,25 @@ impl LayoutEngine {
                 active_node_per_slot.insert(slot_id.clone(), focused.id.clone());
                 continue;
             }
-            // Default: first node in the slot.
-            active_node_per_slot.insert(slot_id.clone(), nodes[0].clone());
+            // Default: first node in the slot — but an agent-declared input
+            // panel (needs_input action button) takes priority: the agent
+            // asks for an input box, the UI gives it one. This makes the
+            // chat panel the natural default on the bottom slot.
+            let default_active = nodes
+                .iter()
+                .find(|id| {
+                    req.snapshot.semantic_tree.iter().any(|n| {
+                        n.id == **id
+                            && n.node_type == NodeType::ActionButton
+                            && n.content
+                                .get("needs_input")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false)
+                    })
+                })
+                .or_else(|| nodes.first())
+                .cloned();
+            active_node_per_slot.insert(slot_id.clone(), default_active.unwrap_or_default());
         }
 
         // Build rectangles for all nodes (each node gets its slot rectangle).
@@ -271,7 +293,18 @@ impl LayoutEngine {
             }
         }
 
-        let bottom_height = if has_bottom { config.bottom_bar_height } else { 0 };
+        // An input panel (needs_input action button) needs more rows than a
+        // plain button bar: conversation record + input + status. Detect it
+        // from the tree, pick the config-driven height (zero hardcoding).
+        let has_input_panel = nodes.iter().any(|n| {
+            n.node_type == NodeType::ActionButton
+                && n.content.get("needs_input").and_then(|v| v.as_bool()).unwrap_or(false)
+        });
+        let bottom_height = if has_bottom {
+            if has_input_panel { config.input_bar_height } else { config.bottom_bar_height }
+        } else {
+            0
+        };
         let remaining_height = height.saturating_sub(bottom_height);
 
         let mut slots = Vec::new();
@@ -324,5 +357,95 @@ impl LayoutEngine {
 impl Default for LayoutEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cellrix_protocol::{SemanticSnapshot, SemanticNode, NodeType};
+
+    fn snap(nodes: Vec<SemanticNode>) -> SemanticSnapshot {
+        let mut s = SemanticSnapshot::new(1, "ok".into());
+        s.semantic_tree = nodes;
+        s
+    }
+
+    fn node(id: &str, ty: NodeType, needs_input: bool) -> SemanticNode {
+        SemanticNode {
+            id: id.into(),
+            node_type: ty,
+            label: id.into(),
+            content: if needs_input {
+                serde_json::json!({ "needs_input": true, "action_id": "send_message" })
+            } else {
+                serde_json::json!({})
+            },
+            slot_binding: None,
+            focused: false,
+        }
+    }
+
+    #[test]
+    fn needs_input_action_button_gets_taller_bottom_slot() {
+        let snapshot = snap(vec![
+            node("tree", NodeType::StateTree, false),
+            node("msg", NodeType::ActionButton, true),
+        ]);
+        let mut engine = LayoutEngine::new();
+        let out = engine
+            .compute(&LayoutRequest {
+                snapshot,
+                manifest: None,
+                terminal_width: 100,
+                terminal_height: 30,
+                zen_focus_node_id: None,
+                active_overrides: Default::default(),
+                config: LayoutConfig::default(),
+            })
+            .unwrap();
+        let bottom = out
+            .slot_nodes
+            .iter()
+            .find(|(id, _)| id.as_str() == "bottom")
+            .map(|(_, v)| v)
+            .unwrap();
+        assert!(bottom.contains(&"msg".to_string()));
+        // bottom slot must be the input_bar_height (taller than the button bar)
+        let rect = out
+            .node_rects
+            .iter()
+            .find(|(id, _)| id.as_str() == "msg")
+            .map(|(_, r)| r)
+            .unwrap();
+        assert_eq!(rect.height, LayoutConfig::default().input_bar_height);
+        assert!(rect.height > LayoutConfig::default().bottom_bar_height);
+    }
+
+    #[test]
+    fn plain_action_button_keeps_short_bottom_slot() {
+        let snapshot = snap(vec![
+            node("tree", NodeType::StateTree, false),
+            node("act", NodeType::ActionButton, false),
+        ]);
+        let mut engine = LayoutEngine::new();
+        let out = engine
+            .compute(&LayoutRequest {
+                snapshot,
+                manifest: None,
+                terminal_width: 100,
+                terminal_height: 30,
+                zen_focus_node_id: None,
+                active_overrides: Default::default(),
+                config: LayoutConfig::default(),
+            })
+            .unwrap();
+        let rect = out
+            .node_rects
+            .iter()
+            .find(|(id, _)| id.as_str() == "act")
+            .map(|(_, r)| r)
+            .unwrap();
+        assert_eq!(rect.height, LayoutConfig::default().bottom_bar_height);
     }
 }

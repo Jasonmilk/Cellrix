@@ -275,21 +275,21 @@ impl App {
             terminal.draw(|f| {
                 let size = f.size();
                 
-                // Fixed 3-row chat box (title / input line / status line):
-                // always visible, so the driver can see where to type and
-                // whether the last send succeeded.
+                // The whole screen belongs to the semantic tree (nodes in
+                // their layout slots) plus the bottom status bar. The chat
+                // input is NOT a sidecar: it is the needs_input action
+                // button rendered by the input-box widget inside its own
+                // grid slot (see renderer.rs / widgets/input_box.rs).
                 let chunks = ratatui::layout::Layout::default()
                     .direction(ratatui::layout::Direction::Vertical)
                     .constraints([
                         ratatui::layout::Constraint::Min(0),
-                        ratatui::layout::Constraint::Length(9),
                         ratatui::layout::Constraint::Length(1),
                     ].as_ref())
                     .split(size);
 
                 let main_area = chunks[0];
-                let input_area = chunks[1];
-                let status_area = chunks[2];
+                let status_area = chunks[1];
 
                 // Engram view: the audit imprint panel owns the whole main
                 // area (its own grid by proportion); the snapshot-driven
@@ -306,11 +306,18 @@ impl App {
                         None
                     };
 
+                    let chat_state = crate::widgets::ChatUiState {
+                        history: &self.state.chat_history,
+                        buffer: &self.state.input_buffer,
+                        last_response: self.state.last_response.as_deref(),
+                        input_active: self.state.chat_focused,
+                    };
                     match self.renderer.render(
                         f, snap, None, (main_area.width, main_area.height), &self.state.focus_manager,
                         self.state.active_slot_nodes.clone(), zen_node_id.as_deref(),
                         self.state.cockpit.as_ref(),
                         self.state.mouse_capture,
+                        Some(&chat_state),
                     ) {
                         Ok(layout_output) => {
                             if self.state.slot_nodes.is_empty() {
@@ -354,82 +361,6 @@ impl App {
                 let status_para = ratatui::widgets::Paragraph::new(ratatui::text::Line::from(status_spans));
                 f.render_widget(status_para, status_area);
 
-                // Chat panel: the same conversation semantics as the WebUI
-                // (who + timestamp + text), plus the input line and the
-                // last-send status. The title derives from the focused
-                // needs_input action button label — the tree declares it.
-                let focused_label = self.state.focus_manager.current_focus().and_then(|id| {
-                    self.state.snapshot.as_ref().and_then(|snap| {
-                        snap.semantic_tree
-                            .iter()
-                            .find(|n| n.id == id)
-                            .map(|n| n.label.clone())
-                    })
-                });
-                let title = if self.state.chat_focused {
-                    format!(
-                        " [ {} — Enter 发送 · Esc 退出 ] ",
-                        focused_label.unwrap_or_else(|| "对话 Chat".to_string())
-                    )
-                } else {
-                    " [ 对话 Chat — 输入消息 ] ".to_string()
-                };
-                let title_style = if self.state.chat_focused {
-                    ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(82, 196, 26))
-                } else {
-                    ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(113, 113, 122))
-                };
-                let input_text = if self.state.chat_focused {
-                    format!("> {}{}", self.state.input_buffer, "▌")
-                } else {
-                    "> （按 Enter 开始输入）".to_string()
-                };
-                let status_text = match &self.state.last_response {
-                    Some(r) if r.starts_with("✗") => r.clone(),
-                    Some(r) => format!("Helix: {r}"),
-                    None => "（还没有对话，发第一句吧）".to_string(),
-                };
-                let status_style = match &self.state.last_response {
-                    Some(r) if r.starts_with("✗") => {
-                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(224, 108, 117))
-                    }
-                    _ => ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(139, 200, 234)),
-                };
-                let mut chat_lines: Vec<ratatui::text::Line> = Vec::new();
-                // Conversation record (isomorphic with the WebUI message
-                // flow): newest N entries, each who + HH:MM + text.
-                let tail: Vec<_> = self.state.chat_history.iter().rev().take(5).collect();
-                for entry in tail.iter().rev() {
-                    let who = match entry.who {
-                        super::app::state::ChatWho::Driver => "你",
-                        super::app::state::ChatWho::Helix => "Helix",
-                    };
-                    let who_style = match entry.who {
-                        super::app::state::ChatWho::Driver => {
-                            ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(139, 200, 234))
-                        }
-                        super::app::state::ChatWho::Helix => {
-                            ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(158, 172, 234))
-                        }
-                    };
-                    chat_lines.push(ratatui::text::Line::from(vec![
-                        ratatui::text::Span::styled(format!("{who} "), who_style),
-                        ratatui::text::Span::styled(
-                            entry.ts.clone(),
-                            ratatui::style::Style::default()
-                                .fg(ratatui::style::Color::Rgb(113, 113, 122)),
-                        ),
-                        ratatui::text::Span::raw("  "),
-                        ratatui::text::Span::raw(entry.text.clone()),
-                    ]));
-                }
-                chat_lines.push(ratatui::text::Line::from(ratatui::text::Span::raw(input_text)));
-                chat_lines.push(ratatui::text::Line::from(ratatui::text::Span::styled(status_text, status_style)));
-                let chat_box = ratatui::widgets::Block::default()
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(91, 95, 199)));
-                let chat_para = ratatui::widgets::Paragraph::new(chat_lines).block(chat_box);
-                f.render_widget(chat_para, input_area);
             })?;
         }
         

@@ -47,6 +47,10 @@ pub struct AppState {
     pub last_heartbeat: Instant,
     pub slot_nodes: HashMap<String, Vec<String>>,
     pub active_slot_nodes: HashMap<String, String>,
+    /// Slots the driver explicitly switched with Tab. Their cached active
+    /// node is kept; untouched slots follow the layout-engine default
+    /// (e.g. the needs_input input panel) on every frame.
+    pub manual_slot_overrides: std::collections::HashSet<String>,
     pub is_zen_mode: bool,
     pub mouse_capture: bool,
     pub active_agents: Vec<String>,
@@ -89,6 +93,7 @@ impl AppState {
             last_heartbeat: Instant::now(),
             slot_nodes: HashMap::new(),
             active_slot_nodes: HashMap::new(),
+            manual_slot_overrides: std::collections::HashSet::new(),
             is_zen_mode: false,
             mouse_capture: true,
             active_agents,

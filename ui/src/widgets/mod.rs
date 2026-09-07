@@ -7,6 +7,7 @@ use crate::FocusManager;
 mod state_tree;
 mod text_panel;
 mod action_button;
+mod input_box;
 mod progress_bar;
 mod code_diff;
 mod metrics;
@@ -40,6 +41,7 @@ pub use helix_mind_widget::{
 pub use anaphase_widget::{
     CognitivePhaseIndicator, TaskDagWidget, HITLWidget, LifecycleWidget, AnaphaseSnapshotWidget,
 };
+pub use input_box::InputBoxWidget;
 pub use cockpit::CockpitWidget;
 pub use tentacle_widget::{
     ToolExecutionWidget, PluginAuditWidget, ToolCallChainWidget, TentacleSnapshotWidget,
@@ -47,6 +49,17 @@ pub use tentacle_widget::{
 
 /// Allow dead code here as these context fields are reserved for 
 /// downstream widget rendering modules in the UI lifecycle.
+/// Dynamic state of the input panel: the conversation record, the typed
+/// buffer, the last-send status and whether input is active. The input box
+/// widget renders exactly this — the UI derives it from AppState, the
+/// widget never touches AppState directly.
+pub struct ChatUiState<'a> {
+    pub history: &'a [crate::app::state::ChatEntry],
+    pub buffer: &'a str,
+    pub last_response: Option<&'a str>,
+    pub input_active: bool,
+}
+
 #[allow(dead_code)]
 pub struct WidgetContext<'a> {
     pub theme: &'a Theme,
@@ -54,6 +67,9 @@ pub struct WidgetContext<'a> {
     pub layout: &'a LayoutOutput,
     pub is_zen: bool,
     pub focus_manager: &'a FocusManager,
+    /// Present when the tree declares a needs_input action button; the
+    /// renderer passes it only when such a node is active.
+    pub chat: Option<&'a ChatUiState<'a>>,
 }
 
 /// Allow dead code here as this factory function is a public API 
@@ -63,7 +79,22 @@ pub fn create_widget<'a>(node: &'a SemanticNode, ctx: &'a WidgetContext) -> Box<
     match node.node_type {
         NodeType::StateTree => Box::new(StateTreeWidget::new(node, ctx)),
         NodeType::TextPanel => Box::new(TextPanelWidget::new(node, ctx)),
-        NodeType::ActionButton => Box::new(ActionButtonWidget::new(node, ctx)),
+        NodeType::ActionButton => {
+            let needs_input = node
+                .content
+                .get("needs_input")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if needs_input {
+                if let Some(chat) = ctx.chat {
+                    Box::new(InputBoxWidget::new(node, ctx, chat))
+                } else {
+                    Box::new(ActionButtonWidget::new(node, ctx))
+                }
+            } else {
+                Box::new(ActionButtonWidget::new(node, ctx))
+            }
+        }
         NodeType::ProgressBar => Box::new(ProgressBarWidget::new(node, ctx)),
         NodeType::CodeDiff => Box::new(CodeDiffWidget::new(node, ctx)),
         NodeType::Metrics => Box::new(MetricsWidget::new(node, ctx)),

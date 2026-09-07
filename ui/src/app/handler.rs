@@ -470,7 +470,10 @@ impl InputHandler {
         };
 
         let new_active = nodes[new_idx].clone();
-        state.active_slot_nodes.insert(slot_id, new_active.clone());
+        state.active_slot_nodes.insert(slot_id.clone(), new_active.clone());
+        // The driver explicitly chose this slot's node: keep it until the
+        // driver switches again (untouched slots follow the layout default).
+        state.manual_slot_overrides.insert(slot_id);
 
         if let Some(snap) = &state.snapshot {
             let focusable_ids: Vec<String> = snap
