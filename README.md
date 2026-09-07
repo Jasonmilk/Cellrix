@@ -277,14 +277,16 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 JSON（同一契约两种传输）。
 
 **TUI 终端**（`up` 选 2）：
-- `Tab` 移动焦点，`Enter` 激活聚焦项；
-- 对话框未聚焦时按 `Enter` 聚焦输入（标题变绿），直接打字；
-- 输入内容后再按 `Enter` 发送，`Esc` 退出输入框；
-- `Ctrl+T` 开关鼠标捕获，`q` 退出。
+- 启动后自动聚焦对话输入（语义树里 agent 声明的 send_message 按钮），
+  打开即可直接打字；
+- `Enter` 发送，`Esc` 退出输入框（草稿保留）；
+- `Tab` 移动焦点，`Ctrl+T` 开关鼠标捕获，`q` 退出；
+- 底部面板显示对话记录（谁 + HH:MM + 内容），与 WebUI 消息流同构。
 
-> 注意：TUI 自带一个独立 Anaphase 子进程（stdio），与 Web 面板的 daemon
-> 并存——两者对话数据源不同，显示自然有差异；看板（cockpit）都轮询同一
-> daemon 快照，故状态一致。
+**同构契约**（TUI ↔ WebUI）：同一数据源（Anaphase snapshot / Tuck audit /
+同一对话语义），同一视图结构（驾驶舱 / 印痕 / 对话），错误一律不进对话流
+（TUI 状态行红字 = WebUI 居中 toast）。差异仅限渲染介质（终端 vs 浏览器）：
+TUI 走 stdio 语义树，WebUI 走 HTTP + SSE——语义一致，传输不同。
 
 ### 6.8 界面选择（2026-09-07）
 
