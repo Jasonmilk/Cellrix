@@ -48,6 +48,7 @@ fn route(path: &str) -> Route {
         "api/trace" => Route::Trace,
         "api/sessions" => Route::Sessions,
         "api/events" => Route::Events,
+        "api/ecosystem" => Route::Ecosystem,
         "api/chat" => Route::Chat,
         _ => Route::NotFound,
     }
@@ -61,6 +62,7 @@ enum Route {
     Trace,
     Sessions,
     Events,
+    Ecosystem,
     Chat,
     NotFound,
 }
@@ -307,6 +309,60 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
                 }
             }
         }
+        Route::Ecosystem => {
+            // Ecosystem status board: probe every component's port; the two
+            // HTTP-capable services (anaphase, tuck) get an extra health
+            // probe for the fine-grained green/yellow split. Ports are each
+            // service's own protocol defaults (tentacle grpc-port 50051,
+            // mind 50052, anaphase cap_http 50061, tuck 60052) — not
+            // hardcoded guesses.
+            use std::net::{SocketAddr, TcpStream};
+            use std::time::Duration;
+            let tcp_up = |port: u16| -> bool {
+                TcpStream::connect_timeout(
+                    &SocketAddr::from(([127, 0, 0, 1], port)),
+                    Duration::from_millis(400),
+                )
+                .is_ok()
+            };
+            let http_state = |base: &str, path: &str, bearer: Option<&str>| -> &'static str {
+                match cellrix_web::probe(base, path, bearer) {
+                    Ok(()) => "ok",
+                    Err(_) => "starting",
+                }
+            };
+            let mut comps = vec![
+                format!(
+                    "{{\"name\":\"tentacle\",\"port\":50051,\"state\":{}}}",
+                    if tcp_up(50051) { "\"ok\"" } else { "\"off\"" }
+                ),
+                format!(
+                    "{{\"name\":\"mind\",\"port\":50052,\"state\":{}}}",
+                    if tcp_up(50052) { "\"ok\"" } else { "\"off\"" }
+                ),
+            ];
+            let a_state = if tcp_up(50061) {
+                http_state(&cfg.anaphase_endpoint, "/v1/health", cellrix_web::client_bearer().as_deref())
+            } else {
+                "off"
+            };
+            comps.push(format!("{{\"name\":\"anaphase\",\"port\":50061,\"state\":\"{a_state}\"}}"));
+            let t_state = if tcp_up(60052) {
+                // tuck_endpoint is optional in the panel config; fall back
+                // to the gateway's own protocol default (60052).
+                let base = cfg
+                    .tuck_endpoint
+                    .as_deref()
+                    .unwrap_or("http://127.0.0.1:60052");
+                http_state(base, "/v1/audit?limit=1", cfg.tuck_key.as_deref())
+            } else {
+                "off"
+            };
+            comps.push(format!("{{\"name\":\"tuck\",\"port\":60052,\"state\":\"{t_state}\"}}"));
+            comps.push("{\"name\":\"panel\",\"port\":0,\"state\":\"ok\"}".to_string());
+            let body = format!("{{\"components\":[{}]}}", comps.join(","));
+            respond(&mut stream, 200, "application/json", body.as_bytes())?;
+        }
         Route::Chat => {
             // Partner-mode dialogue: proxy the panel input box to Anaphase
             // /v1/chat (signed when bound). One single-period cycle per
@@ -500,6 +556,27 @@ fn index_html(cfg: &PanelConfig) -> String {
   .row .ok {{ color:var(--ok); }} .row .bad {{ color:var(--bad); }}
   .grp-head {{ padding:7px 12px; font-size:12px; cursor:pointer; background:rgba(158,172,234,.05); border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:baseline; user-select:none; }}
   .grp-head:hover {{ background:rgba(158,172,234,.10); }}
+  .ses-side {{ border-right:1px solid var(--line); padding-right:12px; max-height:480px; overflow-y:auto; }}
+  .ses-item {{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px; cursor:pointer; font-size:12px; }}
+  .ses-item:hover {{ border-color:var(--acc); }}
+  .ses-item.sel {{ border-color:var(--acc); background:rgba(158,172,234,.08); }}
+  .ses-item .t {{ color:var(--dim); font-size:11px; }}
+  .ses-item .p {{ margin-top:3px; color:var(--text); word-break:break-all; }}
+  .ses-stats {{ display:flex; gap:16px; padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px; flex-wrap:wrap; }}
+  .ses-stats span {{ color:var(--dim); }}
+  .ses-stats b {{ color:var(--text); font-weight:600; }}
+  .ev-row {{ padding:7px 12px; border-bottom:1px solid var(--line); font-size:12px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }}
+  .badge {{ font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; letter-spacing:.5px; }}
+  .badge.turn-start {{ background:rgba(154,154,164,.18); color:#c8c8d0; }}
+  .badge.user-message {{ background:rgba(158,172,234,.18); color:#9eacEA; }}
+  .badge.context-inject {{ background:rgba(197,167,232,.18); color:#c5a7e8; }}
+  .badge.assistant-attempt {{ background:rgba(78,201,160,.16); color:#4ec9a0; }}
+  .badge.tool-call {{ background:rgba(229,192,123,.18); color:#e5c07b; }}
+  .badge.tool-result {{ background:rgba(224,108,117,.16); color:#e06c75; }}
+  .badge.verdict-status {{ background:rgba(224,108,117,.22); color:#e06c75; }}
+  .badge.turn-end {{ background:rgba(154,154,164,.12); color:#9a9aa4; }}
+  .ev-row .body {{ color:var(--text); word-break:break-all; }}
+  .ev-row .ok {{ color:var(--ok); }} .ev-row .bad {{ color:var(--bad); }}
   .grp-head .arrow {{ color:var(--acc); width:12px; display:inline-block; }}
   .grp-head .tid {{ color:var(--acc); font-weight:600; }}
   .grp-body .row {{ padding-left:22px; }}
@@ -510,6 +587,13 @@ fn index_html(cfg: &PanelConfig) -> String {
   .detail pre {{ margin-top:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:11px; overflow-x:auto; max-height:260px; color:var(--text); white-space:pre-wrap; word-break:break-all; }}
   .dim {{ color:var(--dim); }}
   .empty {{ padding:14px 12px; font-size:12px; color:var(--dim); }}
+  .eco {{ display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--dim); padding:8px 0 4px; }}
+  .eco .c {{ display:inline-flex; align-items:center; gap:6px; }}
+  .eco .dot {{ width:9px; height:9px; border-radius:50%; display:inline-block; }}
+  .eco .dot.ok {{ background:var(--ok); box-shadow:0 0 6px rgba(78,201,160,.55); }}
+  .eco .dot.off {{ background:#444; }}
+  .eco .dot.starting {{ background:var(--warn); }}
+  .eco .dot.error {{ background:var(--bad); }}
   .foot {{ color:var(--dim); font-size:11px; margin-top:14px; }}
   @media (max-width:800px) {{ .engram-main {{ grid-template-columns:1fr; }} .timeline {{ max-height:300px; }} }}
 </style>
@@ -525,6 +609,7 @@ fn index_html(cfg: &PanelConfig) -> String {
     <span class="badge" id="state">…</span>
     <span class="badge" id="conn">…</span>
   </div>
+  <div class="eco" id="eco">生态点亮探测中…</div>
 
   <div id="view-cockpit">
     <div class="cards">
@@ -540,15 +625,10 @@ fn index_html(cfg: &PanelConfig) -> String {
 
   <div id="view-engram" style="display:none;">
     <div class="panel">
-      <div class="engram-overview">
-        <span class="k">链</span><span class="v" id="a-count">…</span>
-        <span class="k">queried_by</span><span class="v" id="a-by">…</span>
-        <span class="k" id="a-err" style="color:var(--bad);"></span>
-        <span class="engram-filter"><input id="a-filter" placeholder="过滤 trace_id" onkeydown="if(event.key==='Enter')applyFilter();if(event.key==='Escape')clearFilter();"><button class="btn" onclick="applyFilter()">过滤</button><button class="btn" onclick="clearFilter()">清</button></span>
-      </div>
-      <div class="engram-main">
-        <div class="timeline" id="a-timeline"><div class="empty">等待链数据…</div></div>
-        <div class="detail" id="a-detail"><div class="empty">选择一行查看完整印痕</div></div>
+      <div class="head">印痕 Engram — 经历时间线（会话 = 经历 · 一轮 = 一段认知周期 · 判据与行动同线）</div>
+      <div class="engram-main" style="grid-template-columns:280px 1fr;">
+        <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
+        <div id="s-main"><div class="empty">左侧选择一段经历，查看完整 turn 时间线</div></div>
       </div>
     </div>
   </div>
@@ -556,10 +636,15 @@ fn index_html(cfg: &PanelConfig) -> String {
   <div id="view-chat" style="display:none;">
     <div class="panel">
       <div class="head">对话（伙伴模式 · 单周期一轮 · 走 Tuck 网关审计）</div>
+      <div style="display:grid;grid-template-columns:240px 1fr;gap:12px;">
+        <div class="ses-side" id="chat-side"><div class="empty">经历列表加载中…</div></div>
+        <div>
       <div id="chat-msgs" class="chat-msgs"><div class="empty">说点什么吧——这是给 Helix 的一段新经历。</div></div>
       <div class="chat-input">
         <input id="chat-text" type="text" placeholder="输入消息，回车发送（Enter 发送 / Esc 清除）" autocomplete="off">
         <button class="btn" onclick="sendChat()">发送</button>
+      </div>
+        </div>
       </div>
     </div>
   </div>
@@ -785,140 +870,6 @@ fn index_html(cfg: &PanelConfig) -> String {
     return tb - ta;
   }}
 
-  function rowSummary(e) {{
-    var d = e.payload.data || {{}};
-    var action = d.action || '-';
-    var status = d.status != null ? ' [' + d.status + ']' : '';
-    return '#' + String(e.seq).padStart(4,'0') + ' ' + esc(e.payload.kind) + ' ' + esc(e.payload.trace_id) + ' ' + esc(action) + status;
-  }}
-
-  function renderAudit() {{
-    var box = document.getElementById('a-timeline');
-    var filtered = entries;
-    var f = document.getElementById('a-filter').value.trim();
-    if (f) {{ filtered = entries.filter(function(e){{ return (e.payload.trace_id||'').indexOf(f) >= 0; }}); }}
-    if (!entries.length) {{
-      box.innerHTML = '<div class="empty">' + (tuckConfigured ? '链为空（尚无推理调用）' : '未配置 Tuck —— 启动时加 --tuck-endpoint 与 --tuck-key') + '</div>';
-      return;
-    }}
-    if (!filtered.length) {{ box.innerHTML = '<div class="empty">无匹配条目</div>'; return; }}
-    box.innerHTML = '';
-    // Group by trace_id — one round = one group (request+response+retries
-    // of the same derived id), newest round first. Rows inside keep chain
-    // order (request -> response), so the timeline reads by *round*, not by
-    // scattered entry.
-    var groups = {{}};
-    filtered.forEach(function (e) {{
-      var k = e.payload.trace_id || ('#seq' + e.seq);
-      (groups[k] = groups[k] || []).push(e);
-    }});
-    var maxSeq = function (es) {{ return es[es.length-1].seq; }};
-    var gkeys = Object.keys(groups).sort(function (a, b) {{ return maxSeq(groups[b]) - maxSeq(groups[a]); }});
-    var firstOpen = true;
-    gkeys.forEach(function (k) {{
-      var es = groups[k];
-      var head = document.createElement('div'); head.className = 'grp-head';
-      var dur = durMs(es[0].ts, es[es.length-1].ts);
-      head.innerHTML = '<span class="arrow">▸</span> <span class="tid">' + esc(k) + '</span> <span class="dim">' + es.length + ' 条 · ' + esc(es[0].ts.slice(11,19)) + ' → ' + esc(es[es.length-1].ts.slice(11,19)) + (dur >= 0 ? ' · ' + dur + 'ms' : '') + '</span>';
-      var body = document.createElement('div'); body.className = 'grp-body';
-      body.style.display = firstOpen ? '' : 'none';
-      firstOpen = false;
-      head.onclick = function () {{
-        var hidden = body.style.display === 'none';
-        body.style.display = hidden ? '' : 'none';
-        head.querySelector('.arrow').textContent = hidden ? '▾' : '▸';
-      }};
-      box.appendChild(head); box.appendChild(body);
-      es.forEach(function (e) {{
-        var div = document.createElement('div');
-        div.className = 'row' + (selected === e.seq ? ' sel' : '');
-        div.innerHTML = rowSummary(e);
-        div.onclick = function () {{ selectEntry(e.seq); }};
-        body.appendChild(div);
-      }});
-    }});
-  }}
-
-  function renderDetail() {{
-    var box = document.getElementById('a-detail');
-    if (selected == null) {{ box.innerHTML = '<div class="empty">选择一行查看完整印痕</div>'; return; }}
-    var e = null;
-    for (var i = 0; i < entries.length; i++) {{ if (entries[i].seq === selected) {{ e = entries[i]; break; }} }}
-    if (!e) return;
-    var d = e.payload.data || {{}};
-    var caller = d.caller ? (d.caller.api_key_id || d.caller.sub || JSON.stringify(d.caller)) : '—';
-    var dest = d.destination || '—';
-    var status = d.status != null ? d.status : '—';
-    var verdicts = (d.verdicts || []).join(', ') || '—';
-    var html = '';
-    html += '<div class="line"><span class="key">seq</span><span class="val">' + e.seq + '</span></div>';
-    html += '<div class="line"><span class="key">ts</span><span class="val">' + esc(e.ts) + '</span></div>';
-    html += '<div class="line"><span class="key">kind</span><span class="val">' + esc(e.payload.kind) + '</span></div>';
-    html += '<div class="line"><span class="key">trace_id</span><span class="val">' + esc(e.payload.trace_id) + '</span></div>';
-    html += '<div class="line"><span class="key">caller</span><span class="val">' + esc(caller) + '</span></div>';
-    html += '<div class="line"><span class="key">destination</span><span class="val">' + esc(dest) + '</span></div>';
-    html += '<div class="line"><span class="key">status</span><span class="val">' + esc(status) + '</span></div>';
-    html += '<div class="line"><span class="key">verdicts</span><span class="val">' + esc(verdicts) + '</span></div>';
-    html += '<div class="line"><span class="key">prev_hash</span><span class="val">' + esc(e.prev_hash || '') + '</span></div>';
-    html += '<div class="line"><span class="key">hash</span><span class="val">' + esc(e.hash || '') + '</span></div>';
-    html += '<div class="line"><span class="key">payload</span></div><pre>' + esc(JSON.stringify(d, null, 2)) + '</pre>';
-    html += '<div class="line" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;"><span class="key">正文回放（Engram body）</span></div>';
-    html += '<div id="a-body"><div class="empty">读取正文…</div></div>';
-    box.innerHTML = html;
-    fetchBody(e.payload.trace_id);
-  }}
-
-  // Highlight redaction marks in replayed bodies: reveal *that* a credential
-  // was removed and where, never *what* it was (write-side redaction means
-  // the original never existed in the file — no diff possible, by design).
-  function hl(s) {{ return esc(s).replace(/\[REDACTED\]/g, '<span class="redact">[REDACTED]</span>'); }}
-
-  function fetchBody(traceId) {{
-    if (!traceId) {{
-      document.getElementById('a-body').innerHTML = '<div class="empty">无 trace_id（元数据条目）</div>';
-      return;
-    }}
-    fetch('/api/trace?trace_id=' + encodeURIComponent(traceId)).then(function (r) {{ return r.json(); }}).then(function (j) {{
-      var box = document.getElementById('a-body');
-      if (!box) return;
-      if (j.configured === false) {{ box.innerHTML = '<div class="empty">Anaphase 未开启 reasoning_trace_path（README Engram body trace 一节）</div>'; return; }}
-      if (j.error) {{ box.innerHTML = '<div class="empty">正文查询失败: ' + esc(j.error) + '</div>'; return; }}
-      var es = j.entries || [];
-      if (!es.length) {{ box.innerHTML = '<div class="empty">该轮无正文记录（如 Noop 模式 / 非推理调用）</div>'; return; }}
-      var html = '';
-      es.forEach(function (en) {{
-        html += '<div class="line"><span class="key">ts</span><span class="val">' + esc(en.ts) + '</span></div>';
-        html += '<div class="line"><span class="key">model</span><span class="val">' + esc(en.model) + '</span></div>';
-        html += '<div class="line"><span class="key">prompt</span></div><pre>' + hl(en.prompt) + '</pre>';
-        html += '<div class="line"><span class="key">response</span></div><pre>' + hl(en.response) + '</pre>';
-      }});
-      box.innerHTML = html;
-    }}).catch(function (e) {{
-      var box = document.getElementById('a-body');
-      if (box) box.innerHTML = '<div class="empty">正文拉取失败: ' + esc(e) + '</div>';
-    }});
-  }}
-
-  function selectEntry(seq) {{ selected = seq; renderAudit(); renderDetail(); }}
-  function applyFilter() {{ selected = null; renderAudit(); renderDetail(); }}
-  function clearFilter() {{ document.getElementById('a-filter').value = ''; selected = null; renderAudit(); renderDetail(); }}
-
-  function pollAudit() {{
-    fetch('/api/audit').then(function (r) {{ return r.json(); }}).then(function (j) {{
-      var by = document.getElementById('a-by');
-      var err = document.getElementById('a-err');
-      by.textContent = j.queried_by || '—';
-      if (j.configured === false) {{ err.textContent = '未配置 Tuck（--tuck-endpoint + --tuck-key）'; }}
-      else if (j.error) {{ err.textContent = 'Tuck 不可达: ' + j.error; }}
-      else {{ err.textContent = ''; }}
-      entries = j.entries || [];
-      document.getElementById('a-count').textContent = entries.length ? ('#' + entries[entries.length-1].seq + ' · ' + entries.length + ' 条') : '空';
-      renderAudit(); renderDetail();
-    }}).catch(function (e) {{
-      document.getElementById('a-err').textContent = 'audit 拉取失败: ' + e;
-    }});
-  }}
-
   function tick() {{
     fetch('/api/snapshot').then(function (r) {{
       if (!r.ok) {{ throw new Error('proxy ' + r.status); }}
@@ -970,9 +921,26 @@ fn index_html(cfg: &PanelConfig) -> String {
     }});
   }}
 
-  tick(); pollAudit();
+  // Ecosystem status board: one dot per component (grey=off, yellow=up
+  // but unhealthy, green=healthy). Polled with the same cadence as tick.
+  function loadEcosystem() {{
+    fetch('/api/ecosystem').then(function (r) {{ return r.json(); }}).then(function (j) {{
+      var box = document.getElementById('eco');
+      if (!box) return;
+      var html = '';
+      (j.components || []).forEach(function (c) {{
+        html += '<span class="c"><span class="dot ' + esc(c.state) + '"></span>' + esc(c.name) + '</span>';
+      }});
+      box.innerHTML = html;
+    }}).catch(function () {{
+      var box = document.getElementById('eco');
+      if (box) box.textContent = '生态探测不可用（proxy 未就绪）';
+    }});
+  }}
+
+  tick(); loadEcosystem();
   setInterval(tick, refresh * 1000);
-  setInterval(pollAudit, refresh * 1000);
+  setInterval(loadEcosystem, refresh * 1000);
   // Inline `onclick` attributes resolve against the global scope — expose
   // the interactive entry points explicitly (they live in this IIFE).
   window.showView = showView;
@@ -1075,8 +1043,14 @@ mod tests {
         assert!(html.contains("驾驶舱 Cockpit"));
         assert!(html.contains("印痕 Engram"));
         assert!(html.contains("/api/audit"));
-        assert!(html.contains("trace_id"));
-        assert!(html.contains("prev_hash"));
         assert!(html.contains("Ledger 白盒"));
+        // Engram v2: experience sidebar + turn timeline + ecosystem board.
+        assert!(html.contains("id=\"s-side\""));
+        assert!(html.contains("id=\"s-main\""));
+        assert!(html.contains("id=\"chat-side\""));
+        assert!(html.contains("EV_BADGE"));
+        assert!(html.contains("loadEcosystem"));
+        assert!(html.contains("id=\"eco\""));
+        assert!(html.contains("/api/ecosystem"));
     }
 }

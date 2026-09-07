@@ -344,6 +344,208 @@ fn web_bin() -> String {
     dir.join("cellrix-web").to_string_lossy().into_owned()
 }
 
+/// What a component's health check is: raw TCP (grpc/services without a
+/// probe path) or an HTTP probe with optional bearer.
+enum PollKind {
+    Tcp(u16),
+    Http { base: String, path: String, bearer: Option<String> },
+}
+
+/// Poll a raw TCP port until it accepts connections (services that expose
+/// no HTTP probe — tentacle's gRPC port, mind's port).
+fn tcp_poll_until(name: &str, port: u16, wait_secs: u64) -> Result<(), String> {
+    use std::net::{SocketAddr, TcpStream};
+    let deadline = Instant::now() + Duration::from_secs(wait_secs);
+    loop {
+        let up = TcpStream::connect_timeout(
+            &SocketAddr::from(([127, 0, 0, 1], port)),
+            Duration::from_millis(400),
+        )
+        .is_ok();
+        if up {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err(format!("{name} not up on :{port} within {wait_secs}s"));
+        }
+        std::thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
+    }
+}
+
+/// Can the port be connected right now?
+fn tcp_connected(port: u16) -> bool {
+    use std::net::{SocketAddr, TcpStream};
+    TcpStream::connect_timeout(
+        &SocketAddr::from(([127, 0, 0, 1], port)),
+        Duration::from_millis(200),
+    )
+    .is_ok()
+}
+
+/// Stop whatever holds a protocol port, then wait until it is actually
+/// released. A graceful SIGTERM is tried first; services that install a
+/// shutdown handler may linger, so SIGKILL escalates after 6s and the
+/// release is confirmed (a killed process can take a moment to free the
+/// port).
+fn stop_port(name: &str, port: u16) {
+    let kill_cmd = |flag: &str| {
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!(
+                "pids=$(lsof -ti :{port} 2>/dev/null); [ -n \"$pids\" ] && kill {flag} $pids 2>/dev/null; true"
+            ))
+            .status();
+    };
+    kill_cmd("");
+    let deadline = Instant::now() + Duration::from_secs(6);
+    while tcp_connected(port) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
+    }
+    if tcp_connected(port) {
+        kill_cmd("-9");
+        let d2 = Instant::now() + Duration::from_secs(4);
+        while tcp_connected(port) && Instant::now() < d2 {
+            std::thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
+        }
+    }
+    if tcp_connected(port) {
+        println!("  {name} :{port} ⚠️ 无法停止（仍被占用）");
+    } else {
+        println!("  {name} :{port} 已停止");
+    }
+}
+
+/// Derived start commands. Paths come from the fixed workspace layout
+/// (ECOSYSTEM.md §0); flags are each service's own protocol defaults
+/// (tentacle --grpc-port 50051, mind run, tuck --config) — never guesses.
+fn tentacle_cmd() -> String {
+    let ws = workspace_root();
+    format!(
+        "{} --transport grpc --grpc-port 50051 --plugins-dir {}",
+        ws.join("helix-tentacle/target/debug/tentacle").to_string_lossy(),
+        ws.join("helix-tentacle/fixtures").to_string_lossy()
+    )
+}
+
+fn mind_cmd() -> String {
+    let ws = workspace_root();
+    format!(
+        "{} --config {} run",
+        ws.join("Helix-Mind/target/debug/helix-mind-cli").to_string_lossy(),
+        ws.join(".helix/mind/config.toml").to_string_lossy()
+    )
+}
+
+fn tuck_default_cmd() -> String {
+    let ws = workspace_root();
+    format!(
+        "{} --config {}",
+        ws.join("Tuck/target/debug/tuck").to_string_lossy(),
+        ws.join("Tuck/config.toml").to_string_lossy()
+    )
+}
+
+/// `up --restart`: one command, zero questions. Stop in reverse dependency
+/// order, start in dependency order, health-check each, then open the
+/// panel. Reversible and observable at every step.
+fn restart_all(
+    cfg: &UpConfig,
+    wait_secs: u64,
+    port: u16,
+    anaphase_endpoint: &str,
+    tuck_endpoint: &str,
+    tuck_key: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!();
+    println!("  ─────────────────────────────────────");
+    println!("  Helix 生态一键重启（up --restart）");
+    println!("  停止 → 按依赖序启动 → 健康检查 → 打开面板");
+    println!("  ─────────────────────────────────────");
+    println!();
+
+    // 1. Stop, reverse dependency order: face → gateway → orchestrator →
+    //    memory → executor.
+    for (name, p) in [
+        ("panel", 8080u16),
+        ("tuck", 60052),
+        ("anaphase", 50061),
+        ("mind", 50052),
+        ("tentacle", 50051),
+    ] {
+        stop_port(name, p);
+    }
+    println!();
+
+    // 2. Start, dependency order. Saved commands win; otherwise derive.
+    let anaphase_cmd = cfg
+        .anaphase_cmd
+        .clone()
+        .unwrap_or_else(|| format!("{} --config {}", anaphase_bin_path(), anaphase_config_path()));
+    let tuck_cmd = cfg.tuck_cmd.clone().unwrap_or_else(tuck_default_cmd);
+
+    let components: [(&str, String, PollKind); 4] = [
+        ("tentacle", tentacle_cmd(), PollKind::Tcp(50051)),
+        ("mind", mind_cmd(), PollKind::Tcp(50052)),
+        (
+            "anaphase",
+            anaphase_cmd,
+            PollKind::Http {
+                base: anaphase_endpoint.to_string(),
+                path: "/v1/health".to_string(),
+                bearer: None,
+            },
+        ),
+        (
+            "tuck",
+            tuck_cmd,
+            PollKind::Http {
+                base: tuck_endpoint.to_string(),
+                path: "/v1/audit?limit=1".to_string(),
+                bearer: Some(tuck_key.to_string()),
+            },
+        ),
+    ];
+    for (name, cmd, kind) in components {
+        println!("  启动 {name}: {cmd}");
+        spawn_detached(&cmd)?;
+        let res = match &kind {
+            PollKind::Tcp(p) => tcp_poll_until(name, *p, wait_secs),
+            PollKind::Http { base, path, bearer } => {
+                poll_until(name, base, path, bearer.as_deref(), wait_secs)
+            }
+        };
+        match res {
+            Ok(()) => println!("  {name}: ✅ 已就绪"),
+            Err(e) => {
+                println!("  {name}: ⚠️ {e}");
+                println!("  （继续启动其余组件——面板会如实显示未点亮）");
+            }
+        }
+    }
+
+    // 3. Panel last — spawn with the same wiring as normal `up`.
+    let web = web_bin();
+    let mut cmd = Command::new(&web);
+    cmd.arg("--anaphase-endpoint")
+        .arg(anaphase_endpoint)
+        .arg("--port")
+        .arg(port.to_string());
+    cmd.arg("--tuck-endpoint").arg(tuck_endpoint);
+    cmd.arg("--tuck-key").arg(tuck_key);
+    if !cfg.no_open {
+        cmd.arg("--open");
+    }
+    let mut child = cmd.spawn().map_err(|e| format!("launch web: {e}"))?;
+    println!();
+    println!("  面板已启动：http://127.0.0.1:{port}/（生态点亮条会如实显示各组件状态）");
+    println!("  按 Ctrl+C 停止面板。之后再次运行 up，一路回车即可。");
+    let status = child.wait()?;
+    if !status.success() {
+        eprintln!("  up: 面板异常退出: {status}");
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let cfg = derive_config(&args);
@@ -359,6 +561,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tuck_key = cfg.tuck_key.clone().unwrap_or_else(|| TUCK_KEY_DEFAULT.to_string());
     let wait_secs = cfg.wait_secs.unwrap_or(WAIT_DEFAULT_SECS);
     let port = cfg.port.unwrap_or(WEB_PORT_DEFAULT);
+
+    // `--restart` short-circuits everything else: no questions, no binding
+    // prompts — full ecosystem cycle in dependency order.
+    if args.iter().any(|a| a == "--restart" || a == "-r") {
+        return restart_all(
+            &cfg,
+            wait_secs,
+            port,
+            &anaphase_endpoint,
+            &tuck_endpoint,
+            &tuck_key,
+        );
+    }
 
     println!();
     println!("  ─────────────────────────────────────────────");

@@ -289,6 +289,32 @@ JSON（同一契约两种传输）。
 （TUI 状态行红字 = WebUI 居中 toast）。差异仅限渲染介质（终端 vs 浏览器）：
 TUI 走 stdio 语义树，WebUI 走 HTTP + SSE——语义一致，传输不同。
 
+### 6.10 一键重启 + 生态点亮（2026-09-07）
+
+**`up --restart`**：一条命令重启全部生态，零提问。停止按逆依赖序
+（面板 → Tuck → Anaphase → Mind → Tentacle），启动按依赖序
+（Tentacle → Mind → Anaphase → Tuck → 面板），每步健康检查后如实报告。
+各组件启动命令从固定工作区布局 + 各服务协议默认值推导；`~/.cellrix/up.toml`
+里保存的自定义命令优先（anaphase_cmd / tuck_cmd）。
+
+```bash
+cd Cellrix
+cargo run --bin up -- --restart     # 或 target/debug/up --restart
+```
+
+**生态点亮条**（Web 面板顶部）：tentacle :50051 / mind :50052 / anaphase
+:50061 / tuck :60052 / panel —— 每组件一个状态点：
+`绿 = 健康` · `黄 = 端口通但健康探测未过` · `灰 = 未运行` · `红 = 错误`。
+数据源 `/api/ecosystem`（TCP 探测 + HTTP health 双检，协议默认端口，
+无硬编码）。
+
+**印痕 Engram v2（经历时间线）**：左侧经历列表（每会话一条：时间 · 事件数 ·
+用户输入预览），点击任意经历加载完整 turn 时间线——徽标按生态词汇
+（START / USER / CONTEXT / ATTEMPT / TOOL / RESULT / VERDICT / END）+
+统计条（Duration · Events · Tools · Verdict）。会话 = 经历（ADR-0026），
+判据与行动同线——这是 Helix 相对 DSH 轨迹多出的一层（DSH 没有 verdict）。
+对话视图同一经历列表（一份数据两个入口）。
+
 ### 6.8 界面选择（2026-09-07）
 
 `up` 起界面时问一次：`[1] Web 面板（回车） [2] TUI 终端`。
