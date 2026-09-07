@@ -655,6 +655,15 @@ fn index_html(cfg: &PanelConfig) -> String {
     }});
   }}
 
+  // Round duration from the chain's own timestamps (RFC3339 → ms).
+  // A single-entry round reports 0 — the chain cannot know when the
+  // reasoning *started*, only when Tuck saw it (honest, no guessing).
+  function durMs(a, b) {{
+    var ta = Date.parse(a), tb = Date.parse(b);
+    if (isNaN(ta) || isNaN(tb)) return -1;
+    return tb - ta;
+  }}
+
   function rowSummary(e) {{
     var d = e.payload.data || {{}};
     var action = d.action || '-';
@@ -684,11 +693,15 @@ fn index_html(cfg: &PanelConfig) -> String {
     }});
     var maxSeq = function (es) {{ return es[es.length-1].seq; }};
     var gkeys = Object.keys(groups).sort(function (a, b) {{ return maxSeq(groups[b]) - maxSeq(groups[a]); }});
+    var firstOpen = true;
     gkeys.forEach(function (k) {{
       var es = groups[k];
       var head = document.createElement('div'); head.className = 'grp-head';
-      head.innerHTML = '<span class="arrow">▾</span> <span class="tid">' + esc(k) + '</span> <span class="dim">' + es.length + ' 条 · ' + esc(es[0].ts.slice(11,19)) + ' → ' + esc(es[es.length-1].ts.slice(11,19)) + '</span>';
+      var dur = durMs(es[0].ts, es[es.length-1].ts);
+      head.innerHTML = '<span class="arrow">▸</span> <span class="tid">' + esc(k) + '</span> <span class="dim">' + es.length + ' 条 · ' + esc(es[0].ts.slice(11,19)) + ' → ' + esc(es[es.length-1].ts.slice(11,19)) + (dur >= 0 ? ' · ' + dur + 'ms' : '') + '</span>';
       var body = document.createElement('div'); body.className = 'grp-body';
+      body.style.display = firstOpen ? '' : 'none';
+      firstOpen = false;
       head.onclick = function () {{
         var hidden = body.style.display === 'none';
         body.style.display = hidden ? '' : 'none';

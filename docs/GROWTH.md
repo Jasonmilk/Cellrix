@@ -524,3 +524,18 @@ WebUI 偶发 EAGAIN 的真根因是**旧进程残留**（18:20 面板 + 18:32 an
 
 ### 状态
 🧬 已完成
+
+## [2026-09-07] Engram 全链路 join 打通 + UI 增强
+
+### 变更性质
+- **trace_id 对齐**：Anaphase 推理经 `x-tuck-trace` 头传 derive_job_id（run-xxx）→ Tuck 审计链记录同一 id（缺头回退 live#N）→ 审计链、正文 trace、ledger 三者共用一键
+- **正文 trace 开启**：Anaphase config `reasoning_trace_path`（.helix/traces/reasoning.jsonl，redacted + 4096 截断）——Engram 详情"正文回放"展示 prompt/response/model/ts
+- **UI 增强**：分组头加组内耗时（RFC3339 差）；最新一组默认展开（DSH 轨迹式）；其余组折叠
+- 物理实测：`run-8e2615...` 审计 + 正文回放（configured:True，prompt 2071 chars / response 完整）
+
+### 验收
+- curl 全链：/api/chat → 审计 trace_id=run-xxx → /api/trace?trace_id=run-xxx 返回正文 ✓
+- Cellrix cargo test 全绿；cellrix-web 重启后 self-check ok
+
+### 待办
+- 状态流转（perception→reasoning→execution→reflection）入 Engram 时间线（现链只含 request/response 网关条目）

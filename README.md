@@ -35,7 +35,8 @@
 > trace filter, virtual list, live hash-link verification. TUI/Web share
 > one state model (isomorphic display; renderers are thin backends).
 > **Next**: DSH-style unified Web UI (chat + trajectory + white-box),
-> TUI/Web parity.
+> TUI/Web parity.。
+> **全链路正文回放**：Anaphase 设 `reasoning_trace_path`（本地 config）后，Engram 详情可回放每轮 prompt/response（写前脱敏 + 截断）；推理经 `x-tuck-trace` 头把 `run-xxx` id 传给 Tuck 审计链，链与正文共用一键 join。
 
 **Test Coverage**: 327 tests (实测 `cargo test --workspace --all-features`, 2026-09-07, 0 failed)
 - `cellrix-protocol`: 137 tests (incl. `engram` real-chain shapes)
