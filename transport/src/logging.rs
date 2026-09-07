@@ -13,8 +13,12 @@
 //! - `LogError`: 日志错误
 
 use crate::config::LogConfig;
+// `LogFormat` is used by `init_logging` (tracing feature, non-test code),
+// so it must be imported under the same gate — NOT `#[cfg(test)]`.
+#[cfg(feature = "tracing")]
+use crate::config::LogFormat;
 #[cfg(test)]
-use crate::config::{LogFormat, LogLevel};
+use crate::config::LogLevel;
 use std::sync::Once;
 
 static LOG_INIT: Once = Once::new();
@@ -158,7 +162,9 @@ fn init_logging_internal(config: &LogConfig) -> Result<(), LogError> {
             .open(file_path)
             .map_err(|e| LogError::FileCreateError(e.to_string()))?;
 
-        let file_layer = fmt::layer()
+        // tracing-subscriber 0.3 requires the subscriber type param to be
+        // named explicitly when the layer is not immediately consumed.
+        let file_layer = fmt::layer::<tracing_subscriber::registry::Registry>()
             .with_target(config.include_module_path)
             .with_file(config.include_module_path)
             .with_line_number(config.include_module_path)
