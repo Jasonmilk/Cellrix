@@ -98,6 +98,14 @@ impl InputHandler {
                 KeyCode::Enter => {
                     let action_id = state.input_action.clone().unwrap_or_default();
                     let message = std::mem::take(&mut state.input_buffer);
+                    // Empty draft guard: Enter on an empty box must not fire a
+                    // blank request (keeps the box focused, honest hint).
+                    if message.trim().is_empty() {
+                        state.last_response = Some("（先输入内容，再按 Enter 发送）".to_string());
+                        state.input_action = Some(action_id);
+                        state.chat_focused = true;
+                        return Ok(None);
+                    }
                     let req = ActionRequest {
                         action_id: action_id.clone(),
                         parameters: serde_json::json!({ "message": message }),

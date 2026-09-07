@@ -423,3 +423,19 @@ README（bind 节）｜ GROWTH｜ ECOSYSTEM v1.68（Anaphase 225 / Cellrix 336�
 
 ### 状态
 🧬 已完成
+
+
+## 记录 43：WebUI 无法点击根因修复（IIFE 闭包）+ TUI 空消息防护（2026-09-07）
+
+### 触发条件
+用户实测：WebUI 与 TUI 均"无法操作，只能 Tab，回车/鼠标无响应"。
+
+### 根因（CDP 实证）
+- **Web**：页面 script 是 IIFE（`(function(){...})()`），`showView`/`sendChat`/`applyFilter`/`clearFilter` 全部在闭包内，**不挂 window**。内联 `onclick="showView(...)"` 在全局作用域解析 → `ReferenceError: showView is not defined` → 点击无声失败。此前诊断只 grep 了源码文本（"函数已定义"），未查运行时作用域——CDP `Runtime.evaluate` 打出 `undefined|undefined|undefined` 才实证。
+- **修复**：IIFE 末尾显式 `window.showView = showView; ...` 导出 4 个交互入口。
+- **验证**：CDP `Input.dispatchMouseEvent` 硬件管道真实点击 v-chat → `chatVisible: true` 视图切换；Tab 聚焦 BUTTON；Enter 正常。
+- **TUI**：键盘流正常（Tab 有响应）；Enter 语义 = 聚焦输入框（非直接发送），空消息会发空请求——加空消息防护（保持聚焦 + 提示）。
+- **显示差异**：TUI stdio 自带独立 Anaphase 子进程（对话数据源独立），cockpit 看板与 Web 同轮询 daemon 50061——架构事实，非 bug。
+
+### 状态
+🧬 已完成

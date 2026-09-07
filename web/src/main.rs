@@ -724,6 +724,12 @@ fn index_html(cfg: &PanelConfig) -> String {
   tick(); pollAudit();
   setInterval(tick, refresh * 1000);
   setInterval(pollAudit, refresh * 1000);
+  // Inline `onclick` attributes resolve against the global scope — expose
+  // the interactive entry points explicitly (they live in this IIFE).
+  window.showView = showView;
+  window.sendChat = sendChat;
+  window.applyFilter = applyFilter;
+  window.clearFilter = clearFilter;
 }})();
 </script>
 </body>
