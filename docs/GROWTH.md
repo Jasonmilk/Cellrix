@@ -49,6 +49,24 @@
 - transport LogFormat 测试 import 修复（全量 workspace 测试暴露）。
 - 测试：+2（prefocused_typing_sends_on_enter / input_fields_start_prefocused）→ 337 全绿。
 
+
+## 健康快照 #13：chat 面板接回语义树 + 对话记录同构（2026-09-07）
+
+**变异类型**：用户严肃批评——"`enter 发送 Esc 退出` 完全与 Cellrix 内部隔离，你需要了解 Cellrix 的内部逻辑"。
+
+- **根因**：我此前加的预聚焦（input_action=Some("send_message") 硬编码）+ 3 行旁路 chat 框，
+  绕过 Cellrix 的语义树驱动渲染（Renderer 按 SemanticSnapshot 节点渲染网格）。
+- **修复**：启动只设 pending_chat 标记；首个语义快照到达后，UI 查找 agent 声明的
+  needs_input ActionButton（send_message）→ 聚焦它 → 打开其输入面板——action id 与
+  标题全部从节点派生，零硬编码。chat 框标题 = 聚焦按钮 label（动态）。
+- **对话记录**：TUI 新增 chat_history（谁 + HH:MM + 文本），与 WebUI 消息流同构；
+  传输错误留在状态行红字（= WebUI toast 语义），不进对话流。
+- **同构契约**：README 新增 TUI↔WebUI 同构说明——同一数据源、同一视图语义、
+  错误不进对话流；差异仅限渲染介质（stdio 语义树 vs HTTP+SSE）。
+- 测试：chat_typing_records_conversation_and_sends（驱动+Helix 历史断言）→ 337 全绿。
+- pty 实测：打字回显（p▌i▌n▌g▌）、对话记录（你 19:42 ping / Helix 19:42 pong）、
+  真实回复（Helix: pong）全链路通。
+
 ## 健康快照 #8：P6 完成 — 生产就绪（配置/日志/监控/部署）🎉 全部阶段完成
 
 **日期**：2026-08-30
