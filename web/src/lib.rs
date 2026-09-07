@@ -12,7 +12,7 @@ use std::net::TcpStream;
 /// half-open peer from hanging a thread.
 // LLM reasoning takes seconds (1-2s typical, bursts beyond); a 2s read
 // timeout made the panel proxy hit macOS WouldBlock (os error 35) mid-reply.
-const READ_TIMEOUT_SECS: u64 = 30;
+const READ_TIMEOUT_SECS: u64 = 180;
 
 /// Hand-rolled HTTP GET: read the body after the blank line.
 /// `bearer` is an optional identity credential (never sent to the browser).
@@ -318,6 +318,9 @@ pub fn post_stream(
         if chunked {
             // chunk size line
             let size_line = read_line_from(&mut stream, &mut buffered)?;
+            if size_line.is_empty() {
+                break; // clean EOF between chunks
+            }
             let size_text = String::from_utf8_lossy(&size_line);
             let size_text = size_text.split(';').next().unwrap_or("").trim();
             let size = usize::from_str_radix(size_text, 16)
@@ -337,7 +340,12 @@ pub fn post_stream(
                 } else {
                     let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
                     if n == 0 {
-                        return Err("origin ended mid-chunk".to_string());
+                        // EOF inside a chunk payload: flush the remainder.
+                        if !buffered.is_empty() {
+                            on_chunk(&buffered).map_err(|e| e.to_string())?;
+                            buffered.clear();
+                        }
+                        return Ok(());
                     }
                     buffered.extend_from_slice(&tmp[..n]);
                 }
@@ -383,7 +391,9 @@ fn read_line_from(
         }
         let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
         if n == 0 {
-            return Err("origin ended mid-line".to_string());
+            // EOF: flush whatever is buffered (may be empty) and end.
+            // A partial line is relayed, never dropped with a hard error.
+            return Ok(std::mem::take(buffered));
         }
         buffered.extend_from_slice(&tmp[..n]);
     }

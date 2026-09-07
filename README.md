@@ -34,8 +34,24 @@
 > authoritative — no truncated answers); sessions are auto-named from the
 > first user message and **renameable** (✎, sidecar `.name`, empty =
 > fallback to auto name); **续接** (resume) dropdown in the chat-input's
-> bottom-right continues an explicit experience. TUI/Web share one state
-> model (isomorphic display; renderers are thin backends).
+> bottom-right continues an explicit experience — selecting one **loads
+> that experience's history into the chat space** (messages, answers,
+> tool outcomes), then the next sentence continues it.
+>
+> **Chain integrity (ADR-0029)**: the imprint is a closed loop —
+> physical outcome → deterministic check → audited verdict. `tool/result`
+> rows carry `outcome + outcome_sha` (byte-verifiable product), every
+> criteria report becomes a `check/status` row (judge/gate/expect/
+> evidence_id/reason — no bare labels), `VERDICT` carries its reason,
+> and `END.success ≡ (verdict ≠ Unmet)` (never self-reported). Private
+> thinking persists as `assistant/think` (redacted, display-only) and
+> every expandable row uses **one fold primitive** (click to expand /
+> click to close / hover to preview). Transport faults never interrupt a
+> streamed answer — a partial answer is kept, only a fault with no
+> content toasts. `POST /v1/crystallize` distills UNMET rounds into
+> 0-token rule suggestions (machine suggests, human reviews, nothing
+> auto-injected). TUI/Web share one state model (isomorphic display;
+> renderers are thin backends).
 > **Start**: `cargo run --bin up` from the repo root — Enter through the
 > prompts, the panel opens at http://127.0.0.1:8080/ (or `up --restart`
 > to restart the whole ecosystem; bind/1-to-1 pairing happens on first

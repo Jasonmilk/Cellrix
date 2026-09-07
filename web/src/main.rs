@@ -612,6 +612,18 @@ fn index_html(cfg: &PanelConfig) -> String {
   .think-row .think-head {{ color:var(--acc); font-weight:600; flex-shrink:0; }}
   .think-row .think-body {{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:88%; }}
   .think-row.open .think-body {{ white-space:pre-wrap; word-break:break-all; max-height:200px; overflow:auto; }}
+  .fold {{ display:inline-block; vertical-align:middle; cursor:pointer; }}
+  .fold .fold-head {{ color:var(--acc); font-weight:600; }}
+  .fold .fold-tip {{ color:var(--dim); }}
+  .fold.open .fold-tip {{ transform:rotate(90deg); display:inline-block; }}
+  .fold .fold-body {{ display:none; }}
+  .fold.open .fold-body {{ display:inline; }}
+  .fold .think-full {{ display:inline; white-space:pre-wrap; word-break:break-all; max-height:160px; overflow:auto; font-size:11px; color:var(--text); }}
+  .chip.gate.hard {{ background:rgba(234,102,104,.12); color:#b34146; }}
+  .chip.gate.soft {{ background:rgba(250,173,20,.15); color:#9a6b00; }}
+  .chip.judge {{ background:rgba(158,172,234,.15); color:#3d4a8f; }}
+  .sha {{ font-family:monospace; font-size:10px; color:var(--dim); }}
+  .period-head {{ padding:6px 12px; font-size:11px; color:var(--dim); border-bottom:1px solid var(--line); }}
   .resume-list {{ position:absolute; right:12px; bottom:54px; width:280px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.3); z-index:10; max-height:260px; overflow:auto; }}
   .resume-opt {{ padding:8px 10px; font-size:12px; cursor:pointer; border-bottom:1px solid var(--line); color:var(--text); word-break:break-all; }}
   .resume-opt:hover {{ background:rgba(158,172,234,.12); }}
@@ -721,7 +733,7 @@ fn index_html(cfg: &PanelConfig) -> String {
   // derived job id as the body trace and the Tuck audit chain. The sidebar
   // lists periods (newest first); selecting one loads its turn timeline —
   // badges from the event vocabulary, no second data source.
-  var EV_BADGE = {{ 'turn/start':'START','user/message':'USER','context/inject':'CONTEXT','assistant/attempt':'ATTEMPT','tool/call':'TOOL','tool/result':'RESULT','verdict/status':'VERDICT','turn/end':'END' }};
+  var EV_BADGE = {{ 'turn/start':'START','user/message':'USER','context/inject':'CONTEXT','assistant/attempt':'ATTEMPT','assistant/think':'THINK','tool/call':'TOOL','tool/result':'RESULT','check/status':'CHECK','verdict/status':'VERDICT','turn/end':'END' }};
   var selectedPeriod = null;
   // Explicit continuation (ADR-0026): while set, the next chat request
   // resumes this experience (`job_id`) instead of opening a fresh stranger.
@@ -822,15 +834,37 @@ fn index_html(cfg: &PanelConfig) -> String {
         var top = ch.top || [];
         for (var i = 0; i < top.length; i++) {{
           var n = top[i];
-          body += '<span class="chip mnode" title="' + esc(n.id) + '">' + esc(n.tier) + '·' + n.heat + ' ' + esc(n.phase || '') + '</span>';
+          var nid = n.id ? n.id.slice(0, 8) : '';
+          body += '<span class="chip mnode" title="' + esc(n.id || '') + '">' + esc(n.tier) + '·' + n.heat + ' ' + esc(nid) + ' ' + esc(n.phase || '') + '</span>';
         }}
       }}
     }}
     else if (e.type === 'assistant/attempt') body = esc((d.text || '').slice(0, 200));
+    else if (e.type === 'assistant/think') body = foldHtml('思考', (d.text || '').slice(0, 60), '<pre class="think-full">' + esc(d.text || '') + '</pre>');
     else if (e.type === 'tool/call') body = esc(d.tool) + ' · #' + d.index + ' · expect=' + esc(d.expect);
-    else if (e.type === 'tool/result') body = esc(d.tool) + ' · <span class="' + (d.ok ? 'ok' : 'bad') + '">' + (d.ok ? 'ok' : 'fail') + '</span> · ' + d.duration_ms + 'ms';
-    else if (e.type === 'verdict/status') body = '<b class="' + (d.status === 'Met' ? 'ok' : 'bad') + '">' + esc(d.status || '') + '</b>';
-    else if (e.type === 'turn/end') body = 'done=' + d.done + ' · success=' + d.success + ' · impasse=' + d.impasse;
+    else if (e.type === 'tool/result') {{
+      body = esc(d.tool) + ' · <span class="' + (d.ok ? 'ok' : 'bad') + '">' + (d.ok ? 'ok' : 'fail') + '</span> · ' + d.duration_ms + 'ms' +
+        ' · sha <span class="sha">' + esc(d.outcome_sha || '—') + '</span>';
+      var out = d.outcome || '';
+      if (out) body += ' · ' + foldHtml('结果', out.slice(0, 60), '<pre class="think-full">' + esc(out) + '</pre>');
+    }}
+    else if (e.type === 'check/status') {{
+      body = '<span class="chip gate ' + esc(d.gate || '') + '">' + esc((d.gate || 'gate').toUpperCase()) + '</span>' +
+        '<span class="chip judge">' + esc(d.judge || '?') + '</span> · ' + esc(d.check || '') +
+        ' · <span class="' + (d.passed ? 'ok' : 'bad') + '">' + (d.passed ? 'PASS' : 'FAIL') + '</span>' +
+        ' · expect=' + esc(d.expect || '—') + ' · ' + esc(d.evidence_id || '');
+      var why = d.reason || d.actual || '';
+      if (why) body += ' · ' + foldHtml('依据', why.slice(0, 60), '<pre class="think-full">' + esc(why) + '</pre>');
+    }}
+    else if (e.type === 'verdict/status') {{
+      body = '<b class="' + (d.status === 'Met' ? 'ok' : 'bad') + '">' + esc(d.status || '') + '</b>';
+      if (d.checks !== undefined) body += ' · checks=' + d.checks;
+      if (d.reason) body += ' · ' + esc(d.reason);
+    }}
+    else if (e.type === 'turn/end') {{
+      body = 'done=' + d.done + ' · success=' + d.success + ' · impasse=' + d.impasse;
+      if (d.verdict) body += ' · verdict=<b class="' + (d.verdict === 'Met' ? 'ok' : 'bad') + '">' + esc(d.verdict) + '</b>';
+    }}
     else body = '';
     return '<span class="badge ' + (e.type.replace('/','-')) + '">' + (EV_BADGE[e.type] || esc(e.type)) + '</span> <span class="dim">' + esc(e.time.slice(11,19)) + '</span> <span class="body">' + body + '</span>';
   }}
@@ -893,6 +927,46 @@ fn index_html(cfg: &PanelConfig) -> String {
     return d.querySelector('.think-body');
   }}
 
+  // One fold capability for every expandable row (think / check /
+  // outcome / long reason): click toggles open/closed, hover (title)
+  // previews the full body. A single primitive — no per-feature patches.
+  function foldHtml(label, preview, full) {{
+    return '<span class="fold" onclick="this.classList.toggle(\'open\')" title="' + esc(preview) + '">' +
+      '<span class="fold-head">' + label + ' <span class="fold-tip">▸</span></span>' +
+      '<span class="fold-body">' + full + '</span></span>';
+  }}
+
+  // Load a past experience's history into the chat space (explicit resume):
+  // user turns and answers render as messages, then the next sentence
+  // continues the period (resume_from on the backend).
+  function loadPeriodToChat(jobId) {{
+    fetch('/api/events?job_id=' + encodeURIComponent(jobId)).then(function (r) {{ return r.json(); }}).then(function (j) {{
+      if (j.missing || !j.events) return;
+      var box = document.getElementById('chat-msgs');
+      var empty = box.querySelector('.empty');
+      if (empty) empty.remove();
+      var d = document.createElement('div');
+      d.className = 'period-head';
+      d.textContent = '—— 经历 ' + jobId + ' 的历史 ——';
+      box.appendChild(d);
+      j.events.forEach(function (e) {{
+        if (e.type === 'user/message') addMsg('user', e.data.text || '', false);
+        else if (e.type === 'assistant/attempt') {{
+          var a = document.createElement('div');
+          a.className = 'msg helix';
+          a.innerHTML = '<div class="who">Helix <span class="dim">(经历 ' + jobId.slice(0, 12) + ')</span></div><div class="text">' + esc((e.data.text || '').slice(0, 400)) + '</div>';
+          box.appendChild(a);
+        }} else if (e.type === 'tool/result') {{
+          var t = document.createElement('div');
+          t.className = 'msg helix';
+          t.innerHTML = '<div class="who">Helix <span class="dim">工具 · ' + esc(e.data.tool) + '</span></div><div class="text">' + esc((e.data.outcome || '').slice(0, 200)) + '</div>';
+          box.appendChild(t);
+        }}
+      }});
+      box.scrollTop = box.scrollHeight;
+    }});
+  }}
+
   // Resume-from-experience dropdown: sits in the chat-input's bottom-right,
   // listing the latest periods to continue (explicit, never implicit).
   function toggleResume() {{
@@ -911,6 +985,7 @@ fn index_html(cfg: &PanelConfig) -> String {
           list.style.display = 'none';
           var b = document.getElementById('cont-banner');
           if (b) {{ b.style.display = ''; b.innerHTML = '续接经历 <span class="tid">' + esc(chatJobId) + '</span> —— 下一句话延续这段对话'; }}
+          loadPeriodToChat(chatJobId);
           document.getElementById('chat-text').focus();
         }};
       }});
@@ -964,7 +1039,13 @@ fn index_html(cfg: &PanelConfig) -> String {
             if (!payload) continue;
             var j;
             try {{ j = JSON.parse(payload); }} catch (e) {{ continue; }}
-            if (j.error) {{ showError(j.error); finish(); return; }}
+            if (j.error) {{
+              // A transport fault is the cockpit's business, not Helix's.
+              // If the answer already streamed, keep it and finish quietly;
+              // only a fault with no content gets a toast.
+              if (!bodyEl && !thinkEl) showError(j.error);
+              finish(); return;
+            }}
             if (j.think) {{
               if (!thinkEl) thinkEl = addThinkRow();
               thinkEl.textContent += j.think;
