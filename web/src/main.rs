@@ -116,8 +116,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(ep) => println!("             engram chain @ {ep} (limit {})", cfg.tuck_limit),
         None => println!("             engram: off (pass --tuck-endpoint + --tuck-key to enable)"),
     }
+    health_check(&cfg);
 
     let listener = TcpListener::bind(("127.0.0.1", port))?;
+    if args.iter().any(|a| a == "--open") {
+        let url = format!("http://127.0.0.1:{port}/");
+        println!("             opening browser: {url}");
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open").arg(&url).spawn()?;
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = url;
+        }
+    }
     for stream in listener.incoming() {
         match stream {
             Ok(s) => {
@@ -262,6 +275,10 @@ fn fetch_json(
         None => (base.to_string(), 80),
     };
     let mut stream = TcpStream::connect((host.as_str(), port)).map_err(|e| e.to_string())?;
+    // Probes must not hang on a half-open peer; 2s is plenty for local tools.
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+        .map_err(|e| e.to_string())?;
     let auth = match bearer {
         Some(k) if !k.is_empty() => format!("Authorization: Bearer {k}\r\n"),
         _ => String::new(),
@@ -276,6 +293,69 @@ fn fetch_json(
         .nth(1)
         .map(|s| s.to_string())
         .ok_or_else(|| "empty response".to_string())
+}
+
+/// Probe one data source: Ok when the peer answers with a JSON body.
+/// Refused/half-open/timeout peers are Err — the panel still serves, the
+/// probe only tells the operator *what is missing before they open a tab*.
+fn probe(base: &str, path: &str, bearer: Option<&str>) -> Result<(), String> {
+    let body = fetch_json(base, path, bearer)?;
+    if body.trim_start().starts_with('{') {
+        Ok(())
+    } else {
+        Err("unexpected body".to_string())
+    }
+}
+
+/// Up-style self check: probe Anaphase's own `/v1/health` (the one source of
+/// truth — the same endpoint Cellrix renders and Helix-Mind will read on
+/// demand) and the Tuck audit chain. When something is down, say *what* is
+/// unhealthy instead of leaving a dead panel.
+fn health_check(cfg: &PanelConfig) {
+    match fetch_json(&cfg.anaphase_endpoint, "/v1/health", None) {
+        Ok(body) if body.contains("\"ok\":true") => {
+            println!("             anaphase: ✅ self-check ok")
+        }
+        Ok(body) => {
+            let bad = unhealthy_names(&body);
+            println!(
+                "             anaphase: ❌ self-check failed: {}",
+                if bad.is_empty() { "see /v1/health".to_string() } else { bad.join(", ") }
+            );
+        }
+        Err(e) => println!(
+            "             anaphase: ❌ {e}\n               → start Anaphase first (README §Run: ANAPHASE_CONFIG + anaphase)"
+        ),
+    }
+    if let Some(ep) = &cfg.tuck_endpoint {
+        let key = cfg.tuck_key.as_deref().unwrap_or("");
+        match probe(ep, "/v1/audit?limit=1", Some(key)) {
+            Ok(()) => println!("             tuck: ✅ audit chain reachable"),
+            Err(e) => println!(
+                "             tuck: ❌ {e}\n               → start the Tuck gateway first (README §Run)"
+            ),
+        }
+    }
+}
+
+/// Extract the names of configured-but-unhealthy checks from a /v1/health
+/// body. Field order is stable (name, configured, ok, detail) — this stays
+/// a cheap string scan, no JSON dependency.
+fn unhealthy_names(body: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for seg in body.split("\"name\":\"") {
+        if seg.len() < 3 {
+            continue;
+        }
+        let name = &seg[..seg.find('"').unwrap_or(0)];
+        if name.is_empty() {
+            continue;
+        }
+        if seg.contains("\"configured\":true") && seg.contains("\"ok\":false") {
+            out.push(name.to_string());
+        }
+    }
+    out
 }
 
 /// The embedded panel page: native JS polls `/api/snapshot` + `/api/audit`
@@ -642,6 +722,19 @@ mod tests {
         assert!(cfg.tuck_endpoint.is_none());
         assert!(cfg.tuck_key.is_none());
         assert_eq!(cfg.tuck_limit, TUCK_LIMIT_DEFAULT);
+    }
+
+    #[test]
+    fn unhealthy_names_parses_failed_checks() {
+        let body = r#"{"ok":false,"checks":[{"name":"tentacle","configured":true,"ok":false,"detail":"refused"},{"name":"trace","configured":true,"ok":true,"detail":"ok"},{"name":"mind","configured":false,"ok":true,"detail":"not configured"}]}"#;
+        let bad = unhealthy_names(body);
+        assert_eq!(bad, vec!["tentacle"]);
+    }
+
+    #[test]
+    fn unhealthy_names_ok_body_is_empty() {
+        let body = r#"{"ok":true,"checks":[]}"#;
+        assert!(unhealthy_names(body).is_empty());
     }
 
     #[test]

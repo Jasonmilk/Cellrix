@@ -321,6 +321,12 @@ cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
   of the exact round, redacted at write time, rendered under the imprint
 - trace_id filter box (Enter applies, Esc clears)
 - Auto-poll both projections every 2s; audit limit default 200 (CLI contract)
+- **Up-style self check**: on startup the panel probes Anaphase's own
+  `/v1/health` (the ecosystem's one watch-table source — Cellrix renders it,
+  Helix-Mind reads it on demand) and the Tuck audit chain, printing
+  ✅/❌ + what is unhealthy before you open a tab
+- **`--open`**: after binding, opens the panel in your default browser —
+  one command, then no more commands
 
 Live gateway verification (needs Tuck running on :60052):
 ```bash

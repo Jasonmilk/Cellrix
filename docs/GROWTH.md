@@ -283,3 +283,22 @@ GROWTH｜ PLAN
 
 ### 状态
 🧬 已完成（下一刀：轮动效 / 或切 ③ up 一键 web）
+
+## 记录 35：up 自检——生态级看表 SSOT（2026-09-07）
+
+### 触发条件
+用户拍板 ③ up 一键 web（学习 WorkBuddy/DSH 易用性）；并提醒"自检+实时状态 = Helix-Mind 按需看表，可极致复用"。
+
+### 变更性质
+- **Anaphase `/v1/health` 自检端点**（src/health.rs）：config 派生 + 物理探测（trace/ledger 父目录可写、六端点 TCP 可达、judge 后端、cap_http、凭证存在性——值永不报告）；空字符串 = 未配置不评判；聚合 ok = 所有 configured 项健康
+- **探测确定性修法**：`connect_timeout` 在 macOS 对 loopback 偶发 1.7s 假失败（已实测复现）→ 子线程同步 connect + 主线程 2s 超时（无轮询 bug）
+- **Cellrix web 探头升级**：probe `/v1/health`（打印 self-check ok / 失败项名单），tuck `/v1/audit` 照旧；`--open` flag（监听就绪后自动开浏览器）
+- **复用点（用户提示）**：同一 `/v1/health` + `/v1/agent/snapshot` 服务三类消费者——Cellrix 面板（碳基/硅基同看）、Helix-Mind 按需看表（决策前才拉，不时刻轮询）、运维 curl——单一权威来源，无第二份状态副本（极致复用/按需驱动）
+- **测试**：Anaphase 212→**216**（health 4）；Cellrix web 5→**7**（unhealthy_names 2）→ Cellrix 329
+- **真实验证**：`/v1/health` → ok:true（trace 可写/reasoning 可达/空串不评判）；web 启动 banner → `anaphase: ✅ self-check ok / tuck: ✅ audit chain reachable`
+
+### 验收
+README（Self-check 节 + --open）｜ GROWTH｜ ECOSYSTEM v1.64（Anaphase 216 / Cellrix 329 / 全生态 1496）
+
+### 状态
+🧬 已完成
