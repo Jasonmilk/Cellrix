@@ -294,6 +294,14 @@ What `up` does, step by step:
 5. **Fail-closed**: if Tuck is configured but unreachable, Anaphase refuses
    to reason and tells you (`⚠️ Tuck 不在岗，已停止工作`) — restore Tuck
    and re-run. The panel always shows the honest state.
+6. **One-to-one binding** (first run asks): `up` offers `[1] 绑定  [2] 稍后`
+   — Anaphase mints a 6-digit pairing code (one-time, 10 min), you press
+   Enter to confirm (physical presence = HITL), and the device is bound.
+   Every panel request is then signed (`Bearer v1.<id>.<ts>.<nonce>.<hmac>`):
+   replay dies on ±60s window + one-time nonce; the secret lives only in
+   0600 files (`~/.cellrix/anaphase-identity.json` on the Anaphase side,
+   `~/.cellrix/identity.toml` on the client side — never in git). Unbound =
+   open, honestly reported by `/v1/bind/status`.
 
 Minimum prerequisites for Anaphase to actually reason:
 
