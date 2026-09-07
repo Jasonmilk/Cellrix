@@ -30,7 +30,7 @@ enum Incoming {
 
 impl StdioTransport {
     pub async fn new(command: &str, args: &[String]) -> Result<Self, TransportError> {
-        eprintln!("[DEBUG] Spawning child: {} {:?}", command, args);
+        if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Spawning child: {} {:?}", command, args); }
         let child = Command::new(command)
             .args(args)
             .stdin(std::process::Stdio::piped())
@@ -60,28 +60,28 @@ impl CapTransport for StdioTransport {
         let mut writer = BufWriter::new(stdin);
         let mut reader = BufReader::new(stdout);
 
-        eprintln!("[DEBUG] Starting CIB handshake...");
+        if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Starting CIB handshake..."); }
         let chosen = handshake_client(&mut writer, &mut reader, WireFormat::MessagePack)
             .await
             .map_err(|e| {
-                eprintln!("[DEBUG] Handshake failed: {:?}", e);
+                if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Handshake failed: {:?}", e); }
                 TransportError::Io(e)
             })?;
-        eprintln!("[DEBUG] Handshake succeeded, chosen format: {:?}", chosen);
+        if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Handshake succeeded, chosen format: {:?}", chosen); }
         self.format = chosen;
 
-        eprintln!("[DEBUG] Waiting for first event (must be Manifest)...");
+        if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Waiting for first event (must be Manifest)..."); }
         let first_event: AgentEvent = recv_message(&mut reader, chosen, DEFAULT_TIMEOUT_MS)
             .await
             .map_err(|e| {
-                eprintln!("[DEBUG] Failed to read first event: {:?}", e);
+                if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Failed to read first event: {:?}", e); }
                 TransportError::Io(e)
             })?;
-        eprintln!("[DEBUG] First event received: {:?}", &first_event);
+        if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] First event received: {:?}", &first_event); }
         let manifest = match first_event {
             AgentEvent::Manifest(m) => m,
             other => {
-                eprintln!("[DEBUG] Unexpected first event: {:?}", other);
+                if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Unexpected first event: {:?}", other); }
                 return Err(TransportError::Protocol("First event must be manifest/update".to_string()))
             }
         };
@@ -101,7 +101,7 @@ impl CapTransport for StdioTransport {
                         if response_tx.send(Ok(response)).is_err() { break; }
                     }
                     Err(e) => {
-                        eprintln!("[DEBUG] Background reader error: {:?}", e);
+                        if std::env::var("CELLRIX_DEBUG").is_ok() { eprintln!("[DEBUG] Background reader error: {:?}", e); }
                         let msg = format!("{e}");
                         let kind = e.kind();
                         let _ = event_tx.send(Err(TransportError::Io(std::io::Error::new(kind, msg.clone()))));

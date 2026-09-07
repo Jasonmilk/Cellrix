@@ -439,3 +439,19 @@ README（bind 节）｜ GROWTH｜ ECOSYSTEM v1.68（Anaphase 225 / Cellrix 336�
 
 ### 状态
 🧬 已完成
+
+## 记录 44：TUI 日志门控（CELLRIX_DEBUG）+ 空消息防护（2026-09-07）
+
+### 触发条件
+TUI 启动时 DEBUG 日志（Spawning child/Handshake/First event）混入终端界面，与 TUI 画面互相污染。
+
+### 修复
+- transport stdio 全部 DEBUG eprintln 加 `CELLRIX_DEBUG` 环境变量门控，默认静默（`CELLRIX_DEBUG=1` 才输出）
+- 空消息防护：chat 输入框聚焦后空回车不发空请求（保持聚焦 + 提示），已在记录 43 合并
+
+### 验证
+- 默认启动：无 DEBUG 行；`CELLRIX_DEBUG=1`：完整日志
+- Cellrix 337 全绿
+
+### 状态
+🧬 已完成
