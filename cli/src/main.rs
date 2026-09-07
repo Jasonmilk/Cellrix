@@ -27,6 +27,12 @@ enum Command {
         socket: Option<PathBuf>,
         #[arg(long, help = "Anaphase snapshot endpoint (e.g. http://127.0.0.1:28330) to enable the cockpit")]
         anaphase_endpoint: Option<String>,
+        #[arg(long, help = "Tuck governance gateway base (e.g. http://127.0.0.1:60052) to enable the Engram imprint panel")]
+        tuck_endpoint: Option<String>,
+        #[arg(long, help = "Tuck identity credential (Bearer) for /v1/audit — never the upstream secret")]
+        tuck_key: Option<String>,
+        #[arg(long, default_value_t = 200, help = "Engram poll window: newest N chain entries per fetch (CLI contract default)")]
+        tuck_limit: usize,
     },
     /// Test manifest fetch (via connect)
     Manifest {
@@ -78,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Run { mode, exec, socket, anaphase_endpoint } => {
+        Command::Run { mode, exec, socket, anaphase_endpoint, tuck_endpoint, tuck_key, tuck_limit } => {
             let transport = create_transport(mode, exec, socket, UdsRole::Server).await?;
             let mut app = App::new(transport).await?;
             // Candidate G: attach the cockpit poller when an endpoint is given.
@@ -87,6 +93,16 @@ async fn main() -> anyhow::Result<()> {
                     std::sync::Arc::new(cellrix_transport::anaphase_client::HttpAnaphaseClient::new(ep)),
                     std::time::Duration::from_secs(2),
                 );
+            }
+            // Engram: attach the audit poller when the gateway is given.
+            // The key has no default — the gateway is fail-closed; without
+            // a credential the panel simply shows the gateway error.
+            if let Some(ep) = tuck_endpoint.as_deref().filter(|s| !s.is_empty()) {
+                let key = tuck_key.clone().unwrap_or_default();
+                let client = std::sync::Arc::new(
+                    cellrix_transport::tuck_audit_client::TuckAuditClient::new(ep, key),
+                );
+                app.attach_engram(client, std::time::Duration::from_secs(3), tuck_limit);
             }
             if let Err(e) = app.run().await {
                 match e {

@@ -22,7 +22,7 @@ use cellrix_protocol::anaphase::AgentSnapshot;
 use cellrix_transport::anaphase_client::AnaphaseClient;
 
 use crate::{Renderer, UiError};
-use state::AppState;
+use state::{ActiveView, AppState};
 use terminal::TerminalGuard;
 use handler::{InputHandler, KeyMap};
 use dispatcher::EventDispatcher;
@@ -40,6 +40,8 @@ pub struct App {
     pub heartbeat_timeout: Duration,
     /// Candidate G: cockpit projection channel (poller -> UI).
     cockpit_rx: Option<mpsc::Receiver<AgentSnapshot>>,
+    /// Engram: audit-query projection channel (poller -> UI).
+    engram_rx: Option<mpsc::Receiver<cellrix_protocol::engram::EngramQuery>>,
 }
 
 impl App {
@@ -62,6 +64,7 @@ impl App {
 
         Ok(Self {
             cockpit_rx: None,
+            engram_rx: None,
             transport,
             renderer: Renderer::new(),
             event_rx,
@@ -93,6 +96,39 @@ impl App {
             }
         });
         self.cockpit_rx = Some(rx);
+    }
+
+    /// Engram: attach the audit poller. A background task refetches the
+    /// latest `limit` chain entries on a fixed interval (one `/v1/audit`
+    /// fetch per tick, always newest-first view); the UI drains the latest
+    /// value before each frame. The trace filter is applied locally by the
+    /// widget — the gateway is never spammed with filter churn.
+    pub fn attach_engram(
+        &mut self,
+        client: Arc<dyn cellrix_transport::tuck_audit_client::TuckAuditFetcher>,
+        poll_interval: Duration,
+        limit: usize,
+    ) {
+        let (tx, rx) = mpsc::channel(8);
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(poll_interval);
+            loop {
+                tick.tick().await;
+                let q = cellrix_transport::tuck_audit_client::AuditQuery {
+                    limit: Some(limit),
+                    ..Default::default()
+                };
+                match client.fetch(&q).await {
+                    Ok(query) => {
+                        if tx.send(query).await.is_err() {
+                            break; // UI gone
+                        }
+                    }
+                    Err(_) => { /* transient — keep polling */ }
+                }
+            }
+        });
+        self.engram_rx = Some(rx);
     }
 
     pub async fn run(&mut self) -> Result<(), UiError> {
@@ -203,6 +239,13 @@ impl App {
                 }
             }
 
+            // Engram: drain the latest audit projection before drawing.
+            if let Some(rx) = &mut self.engram_rx {
+                while let Ok(query) = rx.try_recv() {
+                    self.state.set_engram(query);
+                }
+            }
+
             terminal.draw(|f| {
                 let size = f.size();
                 
@@ -222,7 +265,15 @@ impl App {
                 let input_area = chunks[1];
                 let status_area = chunks[2];
 
-                if let Some(snap) = &self.state.snapshot {
+                // Engram view: the audit imprint panel owns the whole main
+                // area (its own grid by proportion); the snapshot-driven
+                // renderer is bypassed entirely.
+                if self.state.active_view == ActiveView::Engram {
+                    // The audit imprint panel owns the whole main area (its
+                    // own grid by proportion); the snapshot-driven renderer
+                    // is bypassed. Status bar + chat box still render below.
+                    crate::widgets::engram::render_engram(&self.state.engram, main_area, f.buffer_mut());
+                } else if let Some(snap) = &self.state.snapshot {
                     let zen_node_id = if self.state.is_zen_mode {
                         self.state.focus_manager.current_focus()
                     } else {

@@ -19,6 +19,18 @@
   （run-8bba24c5ee368a4a#0 三判据全过）→ Web 透传可见
 - Cellrix 316 → 319 全绿；React 孤儿组件（HolographicGrid 等）留待优化期
 
+## 健康快照 #11：Engram（印痕）审计面板（2026-09-07）
+
+**变异类型**：全链路审计印痕视图——用户"轨迹改名为 Engram-印痕，因为我们是全链路的审计"；"Cellrix用自己的方式展示面板，二维网格按比例布局，按需加载按需驱动"
+
+- `protocol/src/engram.rs`：真实 `/v1/audit` 链格式（seq/ts/payload/prev_hash/hash，trace_id 派生非 UUID）
+- `transport/src/tuck_audit_client.rs`：TuckAuditClient + TuckAuditFetcher trait（Bearer 注入、`#`→reqwest 自动 %23、limit 窗口）
+- `ui/src/widgets/engram.rs`：EngramViewState + render_engram 纯函数（概览/时间线/详情三面板比例网格、虚拟列表、本地 trace 过滤）
+- `ui/src/app.rs`：attach_engram 轮询 + `state.set_engram`；handler Ctrl+E 切换视图，f/g/↑/↓/Esc
+- 物理验证：TCP loopback 端到端（Bearer + %23 + 解析）+ **live 真实网关**（`--ignored live`：链完整性逐条校验 hash==prev_hash）
+- 排障记录：std 阻塞 accept 卡死 current_thread runtime（改 tokio::net）；`replace('#','%23')` 双重编码（交 reqwest 自动编码）；header 大小写（hyper 小写化）
+- Cellrix 321 → **325** 全绿（`--all-features`，0 failed）；Engram 数据层/状态层纯逻辑，Web 端可同构复用（TUI=Web 单一状态模型）
+
 ## 健康快照 #8：P6 完成 — 生产就绪（配置/日志/监控/部署）🎉 全部阶段完成
 
 **日期**：2026-08-30

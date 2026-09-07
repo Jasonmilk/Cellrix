@@ -3,6 +3,16 @@ use std::time::Instant;
 use cellrix_protocol::SemanticSnapshot;
 use cellrix_protocol::anaphase::AgentSnapshot;
 use cellrix_layout::FocusManager;
+use crate::widgets::engram::EngramViewState;
+
+/// Top-level view the driver is looking at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveView {
+    /// The snapshot-driven cockpit (nodes / layout engine).
+    Cockpit,
+    /// The Engram imprint panel (Tuck audit chain).
+    Engram,
+}
 
 /// Pure logical state machine for Cellrix UI.
 /// Completely decoupled from physical terminal I/O (crossterm).
@@ -12,6 +22,11 @@ pub struct AppState {
     /// Anaphase cockpit projection (candidate G) — refreshed by the CLI
     /// poller; rendered by the cockpit widget when present.
     pub cockpit: Option<AgentSnapshot>,
+    /// Engram imprint state (Tuck audit chain) — refreshed by the CLI
+    /// poller on filter submit / poll tick.
+    pub engram: EngramViewState,
+    /// Which view is active (Ctrl+E toggles Cockpit/Engram).
+    pub active_view: ActiveView,
     pub error: Option<String>,
     pub focus_manager: FocusManager,
     pub last_heartbeat: Instant,
@@ -43,6 +58,8 @@ impl AppState {
         Self {
             snapshot: None,
             cockpit: None,
+            engram: EngramViewState::default(),
+            active_view: ActiveView::Cockpit,
             error: None,
             focus_manager: FocusManager::new(),
             last_heartbeat: Instant::now(),
@@ -62,6 +79,19 @@ impl AppState {
     /// Update the cockpit projection (latest snapshot wins).
     pub fn set_cockpit(&mut self, snapshot: AgentSnapshot) {
         self.cockpit = Some(snapshot);
+    }
+
+    /// Replace the Engram entries (chain order), keeping the selection
+    /// clamped to the new length.
+    pub fn set_engram(&mut self, query: cellrix_protocol::engram::EngramQuery) {
+        self.engram.entries = query.entries;
+        self.engram.queried_by = query.queried_by;
+        self.engram.error = None;
+        self.engram.loading = false;
+        if let Some(idx) = self.engram.selected {
+            self.engram.selected =
+                Some(idx.min(self.engram.entries.len().saturating_sub(1)));
+        }
     }
 }
 

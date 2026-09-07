@@ -7,7 +7,7 @@ use cellrix_protocol::{ActionRequest, ActionResponse, NodeType};
 use cellrix_transport::CapTransport;
 
 use crate::UiError;
-use super::state::AppState;
+use super::state::{ActiveView, AppState};
 
 /// Pure Rust high-performance Base64 encoder for OSC 52 physical bypass copying over SSH
 pub fn base64_encode(data: &[u8]) -> String {
@@ -46,6 +46,8 @@ pub struct KeyMap {
     pub tab_prev: (KeyCode, KeyModifiers),
     pub agent_next: (KeyCode, KeyModifiers),
     pub agent_prev: (KeyCode, KeyModifiers),
+    /// Toggle between the cockpit view and the Engram imprint view.
+    pub engram_toggle: (KeyCode, KeyModifiers),
 }
 
 impl Default for KeyMap {
@@ -59,6 +61,7 @@ impl Default for KeyMap {
             tab_prev: (KeyCode::Left, KeyModifiers::ALT),
             agent_next: (KeyCode::Char('n'), KeyModifiers::ALT),
             agent_prev: (KeyCode::Char('p'), KeyModifiers::ALT),
+            engram_toggle: (KeyCode::Char('e'), KeyModifiers::CONTROL),
         }
     }
 }
@@ -128,6 +131,77 @@ impl InputHandler {
             }
         }
 
+        // Engram view: capture view-local keys before the global keymap.
+        // Chat box still owns typing when focused; the Engram keys are the
+        // same physical keys, but scoped to the Engram view only.
+        if state.active_view == ActiveView::Engram {
+            if state.engram.filter_input.is_some() {
+                // In filter-typing mode: chars go to the filter buffer.
+                match code {
+                    KeyCode::Char(c)
+                        if modifiers == KeyModifiers::NONE
+                            || modifiers == KeyModifiers::SHIFT => {
+                        state.engram.filter_input.as_mut().unwrap().push(c);
+                        return Ok(None);
+                    }
+                    KeyCode::Backspace => {
+                        state.engram.filter_input.as_mut().unwrap().pop();
+                        return Ok(None);
+                    }
+                    KeyCode::Enter => {
+                        let f = state
+                            .engram
+                            .filter_input
+                            .take()
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty());
+                        state.engram.applied_filter = f;
+                        state.engram.reset_entries();
+                        state.engram.loading = true;
+                        return Ok(None);
+                    }
+                    KeyCode::Esc => {
+                        state.engram.filter_input = None;
+                        return Ok(None);
+                    }
+                    _ => {}
+                }
+            }
+            match code {
+                KeyCode::Up => {
+                    let idx = state.engram.selected.unwrap_or(0);
+                    if !state.engram.entries.is_empty() {
+                        state.engram.selected = Some(idx.saturating_sub(1));
+                    }
+                    return Ok(None);
+                }
+                KeyCode::Down => {
+                    let n = state.engram.entries.len();
+                    let idx = state.engram.selected.unwrap_or(0);
+                    if n > 0 {
+                        state.engram.selected = Some((idx + 1).min(n - 1));
+                    }
+                    return Ok(None);
+                }
+                KeyCode::Char('f') if modifiers == KeyModifiers::NONE => {
+                    state.engram.filter_input = Some(String::new());
+                    return Ok(None);
+                }
+                KeyCode::Char('g') if modifiers == KeyModifiers::NONE => {
+                    let n = state.engram.entries.len();
+                    if n > 0 {
+                        state.engram.selected = Some(n - 1);
+                    }
+                    return Ok(None);
+                }
+                KeyCode::Esc => {
+                    state.active_view = ActiveView::Cockpit;
+                    return Ok(None);
+                }
+                _ => {}
+            }
+        }
+
         // Enter with no input mode: a selected action button still activates;
         // otherwise Enter opens the chat box (discoverable: press Enter, type).
         if code == KeyCode::Enter && modifiers == KeyModifiers::NONE && !state.chat_focused {
@@ -176,6 +250,13 @@ impl InputHandler {
         }
         if key == key_map.agent_prev {
             Self::cycle_active_agent(state, transport, req_map, -1).await;
+            return Ok(None);
+        }
+        if key == key_map.engram_toggle {
+            state.active_view = match state.active_view {
+                ActiveView::Cockpit => ActiveView::Engram,
+                ActiveView::Engram => ActiveView::Cockpit,
+            };
             return Ok(None);
         }
 

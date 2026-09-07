@@ -8,7 +8,7 @@
 [![Protocol](https://img.shields.io/badge/Protocol-CI--144%20v2.0-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
-[![Tests](https://img.shields.io/badge/tests-321-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-325-green.svg)]()
 [![Phases](https://img.shields.io/badge/phases-P0--P6%20complete-5B5FC7.svg)]()
 
 ---
@@ -25,19 +25,25 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-> **Status 2026-09-06**: cockpit real conversation is live — fixed chat box
+> **Status 2026-09-07**: cockpit real conversation is live — fixed chat box
 > (Enter to focus, Enter to send, Esc to blur), three-state feedback
 > (✓ reply / ✗ failure / pending), real LLM round trip through Anaphase
 > (`send_message` → run_cycle → DeepSeek → reply). Web panel (:8080) is a
-> white-box projection of the same snapshot protocol. **Next**: DSH-style
-> unified Web UI (chat + trajectory + white-box), TUI/Web parity.
+> white-box projection of the same snapshot protocol. **Engram（印痕）**
+> landed: the full-chain audit imprint panel (Ctrl+E), consuming the real
+> Tuck `/v1/audit` chain — timeline / detail / chain-integrity view, local
+> trace filter, virtual list, live hash-link verification. TUI/Web share
+> one state model (isomorphic display; renderers are thin backends).
+> **Next**: DSH-style unified Web UI (chat + trajectory + white-box),
+> TUI/Web parity.
 
-**Test Coverage**: 321 tests (实测 `cargo test --workspace`, 2026-09-06, 0 failed / 0 warnings)
-- `cellrix-protocol`: 133 tests
-- `cellrix-ui`: 88 tests
+**Test Coverage**: 325 tests (实测 `cargo test --workspace --all-features`, 2026-09-07, 0 failed)
+- `cellrix-protocol`: 137 tests (incl. `engram` real-chain shapes)
+- `cellrix-transport`: 95 tests (incl. `tuck_audit_client` e2e + live gateway)
+- `cellrix-ui`: 90 tests
 - cockpit live roundtrip: `transport/tests/anaphase_live.rs` (#[ignore], needs live Anaphase)
+- Engram live gateway: `transport/src/tuck_audit_client.rs` `live_fetch_from_real_gateway` (#[ignore], needs the Tuck gateway on :60052)
 - cockpit TUI (real render): see §6.4 (stdio/uds, verified 2026-09-06 both channels)
-- `cellrix-transport`: 85 tests
 - Other: 5 tests
 
 **Helix Ecosystem Full Integration**:
@@ -266,14 +272,39 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 
 Following Google’s strict hermetic testing conventions, all integration tests are isolated inside crate-level `tests/` directories.
 
-### 7.1 Test Coverage (321 tests total, 2026-09-06)
+### 7.1 Test Coverage (325 tests total, 2026-09-07, `--all-features`)
 
 | Crate | Tests | Coverage |
 |---|---|---|
-| `cellrix-protocol` | 133 | PFP/SAP parser, snapshot, action protocol, helix_mind data structures, tuck_audit |
+| `cellrix-protocol` | 137 | PFP/SAP parser, snapshot, action protocol, helix_mind data structures, tuck_audit, **engram (real audit-chain shapes)** |
 | `cellrix-ui` | 90 | State tree, chat input lifecycle, text panel, audit widgets, PFP widgets, security notifications, helix_mind widgets |
-| `cellrix-transport` | 85 | UDS multiplexing, stdio frames, action round trips, helix_mind client (trait + mock) |
-| Other | 13 | Integration tests |
+| `cellrix-transport` | 95 | UDS multiplexing, stdio frames, action round trips, helix_mind client (trait + mock), **tuck_audit_client (e2e + live gateway)** |
+| Other | 3 | Integration tests |
+
+### 7.3 Engram (印痕) — the audit imprint panel
+
+Engram is the full-chain audit imprint view: what Helix *actually* did,
+governed by Tuck's gateway, hash-linked so any tampering breaks the chain.
+
+```bash
+# Run with the cockpit + Engram (Tuck gateway on :60052 by default):
+cellrix-cli run --mode stdio --exec ./target/debug/mock-agent \
+  --anaphase-endpoint http://127.0.0.1:50061 \
+  --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
+```
+
+- `Ctrl+E` — toggle cockpit / Engram view
+- `↑` / `↓` — move the timeline selection (virtual list, only visible rows render)
+- `f` — type a trace_id filter, `Enter` applies, `Esc` cancels (filtered locally — the gateway is never spammed)
+- `g` — jump to the newest entry
+- `Esc` — back to the cockpit
+- Detail column shows kind / trace / caller / destination / status / verdicts /
+  chain `prev_hash` / `hash` — the tamper-evidence link is inspectable, not assumed
+
+Live gateway verification (needs Tuck running on :60052):
+```bash
+cargo test -p cellrix-transport --all-features -- --ignored live
+```
 
 ### 7.2 Run Specific Test Suites
 

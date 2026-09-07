@@ -7,7 +7,7 @@
 
 ---
 
-## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017：StdioTransport::send_action + 单 reader 分发 + 真实 Anaphase 二进制 manifest/snapshot/action 三通道实测通过）**——下一步 Web 优化（React 组件接入/up 菜单第 5 项）
+## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017）** + **Engram（印痕）审计面板（2026-09-07：Tuck /v1/audit 真实链消费，Ctrl+E 切换，时间线/详情/链完整性，本地 trace 过滤，虚拟列表，live 链校验全过）**——下一步 Web 同构映射（DSH 风格 UI/UX，TUI=Web 单一状态模型）
 
 **状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
 
@@ -20,7 +20,7 @@
 - P5: Tentacle 联调（工具执行状态 + 插件审计展示）
 - P6: 生产就绪（配置/日志/监控/部署）
 
-**测试覆盖率**：316 个测试（307 + 候选 G 新增 9：CockpitWidget 3 + AppState 1 + snapshot views 2 + parse 3）
+**测试覆盖率**：325 个测试（`--all-features` 实测 2026-09-07，0 failed；protocol 137 / transport 95 / ui 90 + integration）
 
 ---
 
