@@ -25,17 +25,21 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-> **Status 2026-09-07**: cockpit real conversation is live — fixed chat box
-> (Enter to focus, Enter to send, Esc to blur), three-state feedback
-> (✓ reply / ✗ failure / pending), real LLM round trip through Anaphase
-> (`send_message` → run_cycle → DeepSeek → reply). Web panel (:8080) is a
-> white-box projection of the same snapshot protocol. **Engram（印痕）**
-> landed: the full-chain audit imprint panel (Ctrl+E), consuming the real
-> Tuck `/v1/audit` chain — timeline / detail / chain-integrity view, local
-> trace filter, virtual list, live hash-link verification. TUI/Web share
-> one state model (isomorphic display; renderers are thin backends).
-> **Next**: DSH-style unified Web UI (chat + trajectory + white-box),
-> TUI/Web parity.。
+> **Status 2026-09-08**: Web panel (:8080) is now the primary white-box
+> window (ADR-0033): 印痕 Engram is a DSH-style **turn outline** (not a
+> time-axis gantt) with SA-Core choice / L1–L3 memory-node **chip labels**;
+> chat shows a collapsible **思考 (think) row** (streamed `think` field,
+> display-only, never judged) and the SSE stream is deterministically
+> drained (events before the terminal `{done,reply}`, reply is
+> authoritative — no truncated answers); sessions are auto-named from the
+> first user message and **renameable** (✎, sidecar `.name`, empty =
+> fallback to auto name); **续接** (resume) dropdown in the chat-input's
+> bottom-right continues an explicit experience. TUI/Web share one state
+> model (isomorphic display; renderers are thin backends).
+> **Start**: `cargo run --bin up` from the repo root — Enter through the
+> prompts, the panel opens at http://127.0.0.1:8080/ (or `up --restart`
+> to restart the whole ecosystem; bind/1-to-1 pairing happens on first
+> launch).
 > **全链路正文回放**：Anaphase 设 `reasoning_trace_path`（本地 config）后，Engram 详情可回放每轮 prompt/response（写前脱敏 + 截断）；推理经 `x-tuck-trace` 头把 `run-xxx` id 传给 Tuck 审计链，链与正文共用一键 join。
 
 **Test Coverage**: 327 tests (实测 `cargo test --workspace --all-features`, 2026-09-07, 0 failed)

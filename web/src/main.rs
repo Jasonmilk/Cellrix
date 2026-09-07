@@ -47,6 +47,7 @@ fn route(path: &str) -> Route {
         "api/audit" => Route::Audit,
         "api/trace" => Route::Trace,
         "api/sessions" => Route::Sessions,
+        "api/sessions/rename" => Route::SessionsRename,
         "api/events" => Route::Events,
         "api/ecosystem" => Route::Ecosystem,
         "api/chat" => Route::Chat,
@@ -61,6 +62,7 @@ enum Route {
     Audit,
     Trace,
     Sessions,
+    SessionsRename,
     Events,
     Ecosystem,
     Chat,
@@ -282,6 +284,23 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
                 Ok(body) => respond(&mut stream, 200, "application/json", body.as_bytes())?,
                 Err(e) => {
                     let msg = format!("{{\"configured\":false,\"periods\":[],\"error\":\"{e}\"}}");
+                    respond(&mut stream, 502, "application/json", msg.as_bytes())?;
+                }
+            }
+        }
+        Route::SessionsRename => {
+            // Human-chosen experience name: proxy the POST body through to
+            // Anaphase /v1/sessions/rename (sidecar `{job_id}.name`), signed
+            // when bound. One source of truth, shared by every client.
+            let body = text
+                .split("\r\n\r\n")
+                .nth(1)
+                .unwrap_or("{}");
+            let auth = cellrix_web::client_bearer();
+            match cellrix_web::post_json(&cfg.anaphase_endpoint, "/v1/sessions/rename", body, auth.as_deref()) {
+                Ok(out) => respond(&mut stream, 200, "application/json", out.as_bytes())?,
+                Err(e) => {
+                    let msg = format!("{{\"ok\":false,\"error\":\"{e}\"}}");
                     respond(&mut stream, 502, "application/json", msg.as_bytes())?;
                 }
             }
@@ -510,7 +529,7 @@ fn index_html(cfg: &PanelConfig) -> String {
   .msg.helix {{ align-self:flex-start; background:var(--panel); border:1px solid var(--line); color:var(--text); }}
   .msg .who {{ display:block; font-size:10px; color:var(--dim); margin-bottom:3px; }}
   .msg.err {{ border-color:var(--bad); color:var(--bad); }}
-  .chat-input {{ display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); }}
+  .chat-input {{ position:relative; display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); }}
   .chat-input input {{ flex:1; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; outline:none; }}
   .chat-input input:focus {{ border-color:var(--acc); }}
   .toast {{ position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:50;
@@ -577,14 +596,25 @@ fn index_html(cfg: &PanelConfig) -> String {
   .badge.turn-end {{ background:rgba(154,154,164,.12); color:#9a9aa4; }}
   .ev-row .body {{ color:var(--text); word-break:break-all; }}
   .ev-row .ok {{ color:var(--ok); }} .ev-row .bad {{ color:var(--bad); }}
-  .gantt {{ display:block; width:100%; padding:10px 12px 4px; box-sizing:border-box; }}
-  .gantt .axis {{ color:var(--dim); font-size:10px; }}
-  .gantt .row {{ display:flex; align-items:center; gap:8px; margin-bottom:3px; }}
-  .gantt .lbl {{ width:74px; font-size:10px; color:var(--dim); text-align:right; flex-shrink:0; }}
-  .gantt .bar {{ height:10px; border-radius:3px; min-width:2px; }}
-  .gantt .track {{ flex:1; background:rgba(154,154,164,.12); border-radius:3px; height:10px; position:relative; }}
-  .resume-btn {{ margin-left:auto; font-size:10px; padding:2px 8px; border-radius:6px; border:1px solid var(--acc); color:var(--acc); background:transparent; cursor:pointer; }}
-  .resume-btn:hover {{ background:rgba(158,172,234,.15); }}
+  .btn.ghost {{ border:1px solid var(--line); background:transparent; color:var(--dim); }}
+  .btn.ghost:hover {{ border-color:var(--acc); color:var(--acc); }}
+  .rename-btn {{ margin-left:8px; font-size:11px; padding:0 5px; border-radius:5px; border:1px solid var(--line); background:transparent; color:var(--dim); cursor:pointer; }}
+  .rename-btn:hover {{ border-color:var(--acc); color:var(--acc); }}
+  .sa-core {{ color:var(--acc); font-weight:600; }}
+  .chip {{ display:inline-block; font-size:10px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); margin-right:4px; vertical-align:1px; }}
+  .chip.tier-L0 {{ background:rgba(154,154,164,.18); color:#c8c8d0; border-color:rgba(154,154,164,.45); }}
+  .chip.tier-L1 {{ background:rgba(158,172,234,.15); color:#9eacea; border-color:rgba(158,172,234,.45); }}
+  .chip.tier-L2 {{ background:rgba(229,192,123,.15); color:#e5c07b; border-color:rgba(229,192,123,.45); }}
+  .chip.tier-L3 {{ background:rgba(78,201,160,.15); color:#4ec9a0; border-color:rgba(78,201,160,.45); }}
+  .chip.mnode {{ background:rgba(78,201,160,.1); color:#4ec9a0; border-color:rgba(78,201,160,.3); }}
+  .chip.none {{ background:transparent; color:var(--dim); }}
+  .think-row {{ padding:6px 12px; font-size:11px; color:var(--dim); cursor:pointer; display:flex; gap:8px; align-items:baseline; border-bottom:1px solid var(--line); }}
+  .think-row .think-head {{ color:var(--acc); font-weight:600; flex-shrink:0; }}
+  .think-row .think-body {{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:88%; }}
+  .think-row.open .think-body {{ white-space:pre-wrap; word-break:break-all; max-height:200px; overflow:auto; }}
+  .resume-list {{ position:absolute; right:12px; bottom:54px; width:280px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.3); z-index:10; max-height:260px; overflow:auto; }}
+  .resume-opt {{ padding:8px 10px; font-size:12px; cursor:pointer; border-bottom:1px solid var(--line); color:var(--text); word-break:break-all; }}
+  .resume-opt:hover {{ background:rgba(158,172,234,.12); }}
   .mnode {{ color:var(--acc); }}
   .cont-banner {{ padding:6px 12px; font-size:11px; color:var(--acc); border-bottom:1px solid var(--line); background:rgba(158,172,234,.07); }}
   .grp-head .arrow {{ color:var(--acc); width:12px; display:inline-block; }}
@@ -654,6 +684,8 @@ fn index_html(cfg: &PanelConfig) -> String {
       <div class="chat-input">
         <input id="chat-text" type="text" placeholder="输入消息，回车发送（Enter 发送 / Esc 清除）" autocomplete="off">
         <button class="btn" onclick="sendChat()">发送</button>
+        <button class="btn ghost" onclick="toggleResume()" title="续接某段经历继续对话">续接</button>
+        <div id="resume-list" class="resume-list" style="display:none;"></div>
       </div>
         </div>
       </div>
@@ -714,21 +746,27 @@ fn index_html(cfg: &PanelConfig) -> String {
     periods.forEach(function (p) {{
       var div = document.createElement('div');
       div.className = 'ses-item' + (selectedPeriod === p.job_id ? ' sel' : '');
+      var title = p.name || p.preview || '(无用户输入)';
       div.innerHTML = '<div class="t">' + esc(p.first_ts.slice(5,19)) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id) + '</span>' +
-        '<button class="resume-btn" data-job="' + esc(p.job_id) + '">继续</button></div><div class="p">' + esc(p.preview || '(无用户输入)') + '</div>';
+        '<button class="rename-btn" title="重命名">✎</button></div><div class="p">' + esc(title) + '</div>';
       div.onclick = function () {{
         selectedPeriod = p.job_id;
         showView('engram');
         selectPeriod(p.job_id);
       }};
-      var rb = div.querySelector('.resume-btn');
-      if (rb) rb.onclick = function (ev) {{
+      var rn = div.querySelector('.rename-btn');
+      if (rn) rn.onclick = function (ev) {{
         ev.stopPropagation();
-        chatJobId = p.job_id;
-        selectedPeriod = p.job_id;
-        showView('chat');
-        var b = document.getElementById('cont-banner');
-        if (b) {{ b.style.display = ''; b.innerHTML = '续接经历 <span class="tid">' + esc(chatJobId) + '</span> —— 下一句话延续这段对话（点新经历或刷新即取消）'; }}
+        var cur = p.name || '';
+        var name = window.prompt('重命名这段经历（留空恢复自动名）', cur);
+        if (name === null) return;
+        fetch('/api/sessions/rename', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ job_id: p.job_id, name: name }})
+        }}).then(function (r) {{ return r.json(); }}).then(function () {{
+          loadSessions();
+        }});
       }};
       box.appendChild(div);
     }});
@@ -758,38 +796,14 @@ fn index_html(cfg: &PanelConfig) -> String {
       '<span>Tools <b>' + tools + '</b></span>' +
       (verdicts.length ? '<span>Verdict <b class="' + (verdicts[0] === 'Met' ? 'ok' : 'bad') + '">' + esc(verdicts.join(',')) + '</b></span>' : '') +
       '<span class="tid">' + esc(jobId) + '</span></div>';
-    html += ganttSvg(events);
+    // DSH-style trace is a turn outline, not a time axis: the event rows
+    // below are the rail (compact, badge + timestamp + summary). The
+    // gantt experiment was dropped — a time axis added noise without
+    // structure (2026-09-08, after checking the DSH implementation).
     events.forEach(function (e) {{
       html += '<div class="ev-row">' + eventSummary(e) + '</div>';
     }});
     main.innerHTML = html;
-  }}
-
-  // DSH-style turn trace, Helix vocabulary: one horizontal bar per event
-  // on a shared time axis (first -> last). tool/call -> tool/result pairs
-  // show as consecutive bars, so a 276ms calc reads at a glance. Pure SVG,
-  // zero dependencies; skipped when timestamps are unparseable.
-  function ganttSvg(events) {{
-    var first = Date.parse(events[0].time), last = Date.parse(events[events.length-1].time);
-    if (isNaN(first) || isNaN(last) || last <= first) return '';
-    var span = last - first;
-    var html = '<div class="gantt">';
-    events.forEach(function (e) {{
-      var t = Date.parse(e.time);
-      if (isNaN(t)) return;
-      var left = Math.round((t - first) / span * 100);
-      var width = 1;
-      if (e.type === 'tool/result' && e.data && e.data.duration_ms) {{
-        width = Math.max(1, Math.round(e.data.duration_ms / span * 100));
-        left = Math.max(0, left - width);
-      }}
-      var key = e.type.replace('/','-');
-      var color = CHAT_META[key] || '#9a9aa4';
-      html += '<div class="row"><span class="lbl">' + esc(e.time.slice(11,19)) + '</span><span class="track">' +
-        '<span class="bar" style="position:absolute;left:' + left + '%;width:' + width + '%;background:' + color + ';"></span></span></div>';
-    }});
-    html += '<div class="axis">' + esc(events[0].time.slice(11,19)) + ' → ' + esc(events[events.length-1].time.slice(11,19)) + ' · ' + span + 'ms · 每行=一个事件 · 横条=执行耗时</div></div>';
-    return html;
   }}
 
   function eventSummary(e) {{
@@ -798,17 +812,17 @@ fn index_html(cfg: &PanelConfig) -> String {
     if (e.type === 'user/message') body = esc(d.text || '');
     else if (e.type === 'context/inject') {{
       body = 'nodes=' + d.nodes + ' · chars=' + d.chars;
-      if (d.resume_from) body += ' · resume=' + esc(d.resume_from);
+      if (d.resume_from) body += ' · <span class="chip none">resume</span> ' + esc(d.resume_from);
       var ch = d.choice;
       if (ch) {{
         var t = ch.tiers || {{}};
-        var parts = [];
-        for (var k in t) {{ if (t.hasOwnProperty(k)) parts.push(k + '×' + t[k]); }}
-        body += ' · SA-Core 选择 {{' + (parts.join(' ') || '—') + '}}';
+        var chips = [];
+        for (var k in t) {{ if (t.hasOwnProperty(k)) chips.push('<span class="chip tier tier-' + esc(k) + '">' + esc(k) + '×' + t[k] + '</span>'); }}
+        body += ' · <span class="sa-core">SA-Core 选择</span> ' + (chips.join('') || '<span class="chip none">—</span>');
         var top = ch.top || [];
         for (var i = 0; i < top.length; i++) {{
           var n = top[i];
-          body += ' · <span class="mnode">' + esc(n.tier) + '·' + esc(n.id) + ' ' + n.heat + ' ' + esc(n.phase || '') + '</span>';
+          body += '<span class="chip mnode" title="' + esc(n.id) + '">' + esc(n.tier) + '·' + n.heat + ' ' + esc(n.phase || '') + '</span>';
         }}
       }}
     }}
@@ -864,6 +878,45 @@ fn index_html(cfg: &PanelConfig) -> String {
     return d.querySelector('.body');
   }}
 
+  // DSH-style reasoning disclosure (ReasoningRow): a collapsible think row
+  // above the answer. Streamed while running; click to expand/collapse.
+  function addThinkRow() {{
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'think-row';
+    d.innerHTML = '<span class="think-head">思考</span><span class="think-body"></span>';
+    d.onclick = function () {{ d.classList.toggle('open'); }};
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    return d.querySelector('.think-body');
+  }}
+
+  // Resume-from-experience dropdown: sits in the chat-input's bottom-right,
+  // listing the latest periods to continue (explicit, never implicit).
+  function toggleResume() {{
+    var list = document.getElementById('resume-list');
+    if (list.style.display !== 'none') {{ list.style.display = 'none'; return; }}
+    fetch('/api/sessions').then(function (r) {{ return r.json(); }}).then(function (j) {{
+      var periods = (j.periods || []).slice(0, 8);
+      list.innerHTML = periods.map(function (p) {{
+        var title = p.name || p.preview || '(无用户输入)';
+        return '<div class="resume-opt" data-job="' + esc(p.job_id) + '">' + esc(title) + ' <span class="dim">' + esc(p.job_id.slice(0, 20)) + '</span></div>';
+      }}).join('') || '<div class="empty">尚无经历</div>';
+      list.style.display = '';
+      list.querySelectorAll('.resume-opt').forEach(function (el) {{
+        el.onclick = function () {{
+          chatJobId = el.getAttribute('data-job');
+          list.style.display = 'none';
+          var b = document.getElementById('cont-banner');
+          if (b) {{ b.style.display = ''; b.innerHTML = '续接经历 <span class="tid">' + esc(chatJobId) + '</span> —— 下一句话延续这段对话'; }}
+          document.getElementById('chat-text').focus();
+        }};
+      }});
+    }}).catch(function () {{ list.innerHTML = '<div class="empty">经历列表拉取失败</div>'; list.style.display = ''; }});
+  }}
+
   function sendChat() {{
     var input = document.getElementById('chat-text');
     var text = input.value.trim();
@@ -896,6 +949,7 @@ fn index_html(cfg: &PanelConfig) -> String {
       var dec = new TextDecoder();
       var buf = '';
       var bodyEl = null;
+      var thinkEl = null;
       function pump() {{
         return reader.read().then(function (x) {{
           if (x.done) {{ finish(); return; }}
@@ -911,6 +965,12 @@ fn index_html(cfg: &PanelConfig) -> String {
             var j;
             try {{ j = JSON.parse(payload); }} catch (e) {{ continue; }}
             if (j.error) {{ showError(j.error); finish(); return; }}
+            if (j.think) {{
+              if (!thinkEl) thinkEl = addThinkRow();
+              thinkEl.textContent += j.think;
+              var box = document.getElementById('chat-msgs');
+              box.scrollTop = box.scrollHeight;
+            }}
             if (j.delta) {{
               if (!bodyEl) bodyEl = addStreamMsg();
               bodyEl.textContent += j.delta;
@@ -919,7 +979,10 @@ fn index_html(cfg: &PanelConfig) -> String {
             }}
             if (j.done) {{
               if (!bodyEl) bodyEl = addStreamMsg();
-              if (j.reply && !bodyEl.textContent) bodyEl.textContent = j.reply;
+              // reply is the authoritative full text — overwrite the
+              // typewriter accumulation so a dropped delta can never leave
+              // a truncated answer on screen.
+              if (j.reply) bodyEl.textContent = j.reply;
               finish(); return;
             }}
           }}
@@ -1018,6 +1081,7 @@ fn index_html(cfg: &PanelConfig) -> String {
   // the interactive entry points explicitly (they live in this IIFE).
   window.showView = showView;
   window.sendChat = sendChat;
+  window.toggleResume = toggleResume;
   window.applyFilter = applyFilter;
   window.clearFilter = clearFilter;
 }})();
@@ -1044,6 +1108,8 @@ mod tests {
         assert_eq!(route("/api/audit?limit=50"), Route::Audit);
         assert_eq!(route("/api/trace"), Route::Trace);
         assert_eq!(route("/api/chat"), Route::Chat);
+        assert_eq!(route("/api/sessions"), Route::Sessions);
+        assert_eq!(route("/api/sessions/rename"), Route::SessionsRename);
         assert_eq!(route("/api/trace?trace_id=run-x"), Route::Trace);
     }
 
