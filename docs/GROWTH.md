@@ -213,3 +213,22 @@ README（输入框交互）｜ GROWTH｜ ECOSYSTEM v1.57
 
 ### 状态
 🧬 已完成
+
+## 记录 31：Web 同构映射——Engram 印痕上 Web（2026-09-07）
+
+### 触发条件
+Engram TUI 面板落地后，用户拍板顺序 ②：Web 同构映射（DSH 风格参考，TUI=Web 单一状态模型——"同一个真相的两个投影，硅基/碳基都可参看，无歧义"）。
+
+### 变更性质
+- **cellrix-web 双视图**：Cockpit（Anaphase snapshot）/ Engram（Tuck /v1/audit 链）——顶栏按钮切换，镜像 TUI 的 Ctrl+E
+- **/api/audit Bearer 代理**：`--tuck-endpoint/--tuck-key/--tuck-limit`（default 200，CLI 契约）+ env（TUCK_*）；身份凭证只留在 server 侧，浏览器永远拿不到
+- **同构数据模型**：proxy 透传 Tuck EngramQuery（entries[]: seq/ts/payload{kind,trace_id,data}/prev_hash/hash）——与 TUI TuckAuditFetcher 解析同一响应、同一字段语义
+- **Engram 面板**：overview 条（链游标/count/queried_by/错误）+ 比例网格 timeline 2fr / detail 1fr；点击行 → 完整印痕（caller/destination/status/verdicts/prev_hash/hash + 原始 payload JSON）；trace_id 过滤框（Enter 应用/Esc 清）；窄屏单列降级
+- **测试**：web 3→5（audit route/config 派生/tuck 未配置/index 双视图字段），Cellrix 325→**327** 全绿
+- **真实验证**：cellrix-web 起 8099 → /api/audit 拉真链 count 6、SHA-256 64 位、trace_id join 就位；内嵌 JS `node --check` 语法通过
+
+### 验收
+README（§7.3 Web projection）｜ PLAN 当前阶段｜ ECOSYSTEM v1.61（Cellrix 325→327）
+
+### 状态
+🧬 已完成（下一步：Web 优化——DSH 风格深化轨迹回放）

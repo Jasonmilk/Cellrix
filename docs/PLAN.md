@@ -7,7 +7,7 @@
 
 ---
 
-## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017）** + **Engram（印痕）审计面板（2026-09-07：Tuck /v1/audit 真实链消费，Ctrl+E 切换，时间线/详情/链完整性，本地 trace 过滤，虚拟列表，live 链校验全过）**——下一步 Web 同构映射（DSH 风格 UI/UX，TUI=Web 单一状态模型）
+## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017）** + **Engram（印痕）审计面板（2026-09-07：Tuck /v1/audit 真实链消费，Ctrl+E 切换，时间线/详情/链完整性，本地 trace 过滤，虚拟列表，live 链校验全过）** + **Web 同构映射（2026-09-07：cellrix-web 双视图 Cockpit/Engram，/api/audit Bearer 代理与 TUI 同一 EngramEntry 数据模型，比例网格 timeline 2fr/detail 1fr，trace 过滤，327 全绿）**——下一步：Web 优化（DSH 风格深化：轨迹回放/时间线动效）
 
 **状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
 

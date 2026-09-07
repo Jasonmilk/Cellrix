@@ -301,6 +301,24 @@ cellrix-cli run --mode stdio --exec ./target/debug/mock-agent \
 - Detail column shows kind / trace / caller / destination / status / verdicts /
   chain `prev_hash` / `hash` — the tamper-evidence link is inspectable, not assumed
 
+**Web projection (isomorphic)** — the browser renders the *same data model*
+the TUI shows (one truth, two projections; silicon and carbon read the same
+picture). `cellrix-web` proxies `/api/snapshot` (Anaphase) and `/api/audit`
+(Tuck chain, Bearer injected here — the identity credential never reaches
+the browser):
+
+```bash
+cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
+# -> http://127.0.0.1:8080  (WEB_PORT / --port override)
+```
+
+- Top bar buttons switch Cockpit ↔ Engram (mirrors the TUI `Ctrl+E`)
+- Engram panel: overview strip / timeline `2fr` + detail `1fr` proportional
+  grid; click a row for the full imprint (caller / destination / status /
+  verdicts / prev_hash / hash + raw payload)
+- trace_id filter box (Enter applies, Esc clears)
+- Auto-poll both projections every 2s; audit limit default 200 (CLI contract)
+
 Live gateway verification (needs Tuck running on :60052):
 ```bash
 cargo test -p cellrix-transport --all-features -- --ignored live
