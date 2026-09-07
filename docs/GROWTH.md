@@ -381,3 +381,16 @@ README（bind 节）｜ GROWTH｜ ECOSYSTEM v1.68（Anaphase 225 / Cellrix 336�
 
 ### 状态
 🧬 已完成
+
+## 记录 40：消除 up 重名歧义（2026-09-07）
+
+### 触发条件
+用户实测 `cargo run --bin up` 报错：cellrix-cli 与 cellrix-web 两个包各有 `up` bin。
+
+### 变更性质
+- 删除 `cli/src/bin/up.rs`（旧转发入口，34 行，转发到不存在的 anaphase-helix/target/debug/up——本就是断的）
+- 唯一保留 `cellrix-web` 的完整引导器 up（首跑引导/绑定/面板）
+- 验证：`cargo run --bin up` 唯一解析，直达引导器
+
+### 状态
+🧬 已完成
