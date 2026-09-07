@@ -275,6 +275,11 @@ pub fn post_json(
 /// arrive. This proxy is a byte pipe — it never parses the SSE framing,
 /// it only relays. `on_chunk` is called for every read; an `Err` from it
 /// aborts the relay (e.g. the browser socket closed mid-stream).
+/// Streamed POST (SSE): forwards origin body bytes to the browser as they
+/// arrive. This proxy is a proper HTTP relay — it strips the origin response
+/// head (the panel writes its own) and decodes chunked transfer encoding so
+/// the browser receives clean SSE lines (`data: ...`) with no framing noise.
+/// It never parses the SSE semantics, only the HTTP transport.
 pub fn post_stream(
     base: &str,
     path: &str,
@@ -284,15 +289,105 @@ pub fn post_stream(
 ) -> Result<(), String> {
     let mut stream = post_open(base, path, body, bearer, true)?;
     use std::io::Read;
-    let mut chunk = [0u8; 8192];
-    loop {
-        match stream.read(&mut chunk) {
-            Ok(0) => break, // origin closed = stream end
-            Ok(n) => on_chunk(&chunk[..n]).map_err(|e| e.to_string())?,
-            Err(e) => return Err(e.to_string()),
+
+    // 1. Read the response head (up to the blank line) and discard it.
+    let mut head = Vec::new();
+    let mut tmp = [0u8; 8192];
+    let mut head_end = None;
+    while head_end.is_none() {
+        let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
+        if n == 0 {
+            return Err("empty origin response".to_string());
+        }
+        head.extend_from_slice(&tmp[..n]);
+        if let Some(pos) = find_sub(&head, b"\r\n\r\n") {
+            head_end = Some(pos + 4);
+        }
+    }
+    let head_end = head_end.unwrap();
+    let head_text = String::from_utf8_lossy(&head[..head_end.saturating_sub(4)]);
+    let chunked = head_text
+        .to_ascii_lowercase()
+        .contains("transfer-encoding: chunked");
+    let mut buffered = head[head_end..].to_vec();
+
+    // 2. Relay the body. Chunked is decoded (transport-level, not SSE
+    //    semantics); anything else is forwarded byte-for-byte.
+    let mut done = false;
+    while !done {
+        if chunked {
+            // chunk size line
+            let size_line = read_line_from(&mut stream, &mut buffered)?;
+            let size_text = String::from_utf8_lossy(&size_line);
+            let size_text = size_text.split(';').next().unwrap_or("").trim();
+            let size = usize::from_str_radix(size_text, 16)
+                .map_err(|_| format!("bad chunk size: {size_text}"))?;
+            if size == 0 {
+                done = true; // terminal chunk; trailer (if any) is ignored
+                break;
+            }
+            // chunk payload
+            let mut payload = Vec::with_capacity(size.min(65536));
+            let mut remaining = size;
+            while remaining > 0 {
+                if !buffered.is_empty() {
+                    let take = remaining.min(buffered.len());
+                    payload.extend_from_slice(&buffered[..take]);
+                    buffered.drain(..take);
+                    remaining -= take;
+                } else {
+                    let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
+                    if n == 0 {
+                        return Err("origin ended mid-chunk".to_string());
+                    }
+                    buffered.extend_from_slice(&tmp[..n]);
+                }
+            }
+            on_chunk(&payload).map_err(|e| e.to_string())?;
+            // chunk terminator CRLF
+            let _ = read_line_from(&mut stream, &mut buffered)?;
+        } else {
+            if !buffered.is_empty() {
+                on_chunk(&buffered).map_err(|e| e.to_string())?;
+                buffered.clear();
+            }
+            match stream.read(&mut tmp) {
+                Ok(0) => done = true,
+                Ok(n) => on_chunk(&tmp[..n]).map_err(|e| e.to_string())?,
+                Err(e) => return Err(e.to_string()),
+            }
         }
     }
     Ok(())
+}
+
+/// Index of the first occurrence of `needle` in `hay`, or None.
+fn find_sub(hay: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || hay.len() < needle.len() {
+        return None;
+    }
+    hay.windows(needle.len()).position(|w| w == needle)
+}
+
+/// Read one line (terminated by CRLF or LF) from buffered + stream.
+fn read_line_from(
+    stream: &mut TcpStream,
+    buffered: &mut Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let mut tmp = [0u8; 8192];
+    loop {
+        if let Some(pos) = find_sub(buffered, b"\n") {
+            let line = buffered[..pos].to_vec();
+            buffered.drain(..pos + 1);
+            return Ok(line);
+        }
+        let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
+        if n == 0 {
+            return Err("origin ended mid-line".to_string());
+        }
+        buffered.extend_from_slice(&tmp[..n]);
+    }
 }
 
 fn read_http_body(stream: &mut TcpStream) -> Result<String, String> {

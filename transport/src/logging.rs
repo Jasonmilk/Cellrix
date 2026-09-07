@@ -203,6 +203,7 @@ pub fn is_logging_initialized() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::LogFormat;
 
     #[test]
     fn test_log_error_display() {

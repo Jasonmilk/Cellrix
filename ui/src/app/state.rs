@@ -69,8 +69,12 @@ impl AppState {
             mouse_capture: true,
             active_agents,
             current_agent,
-            input_action: None,
-            chat_focused: false,
+            // Pre-focused chat box: the driver opens the TUI and can type
+            // immediately (Enter is no longer needed to arm the box — a
+            // selected action button used to swallow Enter and confuse the
+            // "where do I type" flow). Tab still moves focus away.
+            input_action: Some("send_message".to_string()),
+            chat_focused: true,
             input_buffer: String::new(),
             last_response: None,
         }
@@ -100,9 +104,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn input_fields_start_inert() {
+    fn input_fields_start_prefocused() {
         let state = AppState::new("test-agent".to_string());
-        assert_eq!(state.input_action, None);
+        assert_eq!(state.input_action.as_deref(), Some("send_message"));
+        assert!(state.chat_focused);
         assert!(state.input_buffer.is_empty());
         assert_eq!(state.last_response, None);
     }

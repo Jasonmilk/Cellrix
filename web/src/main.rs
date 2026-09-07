@@ -417,6 +417,11 @@ fn index_html(cfg: &PanelConfig) -> String {
   .chat-input {{ display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); }}
   .chat-input input {{ flex:1; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; outline:none; }}
   .chat-input input:focus {{ border-color:var(--acc); }}
+  .toast {{ position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:50;
+            background:#2a1f24; border:1px solid var(--bad); color:#ffb4b6;
+            padding:8px 16px; border-radius:10px; font-size:12px; max-width:70%;
+            box-shadow:0 4px 18px rgba(0,0,0,.35); }}
+  .msg .ts {{ float:right; margin-left:10px; font-size:10px; color:var(--dim); opacity:.75; }}
   .btn {{ background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:6px 14px; font-size:12px; font-family:inherit; cursor:pointer; }}
   .btn.on {{ color:var(--acc); border-color:var(--acc); background:rgba(158,172,234,.12); }}
   .badge {{ padding:4px 12px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid var(--line); }}
@@ -542,13 +547,31 @@ fn index_html(cfg: &PanelConfig) -> String {
     if (v==='chat') document.getElementById('chat-text').focus();
   }}
 
+  // One centered toast for system-level errors — never a Helix speech bubble
+  // (a transport failure is not Helix talking, it is the cockpit reporting).
+  function showError(msg) {{
+    var old = document.querySelector('.toast');
+    if (old) old.remove();
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = '⚠ ' + msg;
+    document.body.appendChild(t);
+    setTimeout(function () {{ t.remove(); }}, 5000);
+  }}
+
+  function nowTs() {{
+    var d = new Date();
+    function p(n) {{ return (n < 10 ? '0' : '') + n; }}
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }}
+
   function addMsg(who, text, isErr) {{
     var box = document.getElementById('chat-msgs');
     var empty = box.querySelector('.empty');
     if (empty) empty.remove();
     var d = document.createElement('div');
     d.className = 'msg ' + who + (isErr ? ' err' : '');
-    d.innerHTML = '<span class="who">' + (who==='user' ? '你' : 'Helix') + '</span>' + esc(text);
+    d.innerHTML = '<span class="who">' + (who==='user' ? '你' : 'Helix') + '<span class="ts">' + nowTs() + '</span></span>' + esc(text);
     box.appendChild(d);
     box.scrollTop = box.scrollHeight;
   }}
@@ -608,7 +631,7 @@ fn index_html(cfg: &PanelConfig) -> String {
             if (!payload) continue;
             var j;
             try {{ j = JSON.parse(payload); }} catch (e) {{ continue; }}
-            if (j.error) {{ addMsg('helix', '⚠ ' + j.error, true); finish(); return; }}
+            if (j.error) {{ showError(j.error); finish(); return; }}
             if (j.delta) {{
               if (!bodyEl) bodyEl = addStreamMsg();
               bodyEl.textContent += j.delta;
@@ -626,7 +649,7 @@ fn index_html(cfg: &PanelConfig) -> String {
       }}
       return pump();
     }}).catch(function (e) {{
-      addMsg('helix', '⚠ 发送失败: ' + e.message, true);
+      showError('发送失败: ' + e.message);
     }}).finally(function () {{
       finish();
     }});

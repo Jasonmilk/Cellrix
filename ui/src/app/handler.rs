@@ -484,3 +484,56 @@ impl InputHandler {
         Ok(response)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cellrix_protocol::{ActionRequest, ActionResponse, CapabilityManifest};
+    use cellrix_transport::{CapTransport, TransportError, TransportStream};
+    use std::pin::Pin;
+    use std::sync::Mutex as StdMutex;
+    use tokio_stream::Stream;
+
+    struct RecordingTransport {
+        sent: Arc<StdMutex<Vec<String>>>,
+    }
+    #[async_trait::async_trait]
+    impl CapTransport for RecordingTransport {
+        async fn connect(&mut self) -> Result<(CapabilityManifest, TransportStream), TransportError> {
+            Err(TransportError::NotImplemented("mock".to_string()))
+        }
+        async fn send_action(&mut self, request: ActionRequest) -> Result<ActionResponse, TransportError> {
+            self.sent.lock().unwrap().push(request.parameters["message"].as_str().unwrap_or("").to_string());
+            Ok(ActionResponse::Success { message: "ok".to_string() })
+        }
+    }
+
+    #[tokio::test]
+    async fn prefocused_typing_sends_on_enter() {
+        // Startup is pre-focused: typing needs no Enter arm.
+        let mut state = AppState::new("t".to_string());
+        assert!(state.chat_focused);
+        assert_eq!(state.input_action.as_deref(), Some("send_message"));
+        let sent = Arc::new(StdMutex::new(Vec::new()));
+        let mut transport: Box<dyn CapTransport> = Box::new(RecordingTransport { sent: sent.clone() });
+        let req_map = Arc::new(Mutex::new(HashMap::new()));
+        let key_map = KeyMap::default();
+
+        // Type "ping" directly.
+        for c in ['p', 'i', 'n', 'g'] {
+            InputHandler::handle_key(&mut state, &mut transport, &req_map, &key_map, KeyCode::Char(c), KeyModifiers::NONE)
+                .await
+                .unwrap();
+        }
+        assert_eq!(state.input_buffer, "ping");
+
+        // Enter sends the draft and keeps the box focused.
+        InputHandler::handle_key(&mut state, &mut transport, &req_map, &key_map, KeyCode::Enter, KeyModifiers::NONE)
+            .await
+            .unwrap();
+        assert!(state.input_buffer.is_empty());
+        assert!(state.chat_focused);
+        assert_eq!(state.last_response.as_deref(), Some("✓ ok"));
+        assert_eq!(*sent.lock().unwrap(), vec!["ping"]);
+    }
+}

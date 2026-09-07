@@ -31,6 +31,24 @@
 - 排障记录：std 阻塞 accept 卡死 current_thread runtime（改 tokio::net）；`replace('#','%23')` 双重编码（交 reqwest 自动编码）；header 大小写（hyper 小写化）
 - Cellrix 321 → **325** 全绿（`--all-features`，0 failed）；Engram 数据层/状态层纯逻辑，Web 端可同构复用（TUI=Web 单一状态模型）
 
+
+## 健康快照 #12：WebUI 流式对话根治 + TUI 预聚焦（2026-09-07）
+
+**变异类型**：三处交互根因修复——用户实测 WebUI 发送无回复、TUI 打完字看不到、错误提示位置。
+
+- **WebUI 无回复根因（post_stream 透传 Anaphase 响应头）**：面板字节管道把 Anaphase 的
+  `HTTP/1.1 200 OK...` 响应头 + chunked 帧（`19\r\ndata:...`）原样透传——前端 SSE 解析被
+  头文本与 chunk 大小行前缀污染，所有事件丢弃 → 无回复。修复：post_stream 升级为完整 HTTP
+  中继——剥响应头（面板写自己的头）+ 解码 chunked 传输编码（仅传输层，不解析 SSE 语义），
+  浏览器收到干净 `data:` 行。node 浏览器等效测试：18 个 delta + done 行 + 流式累积 == 最终回复。
+- **TUI 打字看不到根因（Enter 聚焦被选中按钮拦截）**：Enter 聚焦输入框前先判断
+  button_selected——选中 ActionButton 时 Enter 激活按钮而非聚焦。修复：启动即预聚焦
+  （chat_focused=true + input_action=Some）——打开就能打字，Tab 仍可移焦。
+- **WebUI 错误提示位置 + 时间戳**（学 Cherry Studio/DSH）：错误改居中 toast（系统级提示条，
+  不再冒充 Helix 对话气泡）；每条消息带 HH:MM 时间戳。
+- transport LogFormat 测试 import 修复（全量 workspace 测试暴露）。
+- 测试：+2（prefocused_typing_sends_on_enter / input_fields_start_prefocused）→ 337 全绿。
+
 ## 健康快照 #8：P6 完成 — 生产就绪（配置/日志/监控/部署）🎉 全部阶段完成
 
 **日期**：2026-08-30
