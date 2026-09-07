@@ -204,7 +204,7 @@ cargo build --target wasm32-unknown-unknown -p cellrix-layout
 
 The cockpit projects the Anaphase conscious-layer snapshot (mode / cognitive
 state / episode / ledger) — a white-box window into the agent. Point it at a
-running Anaphase (the `up` launcher in anaphase-helix starts one for you).
+running Anaphase (the `up` launcher below starts one for you).
 
 **Two transports** (choose one; `--mode` is the transport, not the app mode):
 
@@ -267,6 +267,41 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 **已验证**（2026-09-06）：`anaphase :50061 snapshot → cellrix-web :8080 代理`
 全链路实测通过——mode / state / episode / ledger / ecosystem 六组件点亮，
 2 秒轮询，`curl http://127.0.0.1:8080/api/snapshot` 返回真实快照。
+
+### 6.5 从零开始（推荐 · 一个入口，之后只有回车）
+
+The one-command path — no flags, no commands to remember:
+
+```bash
+# 1. Build once
+cargo build --release --workspace
+
+# 2. First run: guided — press Enter, and when asked, paste the Anaphase
+#    start command once (e.g. `ANAPHASE_CONFIG=/path/to/config.toml /path/to/anaphase`).
+#    It is saved to ~/.cellrix/up.toml (0600) and never asked again.
+cargo run -p cellrix-web --bin up
+
+# 3. Every later run: Enter, Enter — browser opens.
+cargo run -p cellrix-web --bin up
+```
+
+What `up` does, step by step:
+
+1. Probes Anaphase (`/v1/health`) and Tuck (audit chain).
+2. Healthy → `✅ 运行中`; down + saved command → `[1] 启动 [2] 跳过` (Enter = 1).
+3. Nothing saved yet → asks once for the start command, persists it.
+4. Launches the cockpit panel and opens the browser. Ctrl+C stops it.
+5. **Fail-closed**: if Tuck is configured but unreachable, Anaphase refuses
+   to reason and tells you (`⚠️ Tuck 不在岗，已停止工作`) — restore Tuck
+   and re-run. The panel always shows the honest state.
+
+Minimum prerequisites for Anaphase to actually reason:
+
+- `config.toml`: `reasoning_endpoint` (an OpenAI-compatible LLM — e.g. the
+  Tuck gateway `http://127.0.0.1:60052/v1`) and `reasoning_api_key`.
+- Tuck gateway running (LLM traffic + audit chain, `tuck_endpoint` set).
+- Everything else (`/v1/health`) reports `not configured` honestly until
+  you point it at real organs — no fake green.
 
 ## 7. Testing & Verification
 
