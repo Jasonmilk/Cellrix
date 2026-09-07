@@ -232,3 +232,20 @@ README（§7.3 Web projection）｜ PLAN 当前阶段｜ ECOSYSTEM v1.61（Cellr
 
 ### 状态
 🧬 已完成（下一步：Web 优化——DSH 风格深化轨迹回放）
+
+## 记录 32：Engram 全文回放——正文上 Web（2026-09-07）
+
+### 触发条件
+顺序② Web 同构落地后，用户拍板①（Engram 最后一公里）：点审计条目能看到该轮思考正文。
+
+### 变更性质
+- **web `/api/trace` 代理**：透传 `trace_id` query → Anaphase `/v1/trace`（正文在 Anaphase 侧，写入时已脱敏——凭证不经过本条路径）
+- **detail 面板"正文回放"区**：点击时间线行 → 异步拉该轮 prompt/response（ts/model 标注）；未配置 trace path / 无正文 → 明确空态（引导 README 配置）
+- **测试**：route +1（/api/trace），Cellrix 327 不变
+- **真实验证**：cellrix-web → /api/trace?trace_id=run-a430d84680aabd0b → 真实 "hello"→"Hello! How can I help you today?"（全链路物理成立）
+
+### 验收
+README（§7.3 full-text replay）｜ GROWTH｜ ECOSYSTEM v1.62
+
+### 状态
+🧬 已完成

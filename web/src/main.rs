@@ -44,6 +44,7 @@ fn route(path: &str) -> Route {
         "" => Route::Index,
         "api/snapshot" => Route::Snapshot,
         "api/audit" => Route::Audit,
+        "api/trace" => Route::Trace,
         _ => Route::NotFound,
     }
 }
@@ -53,6 +54,7 @@ enum Route {
     Index,
     Snapshot,
     Audit,
+    Trace,
     NotFound,
 }
 
@@ -184,6 +186,30 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
                     let msg =
                         "{\"configured\":false,\"count\":0,\"queried_by\":\"\",\"entries\":[]}";
                     respond(&mut stream, 200, "application/json", msg.as_bytes())?;
+                }
+            }
+        }
+        Route::Trace => {
+            // Engram body half: proxy the Anaphase reasoning-trace query,
+            // passing the browser's query string (trace_id=...) through.
+            // The Anaphase side answers with redacted bodies — no
+            // credential ever rides this path (Redaction ran on write).
+            let q = text
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .unwrap_or("/api/trace");
+            let query = q.split('?').nth(1).unwrap_or("");
+            let target = if query.is_empty() {
+                "/v1/trace?limit=20".to_string()
+            } else {
+                format!("/v1/trace?{query}&limit=20")
+            };
+            match fetch_json(&cfg.anaphase_endpoint, &target, None) {
+                Ok(body) => respond(&mut stream, 200, "application/json", body.as_bytes())?,
+                Err(e) => {
+                    let msg = format!("{{\"configured\":false,\"count\":0,\"entries\":[],\"error\":\"{e}\"}}");
+                    respond(&mut stream, 502, "application/json", msg.as_bytes())?;
                 }
             }
         }
@@ -421,7 +447,36 @@ fn index_html(cfg: &PanelConfig) -> String {
     html += '<div class="line"><span class="key">prev_hash</span><span class="val">' + esc(e.prev_hash || '') + '</span></div>';
     html += '<div class="line"><span class="key">hash</span><span class="val">' + esc(e.hash || '') + '</span></div>';
     html += '<div class="line"><span class="key">payload</span></div><pre>' + esc(JSON.stringify(d, null, 2)) + '</pre>';
+    html += '<div class="line" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;"><span class="key">正文回放（Engram body）</span></div>';
+    html += '<div id="a-body"><div class="empty">读取正文…</div></div>';
     box.innerHTML = html;
+    fetchBody(e.payload.trace_id);
+  }}
+
+  function fetchBody(traceId) {{
+    if (!traceId) {{
+      document.getElementById('a-body').innerHTML = '<div class="empty">无 trace_id（元数据条目）</div>';
+      return;
+    }}
+    fetch('/api/trace?trace_id=' + encodeURIComponent(traceId)).then(function (r) {{ return r.json(); }}).then(function (j) {{
+      var box = document.getElementById('a-body');
+      if (!box) return;
+      if (j.configured === false) {{ box.innerHTML = '<div class="empty">Anaphase 未开启 reasoning_trace_path（README Engram body trace 一节）</div>'; return; }}
+      if (j.error) {{ box.innerHTML = '<div class="empty">正文查询失败: ' + esc(j.error) + '</div>'; return; }}
+      var es = j.entries || [];
+      if (!es.length) {{ box.innerHTML = '<div class="empty">该轮无正文记录（如 Noop 模式 / 非推理调用）</div>'; return; }}
+      var html = '';
+      es.forEach(function (en) {{
+        html += '<div class="line"><span class="key">ts</span><span class="val">' + esc(en.ts) + '</span></div>';
+        html += '<div class="line"><span class="key">model</span><span class="val">' + esc(en.model) + '</span></div>';
+        html += '<div class="line"><span class="key">prompt</span></div><pre>' + esc(en.prompt) + '</pre>';
+        html += '<div class="line"><span class="key">response</span></div><pre>' + esc(en.response) + '</pre>';
+      }});
+      box.innerHTML = html;
+    }}).catch(function (e) {{
+      var box = document.getElementById('a-body');
+      if (box) box.innerHTML = '<div class="empty">正文拉取失败: ' + esc(e) + '</div>';
+    }});
   }}
 
   function selectEntry(seq) {{ selected = seq; renderAudit(); renderDetail(); }}
@@ -518,6 +573,8 @@ mod tests {
         assert_eq!(route("/api/snapshot?x=1"), Route::Snapshot); // query stripped inside route
         assert_eq!(route("/api/audit"), Route::Audit);
         assert_eq!(route("/api/audit?limit=50"), Route::Audit);
+        assert_eq!(route("/api/trace"), Route::Trace);
+        assert_eq!(route("/api/trace?trace_id=run-x"), Route::Trace);
     }
 
     #[test]

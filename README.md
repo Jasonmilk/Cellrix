@@ -316,6 +316,9 @@ cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
 - Engram panel: overview strip / timeline `2fr` + detail `1fr` proportional
   grid; click a row for the full imprint (caller / destination / status /
   verdicts / prev_hash / hash + raw payload)
+- **Full-text replay** (2026-09-07): clicking an audit row also fetches that
+  round's bodies via `/api/trace` → Anaphase `/v1/trace` — prompt + response
+  of the exact round, redacted at write time, rendered under the imprint
 - trace_id filter box (Enter applies, Esc clears)
 - Auto-poll both projections every 2s; audit limit default 200 (CLI contract)
 
