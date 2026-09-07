@@ -50,6 +50,23 @@
 - 测试：+2（prefocused_typing_sends_on_enter / input_fields_start_prefocused）→ 337 全绿。
 
 
+
+## 健康快照 #14：chat 输入 = 语义树组件（根治"分层"）（2026-09-07）
+
+**变异类型**：用户再次严肃批评——"你看到没有，上下分层了！`^O Zen` 下面完全是和上面不一样的背景色，操作逻辑也变了！我觉得应该增加一个动态属性的输入框组件！你先把 Cellrix 的哲学与结构搞清楚，否则无法驾驭 Cellrix！"
+
+- **根因链（彻底弄清 Cellrix 内部逻辑后）**：
+  1. 上一轮 chat 面板虽从语义树派生数据，但仍是 run_loop 里硬切的 9 行旁路区——背景不同、焦点循环外，即用户看到的"分层"；
+  2. 布局引擎的底部槽位默认 active = 槽位第一个节点（status-action），send_message（needs_input）从未被渲染为输入框。
+- **修复（agent 驱动，零硬编码）**：
+  1. 新增 **InputBoxWidget**（动态属性输入框组件）：ActionButton 声明 needs_input → 渲染为输入面板（对话记录 谁+时间戳+文本 / 输入行 / 发送状态），落在自己网格槽位里——背景、边框、焦点循环与所有语义节点一致；
+  2. 布局：needs_input 节点获得更高底部槽位（input_bar_height，配置化）；槽位默认 active 优先 needs_input 节点——agent 要输入框，UI 就给输入框；
+  3. AppState 新增 manual_slot_overrides：Tab 手动切换的槽位保留选择，未切换槽位每帧跟随布局默认；
+  4. run_loop 恢复纯语义树布局（无旁路切片）。
+- **桥的确认**：用户提示"桥文件在 Anaphase 那边"——即 LayoutHints/GridDefinition（snapshot layout_overrides / manifest layout_hints）——Anaphase 声明布局与节点属性，Cellrix 执行。本轮 InputBox 属性（needs_input/placeholder/label）全部来自 Anaphase 声明的节点，Cellrix 不臆造。
+- 测试：340 全绿（新增 renderer 隔离测试：needs_input 渲染输入面板而非 "Click to execute"；布局双测试：输入面板 vs 普通按钮高度）。
+- pty 实测：打字回显、对话记录（你 20:07 ping / Helix 20:07 pong）、真实回复全链路通。
+
 ## 健康快照 #13：chat 面板接回语义树 + 对话记录同构（2026-09-07）
 
 **变异类型**：用户严肃批评——"`enter 发送 Esc 退出` 完全与 Cellrix 内部隔离，你需要了解 Cellrix 的内部逻辑"。
