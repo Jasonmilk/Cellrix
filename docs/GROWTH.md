@@ -341,3 +341,29 @@ README §up（引导流程）｜ GROWTH｜ ECOSYSTEM v1.66（Cellrix 333）
 
 ### 状态
 🧬 已完成
+
+## 记录 38：1对1 身份绑定——Anaphase 发起（2026-09-07）
+
+### 触发条件
+用户拍板：绑定由 Anaphase 发起（意识层自我认知动作，界面层只转达人类在场证明）。
+
+### 变更性质（Anaphase）
+- **src/bind.rs**：配对码（6 位，一次性 10 分钟）→ 人类确认（HITL）→ device_id + secret（32hex）→ 落盘 `~/.cellrix/anaphase-identity.json`（0600）
+- **验证四关**：device_id 已知 + ts 窗口 ±60s + nonce 一次性（有界 seen 集，v2 换 Bloom）+ HMAC（手写 RFC2104，复用已有 sha2，零新 crypto 依赖）
+- **cap_http 门禁**：绑定后除 /v1/bind/* + /v1/health 全端点验 Bearer；未绑定 = 开放（诚实 not bound，按需驱动）
+- **API**：POST /v1/bind/start / confirm + GET /v1/bind/status
+- **测试**：+6（RFC2202 向量、round-trip、重放拒绝、坏 HMAC、错码、持久化 0600），Anaphase 219→**225**
+- **真实验证**：未绑定 status → start → confirm → 无 auth 401 → 签名 200 → **重放 401** → health 保持 200 → 0600
+
+### 变更性质（Cellrix web）
+- **lib.rs**：client identity 读取（~/.cellrix/identity.toml）+ sign_bearer（HMAC，nonce=纳秒+pid 每请求唯一）+ post_json + extract_json_str（无 serde，极致节能）+3 测试
+- **main.rs**：Anaphase 三处 fetch 全部带 client_bearer()（绑定后面板仍可用）
+- **up**：绑定引导选择题（Anaphase 发起、up 只转达）→ 显示配对码 → 回车 → 落盘客户端 identity.toml（0600）
+- **测试**：web 11→**14**，Cellrix 333→**336**
+- **真实验证**：up 引导全闭环（选择题→配对码 863954→回车→✅ anaphase#912e...→双 0600→面板签名访问服务正常）
+
+### 验收
+README（bind 节）｜ GROWTH｜ ECOSYSTEM v1.68（Anaphase 225 / Cellrix 336）
+
+### 状态
+🧬 已完成

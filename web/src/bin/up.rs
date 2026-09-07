@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use cellrix_web::probe;
+use cellrix_web::{extract_json_str, post_json, probe};
 
 /// How long to wait for a component to become healthy after starting it.
 const WAIT_DEFAULT_SECS: u64 = 30;
@@ -269,6 +269,25 @@ fn ensure_guided(
     }
 }
 
+/// Persist the client half of the one-to-one binding (0600, never in git).
+fn save_client_identity(device_id: &str, secret: &str) -> Result<(), String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME unset".to_string())?;
+    let dir = std::path::Path::new(&home).join(".cellrix");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("identity.toml");
+    let body = format!(
+        "# up client identity (0600, never in git)\ndevice_id = \"{device_id}\"\nsecret = \"{secret}\"\n"
+    );
+    std::fs::write(&path, body).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Locate the panel binary: `CARGO_BIN_EXE_cellrix-web` under cargo, else
 /// the sibling of this executable (same build dir). No hardcoded path.
 fn web_bin() -> String {
@@ -360,7 +379,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
-    // 3. Launch the panel and open the browser.
+    // 3. One-to-one binding (2026-09-07): Anaphase is the challenger —
+    //    it mints the pairing code and verifies the confirm; `up` only
+    //    relays the human's physical presence (回车 = 在场证明, HITL).
+    //    Unbound = open, honest; bound = every panel request is signed.
+    let status_body = cellrix_web::fetch_json(&anaphase_endpoint, "/v1/bind/status", None).ok();
+    let bound = status_body
+        .as_deref()
+        .map(|b| b.contains("\"bound\":true"))
+        .unwrap_or(false);
+    if !bound {
+        let choice = ask(
+            "  要绑定这台设备吗（1对1 身份）？[1] 绑定  [2] 稍后（回车=1）: ",
+            1,
+        );
+        if choice == 1 {
+            match post_json(&anaphase_endpoint, "/v1/bind/start", "{}", None) {
+                Ok(resp) => {
+                    let Some(code) = extract_json_str(&resp, "pairing_code") else {
+                        println!("  绑定不可用：{resp}");
+                        return Ok(());
+                    };
+                    println!();
+                    println!("  ── 配对码（10 分钟内有效，仅显示在本机）──");
+                    println!("  {code}");
+                    println!("  ────────────────────────────────────────");
+                    print!("  确认绑定？回车确认（取消按 Ctrl+C）: ");
+                    let _ = std::io::stdout().flush();
+                    let mut _line = String::new();
+                    let _ = std::io::stdin().read_line(&mut _line);
+                    let body = format!("{{\"pairing_code\":\"{code}\"}}");
+                    match post_json(&anaphase_endpoint, "/v1/bind/confirm", &body, None) {
+                        Ok(confirm) => {
+                            if let (Some(id), Some(secret)) = (
+                                extract_json_str(&confirm, "device_id"),
+                                extract_json_str(&confirm, "client_secret"),
+                            ) {
+                                match save_client_identity(&id, &secret) {
+                                    Ok(()) => println!("  ✅ 绑定完成：{id}（凭证已存 ~/.cellrix/identity.toml, 0600）"),
+                                    Err(e) => println!("  ⚠️ 绑定已确认，但凭证保存失败：{e}"),
+                                }
+                            } else {
+                                println!("  绑定失败：{confirm}");
+                            }
+                        }
+                        Err(e) => println!("  绑定失败：{e}"),
+                    }
+                }
+                Err(e) => println!("  绑定不可用：{e}"),
+            }
+        }
+    }
+
+    // 4. Launch the panel and open the browser.
     let web = web_bin();
     let mut cmd = Command::new(web);
     cmd.arg("--anaphase-endpoint")

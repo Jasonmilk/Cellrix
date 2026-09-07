@@ -8,6 +8,8 @@ repository.workspace = true
 description = "Anaphase cockpit web panel — browser-visible white-box (G2, ADR-0014)"
 
 [dependencies]
+hmac = "0.12"
+sha2 = "0.10"
 
 [lib]
 name = "cellrix_web"

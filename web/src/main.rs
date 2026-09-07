@@ -170,7 +170,8 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
             respond(&mut stream, 200, "text/html; charset=utf-8", body.as_bytes())?;
         }
         Route::Snapshot => {
-            match fetch_json(&cfg.anaphase_endpoint, SNAPSHOT_PATH, None) {
+            let auth = cellrix_web::client_bearer();
+            match fetch_json(&cfg.anaphase_endpoint, SNAPSHOT_PATH, auth.as_deref()) {
                 Ok(body) => respond(&mut stream, 200, "application/json", body.as_bytes())?,
                 Err(e) => {
                     let msg = format!("{{\"status\":\"Error\",\"error\":\"{e}\"}}");
@@ -219,7 +220,8 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
             } else {
                 format!("/v1/trace?{query}&limit=20")
             };
-            match fetch_json(&cfg.anaphase_endpoint, &target, None) {
+            let auth = cellrix_web::client_bearer();
+            match fetch_json(&cfg.anaphase_endpoint, &target, auth.as_deref()) {
                 Ok(body) => respond(&mut stream, 200, "application/json", body.as_bytes())?,
                 Err(e) => {
                     let msg = format!("{{\"configured\":false,\"count\":0,\"entries\":[],\"error\":\"{e}\"}}");
@@ -267,7 +269,8 @@ fn respond(
 /// demand) and the Tuck audit chain. When something is down, say *what* is
 /// unhealthy instead of leaving a dead panel.
 fn health_check(cfg: &PanelConfig) {
-    match fetch_json(&cfg.anaphase_endpoint, "/v1/health", None) {
+    let auth = cellrix_web::client_bearer();
+    match fetch_json(&cfg.anaphase_endpoint, "/v1/health", auth.as_deref()) {
         Ok(body) if body.contains("\"ok\":true") => {
             println!("             anaphase: ✅ self-check ok")
         }
