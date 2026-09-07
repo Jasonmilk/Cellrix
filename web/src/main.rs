@@ -102,6 +102,17 @@ impl PanelConfig {
     }
 }
 
+/// True when a Cellrix panel is already answering on `port` (probe the
+/// index page — our HTML carries the `view-chat` marker). Anything else on
+/// the port (foreign service) reads as false and stays an honest error.
+fn panel_already_up(port: &u16) -> bool {
+    let base = format!("http://127.0.0.1:{port}");
+    match cellrix_web::fetch_json(&base, "/", None) {
+        Ok(body) => body.contains("view-chat"),
+        Err(_) => false,
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let cfg = PanelConfig::derive(&args);
@@ -121,7 +132,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     health_check(&cfg);
 
-    let listener = TcpListener::bind(("127.0.0.1", port))?;
+    // Idempotent start (2026-09-07): re-running `up` is the normal daily
+    // path for a beginner — if the panel is already serving on this port,
+    // do not stack a second listener (AddrInUse); open the browser and go.
+    if panel_already_up(&port) {
+        println!("  面板已在运行：http://127.0.0.1:{port}/（无需重复启动）");
+        if args.iter().any(|a| a == "--open") {
+            let url = format!("http://127.0.0.1:{port}/");
+            std::process::Command::new("open").arg(&url).spawn()?;
+        }
+        return Ok(());
+    }
+    let listener = match TcpListener::bind(("127.0.0.1", port)) {
+        Ok(l) => l,
+        Err(e) => {
+            // Race fallback: someone took the port between probe and bind.
+            if panel_already_up(&port) {
+                println!("  面板已在运行：http://127.0.0.1:{port}/（无需重复启动）");
+                if args.iter().any(|a| a == "--open") {
+                    let url = format!("http://127.0.0.1:{port}/");
+                    std::process::Command::new("open").arg(&url).spawn()?;
+                }
+                return Ok(());
+            }
+            return Err(e.into());
+        }
+    };
     if args.iter().any(|a| a == "--open") {
         let url = format!("http://127.0.0.1:{port}/");
         println!("             opening browser: {url}");
@@ -744,6 +780,30 @@ mod tests {
         assert!(cfg.tuck_endpoint.is_none());
         assert!(cfg.tuck_key.is_none());
         assert_eq!(cfg.tuck_limit, TUCK_LIMIT_DEFAULT);
+    }
+
+    #[test]
+    fn panel_already_up_detects_own_panel_and_ignores_foreign() {
+        // Our panel: a listener answering with the index page marker.
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n<div id=view-chat></div>");
+        });
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        assert!(panel_already_up(&port));
+        // Foreign/empty port: no panel.
+        let l2 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let p2 = l2.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let (mut s, _) = l2.accept().unwrap();
+            let _ = s.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n");
+        });
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        assert!(!panel_already_up(&p2));
+        // No listener at all.
+        assert!(!panel_already_up(&1));
     }
 
     #[test]
