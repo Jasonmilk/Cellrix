@@ -292,6 +292,45 @@ fn save_client_identity(device_id: &str, secret: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Cellrix TUI binary (workspace sibling, same profile dir as up).
+fn cellrix_cli_bin() -> Option<String> {
+    std::env::current_exe().ok().and_then(|exe| {
+        let dir = exe.parent()?;
+        let cand = dir.join("cellrix-cli");
+        if cand.exists() { Some(cand.to_string_lossy().into_owned()) } else { None }
+    })
+}
+
+/// Anaphase binary, derived from the fixed workspace layout (ECOSYSTEM.md
+/// §0) — sibling repos under the workspace root, never hardcoded per user.
+fn anaphase_bin_path() -> String {
+    let ws = workspace_root();
+    ws.join("anaphase-helix/target/debug/anaphase")
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// Anaphase config, same derivation. Missing file → Anaphase falls back to
+/// Noop (its own honest default), so this never breaks the launch.
+fn anaphase_config_path() -> String {
+    let ws = workspace_root();
+    ws.join("anaphase-helix/config.toml")
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// Workspace root: parent of the Cellrix checkout (env! resolves at compile
+/// time — absolute, any cwd).
+fn workspace_root() -> std::path::PathBuf {
+    // `up` is compiled in Cellrix/web → manifest dir = <ws>/Cellrix/web;
+    // the fixed workspace root is two levels up (ECOSYSTEM.md §0).
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or_default()
+}
+
 /// Locate the panel binary: `CARGO_BIN_EXE_cellrix-web` under cargo, else
 /// the sibling of this executable (same build dir). No hardcoded path.
 fn web_bin() -> String {
@@ -439,7 +478,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // 4. Launch the panel and open the browser.
+    // 4. Surface choice: Web panel (default, 回车) or TUI terminal.
+    //    The beginner's promise is "最多选择加回车" — the default is the
+    //    Web panel; TUI is one extra choice, never a separate command to
+    //    remember.
+    let tui_bin = cellrix_cli_bin();
+    let pick = ask(
+        "  界面： [1] Web 面板（回车=1）  [2] TUI 终端: ",
+        1,
+    );
+    if pick == 2 {
+        match tui_bin {
+            Some(tui) => {
+                // TUI (stdio) spawns its own Anaphase child — same config
+                // injected via `--config` (absolute path, works from any cwd).
+                // The stdio child does not bind cap_http (no port clash).
+                let exec = format!(
+                    "{} --config {}",
+                    anaphase_bin_path(),
+                    anaphase_config_path()
+                );
+                let status = std::process::Command::new(&tui)
+                    .args([
+                        "run",
+                        "--mode", "stdio",
+                        "--exec", &exec,
+                        "--anaphase-endpoint", &anaphase_endpoint,
+                        "--tuck-endpoint", &tuck_endpoint,
+                        "--tuck-key", &tuck_key,
+                    ])
+                    .status()?;
+                if !status.success() {
+                    eprintln!("  up: TUI 异常退出: {status}");
+                }
+                return Ok(());
+            }
+            None => {
+                println!("  TUI 未构建——先运行: cargo build -p cellrix-cli");
+            }
+        }
+    }
+
+    // 5. Launch the panel and open the browser.
     let web = web_bin();
     let mut cmd = Command::new(web);
     cmd.arg("--anaphase-endpoint")

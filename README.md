@@ -268,6 +268,12 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 全链路实测通过——mode / state / episode / ledger / ecosystem 六组件点亮，
 2 秒轮询，`curl http://127.0.0.1:8080/api/snapshot` 返回真实快照。
 
+### 6.8 界面选择（2026-09-07）
+
+`up` 起界面时问一次：`[1] Web 面板（回车） [2] TUI 终端`。
+Web = 浏览器面板（默认）；TUI = 终端交互界面（`cellrix-cli run --mode
+stdio`，自带一个 Anaphase 子进程，与 Web 的 daemon 不冲突）。
+
 ### 6.7 重复运行（2026-09-07）
 
 `up` 幂等：面板已在运行时再跑 `up`，会探测到并提示

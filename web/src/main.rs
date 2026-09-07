@@ -689,6 +689,8 @@ fn index_html(cfg: &PanelConfig) -> String {
         return;
       }}
       var m = snap.mode || '?';
+      // Honest status line: success path must leave the "连接中…" placeholder.
+      sub.textContent = 'Anaphase 在线 · ' + m.toUpperCase() + ' · ' + (snap.episode || '暂无经历');
       mode.textContent = m.toUpperCase();
       mode.className = 'badge ' + m;
       st.textContent = 'state: ' + (snap.state || '?');

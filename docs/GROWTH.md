@@ -408,3 +408,18 @@ README（bind 节）｜ GROWTH｜ ECOSYSTEM v1.68（Anaphase 225 / Cellrix 336�
 
 ### 状态
 🧬 已完成
+
+## 记录 42：WebUI 状态行修复 + up 界面选择权 + TUI 全链路打通（2026-09-07）
+
+### 触发条件
+①用户反馈 WebUI 标题下永远"连接中…"（与绿点在线矛盾），随后报 `TypeError: Cannot read properties of undefined (reading 'toUpperCase')`；②用户要求不强制跳 WebUI，给 TUI 选择权。
+
+### 变更性质
+- **sub JS 修复**：成功分支的诚实状态行引用了未声明的 `m`（在 `var m` 前执行）→ TypeError → catch 显示"拉取失败"。移到 `var m` 之后；成功后显示「Anaphase 在线 · PARTNER · 暂无经历」
+- **up 界面选择权**：`[1] Web 面板（回车=1） [2] TUI 终端`——回车默认 Web（小白承诺不变），选 2 起 TUI
+- **TUI 全链路**：cellrix-cli stdio 模式 + Anaphase 新增 `--config <path>` flag（flags > env > 默认，DNA 11）——TUI 子进程注入同一 config；stdio 模式不开 cap_http（无端口冲突）；握手 + Manifest + 全栈装配验证通过
+- **workspace_root 修正**：up 在 Cellrix/web → 工作区根需两级 parent（曾算出 Cellrix/anaphase-helix 错误路径）
+- 验证：无头 Chrome sub=「在线 · PARTNER」无 TypeError；TUI Spawning 路径正确
+
+### 状态
+🧬 已完成
