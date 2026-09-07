@@ -328,6 +328,7 @@ fn index_html(cfg: &PanelConfig) -> String {
   .row {{ padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px; cursor:pointer; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }}
   .row:hover {{ background:rgba(158,172,234,.06); }}
   .row.sel {{ background:rgba(158,172,234,.14); border-left:3px solid var(--acc); }}
+  .redact {{ color:#EA6668; background:rgba(234,102,104,.09); border-radius:3px; padding:0 3px; font-weight:600; white-space:nowrap; }}
   .row .seq {{ color:var(--dim); }}
   .row .kind {{ color:var(--acc); font-weight:600; }}
   .row .tid {{ color:var(--dim); }}
@@ -481,6 +482,11 @@ fn index_html(cfg: &PanelConfig) -> String {
     fetchBody(e.payload.trace_id);
   }}
 
+  // Highlight redaction marks in replayed bodies: reveal *that* a credential
+  // was removed and where, never *what* it was (write-side redaction means
+  // the original never existed in the file — no diff possible, by design).
+  function hl(s) {{ return esc(s).replace(/\[REDACTED\]/g, '<span class="redact">[REDACTED]</span>'); }}
+
   function fetchBody(traceId) {{
     if (!traceId) {{
       document.getElementById('a-body').innerHTML = '<div class="empty">无 trace_id（元数据条目）</div>';
@@ -497,8 +503,8 @@ fn index_html(cfg: &PanelConfig) -> String {
       es.forEach(function (en) {{
         html += '<div class="line"><span class="key">ts</span><span class="val">' + esc(en.ts) + '</span></div>';
         html += '<div class="line"><span class="key">model</span><span class="val">' + esc(en.model) + '</span></div>';
-        html += '<div class="line"><span class="key">prompt</span></div><pre>' + esc(en.prompt) + '</pre>';
-        html += '<div class="line"><span class="key">response</span></div><pre>' + esc(en.response) + '</pre>';
+        html += '<div class="line"><span class="key">prompt</span></div><pre>' + hl(en.prompt) + '</pre>';
+        html += '<div class="line"><span class="key">response</span></div><pre>' + hl(en.response) + '</pre>';
       }});
       box.innerHTML = html;
     }}).catch(function (e) {{
