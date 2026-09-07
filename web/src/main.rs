@@ -272,11 +272,47 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
             // /v1/chat (signed when bound). One single-period cycle per
             // request; the reply is the reasoning output (redacted already
             // on the Anaphase side).
+            // Two transports, one contract: when the browser asks for SSE we
+            // relay live bytes (typewriter chat, no read-timeout cliff); the
+            // plain JSON path stays for curl / old clients.
             let body = text
                 .split("\r\n\r\n")
                 .nth(1)
                 .unwrap_or("{\"message\":\"\"}");
             let auth = cellrix_web::client_bearer();
+            let wants_sse = text
+                .lines()
+                .any(|l| l.to_ascii_lowercase().starts_with("accept:") && l.to_ascii_lowercase().contains("text/event-stream"));
+            if wants_sse {
+                // Byte pipe: headers first (no Content-Length — the stream
+                // length is unknown), then relay chunks as they arrive.
+                use std::io::Write;
+                stream
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
+                    )
+                    .map_err(|e| e.to_string())?;
+                let mut out = stream.try_clone().map_err(|e| e.to_string())?;
+                match cellrix_web::post_stream(
+                    &cfg.anaphase_endpoint,
+                    "/v1/chat",
+                    body,
+                    auth.as_deref(),
+                    &mut |chunk| out.write_all(chunk),
+                ) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        // Stream aborted (origin closed or timeout): surface
+                        // an error line so the browser never sees a silent
+                        // hang. A closed browser socket is not an error we
+                        // need to report — write failures are expected there.
+                        let _ = out.write_all(
+                            format!("data: {{\"error\":\"{e}\"}}\n\n").as_bytes(),
+                        );
+                    }
+                }
+                return Ok(());
+            }
             match cellrix_web::post_json(&cfg.anaphase_endpoint, "/v1/chat", body, auth.as_deref())
             {
                 Ok(resp) => respond(&mut stream, 200, "application/json", resp.as_bytes())?,
@@ -517,6 +553,20 @@ fn index_html(cfg: &PanelConfig) -> String {
     box.scrollTop = box.scrollHeight;
   }}
 
+  // Streaming message element: created once per reply, text appended as
+  // SSE deltas arrive (typewriter). Returns the element to finalize.
+  function addStreamMsg() {{
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'msg helix';
+    d.innerHTML = '<span class="who">Helix</span><span class="body"></span>';
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    return d.querySelector('.body');
+  }}
+
   function sendChat() {{
     var input = document.getElementById('chat-text');
     var text = input.value.trim();
@@ -525,18 +575,60 @@ fn index_html(cfg: &PanelConfig) -> String {
     input.value = '';
     var btn = document.querySelector('.chat-input .btn');
     btn.disabled = true; btn.textContent = '思考中…';
-    fetch('/api/chat', {{
-      method: 'POST',
-      headers: {{ 'Content-Type': 'application/json' }},
-      body: JSON.stringify({{ message: text }})
-    }}).then(function (r) {{ return r.json(); }}).then(function (j) {{
-      if (j.error) {{ addMsg('helix', '⚠ ' + j.error + (j.detail ? ' — ' + j.detail : ''), true); }}
-      else {{ addMsg('helix', j.reply || '（无回复）', false); }}
-    }}).catch(function (e) {{
-      addMsg('helix', '⚠ 发送失败: ' + e, true);
-    }}).finally(function () {{
+    var done = false;
+    function finish() {{
+      if (done) return;
+      done = true;
       btn.disabled = false; btn.textContent = '发送';
       input.focus();
+    }}
+    fetch('/api/chat', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }},
+      body: JSON.stringify({{ message: text }})
+    }}).then(function (r) {{
+      if (!r.body || !r.ok) {{ return r.json().then(function (j) {{
+        throw new Error((j.error || 'HTTP ' + r.status) + (j.detail ? ' — ' + j.detail : ''));
+      }}); }}
+      var reader = r.body.getReader();
+      var dec = new TextDecoder();
+      var buf = '';
+      var bodyEl = null;
+      function pump() {{
+        return reader.read().then(function (x) {{
+          if (x.done) {{ finish(); return; }}
+          buf += dec.decode(x.value, {{ stream: true }});
+          var idx;
+          while ((idx = buf.indexOf('\n\n')) >= 0) {{
+            var evt = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            var line = evt.trim();
+            if (line.indexOf('data:') !== 0) continue;
+            var payload = line.slice(5).trim();
+            if (!payload) continue;
+            var j;
+            try {{ j = JSON.parse(payload); }} catch (e) {{ continue; }}
+            if (j.error) {{ addMsg('helix', '⚠ ' + j.error, true); finish(); return; }}
+            if (j.delta) {{
+              if (!bodyEl) bodyEl = addStreamMsg();
+              bodyEl.textContent += j.delta;
+              var box = document.getElementById('chat-msgs');
+              box.scrollTop = box.scrollHeight;
+            }}
+            if (j.done) {{
+              if (!bodyEl) bodyEl = addStreamMsg();
+              if (j.reply && !bodyEl.textContent) bodyEl.textContent = j.reply;
+              finish(); return;
+            }}
+          }}
+          return pump();
+        }});
+      }}
+      return pump();
+    }}).catch(function (e) {{
+      addMsg('helix', '⚠ 发送失败: ' + e.message, true);
+    }}).finally(function () {{
+      finish();
     }});
   }}
 

@@ -10,7 +10,9 @@ use std::net::TcpStream;
 
 /// Read timeout for probes and proxies: plenty for local tools, keeps a
 /// half-open peer from hanging a thread.
-const READ_TIMEOUT_SECS: u64 = 2;
+// LLM reasoning takes seconds (1-2s typical, bursts beyond); a 2s read
+// timeout made the panel proxy hit macOS WouldBlock (os error 35) mid-reply.
+const READ_TIMEOUT_SECS: u64 = 30;
 
 /// Hand-rolled HTTP GET: read the body after the blank line.
 /// `bearer` is an optional identity credential (never sent to the browser).
@@ -193,7 +195,9 @@ pub fn sign_bearer(device_id: &str, secret: &str) -> String {
     let ts = now.as_secs().to_string();
     // Nonce: nanosecond clock + pid — unique per request (a same-second
     // repeat would be rejected as a replay by the Anaphase side).
-    let nonce = format!("{:x}", now.as_nanos() ^ std::process::id() as u128 ^ 0x5f3759dfu128);
+    static NONCE_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = NONCE_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128;
+    let nonce = format!("{:x}", now.as_nanos() ^ (std::process::id() as u128) ^ (seq << 32) ^ 0x5f3759dfu128);
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("hmac key");
     mac.update(format!("{device_id}|{ts}|{nonce}").as_bytes());
     let mac = mac.finalize().into_bytes();
@@ -221,12 +225,16 @@ pub fn extract_json_str(body: &str, key: &str) -> Option<String> {
 
 /// POST a JSON body, return the response body. Same transport contract as
 /// `fetch_json` (raw TCP, no external deps).
-pub fn post_json(
+/// Open a POST connection, write the (signed) request and return the
+/// connected stream. Shared by the buffered and streamed paths — one
+/// request shape, two transports.
+fn post_open(
     base: &str,
     path: &str,
     body: &str,
     bearer: Option<&str>,
-) -> Result<String, String> {
+    accept_sse: bool,
+) -> Result<std::net::TcpStream, String> {
     let base = base.trim_start_matches("http://").trim_end_matches('/');
     let (host, port) = match base.rsplit_once(':') {
         Some((h, p)) => (h.to_string(), p.parse::<u16>().map_err(|e| e.to_string())?),
@@ -240,6 +248,9 @@ pub fn post_json(
         "POST {path} HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n",
         body.len()
     );
+    if accept_sse {
+        req.push_str("Accept: text/event-stream\r\n");
+    }
     if let Some(k) = bearer.filter(|k| !k.is_empty()) {
         req.push_str(&format!("Authorization: Bearer {k}\r\n"));
     }
@@ -247,7 +258,41 @@ pub fn post_json(
     req.push_str(body);
     use std::io::Write;
     stream.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(stream)
+}
+
+pub fn post_json(
+    base: &str,
+    path: &str,
+    body: &str,
+    bearer: Option<&str>,
+) -> Result<String, String> {
+    let mut stream = post_open(base, path, body, bearer, false)?;
     read_http_body(&mut stream)
+}
+
+/// Streamed POST (SSE): forwards origin bytes to the browser as they
+/// arrive. This proxy is a byte pipe — it never parses the SSE framing,
+/// it only relays. `on_chunk` is called for every read; an `Err` from it
+/// aborts the relay (e.g. the browser socket closed mid-stream).
+pub fn post_stream(
+    base: &str,
+    path: &str,
+    body: &str,
+    bearer: Option<&str>,
+    on_chunk: &mut dyn FnMut(&[u8]) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let mut stream = post_open(base, path, body, bearer, true)?;
+    use std::io::Read;
+    let mut chunk = [0u8; 8192];
+    loop {
+        match stream.read(&mut chunk) {
+            Ok(0) => break, // origin closed = stream end
+            Ok(n) => on_chunk(&chunk[..n]).map_err(|e| e.to_string())?,
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Ok(())
 }
 
 fn read_http_body(stream: &mut TcpStream) -> Result<String, String> {

@@ -455,3 +455,19 @@ TUI 启动时 DEBUG 日志（Spawning child/Handshake/First event）混入终端
 
 ### 状态
 🧬 已完成
+
+---
+## 记录 45：面板 SSE 字节管道 + 前端打字机 2026-09-07
+### 背景
+WebUI 偶发 EAGAIN 的真根因是**旧进程残留**（18:20 面板 + 18:32 anaphase 未被 pkill 杀掉，新二进制端口占用启动失败）。强杀后 SSE 全链路打通。
+### 变更
+- `web/src/lib.rs`：抽 `post_open`（请求构建复用，极致复用）+ 新增 `post_stream`——**字节管道**（不解析 SSE 帧，只透传，极致解耦）；`Accept: text/event-stream` 仅在流式路径发出
+- `web/src/main.rs` Route::Chat：浏览器请求含 `Accept: text/event-stream` → 手写流式响应头（无 Content-Length）+ 逐 chunk 透传；错误写为 SSE error 行（浏览器可见，不静默挂起）；JSON 路径保留
+- 前端 `sendChat`：fetch ReadableStream + SSE 事件解析（`delta` 增量打字机 / `done` 收尾 / `error` 展示）；按钮禁用期间防重入
+### 验证
+- curl 面板 SSE：chunked + 逐 delta 流式（"你好"→"，"→"我是"…）✓
+- 5 连发全成功
+- Cellrix 337 全绿
+
+### 状态
+🧬 已完成
