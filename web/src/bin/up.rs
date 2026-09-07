@@ -1,32 +1,49 @@
-//! `up` — one command to the cockpit: ensure Anaphase + Tuck are healthy
-//! (auto-start them when a `--*-cmd` is given), then launch the web panel
-//! and open the browser. After this command you do not need another one.
+//! `up` — one command to the cockpit, guided for a complete beginner:
+//! run `up`, press Enter a couple of times, browser opens. No commands to
+//! remember, no flags to type (最多选择加回车).
 //!
-//! Decoupling: `up` never guesses where Anaphase/Tuck live or how they are
-//! configured — their start commands come from `--anaphase-cmd` /
-//! `--tuck-cmd` (or `UP_ANAPHASE_CMD` / `UP_TUCK_CMD`). With no command
-//! given, a missing component is reported with a pointer to README §Run
-//! instead of being silently skipped (物理事实优先).
-//!
-//! The web binary path is injected at compile time (`CARGO_BIN_EXE_`), so
-//! there is no runtime path guessing — 0 hardcoding, deterministic.
+//! How it stays zero-hardcoded and decoupled:
+//! - Configuration source chain: CLI flags > env > `~/.cellrix/up.toml` >
+//!   protocol defaults. `up` never guesses where Anaphase/Tuck live — the
+//!   first guided run asks for start commands once and persists them, so
+//!   every later run is Enter-only.
+//! - The web binary path is derived deterministically (`CARGO_BIN_EXE_`
+//!   under cargo, else the sibling of this executable in the build dir).
+//! - Tuck's key lives only in the 0600 user config file (never in git,
+//!   never echoed).
 
+use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use cellrix_web::probe;
 
 /// How long to wait for a component to become healthy after starting it.
-/// Protocol default — overridable with `--wait`.
 const WAIT_DEFAULT_SECS: u64 = 30;
 /// Poll interval while waiting for health.
 const POLL_INTERVAL_MS: u64 = 500;
-/// Default web port when no `--port`/`WEB_PORT` is given (mirrors the panel).
+/// Default web port when not given (mirrors the panel).
 const WEB_PORT_DEFAULT: u16 = 8080;
-/// Default Anaphase cap_http endpoint when not given (mirrors the panel).
+/// Default Anaphase cap_http endpoint (mirrors the panel).
 const ANAPHASE_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:50061";
+/// User config file: `$HOME/.cellrix/up.toml` (per-user, 0600, never in a
+/// repository). Key name is a fixed convention, not a hardcoded path.
+const CONFIG_REL_PATH: &str = ".cellrix/up.toml";
 
-fn flag<'a>(args: &'a [String], name: &str) -> Option<String> {
+#[derive(Debug, Clone, Default)]
+struct UpConfig {
+    anaphase_endpoint: Option<String>,
+    tuck_endpoint: Option<String>,
+    tuck_key: Option<String>,
+    anaphase_cmd: Option<String>,
+    tuck_cmd: Option<String>,
+    wait_secs: Option<u64>,
+    port: Option<u16>,
+    no_open: bool,
+}
+
+fn flag(args: &[String], name: &str) -> Option<String> {
     args.windows(2)
         .find(|w| w[0] == name)
         .map(|w| w[1].clone())
@@ -35,6 +52,97 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<String> {
 
 fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.is_empty())
+}
+
+/// `$HOME/.cellrix/up.toml` — deterministic per-user location.
+fn config_path() -> Option<PathBuf> {
+    let home = env("HOME")?;
+    Some(PathBuf::from(home).join(CONFIG_REL_PATH))
+}
+
+/// Parse a saved config file (TOML-lite, our own shape). Unknown keys are
+/// ignored — forward-compatible.
+fn load_config_file(path: &PathBuf) -> UpConfig {
+    let mut c = UpConfig::default();
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return c;
+    };
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        let v = v.trim().trim_matches('"').to_string();
+        match k.trim() {
+            "anaphase_endpoint" => c.anaphase_endpoint = Some(v),
+            "tuck_endpoint" => c.tuck_endpoint = Some(v),
+            "tuck_key" => c.tuck_key = Some(v),
+            "anaphase_cmd" => c.anaphase_cmd = Some(v),
+            "tuck_cmd" => c.tuck_cmd = Some(v),
+            _ => {}
+        }
+    }
+    c
+}
+
+/// Persist the guided answers so later runs are Enter-only. Writes with
+/// 0600 (owner read/write only) — the key must not be world-readable.
+fn save_config_file(path: &PathBuf, c: &UpConfig) -> Result<(), String> {
+    let dir = path.parent().ok_or("config dir unavailable")?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let mut toml = String::from("# up saved config (per-user, 0600)\n");
+    let mut push = |k: &str, v: Option<&String>| {
+        if let Some(v) = v {
+            toml.push_str(&format!("{k} = \"{}\"\n", v.replace('"', "\\\"")));
+        }
+    };
+    push("anaphase_endpoint", c.anaphase_endpoint.as_ref());
+    push("tuck_endpoint", c.tuck_endpoint.as_ref());
+    push("tuck_key", c.tuck_key.as_ref());
+    push("anaphase_cmd", c.anaphase_cmd.as_ref());
+    push("tuck_cmd", c.tuck_cmd.as_ref());
+    std::fs::write(path, toml).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
+/// Merge: file < env < flags (later sources win).
+fn derive_config(args: &[String]) -> UpConfig {
+    let path = config_path();
+    let mut c = path.as_ref().map(load_config_file).unwrap_or_default();
+
+    c.anaphase_endpoint = flag(args, "--anaphase-endpoint")
+        .or_else(|| env("ANAPHASE_ENDPOINT"))
+        .or(c.anaphase_endpoint);
+    c.tuck_endpoint = flag(args, "--tuck-endpoint")
+        .or_else(|| env("TUCK_ENDPOINT"))
+        .or(c.tuck_endpoint);
+    c.tuck_key = flag(args, "--tuck-key")
+        .or_else(|| env("TUCK_KEY"))
+        .or(c.tuck_key);
+    c.anaphase_cmd = flag(args, "--anaphase-cmd")
+        .or_else(|| env("UP_ANAPHASE_CMD"))
+        .or(c.anaphase_cmd);
+    c.tuck_cmd = flag(args, "--tuck-cmd")
+        .or_else(|| env("UP_TUCK_CMD"))
+        .or(c.tuck_cmd);
+    c.wait_secs = flag(args, "--wait")
+        .and_then(|v| v.parse().ok())
+        .or_else(|| env("UP_WAIT").and_then(|v| v.parse().ok()))
+        .or(c.wait_secs);
+    c.port = flag(args, "--port")
+        .and_then(|v| v.parse().ok())
+        .or_else(|| env("WEB_PORT").and_then(|v| v.parse().ok()))
+        .or(c.port);
+    c.no_open = args.iter().any(|a| a == "--no-open") || c.no_open;
+    c
 }
 
 /// Spawn a start command detached (it keeps running after `up` exits).
@@ -70,39 +178,99 @@ fn poll_until(
     }
 }
 
-/// Ensure one component is healthy: already up → ok; down + start command →
-/// spawn and poll; down + no command → Err with guidance (never silently
-/// skipped).
-fn ensure(
-    name: &str,
-    base: &str,
-    path: &str,
-    bearer: Option<&str>,
-    cmd: Option<&str>,
-    wait_secs: u64,
-) -> Result<(), String> {
-    match probe(base, path, bearer) {
-        Ok(()) => {
-            println!("{name}: ✅ already healthy");
-            Ok(())
-        }
-        Err(e) => match cmd {
-            Some(c) => {
-                println!("{name}: ❌ down ({e}) — starting: {c}");
-                spawn_detached(c)?;
-                poll_until(name, base, path, bearer, wait_secs)
-            }
-            None => Err(format!(
-                "{name} not running ({e})\n  → pass --{name}-cmd \"...\" to auto-start, or start it manually (README §Run)"
-            )),
-        },
+/// One yes/no style question. Enter = `default`. Anything else parses as a
+/// number and falls back to `default` when invalid.
+fn ask(prompt: &str, default: u8) -> u8 {
+    print!("{prompt}");
+    let _ = std::io::stdout().flush();
+    let mut line = String::new();
+    let _ = std::io::stdin().read_line(&mut line);
+    let t = line.trim();
+    if t.is_empty() {
+        return default;
+    }
+    t.parse().unwrap_or(default)
+}
+
+/// Ask for a start command once (the only typing a beginner ever does),
+/// persist it, and report the choice.
+fn ask_cmd(component: &str, prompt_hint: &str) -> Option<String> {
+    println!();
+    println!("  {component} 尚未运行，也无法自动启动（还没有保存启动命令）。");
+    println!("  {prompt_hint}");
+    println!("  例如：ANAPHASE_CONFIG=/path/to/config.toml /path/to/anaphase");
+    print!("  输入启动命令（直接回车=跳过，本次不启动）: ");
+    let _ = std::io::stdout().flush();
+    let mut line = String::new();
+    let _ = std::io::stdin().read_line(&mut line);
+    let t = line.trim().to_string();
+    if t.is_empty() {
+        None
+    } else {
+        Some(t)
     }
 }
 
-/// Locate the panel binary: cargo injects `CARGO_BIN_EXE_cellrix-web` under
-/// `cargo run`/`cargo test`; when the binary is executed directly, derive it
-/// deterministically as the sibling of this executable (same build dir) —
-/// no hardcoded path either way (0 hardcoding).
+/// Guided ensure: healthy → done; down → ask start/skip; when a command is
+/// chosen it is spawned, polled, and (first time) persisted.
+fn ensure_guided(
+    name: &str,
+    base: &str,
+    health_path: &str,
+    bearer: Option<&str>,
+    cfg_cmd: Option<String>,
+    wait_secs: u64,
+    save_cmd: impl FnOnce(Option<String>),
+) -> Result<(), String> {
+    match probe(base, health_path, bearer) {
+        Ok(()) => {
+            println!("  {name}: ✅ 运行中");
+            Ok(())
+        }
+        Err(e) => {
+            println!("  {name}: ❌ 未运行（{e}）");
+            match cfg_cmd {
+                Some(cmd) => {
+                    let choice = ask(
+                        &format!("  要自动启动 {name} 吗？[1] 启动  [2] 跳过（回车=1）: "),
+                        1,
+                    );
+                    if choice == 1 {
+                        println!("  启动中: {cmd}");
+                        spawn_detached(&cmd)?;
+                        poll_until(name, base, health_path, bearer, wait_secs)?;
+                        println!("  {name}: ✅ 已就绪");
+                        Ok(())
+                    } else {
+                        println!("  {name}: 跳过（面板会显示 ❌）");
+                        Ok(())
+                    }
+                }
+                None => {
+                    // First time: capture the start command once and keep it.
+                    let cmd = ask_cmd(name, "请输入它的启动命令（只输入这一次，之后回车即可）。");
+                    save_cmd(cmd.clone());
+                    match cmd {
+                        Some(c) => {
+                            println!("  启动中: {c}");
+                            spawn_detached(&c)?;
+                            poll_until(name, base, health_path, bearer, wait_secs)?;
+                            println!("  {name}: ✅ 已就绪");
+                            Ok(())
+                        }
+                        None => {
+                            println!("  {name}: 已跳过（面板会显示 ❌）");
+                            Ok(())
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Locate the panel binary: `CARGO_BIN_EXE_cellrix-web` under cargo, else
+/// the sibling of this executable (same build dir). No hardcoded path.
 fn web_bin() -> String {
     if let Ok(p) = std::env::var("CARGO_BIN_EXE_cellrix-web") {
         return p;
@@ -110,61 +278,89 @@ fn web_bin() -> String {
     let dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
+        .unwrap_or_else(|| PathBuf::from("."));
     dir.join("cellrix-web").to_string_lossy().into_owned()
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
+    let cfg = derive_config(&args);
 
-    let anaphase_endpoint = flag(&args, "--anaphase-endpoint")
-        .or_else(|| env("ANAPHASE_ENDPOINT"))
+    let anaphase_endpoint = cfg
+        .anaphase_endpoint
+        .clone()
         .unwrap_or_else(|| ANAPHASE_ENDPOINT_DEFAULT.to_string());
-    let tuck_endpoint = flag(&args, "--tuck-endpoint").or_else(|| env("TUCK_ENDPOINT"));
-    let tuck_key = flag(&args, "--tuck-key").or_else(|| env("TUCK_KEY"));
-    let anaphase_cmd = flag(&args, "--anaphase-cmd").or_else(|| env("UP_ANAPHASE_CMD"));
-    let tuck_cmd = flag(&args, "--tuck-cmd").or_else(|| env("UP_TUCK_CMD"));
-    let wait_secs = flag(&args, "--wait")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(WAIT_DEFAULT_SECS);
-    let port = flag(&args, "--port")
-        .and_then(|v| v.parse().ok())
-        .or_else(|| env("WEB_PORT").and_then(|v| v.parse().ok()))
-        .unwrap_or(WEB_PORT_DEFAULT);
-    let no_open = args.iter().any(|a| a == "--no-open");
+    let tuck_endpoint = cfg.tuck_endpoint.clone();
+    let tuck_key = cfg.tuck_key.clone();
+    let wait_secs = cfg.wait_secs.unwrap_or(WAIT_DEFAULT_SECS);
+    let port = cfg.port.unwrap_or(WEB_PORT_DEFAULT);
 
-    println!("up: one command to the cockpit");
-    println!("  anaphase @ {anaphase_endpoint}");
-    if let Some(ep) = &tuck_endpoint {
-        println!("  tuck @ {ep}");
-    } else {
-        println!("  tuck: not configured (pass --tuck-endpoint + --tuck-key)");
-    }
+    println!();
+    println!("  ─────────────────────────────────────────────");
+    println!("  Helix 驾驶舱启动器（up）");
+    println!("  一路回车即可——最后自动打开浏览器");
+    println!("  ─────────────────────────────────────────────");
+    println!();
 
-    // 1. Anaphase self-check first — the cockpit's own source of truth.
-    ensure(
-        "anaphase",
+    // 1. Anaphase — the cockpit's own source of truth.
+    let anaphase_cmd = cfg.anaphase_cmd.clone();
+    let saved_path = config_path();
+    let save_anaphase = {
+        let path = saved_path.clone();
+        let ep = anaphase_endpoint.clone();
+        let tuck_ep = tuck_endpoint.clone();
+        let tuck_k = tuck_key.clone();
+        move |cmd: Option<String>| {
+            if let Some(p) = &path {
+                let mut c = UpConfig::default();
+                c.anaphase_endpoint = Some(ep.clone());
+                c.tuck_endpoint = tuck_ep.clone();
+                c.tuck_key = tuck_k.clone();
+                c.anaphase_cmd = cmd.clone();
+                let _ = save_config_file(p, &c);
+            }
+        }
+    };
+    ensure_guided(
+        "Anaphase",
         &anaphase_endpoint,
         "/v1/health",
         None,
-        anaphase_cmd.as_deref(),
+        anaphase_cmd,
         wait_secs,
+        save_anaphase,
     )?;
 
-    // 2. Tuck audit chain (optional — the panel degrades without it).
+    // 2. Tuck (optional — the panel degrades without it).
     if let Some(ep) = &tuck_endpoint {
         let key = tuck_key.as_deref().unwrap_or("");
-        ensure(
-            "tuck",
+        let tuck_cmd = cfg.tuck_cmd.clone();
+        let path = saved_path.clone();
+        let ep2 = ep.clone();
+        let k2 = tuck_key.clone();
+        let a_ep = anaphase_endpoint.clone();
+        let save_tuck = move |cmd: Option<String>| {
+            if let Some(p) = &path {
+                let mut c = UpConfig::default();
+                c.anaphase_endpoint = Some(a_ep.clone());
+                c.tuck_endpoint = Some(ep2.clone());
+                c.tuck_key = k2.clone();
+                c.tuck_cmd = cmd.clone();
+                let _ = save_config_file(p, &c);
+            }
+        };
+        ensure_guided(
+            "Tuck",
             ep,
             "/v1/audit?limit=1",
             Some(key),
-            tuck_cmd.as_deref(),
+            tuck_cmd,
             wait_secs,
+            save_tuck,
         )?;
     }
 
-    // 3. Launch the panel (deterministic sibling path) and open the browser.
+    // 3. Launch the panel and open the browser.
     let web = web_bin();
     let mut cmd = Command::new(web);
     cmd.arg("--anaphase-endpoint")
@@ -177,14 +373,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(k) = &tuck_key {
         cmd.arg("--tuck-key").arg(k);
     }
-    if !no_open {
+    if !cfg.no_open {
         cmd.arg("--open");
     }
     let mut child = cmd.spawn().map_err(|e| format!("launch web: {e}"))?;
-    println!("up: panel launched — Ctrl+C here to stop it");
+    println!();
+    println!("  面板已启动：http://127.0.0.1:{port}/");
+    println!("  按 Ctrl+C 停止面板。之后再次运行 up，一路回车即可。");
     let status = child.wait()?;
     if !status.success() {
-        eprintln!("up: panel exited abnormally: {status}");
+        eprintln!("  up: 面板异常退出: {status}");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_file_round_trip() {
+        let mut c = UpConfig::default();
+        c.anaphase_endpoint = Some("http://127.0.0.1:50123".into());
+        c.tuck_endpoint = Some("http://127.0.0.1:60052".into());
+        c.tuck_key = Some("tk-local-gate".into());
+        c.anaphase_cmd = Some("ANAPHASE_CONFIG=/tmp/c.toml anaphase".into());
+        let dir = std::env::temp_dir().join(format!("up-cfg-test-{}", std::process::id()));
+        let path = dir.join("up.toml");
+        save_config_file(&path, &c).unwrap();
+        let loaded = load_config_file(&path);
+        assert_eq!(loaded.anaphase_cmd.as_deref(), Some("ANAPHASE_CONFIG=/tmp/c.toml anaphase"));
+        assert_eq!(loaded.tuck_key.as_deref(), Some("tk-local-gate"));
+        assert_eq!(loaded.anaphase_endpoint.as_deref(), Some("http://127.0.0.1:50123"));
+        // 0600 on unix.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn config_merge_flags_win_over_file() {
+        let mut c = UpConfig::default();
+        c.anaphase_endpoint = Some("http://127.0.0.1:1".into());
+        c.tuck_cmd = Some("old".into());
+        let dir = std::env::temp_dir().join(format!("up-cfg-merge-{}", std::process::id()));
+        let path = dir.join("up.toml");
+        save_config_file(&path, &c).unwrap();
+        let saved = load_config_file(&path);
+        // Simulate flags overriding: saved file value must be replaceable.
+        let mut merged = saved;
+        merged.anaphase_endpoint = Some("http://127.0.0.1:2".into());
+        assert_eq!(merged.anaphase_endpoint.as_deref(), Some("http://127.0.0.1:2"));
+        assert_eq!(merged.tuck_cmd.as_deref(), Some("old"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

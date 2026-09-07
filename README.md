@@ -328,25 +328,32 @@ cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
 - **`--open`**: after binding, opens the panel in your default browser —
   one command, then no more commands
 
-### `up` — one command to the cockpit
+### `up` — one command to the cockpit (guided for beginners)
 
-`up` ensures Anaphase + Tuck are healthy (auto-starting them when given a
-start command), then launches the panel and opens your browser:
+Run it and press Enter — that's it. The first run asks once for the start
+commands, saves them, and every later run is fully automatic:
 
 ```text
 cargo run -p cellrix-web --bin up
-  --anaphase-endpoint http://127.0.0.1:50061
-  --tuck-endpoint http://127.0.0.1:60052 --tuck-key <key>
-  --anaphase-cmd "ANAPHASE_CONFIG=... anaphase"     # optional auto-start
-  --tuck-cmd "tuck --gate ..."                      # optional auto-start
-  --wait 30                                          # health poll budget
 ```
 
-- Already healthy → `✅ already healthy`, no restart
-- Down + `--*-cmd` given → spawned detached and polled until healthy
-- Down + no command → clear guidance, never silently skipped
-- Paths/configs stay with the caller (`UP_ANAPHASE_CMD` / `UP_TUCK_CMD` env
-  work too) — `up` orchestrates, never guesses (0 hardcoding)
+What happens:
+
+1. `up` probes Anaphase (`/v1/health`) and Tuck (audit chain).
+2. Healthy → `✅ 运行中`, nothing to do.
+3. Down + saved command → one choice: `[1] 启动  [2] 跳过` (Enter = 1).
+4. Down + nothing saved yet → asked once for the start command
+   (e.g. `ANAPHASE_CONFIG=/path/to/config.toml /path/to/anaphase`);
+   it is saved to `~/.cellrix/up.toml` (0600, never in git) and used
+   from then on. Enter alone skips — the panel honestly shows ❌.
+5. The panel launches and the browser opens. Ctrl+C stops it.
+
+Advanced knobs (optional — a beginner never needs them):
+`--anaphase-endpoint / --tuck-endpoint / --tuck-key / --anaphase-cmd /
+--tuck-cmd / --wait / --port / --no-open`. Env equivalents:
+`ANAPHASE_ENDPOINT, TUCK_ENDPOINT, TUCK_KEY, UP_ANAPHASE_CMD, UP_TUCK_CMD,
+WEB_PORT`. Source chain: flags > env > `~/.cellrix/up.toml` > protocol
+defaults — `up` never guesses, 0 hardcoding.
 
 Live gateway verification (needs Tuck running on :60052):
 ```bash
