@@ -268,6 +268,13 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 全链路实测通过——mode / state / episode / ledger / ecosystem 六组件点亮，
 2 秒轮询，`curl http://127.0.0.1:8080/api/snapshot` 返回真实快照。
 
+### 6.6 对话（2026-09-07）
+
+打开面板后点「对话 Chat」——输入消息回车即发送。Anaphase `/v1/chat`
+每次请求装配一个全新 Helix 跑单周期（同潜意识、同黑盒），回复走 Tuck
+网关审计（Engram 可查）。当前每轮无跨轮记忆（对话连续性属未来 Memory
+/L3 情景），Helix 会诚实告诉你"没有之前的记录"。
+
 ### 6.5 从零开始（推荐 · 一个入口，之后只有回车）
 
 The one-command path — no flags, no commands to remember:

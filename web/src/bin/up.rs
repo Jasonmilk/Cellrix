@@ -27,6 +27,10 @@ const POLL_INTERVAL_MS: u64 = 500;
 const WEB_PORT_DEFAULT: u16 = 8080;
 /// Default Anaphase cap_http endpoint (mirrors the panel).
 const ANAPHASE_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:50061";
+// Tuck protocol defaults (source = Tuck gateway): local port + its default
+// local audit key. `up` never guesses — these are the protocol's own values.
+const TUCK_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:60052";
+const TUCK_KEY_DEFAULT: &str = "tk-local-gate";
 /// User config file: `$HOME/.cellrix/up.toml` (per-user, 0600, never in a
 /// repository). Key name is a fixed convention, not a hardcoded path.
 const CONFIG_REL_PATH: &str = ".cellrix/up.toml";
@@ -309,8 +313,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .anaphase_endpoint
         .clone()
         .unwrap_or_else(|| ANAPHASE_ENDPOINT_DEFAULT.to_string());
-    let tuck_endpoint = cfg.tuck_endpoint.clone();
-    let tuck_key = cfg.tuck_key.clone();
+    let tuck_endpoint = cfg
+        .tuck_endpoint
+        .clone()
+        .unwrap_or_else(|| TUCK_ENDPOINT_DEFAULT.to_string());
+    let tuck_key = cfg.tuck_key.clone().unwrap_or_else(|| TUCK_KEY_DEFAULT.to_string());
     let wait_secs = cfg.wait_secs.unwrap_or(WAIT_DEFAULT_SECS);
     let port = cfg.port.unwrap_or(WEB_PORT_DEFAULT);
 
@@ -333,8 +340,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(p) = &path {
                 let mut c = UpConfig::default();
                 c.anaphase_endpoint = Some(ep.clone());
-                c.tuck_endpoint = tuck_ep.clone();
-                c.tuck_key = tuck_k.clone();
+                c.tuck_endpoint = Some(tuck_ep.clone());
+                c.tuck_key = Some(tuck_k.clone());
                 c.anaphase_cmd = cmd.clone();
                 let _ = save_config_file(p, &c);
             }
@@ -350,13 +357,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         save_anaphase,
     )?;
 
-    // 2. Tuck (optional — the panel degrades without it).
-    if let Some(ep) = &tuck_endpoint {
-        let key = tuck_key.as_deref().unwrap_or("");
+    // 2. Tuck (protocol default 60052 — the audit/LLM gateway; the panel
+    //    degrades gracefully if it is down, but up always probes it).
+    {
+        let key = tuck_key.as_str();
         let tuck_cmd = cfg.tuck_cmd.clone();
         let path = saved_path.clone();
-        let ep2 = ep.clone();
-        let k2 = tuck_key.clone();
+        let ep2 = tuck_endpoint.clone();
+        let k2 = Some(tuck_key.clone());
         let a_ep = anaphase_endpoint.clone();
         let save_tuck = move |cmd: Option<String>| {
             if let Some(p) = &path {
@@ -370,7 +378,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         ensure_guided(
             "Tuck",
-            ep,
+            &tuck_endpoint,
             "/v1/audit?limit=1",
             Some(key),
             tuck_cmd,
@@ -438,12 +446,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .arg(&anaphase_endpoint)
         .arg("--port")
         .arg(port.to_string());
-    if let Some(ep) = &tuck_endpoint {
-        cmd.arg("--tuck-endpoint").arg(ep);
-    }
-    if let Some(k) = &tuck_key {
-        cmd.arg("--tuck-key").arg(k);
-    }
+    cmd.arg("--tuck-endpoint").arg(&tuck_endpoint);
+    cmd.arg("--tuck-key").arg(&tuck_key);
     if !cfg.no_open {
         cmd.arg("--open");
     }

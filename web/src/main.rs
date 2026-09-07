@@ -46,6 +46,7 @@ fn route(path: &str) -> Route {
         "api/snapshot" => Route::Snapshot,
         "api/audit" => Route::Audit,
         "api/trace" => Route::Trace,
+        "api/chat" => Route::Chat,
         _ => Route::NotFound,
     }
 }
@@ -56,6 +57,7 @@ enum Route {
     Snapshot,
     Audit,
     Trace,
+    Chat,
     NotFound,
 }
 
@@ -229,6 +231,25 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
                 }
             }
         }
+        Route::Chat => {
+            // Partner-mode dialogue: proxy the panel input box to Anaphase
+            // /v1/chat (signed when bound). One single-period cycle per
+            // request; the reply is the reasoning output (redacted already
+            // on the Anaphase side).
+            let body = text
+                .split("\r\n\r\n")
+                .nth(1)
+                .unwrap_or("{\"message\":\"\"}");
+            let auth = cellrix_web::client_bearer();
+            match cellrix_web::post_json(&cfg.anaphase_endpoint, "/v1/chat", body, auth.as_deref())
+            {
+                Ok(resp) => respond(&mut stream, 200, "application/json", resp.as_bytes())?,
+                Err(e) => {
+                    let msg = format!("{{\"error\":\"{e}\"}}");
+                    respond(&mut stream, 502, "application/json", msg.as_bytes())?;
+                }
+            }
+        }
         Route::NotFound => {
             respond(&mut stream, 404, "text/plain", b"404 not found")?;
         }
@@ -315,6 +336,15 @@ fn index_html(cfg: &PanelConfig) -> String {
   h1 {{ font-size:16px; font-weight:600; color:var(--acc); margin-bottom:4px; }}
   .sub {{ color:var(--dim); font-size:12px; margin-bottom:14px; }}
   .bar {{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }}
+  .chat-msgs {{ max-height:340px; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }}
+  .msg {{ max-width:85%; padding:8px 12px; border-radius:12px; font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }}
+  .msg.user {{ align-self:flex-end; background:rgba(158,172,234,.16); border:1px solid var(--acc); }}
+  .msg.helix {{ align-self:flex-start; background:var(--panel); border:1px solid var(--line); color:var(--text); }}
+  .msg .who {{ display:block; font-size:10px; color:var(--dim); margin-bottom:3px; }}
+  .msg.err {{ border-color:var(--bad); color:var(--bad); }}
+  .chat-input {{ display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); }}
+  .chat-input input {{ flex:1; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; outline:none; }}
+  .chat-input input:focus {{ border-color:var(--acc); }}
   .btn {{ background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:6px 14px; font-size:12px; font-family:inherit; cursor:pointer; }}
   .btn.on {{ color:var(--acc); border-color:var(--acc); background:rgba(158,172,234,.12); }}
   .badge {{ padding:4px 12px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid var(--line); }}
@@ -373,6 +403,7 @@ fn index_html(cfg: &PanelConfig) -> String {
   <div class="bar">
     <button class="btn on" id="v-cockpit" onclick="showView('cockpit')">驾驶舱 Cockpit</button>
     <button class="btn" id="v-engram" onclick="showView('engram')">印痕 Engram</button>
+    <button class="btn" id="v-chat" onclick="showView('chat')">对话 Chat</button>
     <span class="badge" id="mode">…</span>
     <span class="badge" id="state">…</span>
     <span class="badge" id="conn">…</span>
@@ -405,6 +436,17 @@ fn index_html(cfg: &PanelConfig) -> String {
     </div>
   </div>
 
+  <div id="view-chat" style="display:none;">
+    <div class="panel">
+      <div class="head">对话（伙伴模式 · 单周期一轮 · 走 Tuck 网关审计）</div>
+      <div id="chat-msgs" class="chat-msgs"><div class="empty">说点什么吧——这是给 Helix 的一段新经历。</div></div>
+      <div class="chat-input">
+        <input id="chat-text" type="text" placeholder="输入消息，回车发送（Enter 发送 / Esc 清除）" autocomplete="off">
+        <button class="btn" onclick="sendChat()">发送</button>
+      </div>
+    </div>
+  </div>
+
   <div class="foot">数据源: Anaphase /v1/agent/snapshot（ADR-0010）· Tuck /v1/audit 链 · 自动刷新 {refresh}s · 视图切换同 TUI Ctrl+E · <a href="/api/snapshot" style="color:var(--acc);">snapshot JSON</a> · <a href="/api/audit" style="color:var(--acc);">audit JSON</a></div>
 <script>
 (function () {{
@@ -412,13 +454,54 @@ fn index_html(cfg: &PanelConfig) -> String {
   var tuckConfigured = {tuck_configured};
   var entries = [];
   var selected = null;
+  document.addEventListener('keydown', function (e) {{
+    if (e.target && e.target.id === 'chat-text' && e.key === 'Enter') {{ sendChat(); }}
+    if (e.target && e.target.id === 'chat-text' && e.key === 'Escape') {{ document.getElementById('chat-text').value = ''; }}
+  }});
 
   function esc(s) {{ return String(s).replace(/[&<>"']/g, function (c) {{ return {{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]; }}); }}
   function showView(v) {{
     document.getElementById('view-cockpit').style.display = v==='cockpit' ? '' : 'none';
     document.getElementById('view-engram').style.display = v==='engram' ? '' : 'none';
+    document.getElementById('view-chat').style.display = v==='chat' ? '' : 'none';
     document.getElementById('v-cockpit').className = 'btn' + (v==='cockpit' ? ' on' : '');
     document.getElementById('v-engram').className = 'btn' + (v==='engram' ? ' on' : '');
+    document.getElementById('v-chat').className = 'btn' + (v==='chat' ? ' on' : '');
+    if (v==='chat') document.getElementById('chat-text').focus();
+  }}
+
+  function addMsg(who, text, isErr) {{
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'msg ' + who + (isErr ? ' err' : '');
+    d.innerHTML = '<span class="who">' + (who==='user' ? '你' : 'Helix') + '</span>' + esc(text);
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+  }}
+
+  function sendChat() {{
+    var input = document.getElementById('chat-text');
+    var text = input.value.trim();
+    if (!text) return;
+    addMsg('user', text, false);
+    input.value = '';
+    var btn = document.querySelector('.chat-input .btn');
+    btn.disabled = true; btn.textContent = '思考中…';
+    fetch('/api/chat', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ message: text }})
+    }}).then(function (r) {{ return r.json(); }}).then(function (j) {{
+      if (j.error) {{ addMsg('helix', '⚠ ' + j.error + (j.detail ? ' — ' + j.detail : ''), true); }}
+      else {{ addMsg('helix', j.reply || '（无回复）', false); }}
+    }}).catch(function (e) {{
+      addMsg('helix', '⚠ 发送失败: ' + e, true);
+    }}).finally(function () {{
+      btn.disabled = false; btn.textContent = '发送';
+      input.focus();
+    }});
   }}
 
   function rowSummary(e) {{
@@ -626,6 +709,7 @@ mod tests {
         assert_eq!(route("/api/audit"), Route::Audit);
         assert_eq!(route("/api/audit?limit=50"), Route::Audit);
         assert_eq!(route("/api/trace"), Route::Trace);
+        assert_eq!(route("/api/chat"), Route::Chat);
         assert_eq!(route("/api/trace?trace_id=run-x"), Route::Trace);
     }
 
