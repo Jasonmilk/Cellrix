@@ -308,10 +308,17 @@ cargo run --bin up -- --restart     # 或 target/debug/up --restart
 数据源 `/api/ecosystem`（TCP 探测 + HTTP health 双检，协议默认端口，
 无硬编码）。
 
-**印痕 Engram v2（经历时间线）**：左侧经历列表（每会话一条：时间 · 事件数 ·
-用户输入预览），点击任意经历加载完整 turn 时间线——徽标按生态词汇
+**印痕 Engram v3（经历时间线 · 白盒 + 甘特图 + 续聊，ADR-0026/0027）**：
+左侧经历列表（每会话一条：时间 · 事件数 · 用户输入预览 + **继续**按钮），
+点击任意经历加载完整 turn 时间线——徽标按生态词汇
 （START / USER / CONTEXT / ATTEMPT / TOOL / RESULT / VERDICT / END）+
-统计条（Duration · Events · Tools · Verdict）。会话 = 经历（ADR-0026），
+统计条（Duration · Events · Tools · Verdict）+
+**甘特图**（纯 SVG 时间轴：每事件一条横条，tool/result 画执行耗时——DSH 式
+轨迹，Helix 自有词汇）。**CONTEXT 行展开 SA-Core 选择白盒**：
+`SA-Core 选择 {L1×2 L3×18}` + top 节点 `L3·id heat phase`——看到 Helix 从
+记忆捞了什么、信了几分（provenance only，绝不写节点正文）。
+**继续** = 显式续聊：带 `job_id` 发起新一轮，上一轮摘要作为 true history
+注入，新轮 `context/inject` 记 `resume_from`。会话 = 经历（ADR-0026），
 判据与行动同线——这是 Helix 相对 DSH 轨迹多出的一层（DSH 没有 verdict）。
 对话视图同一经历列表（一份数据两个入口）。
 

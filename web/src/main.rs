@@ -577,6 +577,16 @@ fn index_html(cfg: &PanelConfig) -> String {
   .badge.turn-end {{ background:rgba(154,154,164,.12); color:#9a9aa4; }}
   .ev-row .body {{ color:var(--text); word-break:break-all; }}
   .ev-row .ok {{ color:var(--ok); }} .ev-row .bad {{ color:var(--bad); }}
+  .gantt {{ display:block; width:100%; padding:10px 12px 4px; box-sizing:border-box; }}
+  .gantt .axis {{ color:var(--dim); font-size:10px; }}
+  .gantt .row {{ display:flex; align-items:center; gap:8px; margin-bottom:3px; }}
+  .gantt .lbl {{ width:74px; font-size:10px; color:var(--dim); text-align:right; flex-shrink:0; }}
+  .gantt .bar {{ height:10px; border-radius:3px; min-width:2px; }}
+  .gantt .track {{ flex:1; background:rgba(154,154,164,.12); border-radius:3px; height:10px; position:relative; }}
+  .resume-btn {{ margin-left:auto; font-size:10px; padding:2px 8px; border-radius:6px; border:1px solid var(--acc); color:var(--acc); background:transparent; cursor:pointer; }}
+  .resume-btn:hover {{ background:rgba(158,172,234,.15); }}
+  .mnode {{ color:var(--acc); }}
+  .cont-banner {{ padding:6px 12px; font-size:11px; color:var(--acc); border-bottom:1px solid var(--line); background:rgba(158,172,234,.07); }}
   .grp-head .arrow {{ color:var(--acc); width:12px; display:inline-block; }}
   .grp-head .tid {{ color:var(--acc); font-weight:600; }}
   .grp-body .row {{ padding-left:22px; }}
@@ -639,6 +649,7 @@ fn index_html(cfg: &PanelConfig) -> String {
       <div style="display:grid;grid-template-columns:240px 1fr;gap:12px;">
         <div class="ses-side" id="chat-side"><div class="empty">经历列表加载中…</div></div>
         <div>
+      <div id="cont-banner" class="cont-banner" style="display:none;"></div>
       <div id="chat-msgs" class="chat-msgs"><div class="empty">说点什么吧——这是给 Helix 的一段新经历。</div></div>
       <div class="chat-input">
         <input id="chat-text" type="text" placeholder="输入消息，回车发送（Enter 发送 / Esc 清除）" autocomplete="off">
@@ -680,6 +691,10 @@ fn index_html(cfg: &PanelConfig) -> String {
   // badges from the event vocabulary, no second data source.
   var EV_BADGE = {{ 'turn/start':'START','user/message':'USER','context/inject':'CONTEXT','assistant/attempt':'ATTEMPT','tool/call':'TOOL','tool/result':'RESULT','verdict/status':'VERDICT','turn/end':'END' }};
   var selectedPeriod = null;
+  // Explicit continuation (ADR-0026): while set, the next chat request
+  // resumes this experience (`job_id`) instead of opening a fresh stranger.
+  var chatJobId = null;
+  var CHAT_META = {{ 'turn-start':'#9a9aa4','user-message':'#9eacea','context-inject':'#c5a7e8','assistant-attempt':'#4ec9a0','tool-call':'#e5c07b','tool-result':'#e06c75','verdict-status':'#e06c75','turn-end':'#9a9aa4' }};
 
   function loadSessions() {{
     fetch('/api/sessions').then(function (r) {{ return r.json(); }}).then(function (j) {{
@@ -699,11 +714,21 @@ fn index_html(cfg: &PanelConfig) -> String {
     periods.forEach(function (p) {{
       var div = document.createElement('div');
       div.className = 'ses-item' + (selectedPeriod === p.job_id ? ' sel' : '');
-      div.innerHTML = '<div class="t">' + esc(p.first_ts.slice(5,19)) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id) + '</span></div><div class="p">' + esc(p.preview || '(无用户输入)') + '</div>';
+      div.innerHTML = '<div class="t">' + esc(p.first_ts.slice(5,19)) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id) + '</span>' +
+        '<button class="resume-btn" data-job="' + esc(p.job_id) + '">继续</button></div><div class="p">' + esc(p.preview || '(无用户输入)') + '</div>';
       div.onclick = function () {{
         selectedPeriod = p.job_id;
         showView('engram');
         selectPeriod(p.job_id);
+      }};
+      var rb = div.querySelector('.resume-btn');
+      if (rb) rb.onclick = function (ev) {{
+        ev.stopPropagation();
+        chatJobId = p.job_id;
+        selectedPeriod = p.job_id;
+        showView('chat');
+        var b = document.getElementById('cont-banner');
+        if (b) {{ b.style.display = ''; b.innerHTML = '续接经历 <span class="tid">' + esc(chatJobId) + '</span> —— 下一句话延续这段对话（点新经历或刷新即取消）'; }}
       }};
       box.appendChild(div);
     }});
@@ -733,17 +758,60 @@ fn index_html(cfg: &PanelConfig) -> String {
       '<span>Tools <b>' + tools + '</b></span>' +
       (verdicts.length ? '<span>Verdict <b class="' + (verdicts[0] === 'Met' ? 'ok' : 'bad') + '">' + esc(verdicts.join(',')) + '</b></span>' : '') +
       '<span class="tid">' + esc(jobId) + '</span></div>';
+    html += ganttSvg(events);
     events.forEach(function (e) {{
       html += '<div class="ev-row">' + eventSummary(e) + '</div>';
     }});
     main.innerHTML = html;
   }}
 
+  // DSH-style turn trace, Helix vocabulary: one horizontal bar per event
+  // on a shared time axis (first -> last). tool/call -> tool/result pairs
+  // show as consecutive bars, so a 276ms calc reads at a glance. Pure SVG,
+  // zero dependencies; skipped when timestamps are unparseable.
+  function ganttSvg(events) {{
+    var first = Date.parse(events[0].time), last = Date.parse(events[events.length-1].time);
+    if (isNaN(first) || isNaN(last) || last <= first) return '';
+    var span = last - first;
+    var html = '<div class="gantt">';
+    events.forEach(function (e) {{
+      var t = Date.parse(e.time);
+      if (isNaN(t)) return;
+      var left = Math.round((t - first) / span * 100);
+      var width = 1;
+      if (e.type === 'tool/result' && e.data && e.data.duration_ms) {{
+        width = Math.max(1, Math.round(e.data.duration_ms / span * 100));
+        left = Math.max(0, left - width);
+      }}
+      var key = e.type.replace('/','-');
+      var color = CHAT_META[key] || '#9a9aa4';
+      html += '<div class="row"><span class="lbl">' + esc(e.time.slice(11,19)) + '</span><span class="track">' +
+        '<span class="bar" style="position:absolute;left:' + left + '%;width:' + width + '%;background:' + color + ';"></span></span></div>';
+    }});
+    html += '<div class="axis">' + esc(events[0].time.slice(11,19)) + ' → ' + esc(events[events.length-1].time.slice(11,19)) + ' · ' + span + 'ms · 每行=一个事件 · 横条=执行耗时</div></div>';
+    return html;
+  }}
+
   function eventSummary(e) {{
     var d = e.data || {{}};
     var body = '';
     if (e.type === 'user/message') body = esc(d.text || '');
-    else if (e.type === 'context/inject') body = 'nodes=' + d.nodes + ' · chars=' + d.chars;
+    else if (e.type === 'context/inject') {{
+      body = 'nodes=' + d.nodes + ' · chars=' + d.chars;
+      if (d.resume_from) body += ' · resume=' + esc(d.resume_from);
+      var ch = d.choice;
+      if (ch) {{
+        var t = ch.tiers || {{}};
+        var parts = [];
+        for (var k in t) {{ if (t.hasOwnProperty(k)) parts.push(k + '×' + t[k]); }}
+        body += ' · SA-Core 选择 {{' + (parts.join(' ') || '—') + '}}';
+        var top = ch.top || [];
+        for (var i = 0; i < top.length; i++) {{
+          var n = top[i];
+          body += ' · <span class="mnode">' + esc(n.tier) + '·' + esc(n.id) + ' ' + n.heat + ' ' + esc(n.phase || '') + '</span>';
+        }}
+      }}
+    }}
     else if (e.type === 'assistant/attempt') body = esc((d.text || '').slice(0, 200));
     else if (e.type === 'tool/call') body = esc(d.tool) + ' · #' + d.index + ' · expect=' + esc(d.expect);
     else if (e.type === 'tool/result') body = esc(d.tool) + ' · <span class="' + (d.ok ? 'ok' : 'bad') + '">' + (d.ok ? 'ok' : 'fail') + '</span> · ' + d.duration_ms + 'ms';
@@ -805,6 +873,11 @@ fn index_html(cfg: &PanelConfig) -> String {
     var btn = document.querySelector('.chat-input .btn');
     btn.disabled = true; btn.textContent = '思考中…';
     var done = false;
+    var job = chatJobId || null;
+    if (job) {{
+      var b = document.getElementById('cont-banner');
+      if (b) b.innerHTML = '已续接 ' + esc(job) + ' —— 新经历已开启，本提示仍显示本次续接来源';
+    }}
     function finish() {{
       if (done) return;
       done = true;
@@ -814,7 +887,7 @@ fn index_html(cfg: &PanelConfig) -> String {
     fetch('/api/chat', {{
       method: 'POST',
       headers: {{ 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }},
-      body: JSON.stringify({{ message: text }})
+      body: JSON.stringify({{ message: text, job_id: job }})
     }}).then(function (r) {{
       if (!r.body || !r.ok) {{ return r.json().then(function (j) {{
         throw new Error((j.error || 'HTTP ' + r.status) + (j.detail ? ' — ' + j.detail : ''));

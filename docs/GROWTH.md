@@ -32,6 +32,23 @@
 - Cellrix 321 → **325** 全绿（`--all-features`，0 failed）；Engram 数据层/状态层纯逻辑，Web 端可同构复用（TUI=Web 单一状态模型）
 
 
+## 健康快照 #13：印痕 v3 —— 甘特图 + SA-Core 白盒 + 会话续聊（2026-09-07）
+
+**变异类型**：印痕三深化（用户："没有 DSH 的甘特图 / 会话无法选择继续聊 /
+我们是不是可以做得更深？SA-Core 选择了什么？"）
+
+- **Anaphase 侧（ADR-0027）**：`QueryResult.nodes` → `Vec<MemoryNode>`
+  （透传 Mind 的 id/tier/heat/phase，此前只取 content_json 把白盒能力全丢）；
+  vendored `helix_mind.proto` Node 补字段 16-19；`context/inject` 写
+  `choice`（tiers 分布 + top 3，provenance only 不写正文）；`/v1/chat`
+  收 `job_id` → `read_summary` 展平上一轮 → resume 注入 → 记 `resume_from`
+- **Cellrix 侧**：`ganttSvg()` 纯 SVG 时间轴（每事件一条横条 + tool 执行段，
+  零依赖）；CONTEXT 行展开 SA-Core 选择 + top 节点；经历项加「继续」按钮
+  （`chatJobId` → sendChat 带 job_id → cont-banner 提示续接中）
+- 测试：341 全绿（前端改动不破坏 index_html 断言）
+- 实弹：续聊 `8 的 6 次方`（job_id=run-ffaa02…）→ 新轮 choice
+  {tiers:{L1:2,L3:18}} + resume_from → 真实 calc 8**6=262144
+
 ## 健康快照 #12：WebUI 流式对话根治 + TUI 预聚焦（2026-09-07）
 
 **变异类型**：三处交互根因修复——用户实测 WebUI 发送无回复、TUI 打完字看不到、错误提示位置。
