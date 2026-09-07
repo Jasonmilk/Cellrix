@@ -46,6 +46,8 @@ fn route(path: &str) -> Route {
         "api/snapshot" => Route::Snapshot,
         "api/audit" => Route::Audit,
         "api/trace" => Route::Trace,
+        "api/sessions" => Route::Sessions,
+        "api/events" => Route::Events,
         "api/chat" => Route::Chat,
         _ => Route::NotFound,
     }
@@ -57,6 +59,8 @@ enum Route {
     Snapshot,
     Audit,
     Trace,
+    Sessions,
+    Events,
     Chat,
     NotFound,
 }
@@ -263,6 +267,42 @@ fn handle(mut stream: TcpStream, cfg: &PanelConfig) -> Result<(), Box<dyn std::e
                 Ok(body) => respond(&mut stream, 200, "application/json", body.as_bytes())?,
                 Err(e) => {
                     let msg = format!("{{\"configured\":false,\"count\":0,\"entries\":[],\"error\":\"{e}\"}}");
+                    respond(&mut stream, 502, "application/json", msg.as_bytes())?;
+                }
+            }
+        }
+        Route::Sessions => {
+            // Session-management sidebar (Engram v2): proxy the Anaphase
+            // period list (one summary per cognitive period, newest first).
+            let auth = cellrix_web::client_bearer();
+            let target = "/v1/sessions?limit=50";
+            match fetch_json(&cfg.anaphase_endpoint, target, auth.as_deref()) {
+                Ok(body) => respond(&mut stream, 200, "application/json", body.as_bytes())?,
+                Err(e) => {
+                    let msg = format!("{{\"configured\":false,\"periods\":[],\"error\":\"{e}\"}}");
+                    respond(&mut stream, 502, "application/json", msg.as_bytes())?;
+                }
+            }
+        }
+        Route::Events => {
+            // One period's event stream (Engram turn timeline): pass the
+            // browser's job_id= query through to Anaphase /v1/events.
+            let q = text
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .unwrap_or("/api/events");
+            let query = q.split('?').nth(1).unwrap_or("");
+            let target = if query.is_empty() {
+                "/v1/events".to_string()
+            } else {
+                format!("/v1/events?{query}")
+            };
+            let auth = cellrix_web::client_bearer();
+            match fetch_json(&cfg.anaphase_endpoint, &target, auth.as_deref()) {
+                Ok(body) => respond(&mut stream, 200, "application/json", body.as_bytes())?,
+                Err(e) => {
+                    let msg = format!("{{\"configured\":false,\"missing\":true,\"events\":[],\"error\":\"{e}\"}}");
                     respond(&mut stream, 502, "application/json", msg.as_bytes())?;
                 }
             }
@@ -545,6 +585,87 @@ fn index_html(cfg: &PanelConfig) -> String {
     document.getElementById('v-engram').className = 'btn' + (v==='engram' ? ' on' : '');
     document.getElementById('v-chat').className = 'btn' + (v==='chat' ? ' on' : '');
     if (v==='chat') document.getElementById('chat-text').focus();
+    if (v==='engram' || v==='chat') loadSessions();
+  }}
+
+  // === Engram v2 (ADR-0026): session event timeline ===
+  // One cognitive period = one `run-xxx` event stream, keyed by the same
+  // derived job id as the body trace and the Tuck audit chain. The sidebar
+  // lists periods (newest first); selecting one loads its turn timeline —
+  // badges from the event vocabulary, no second data source.
+  var EV_BADGE = {{ 'turn/start':'START','user/message':'USER','context/inject':'CONTEXT','assistant/attempt':'ATTEMPT','tool/call':'TOOL','tool/result':'RESULT','verdict/status':'VERDICT','turn/end':'END' }};
+  var selectedPeriod = null;
+
+  function loadSessions() {{
+    fetch('/api/sessions').then(function (r) {{ return r.json(); }}).then(function (j) {{
+      var periods = j.periods || [];
+      var empty = '<div class="empty">' + (j.configured ? '尚无经历（先和 Helix 说句话）' : '未开启会话事件流（Anaphase config `session_events_path`）') + '</div>';
+      renderSide('s-side', periods, empty);
+      renderSide('chat-side', periods, empty);
+    }}).catch(function (e) {{
+      document.getElementById('s-side').innerHTML = '<div class="empty">经历列表拉取失败: ' + esc(e.message) + '</div>';
+    }});
+  }}
+
+  function renderSide(id, periods, empty) {{
+    var box = document.getElementById(id);
+    if (!periods.length) {{ box.innerHTML = empty; return; }}
+    box.innerHTML = '';
+    periods.forEach(function (p) {{
+      var div = document.createElement('div');
+      div.className = 'ses-item' + (selectedPeriod === p.job_id ? ' sel' : '');
+      div.innerHTML = '<div class="t">' + esc(p.first_ts.slice(5,19)) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id) + '</span></div><div class="p">' + esc(p.preview || '(无用户输入)') + '</div>';
+      div.onclick = function () {{
+        selectedPeriod = p.job_id;
+        showView('engram');
+        selectPeriod(p.job_id);
+      }};
+      box.appendChild(div);
+    }});
+  }}
+
+  function selectPeriod(jobId) {{
+    var main = document.getElementById('s-main');
+    main.innerHTML = '<div class="empty">加载 ' + esc(jobId) + '…</div>';
+    fetch('/api/events?job_id=' + encodeURIComponent(jobId)).then(function (r) {{ return r.json(); }}).then(function (j) {{
+      if (j.missing || !j.events || !j.events.length) {{
+        main.innerHTML = '<div class="empty">该轮无事件流（' + esc(jobId) + '）——见底部 audit JSON 链</div>';
+        return;
+      }}
+      renderTimeline(main, j.events, jobId);
+    }}).catch(function (e) {{
+      main.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>';
+    }});
+  }}
+
+  function renderTimeline(main, events, jobId) {{
+    var dur = durMs(events[0].time, events[events.length-1].time);
+    var tools = events.filter(function (e) {{ return e.type === 'tool/call'; }}).length;
+    var verdicts = events.filter(function (e) {{ return e.type === 'verdict/status'; }}).map(function (e) {{ return e.data.status; }});
+    var html = '<div class="ses-stats">' +
+      '<span>Duration <b>' + (dur >= 0 ? dur + 'ms' : '—') + '</b></span>' +
+      '<span>Events <b>' + events.length + '</b></span>' +
+      '<span>Tools <b>' + tools + '</b></span>' +
+      (verdicts.length ? '<span>Verdict <b class="' + (verdicts[0] === 'Met' ? 'ok' : 'bad') + '">' + esc(verdicts.join(',')) + '</b></span>' : '') +
+      '<span class="tid">' + esc(jobId) + '</span></div>';
+    events.forEach(function (e) {{
+      html += '<div class="ev-row">' + eventSummary(e) + '</div>';
+    }});
+    main.innerHTML = html;
+  }}
+
+  function eventSummary(e) {{
+    var d = e.data || {{}};
+    var body = '';
+    if (e.type === 'user/message') body = esc(d.text || '');
+    else if (e.type === 'context/inject') body = 'nodes=' + d.nodes + ' · chars=' + d.chars;
+    else if (e.type === 'assistant/attempt') body = esc((d.text || '').slice(0, 200));
+    else if (e.type === 'tool/call') body = esc(d.tool) + ' · #' + d.index + ' · expect=' + esc(d.expect);
+    else if (e.type === 'tool/result') body = esc(d.tool) + ' · <span class="' + (d.ok ? 'ok' : 'bad') + '">' + (d.ok ? 'ok' : 'fail') + '</span> · ' + d.duration_ms + 'ms';
+    else if (e.type === 'verdict/status') body = '<b class="' + (d.status === 'Met' ? 'ok' : 'bad') + '">' + esc(d.status || '') + '</b>';
+    else if (e.type === 'turn/end') body = 'done=' + d.done + ' · success=' + d.success + ' · impasse=' + d.impasse;
+    else body = '';
+    return '<span class="badge ' + (e.type.replace('/','-')) + '">' + (EV_BADGE[e.type] || esc(e.type)) + '</span> <span class="dim">' + esc(e.time.slice(11,19)) + '</span> <span class="body">' + body + '</span>';
   }}
 
   // One centered toast for system-level errors — never a Helix speech bubble

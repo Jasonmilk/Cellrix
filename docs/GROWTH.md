@@ -539,3 +539,15 @@ WebUI 偶发 EAGAIN 的真根因是**旧进程残留**（18:20 面板 + 18:32 an
 
 ### 待办
 - 状态流转（perception→reasoning→execution→reflection）入 Engram 时间线（现链只含 request/response 网关条目）
+
+## [2026-09-07] Engram v2：会话经历时间线 + 会话管理侧栏（ADR-0026）
+
+### 变更性质
+- **印痕视图重画**：左侧经历列表（/api/sessions：时间 · 事件数 · 用户输入预览）+ 右侧 turn 时间线（/api/events?job_id=）
+- **DSH 式徽标**（生态词汇）：START / USER / CONTEXT / ATTEMPT / TOOL / RESULT / VERDICT / END，统计条（Duration · Events · Tools · Verdict）
+- **Chat 视图加经历侧栏**：同一数据源（极致复用），点击切印痕看详情——会话管理的第一个 UI 形态
+- **proxy**：/api/sessions + /api/events 路由（Bearer 注入，同 trace 模式）
+
+### 验收
+- 端到端：Chat 发消息 → 印痕出现新经历 → 点击渲染完整 turn 时间线（质量守恒轮 5 事件）✓
+- Cellrix 测试全绿（路由新增 Sessions/Events）
