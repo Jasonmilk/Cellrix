@@ -302,3 +302,22 @@ README（Self-check 节 + --open）｜ GROWTH｜ ECOSYSTEM v1.64（Anaphase 216 
 
 ### 状态
 🧬 已完成
+
+## 记录 36：up 一键——三件套拉起（2026-09-07）
+
+### 触发条件
+用户拍板 ③ 完整化（WorkBuddy/DSH 式易用性）：一个命令起 Anaphase + Tuck + web，之后零命令。
+
+### 变更性质
+- **web/src/lib.rs 抽取**：fetch_json/probe/unhealthy_names 从 main.rs 移入共享 lib（up 与面板复用，极致复用；std-only）
+- **`up` bin**（web package 第二个 bin）：ensure() 流程——probe 健康 → ✅ 已就绪；down + `--anaphase-cmd/--tuck-cmd`（或 UP_*_CMD env）→ spawn（detached）+ 轮询健康（--wait 默认 30s/500ms 间隔）；down + 无 cmd → **明确引导不静默跳过**（物理事实优先）
+- **web 路径确定性派生**：CARGO_BIN_EXE（cargo 环境）→ 回退 current_exe 兄弟（同 build 目录）——无硬编码路径（0 硬编码）
+- **解耦边界**：up 不持有 Anaphase/Tuck 的配置（config.toml/key）——启动命令由调用方提供，Cellrix 只编排不猜
+- **测试**：lib 4（probe ok/refused + unhealthy_names 2）+ main 5 → web 7→**9**，Cellrix 329→**331**
+- **真实验证**：anaphase(50123)+tuck(60052) 健康 → up → `anaphase: ✅ already healthy / tuck: ✅ already healthy / panel launched` + web 真实服务（DOCTYPE）
+
+### 验收
+README（§up 一节）｜ GROWTH｜ ECOSYSTEM v1.65（Cellrix 331）
+
+### 状态
+🧬 已完成

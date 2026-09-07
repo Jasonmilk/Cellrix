@@ -328,6 +328,26 @@ cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
 - **`--open`**: after binding, opens the panel in your default browser —
   one command, then no more commands
 
+### `up` — one command to the cockpit
+
+`up` ensures Anaphase + Tuck are healthy (auto-starting them when given a
+start command), then launches the panel and opens your browser:
+
+```text
+cargo run -p cellrix-web --bin up
+  --anaphase-endpoint http://127.0.0.1:50061
+  --tuck-endpoint http://127.0.0.1:60052 --tuck-key <key>
+  --anaphase-cmd "ANAPHASE_CONFIG=... anaphase"     # optional auto-start
+  --tuck-cmd "tuck --gate ..."                      # optional auto-start
+  --wait 30                                          # health poll budget
+```
+
+- Already healthy → `✅ already healthy`, no restart
+- Down + `--*-cmd` given → spawned detached and polled until healthy
+- Down + no command → clear guidance, never silently skipped
+- Paths/configs stay with the caller (`UP_ANAPHASE_CMD` / `UP_TUCK_CMD` env
+  work too) — `up` orchestrates, never guesses (0 hardcoding)
+
 Live gateway verification (needs Tuck running on :60052):
 ```bash
 cargo test -p cellrix-transport --all-features -- --ignored live
