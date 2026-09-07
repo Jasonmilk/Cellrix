@@ -249,3 +249,20 @@ README（§7.3 full-text replay）｜ GROWTH｜ ECOSYSTEM v1.62
 
 ### 状态
 🧬 已完成
+
+## 记录 33：Web 时间线按轮分组（2026-09-07）
+
+### 触发条件
+顺序② Web 深化（DSH 风格）第一刀：审计时间线散行（request/response 各自一行）读起来像流水账——按 trace_id 合成"一轮"。
+
+### 变更性质
+- **renderAudit 分组**：同 trace_id 的条目聚合为一组（组 = 一轮：request+response+重试），组内保持链顺序（request→response）；最新组在上
+- **组头**：trace_id + 条目数 + 时间范围；点击折叠/展开（▾/▸）
+- **CSS**：grp-head/grp-body（组头浅高亮、行缩进 22px）
+- **测试**：web 5 不变；内嵌 JS `node --check` 通过；真实页面分组渲染就位（grp-head/Group by trace_id 字段验证）
+
+### 验收
+GROWTH｜ ECOSYSTEM v1.63（数字不变，Cellrix 327）
+
+### 状态
+🧬 已完成（下一刀：正文 [REDACTED] 高亮 / 轮动效）

@@ -7,7 +7,7 @@
 
 ---
 
-## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017）** + **Engram（印痕）审计面板（2026-09-07：Tuck /v1/audit 真实链消费，Ctrl+E 切换，时间线/详情/链完整性，本地 trace 过滤，虚拟列表，live 链校验全过）** + **Web 同构映射（2026-09-07：cellrix-web 双视图 Cockpit/Engram，/api/audit Bearer 代理与 TUI 同一 EngramEntry 数据模型，比例网格 timeline 2fr/detail 1fr，trace 过滤，327 全绿）**——**全文回放（2026-09-07：/api/trace 代理 + detail 正文区，点审计条目看该轮 prompt/response）**——下一步：Web 优化（DSH 风格深化：时间线动效/正文高亮/按 trace 分组）
+## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017）** + **Engram（印痕）审计面板（2026-09-07：Tuck /v1/audit 真实链消费，Ctrl+E 切换，时间线/详情/链完整性，本地 trace 过滤，虚拟列表，live 链校验全过）** + **Web 同构映射（2026-09-07：cellrix-web 双视图 Cockpit/Engram，/api/audit Bearer 代理与 TUI 同一 EngramEntry 数据模型，比例网格 timeline 2fr/detail 1fr，trace 过滤，327 全绿）**——**全文回放（2026-09-07：/api/trace 代理 + detail 正文区，点审计条目看该轮 prompt/response）**——**时间线按轮分组（2026-09-07：同 trace_id 合成一轮，组头折叠，最新轮在上）**——下一步：正文 [REDACTED] 高亮 / 轮动效
 
 **状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
 

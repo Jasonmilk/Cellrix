@@ -332,6 +332,11 @@ fn index_html(cfg: &PanelConfig) -> String {
   .row .kind {{ color:var(--acc); font-weight:600; }}
   .row .tid {{ color:var(--dim); }}
   .row .ok {{ color:var(--ok); }} .row .bad {{ color:var(--bad); }}
+  .grp-head {{ padding:7px 12px; font-size:12px; cursor:pointer; background:rgba(158,172,234,.05); border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:baseline; user-select:none; }}
+  .grp-head:hover {{ background:rgba(158,172,234,.10); }}
+  .grp-head .arrow {{ color:var(--acc); width:12px; display:inline-block; }}
+  .grp-head .tid {{ color:var(--acc); font-weight:600; }}
+  .grp-body .row {{ padding-left:22px; }}
   .detail {{ padding:12px; font-size:12px; }}
   .detail .line {{ margin-bottom:6px; display:flex; gap:8px; flex-wrap:wrap; }}
   .detail .key {{ color:var(--dim); min-width:90px; }}
@@ -415,12 +420,35 @@ fn index_html(cfg: &PanelConfig) -> String {
     }}
     if (!filtered.length) {{ box.innerHTML = '<div class="empty">无匹配条目</div>'; return; }}
     box.innerHTML = '';
-    filtered.slice().reverse().forEach(function (e, i) {{
-      var div = document.createElement('div');
-      div.className = 'row' + (selected === e.seq ? ' sel' : '');
-      div.innerHTML = rowSummary(e);
-      div.onclick = function () {{ selectEntry(e.seq); }};
-      box.appendChild(div);
+    // Group by trace_id — one round = one group (request+response+retries
+    // of the same derived id), newest round first. Rows inside keep chain
+    // order (request -> response), so the timeline reads by *round*, not by
+    // scattered entry.
+    var groups = {{}};
+    filtered.forEach(function (e) {{
+      var k = e.payload.trace_id || ('#seq' + e.seq);
+      (groups[k] = groups[k] || []).push(e);
+    }});
+    var maxSeq = function (es) {{ return es[es.length-1].seq; }};
+    var gkeys = Object.keys(groups).sort(function (a, b) {{ return maxSeq(groups[b]) - maxSeq(groups[a]); }});
+    gkeys.forEach(function (k) {{
+      var es = groups[k];
+      var head = document.createElement('div'); head.className = 'grp-head';
+      head.innerHTML = '<span class="arrow">▾</span> <span class="tid">' + esc(k) + '</span> <span class="dim">' + es.length + ' 条 · ' + esc(es[0].ts.slice(11,19)) + ' → ' + esc(es[es.length-1].ts.slice(11,19)) + '</span>';
+      var body = document.createElement('div'); body.className = 'grp-body';
+      head.onclick = function () {{
+        var hidden = body.style.display === 'none';
+        body.style.display = hidden ? '' : 'none';
+        head.querySelector('.arrow').textContent = hidden ? '▾' : '▸';
+      }};
+      box.appendChild(head); box.appendChild(body);
+      es.forEach(function (e) {{
+        var div = document.createElement('div');
+        div.className = 'row' + (selected === e.seq ? ' sel' : '');
+        div.innerHTML = rowSummary(e);
+        div.onclick = function () {{ selectEntry(e.seq); }};
+        body.appendChild(div);
+      }});
     }});
   }}
 
