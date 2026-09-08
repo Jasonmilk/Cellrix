@@ -1306,8 +1306,6 @@ fn index_html(cfg: &PanelConfig) -> String {
     setTimeout(function(){{ rip.remove(); }}, 300);
   }}, true);
   window.toggleResume = toggleResume;
-  window.applyFilter = applyFilter;
-  window.clearFilter = clearFilter;
 }})();
 </script>
 </body>
