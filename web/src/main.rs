@@ -800,12 +800,10 @@ fn index_html(cfg: &PanelConfig) -> String {
   </div>
 
   <div id="view-engram" style="display:none;">
-    <div class="panel">
-      <div class="head">印痕 Engram — 经历时间线（会话 = 经历 · 一轮 = 一段认知周期 · 判据与行动同线）</div>
-      <div class="engram-main" style="grid-template-columns:280px 1fr;">
-        <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
-        <div id="s-main"><div class="empty">左侧选择一段经历，查看完整 turn 时间线</div></div>
-      </div>
+    <div class="head" style="margin-bottom:12px">印痕 Engram — 全链路可审计轨迹（会话 = 经历 · 判据与行动同线 · 水之波光 v11.2.0 骨架）</div>
+    <div class="engram-main" style="grid-template-columns:280px 1fr;">
+      <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
+      <div id="s-main">{engram}</div>
     </div>
   </div>
 
@@ -852,12 +850,11 @@ fn index_html(cfg: &PanelConfig) -> String {
     if (v==='engram' || v==='chat') loadSessions();
   }}
 
-  // === Engram v2 (ADR-0026): session event timeline ===
-  // One cognitive period = one `run-xxx` event stream, keyed by the same
+  // === Engram v3 (水之波光 v11.2.0 骨架): experience sidebar + trajectory
+  // === One cognitive period = one `run-xxx` event stream, keyed by the same
   // derived job id as the body trace and the Tuck audit chain. The sidebar
-  // lists periods (newest first); selecting one loads its turn timeline —
-  // badges from the event vocabulary, no second data source.
-  var EV_BADGE = {{ 'turn/start':'START','user/message':'USER','context/inject':'CONTEXT','assistant/attempt':'ATTEMPT','assistant/think':'THINK','tool/call':'TOOL','tool/result':'RESULT','check/status':'CHECK','verdict/status':'VERDICT','turn/end':'END' }};
+  // lists periods (newest first); selecting one loads the trajectory
+  // skeleton rendered by assets/engram.html — badges, tracks, inspector.
   var selectedPeriod = null;
   // Explicit continuation (ADR-0026): while set, the next chat request
   // resumes this experience (`job_id`) instead of opening a fresh stranger.
@@ -886,6 +883,7 @@ fn index_html(cfg: &PanelConfig) -> String {
         '<button class="rename-btn" title="重命名">✎</button></div><div class="p">' + esc(title) + '</div>';
       div.onclick = function () {{
         selectedPeriod = p.job_id;
+        window.__engramMeta = {{ job_id: p.job_id, name: p.name, preview: p.preview }};
         showView('engram');
         selectPeriod(p.job_id);
       }};
@@ -908,88 +906,10 @@ fn index_html(cfg: &PanelConfig) -> String {
   }}
 
   function selectPeriod(jobId) {{
-    var main = document.getElementById('s-main');
-    main.innerHTML = '<div class="empty">加载 ' + esc(jobId) + '…</div>';
-    fetch('/api/events?job_id=' + encodeURIComponent(jobId)).then(function (r) {{ return r.json(); }}).then(function (j) {{
-      if (j.missing || !j.events || !j.events.length) {{
-        main.innerHTML = '<div class="empty">该轮无事件流（' + esc(jobId) + '）——见底部 audit JSON 链</div>';
-        return;
-      }}
-      renderTimeline(main, j.events, jobId);
-    }}).catch(function (e) {{
-      main.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>';
-    }});
-  }}
-
-  function renderTimeline(main, events, jobId) {{
-    var dur = durMs(events[0].time, events[events.length-1].time);
-    var tools = events.filter(function (e) {{ return e.type === 'tool/call'; }}).length;
-    var verdicts = events.filter(function (e) {{ return e.type === 'verdict/status'; }}).map(function (e) {{ return e.data.status; }});
-    var html = '<div class="ses-stats">' +
-      '<span>Duration <b>' + (dur >= 0 ? dur + 'ms' : '—') + '</b></span>' +
-      '<span>Events <b>' + events.length + '</b></span>' +
-      '<span>Tools <b>' + tools + '</b></span>' +
-      (verdicts.length ? '<span>Verdict <b class="' + (verdicts[0] === 'Met' ? 'ok' : 'bad') + '">' + esc(verdicts.join(',')) + '</b></span>' : '') +
-      '<span class="tid">' + esc(jobId) + '</span></div>';
-    // DSH-style trace is a turn outline, not a time axis: the event rows
-    // below are the rail (compact, badge + timestamp + summary). The
-    // gantt experiment was dropped — a time axis added noise without
-    // structure (2026-09-08, after checking the DSH implementation).
-    events.forEach(function (e) {{
-      html += '<div class="ev-row">' + eventSummary(e) + '</div>';
-    }});
-    main.innerHTML = html;
-  }}
-
-  function eventSummary(e) {{
-    var d = e.data || {{}};
-    var body = '';
-    if (e.type === 'user/message') body = esc(d.text || '');
-    else if (e.type === 'context/inject') {{
-      body = 'nodes=' + d.nodes + ' · chars=' + d.chars;
-      if (d.resume_from) body += ' · <span class="chip none">resume</span> ' + esc(d.resume_from);
-      var ch = d.choice;
-      if (ch) {{
-        var t = ch.tiers || {{}};
-        var chips = [];
-        for (var k in t) {{ if (t.hasOwnProperty(k)) chips.push('<span class="chip tier tier-' + esc(k) + '">' + esc(k) + '×' + t[k] + '</span>'); }}
-        body += ' · <span class="sa-core">SA-Core 选择</span> ' + (chips.join('') || '<span class="chip none">—</span>');
-        var top = ch.top || [];
-        for (var i = 0; i < top.length; i++) {{
-          var n = top[i];
-          var nid = n.id ? n.id.slice(0, 8) : '';
-          body += '<span class="chip mnode" title="' + esc(n.id || '') + '">' + esc(n.tier) + '·' + n.heat + ' ' + esc(nid) + ' ' + esc(n.phase || '') + '</span>';
-        }}
-      }}
-    }}
-    else if (e.type === 'assistant/attempt') body = esc((d.text || '').slice(0, 200));
-    else if (e.type === 'assistant/think') body = foldHtml('思考', (d.text || '').slice(0, 60), '<pre class="think-full">' + esc(d.text || '') + '</pre>');
-    else if (e.type === 'tool/call') body = esc(d.tool) + ' · #' + d.index + ' · expect=' + esc(d.expect);
-    else if (e.type === 'tool/result') {{
-      body = esc(d.tool) + ' · <span class="' + (d.ok ? 'ok' : 'bad') + '">' + (d.ok ? 'ok' : 'fail') + '</span> · ' + d.duration_ms + 'ms' +
-        ' · sha <span class="sha">' + esc(d.outcome_sha || '—') + '</span>';
-      var out = d.outcome || '';
-      if (out) body += ' · ' + foldHtml('结果', out.slice(0, 60), '<pre class="think-full">' + esc(out) + '</pre>');
-    }}
-    else if (e.type === 'check/status') {{
-      body = '<span class="chip gate ' + esc(d.gate || '') + '">' + esc((d.gate || 'gate').toUpperCase()) + '</span>' +
-        '<span class="chip judge">' + esc(d.judge || '?') + '</span> · ' + esc(d.check || '') +
-        ' · <span class="' + (d.passed ? 'ok' : 'bad') + '">' + (d.passed ? 'PASS' : 'FAIL') + '</span>' +
-        ' · expect=' + esc(d.expect || '—') + ' · ' + esc(d.evidence_id || '');
-      var why = d.reason || d.actual || '';
-      if (why) body += ' · ' + foldHtml('依据', why.slice(0, 60), '<pre class="think-full">' + esc(why) + '</pre>');
-    }}
-    else if (e.type === 'verdict/status') {{
-      body = '<b class="' + (d.status === 'Met' ? 'ok' : 'bad') + '">' + esc(d.status || '') + '</b>';
-      if (d.checks !== undefined) body += ' · checks=' + d.checks;
-      if (d.reason) body += ' · ' + esc(d.reason);
-    }}
-    else if (e.type === 'turn/end') {{
-      body = 'done=' + d.done + ' · success=' + d.success + ' · impasse=' + d.impasse;
-      if (d.verdict) body += ' · verdict=<b class="' + (d.verdict === 'Met' ? 'ok' : 'bad') + '">' + esc(d.verdict) + '</b>';
-    }}
-    else body = '';
-    return '<span class="badge ' + (e.type.replace('/','-')) + '">' + (EV_BADGE[e.type] || esc(e.type)) + '</span> <span class="dim">' + esc(e.time.slice(11,19)) + '</span> <span class="body">' + body + '</span>';
+    // 印痕 v3（水之波光 v11.2.0 骨架）：轨迹视图由 engram.html 资产渲染。
+    // 会话元信息（名称/预览）通过 window.__engramMeta 桥接。
+    var meta = window.__engramMeta || null;
+    if (window.__engramLoad) window.__engramLoad(jobId, meta);
   }}
 
   // One centered toast for system-level errors — never a Helix speech bubble
@@ -1048,15 +968,6 @@ fn index_html(cfg: &PanelConfig) -> String {
     box.appendChild(d);
     box.scrollTop = box.scrollHeight;
     return d.querySelector('.think-body');
-  }}
-
-  // One fold capability for every expandable row (think / check /
-  // outcome / long reason): click toggles open/closed, hover (title)
-  // previews the full body. A single primitive — no per-feature patches.
-  function foldHtml(label, preview, full) {{
-    return '<span class="fold" onclick="this.classList.toggle(\'open\')" title="' + esc(preview) + '">' +
-      '<span class="fold-head">' + label + ' <span class="fold-tip">▸</span></span>' +
-      '<span class="fold-body">' + full + '</span></span>';
   }}
 
   // Load a past experience's history into the chat space (explicit resume):
@@ -1201,15 +1112,6 @@ fn index_html(cfg: &PanelConfig) -> String {
     }});
   }}
 
-  // Round duration from the chain's own timestamps (RFC3339 → ms).
-  // A single-entry round reports 0 — the chain cannot know when the
-  // reasoning *started*, only when Tuck saw it (honest, no guessing).
-  function durMs(a, b) {{
-    var ta = Date.parse(a), tb = Date.parse(b);
-    if (isNaN(ta) || isNaN(tb)) return -1;
-    return tb - ta;
-  }}
-
   function tick() {{
     fetch('/api/snapshot').then(function (r) {{
       if (!r.ok) {{ throw new Error('proxy ' + r.status); }}
@@ -1313,6 +1215,7 @@ fn index_html(cfg: &PanelConfig) -> String {
 "#,
         refresh = REFRESH_SECS,
         tuck_configured = tuck_configured,
+        engram = include_str!("../assets/engram.html"),
     )
 }
 
@@ -1405,11 +1308,14 @@ mod tests {
         assert!(html.contains("印痕 Engram"));
         assert!(html.contains("/api/audit"));
         assert!(html.contains("Ledger 白盒"));
-        // Engram v2: experience sidebar + turn timeline + ecosystem board.
+        // Engram v3: experience sidebar + trajectory skeleton (v11.2.0).
         assert!(html.contains("id=\"s-side\""));
         assert!(html.contains("id=\"s-main\""));
         assert!(html.contains("id=\"chat-side\""));
-        assert!(html.contains("EV_BADGE"));
+        assert!(html.contains("__engramLoad"));
+        assert!(html.contains("id=\"eTblVp\""));
+        assert!(html.contains("id=\"eLaneInput\""));
+        assert!(html.contains("id=\"eInsp\""));
         assert!(html.contains("loadEcosystem"));
         assert!(html.contains("id=\"eco\""));
         assert!(html.contains("/api/ecosystem"));
