@@ -25,23 +25,21 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-> **Status 2026-09-09 (ADR-0015 D11-D13)**: WebUI fully rebuilt under the
-> **水之波光 · 触境 (Lumtact)** component language — the **道** layer, not
-> just the skin: `web/assets/` split into `tokens.html` (design tokens,
-> 132 lines) + `components.html` (component assets — button family with
-> currentColor ripple, `.inp` 44px inputs with focus halo, `.tbl-shell`
-> table system with sticky 2px headers + scroll-fade self-proof,
-> **≤620px vertical card stacking via `data-label`**, zero-state `.empty`
-> orb that self-proves "empty ≠ broken") + `gleam.html` (component
-> behavior — **TIER runtime probe** T0/T1/T2 with reduced-motion straight
-> to T2, ripple-static degradation, contract self-check `runAudit` that
-> verifies contrast ≥4.5:1 / hit area ≥44px / focus-visible /
-> degradation keeps feedback, footer badge + console). Live audit PASS:
-> text/bg 15.54:1 · dim/surface 6.62:1 · onAccent 6.69:1 ·
-> onDanger/danger **6.02:1** (FIX-02 target). Ledger white-box upgraded
-> from grid rows to a real `<table>` (5-column sticky header + row click
-> expand). All files <400 lines (DNA v1.1). Degradation is
-> **re-negotiation, not deletion** — feedback survives every tier.
+> **Status 2026-09-09 (ADR-0015 D14)**: Session management deepened under
+> the **水之波光 · 触境** component language, **DSH skeleton** (dshbook ch.1:
+> session log = durable facts, click = resume progress). Chat sidebar now
+> **loads a period's history into the chat space** on click (period-head +
+> messages + resume anchor + banner + highlight), inline rename (✎ →
+> edit-in-place on the title row, Enter save / Esc cancel, toast feedback,
+> empty = restore auto name) — no native prompt. "+ 新对话" resets the
+> anchor and restores the honest zero-state. Robustness guards: `sesSeq` /
+> `histSeq` request-sequence guards (a slow stale response never clobbers
+> a newer list/history), `chatBusy` no-double-send, `.sk` skeleton loading,
+> dual-sidebar failure/empty states. 400-line red line enforced: session
+> logic split into `web/assets/session.html` (219 lines), script.html 278.
+> Components sedimented to lumtract as `lumtact-sessions.css` (183 lines,
+> `lumtact-ses-` prefix, token-reference-only, verify 25/25). Live test:
+> resume-send "7 的 9 次方" → Helix calc → **40353607** on screen.
 > 
 > **Cockpit v2** (2026-09-09): old stat cards + plain ledger list are gone —
 > stats bar (episode / ledger count / refresh tick) + Ledger white-box as a

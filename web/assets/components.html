@@ -160,13 +160,43 @@
   .fold.open .fold-body { display:inline; }
   .fold .think-full { display:inline; white-space:pre-wrap; word-break:break-all;
     max-height:160px; overflow:auto; font-size:11px; color:var(--text); }
-  .ses-side { border-right:1px solid var(--line); padding-right:12px; max-height:480px; overflow-y:auto; }
-  .ses-item { padding:10px; border:1px solid var(--line); border-radius:var(--r-md);
-    margin-bottom:8px; cursor:pointer; font-size:12px; background:var(--surface); }
-  .ses-item:hover { border-color:var(--accent); }
+  /* ---------- 会话列表组件（DSH 骨架 + 水之波光血统） ----------
+     持久事实可回放 [DSH 理念]：左侧会话列表 = 经历的索引，点击即恢复进度。 */
+  .ses-side { border-right:1px solid var(--line); padding-right:12px; max-height:480px;
+    overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .ses-head { display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:2px 2px 6px; font-size:11px; color:var(--text-dim); }
+  .ses-item { padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-md);
+    cursor:pointer; font-size:12px; background:var(--surface); position:relative;
+    transition:border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
+  .ses-item:hover { border-color:var(--accent); background:var(--surface-hover); }
   .ses-item.sel { border-color:var(--accent); background:var(--accent-soft); }
-  .ses-item .t { color:var(--text-dim); font-size:11px; }
-  .ses-item .p { margin-top:3px; color:var(--text); word-break:break-all; }
+  .ses-item .nm { color:var(--text); font-weight:600; word-break:break-all;
+    display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;
+    margin-bottom:2px; }
+  .ses-item .t { color:var(--text-dim); font-size:11px; display:flex; align-items:center;
+    gap:6px; flex-wrap:wrap; }
+  .ses-item .t .act { margin-left:auto; display:none; gap:4px; }
+  .ses-item:hover .t .act, .ses-item.sel .t .act { display:flex; }
+  .ses-item .p { margin-top:3px; color:var(--text); word-break:break-all;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .ses-item .p.dim { color:var(--text-dim); font-style:italic; }
+  /* 内联重命名编辑态：标题行换输入框，保存/取消成对出现 */
+  .ses-item .ses-edit { display:flex; gap:6px; align-items:center; }
+  .ses-item .ses-edit .inp { min-width:0; flex:1; padding:6px 10px; font-size:12px; }
+  .btn-icon { width:44px; height:44px; min-width:44px; padding:0; display:inline-flex;
+    align-items:center; justify-content:center; border-radius:var(--r-md);
+    border:1px solid var(--line); background:transparent; color:var(--text-dim);
+    cursor:pointer; font-size:14px; }
+  .btn-icon:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-icon.sm { width:34px; height:34px; min-width:34px; font-size:12px; }
+  /* 骨架屏（加载中）：脉冲明暗是"进行中"的确定性信号 [PHYS:C-003] */
+  .sk { border:1px solid var(--line); border-radius:var(--r-md); padding:10px 12px;
+    background:var(--surface); animation:sk-pulse 1.2s ease-in-out infinite alternate; }
+  .sk .sk-l1 { height:10px; width:45%; border-radius:3px; background:var(--line); opacity:.6; }
+  .sk .sk-l2 { height:10px; width:80%; border-radius:3px; background:var(--line);
+    opacity:.35; margin-top:8px; }
+  @keyframes sk-pulse { from { opacity:.55; } to { opacity:1; } }
   .ses-stats { display:flex; gap:16px; padding:8px 12px; border-bottom:1px solid var(--line);
     font-size:12px; flex-wrap:wrap; }
   .ses-stats span { color:var(--text-dim); }
@@ -178,7 +208,9 @@
     color:var(--text); word-break:break-all; }
   .resume-opt:hover { background:var(--surface-hover); }
   .cont-banner { padding:8px 12px; font-size:11px; color:var(--accent);
-    border-bottom:1px solid var(--line); background:var(--accent-soft); }
+    border-bottom:1px solid var(--line); background:var(--accent-soft); display:flex;
+    align-items:center; gap:8px; }
+  .cont-banner .btn-icon { margin-left:auto; }
   .rename-btn { margin-left:8px; font-size:11px; padding:4px 8px; min-height:32px;
     border-radius:6px; border:1px solid var(--line); background:transparent; color:var(--text-dim);
     cursor:pointer; font-family:inherit; }

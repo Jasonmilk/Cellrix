@@ -1,0 +1,232 @@
+<script>
+// === 会话管理资产（session.html）：列表 / 内联重命名 / 续接 / 新对话
+// DSH 骨架：左侧会话列表 = 持久事实的索引，点击即恢复进度；水之波光血统：
+// 骨架屏加载、零态自证、toast 反馈。共享状态走 window.Cx（script.html）。
+(function () {
+  var Cx = window.Cx || {};
+  var st = Cx.state || {};
+
+  function esc(s) { return Cx.esc ? Cx.esc(s) : String(s); }
+  function skRow() {
+    return '<div class="sk"><div class="sk-l1"></div><div class="sk-l2"></div></div>';
+  }
+
+  // auto name: 经历 09-07 15:19 (first event ts), stable per job — never
+  // shows raw "无用户输入" as a title (a session needs a name, DSH-style).
+  function autoName(p) {
+    if (p.name) return p.name;
+    if (p.preview) return p.preview;
+    var ts = String(p.first_ts || '');
+    return '经历 ' + ts.slice(5, 10) + ' ' + ts.slice(11, 16);
+  }
+
+  function loadSessions() {
+    var seq = ++st.sesSeq;
+    var s = document.getElementById('s-side');
+    var c = document.getElementById('chat-side');
+    s.innerHTML = skRow() + skRow() + skRow();
+    if (c) c.innerHTML = skRow() + skRow() + skRow();
+    fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
+      if (seq !== st.sesSeq) return; // 晚到的旧响应，丢弃
+      var periods = j.periods || [];
+      var empty = '<div class="empty">' + (j.configured ? '尚无经历（先和 Helix 说句话）' : '未开启会话事件流（Anaphase config `session_events_path`）') + '</div>';
+      renderSide('s-side', periods, empty, false);
+      renderSide('chat-side', periods, empty, true);
+    }).catch(function (e) {
+      if (seq !== st.sesSeq) return;
+      var msg = '<div class="empty">经历列表拉取失败: ' + esc(e.message) + '</div>';
+      document.getElementById('s-side').innerHTML = msg;
+      var c = document.getElementById('chat-side');
+      if (c) c.innerHTML = msg;
+    });
+  }
+
+  // `chatMode` drives the click behaviour: the chat sidebar loads the
+  // period's history into the chat space (resume), the engram sidebar
+  // opens its trajectory. One component, two intents [极致复用].
+  function renderSide(id, periods, empty, chatMode) {
+    var box = document.getElementById(id);
+    if (!periods.length) { box.innerHTML = empty; return; }
+    var head = '<div class="ses-head"><span>' + periods.length + ' 段经历</span>' +
+      (chatMode ? '<button type="button" class="btn btn-sm btn-ghost" id="btn-newchat">+ 新对话</button>' : '') +
+      '</div>';
+    box.innerHTML = head;
+    var headEl = box.firstChild;
+    var nbtn = headEl && headEl.querySelector('#btn-newchat');
+    if (nbtn) nbtn.onclick = function (ev) {
+      ev.stopPropagation();
+      newChat();
+    };
+    periods.forEach(function (p) {
+      var div = document.createElement('div');
+      var sel = (chatMode ? st.chatJobId : null) === p.job_id;
+      div.className = 'ses-item' + (sel ? ' sel' : '');
+      var ts = String(p.first_ts || '');
+      var disp = ts.slice(5, 10) + ' ' + ts.slice(11, 16);
+      // 主标题 = 名字（人起的）> 预览（机器抓的）> 自动名——永不裸挂 "(无用户输入)"
+      var nm = autoName(p);
+      // 有名字时，预览作为正文行展示；无名字时预览已作标题，避免重复
+      var preview = p.name && p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
+      div.innerHTML =
+        '<div class="nm">' + esc(nm) + '</div>' +
+        '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' +
+        '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.job_id) + '" title="重命名">✎</button></span></div>' +
+        preview;
+      div.onclick = function () {
+        if (chatMode) {
+          // 恢复进度到对话空间（DSH：点击会话 = 回放过去 + 从此续写）
+          st.chatJobId = p.job_id;
+          renderSide('chat-side', periods, empty, true);
+          loadPeriodToChat(p.job_id);
+          setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
+          document.getElementById('chat-text').focus();
+        } else {
+          window.__engramMeta = { job_id: p.job_id, name: p.name, preview: p.preview };
+          Cx.showView('engram');
+          Cx.selectPeriod(p.job_id);
+        }
+      };
+      var rn = div.querySelector('[data-ren]');
+      if (rn) rn.onclick = function (ev) {
+        ev.stopPropagation();
+        beginRename(div, p.job_id, p.name || '');
+      };
+      box.appendChild(div);
+    });
+  }
+
+  // Inline rename (no native prompt): edit row -> save/cancel, toast the
+  // outcome. Empty name = clear sidecar (auto name returns) [ADR-0026].
+  function beginRename(item, jobId, current) {
+    if (item.querySelector('.ses-edit')) return;
+    var nm = item.querySelector('.nm');
+    var t = item.querySelector('.t');
+    var act = t && t.querySelector('.act');
+    var edit = document.createElement('div');
+    edit.className = 'ses-edit';
+    edit.innerHTML = '<input class="inp" value="' + esc(current) + '" placeholder="自动名：经历 + 时间" maxlength="80">' +
+      '<button type="button" class="btn-icon sm" data-save title="保存">✓</button>' +
+      '<button type="button" class="btn-icon sm" data-cancel title="取消">✗</button>';
+    if (act) act.style.display = 'none';
+    // 编辑态占据主标题行（.nm），时间行保持可见
+    if (nm) { nm.textContent = ''; nm.appendChild(edit); } else { t.insertBefore(edit, t.firstChild); }
+    var inp = edit.querySelector('.inp');
+    inp.focus(); inp.select();
+    var save = edit.querySelector('[data-save]');
+    var cancel = edit.querySelector('[data-cancel]');
+    function done() { if (nm) nm.textContent = ''; edit.remove(); if (act) act.style.display = ''; }
+    cancel.onclick = function (ev) { ev.stopPropagation(); done(); };
+    save.onclick = function (ev) {
+      ev.stopPropagation();
+      var name = inp.value.trim();
+      fetch('/api/sessions/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, name: name })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        done();
+        if (j.ok) { Cx.showToast(name ? '已重命名' : '已恢复自动名'); loadSessions(); }
+        else Cx.showToast('重命名失败: ' + (j.error || 'unknown'));
+      }).catch(function (e) {
+        done(); Cx.showToast('重命名失败: ' + e.message);
+      });
+    };
+    inp.onkeydown = function (ev) {
+      if (ev.key === 'Enter') { ev.stopPropagation(); save.click(); }
+      if (ev.key === 'Escape') { ev.stopPropagation(); cancel.click(); }
+    };
+  }
+
+  // Load a past experience's history into the chat space (explicit resume):
+  // user turns and answers render as messages, then the next sentence
+  // continues the period (resume_from on the backend). seq-guarded: a slow
+  // earlier fetch must not overwrite a session the user switched to.
+  function loadPeriodToChat(jobId) {
+    var seq = ++st.histSeq;
+    var box = document.getElementById('chat-msgs');
+    box.innerHTML = '<div class="period-head">—— 正在加载 ' + esc(jobId.slice(0, 12)) + ' 的历史 ——</div>';
+    fetch('/api/events?job_id=' + encodeURIComponent(jobId)).then(function (r) { return r.json(); }).then(function (j) {
+      if (seq !== st.histSeq) return;
+      if (j.missing || !j.events) {
+        box.innerHTML = '<div class="empty">' + (j.missing ? '该经历的事件文件缺失' : '没有可回放的事件') + '</div>';
+        return;
+      }
+      box.innerHTML = '';
+      var d = document.createElement('div');
+      d.className = 'period-head';
+      d.textContent = '—— 经历 ' + jobId + ' 的历史 ——';
+      box.appendChild(d);
+      j.events.forEach(function (e) {
+        if (e.type === 'user/message') Cx.addMsg('user', e.data.text || '', false);
+        else if (e.type === 'assistant/attempt') {
+          var a = document.createElement('div');
+          a.className = 'msg helix';
+          a.innerHTML = '<div class="who">Helix <span class="dim">(经历 ' + esc(jobId.slice(0, 12)) + ')</span></div><div class="text">' + esc((e.data.text || '').slice(0, 400)) + '</div>';
+          box.appendChild(a);
+        } else if (e.type === 'tool/result') {
+          var t = document.createElement('div');
+          t.className = 'msg helix';
+          t.innerHTML = '<div class="who">Helix <span class="dim">工具 · ' + esc(e.data.tool) + '</span></div><div class="text">' + esc((e.data.outcome || '').slice(0, 200)) + '</div>';
+          box.appendChild(t);
+        }
+      });
+      box.scrollTop = box.scrollHeight;
+    }).catch(function (e) {
+      if (seq !== st.histSeq) return;
+      box.innerHTML = '<div class="empty">历史加载失败: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  // Fresh conversation: drop the resume anchor, clear the space, restore
+  // the honest empty state. The next message opens a NEW period.
+  function newChat() {
+    st.chatJobId = null;
+    st.histSeq++; // 丢弃任何在途的历史加载
+    var box = document.getElementById('chat-msgs');
+    box.innerHTML = '<div class="empty"><div class="orb" aria-hidden="true">⌁</div><b>尚未开始的对话</b><p>说句话吧——这是给 Helix 的一段新经历。</p></div>';
+    setBanner(null);
+    document.getElementById('chat-text').focus();
+  }
+
+  function setBanner(html) {
+    var b = document.getElementById('cont-banner');
+    if (!b) return;
+    if (html === null) { b.style.display = 'none'; b.innerHTML = ''; return; }
+    b.style.display = '';
+    b.innerHTML = html +
+      '<button type="button" class="btn-icon sm" data-drop title="结束续接（开始新对话）">✗</button>';
+    var drop = b.querySelector('[data-drop]');
+    if (drop) drop.onclick = function () { newChat(); };
+  }
+
+  // Resume-from-experience dropdown: sits in the chat-input's bottom-right,
+  // listing the latest periods to continue (explicit, never implicit).
+  function toggleResume() {
+    var list = document.getElementById('resume-list');
+    if (list.style.display !== 'none') { list.style.display = 'none'; return; }
+    fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
+      var periods = (j.periods || []).slice(0, 8);
+      list.innerHTML = periods.map(function (p) {
+        return '<div class="resume-opt" data-job="' + esc(p.job_id) + '">' + esc(autoName(p)) + ' <span class="dim">' + esc(p.job_id.slice(0, 20)) + '</span></div>';
+      }).join('') || '<div class="empty">尚无经历</div>';
+      list.style.display = '';
+      list.querySelectorAll('.resume-opt').forEach(function (el) {
+        el.onclick = function () {
+          st.chatJobId = el.getAttribute('data-job');
+          list.style.display = 'none';
+          setBanner('续接经历 <span class="tid">' + esc(st.chatJobId) + '</span> —— 下一句话延续这段对话');
+          loadPeriodToChat(st.chatJobId);
+          document.getElementById('chat-text').focus();
+        };
+      });
+    }).catch(function () { list.innerHTML = '<div class="empty">经历列表拉取失败</div>'; list.style.display = ''; });
+  }
+
+  window.CxSession = { loadSessions: loadSessions, toggleResume: toggleResume, newChat: newChat };
+  window.toggleResume = toggleResume; // chat.html onclick 内联依赖全局
+
+  // 页面就绪即加载一次列表（默认停在 cockpit，切换视图再刷新）——
+  // 对话/印痕侧栏不因"没切过视图"而停留在"加载中"。
+  if (document.getElementById('s-side')) loadSessions();
+})();
+</script>

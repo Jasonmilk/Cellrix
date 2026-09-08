@@ -44,7 +44,7 @@ fn now_hhmm() -> String {
         .as_secs();
     // Local time via libc tm (chrono-free, zero extra deps).
     let t = unsafe {
-        let mut t = d as i64;
+        let t = d as i64;
         let mut out = std::mem::zeroed::<libc::tm>();
         libc::localtime_r(&t, &mut out);
         out

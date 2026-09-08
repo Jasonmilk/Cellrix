@@ -104,6 +104,7 @@ fn index_html(cfg: &PanelConfig) -> String {
     const CHAT: &str = include_str!("../assets/chat.html");
     const ENGRAM: &str = include_str!("../assets/engram.html");
     const SCRIPT: &str = include_str!("../assets/script.html");
+    const SESSION: &str = include_str!("../assets/session.html");
     const GLEAM: &str = include_str!("../assets/gleam.html");
 
     let tuck_configured = cfg.tuck_endpoint.is_some();
@@ -114,6 +115,7 @@ fn index_html(cfg: &PanelConfig) -> String {
         .replace("__CHAT__", CHAT)
         .replace("__ENGRAM__", ENGRAM)
         .replace("__SCRIPT__", SCRIPT)
+        .replace("__SESSION__", SESSION)
         .replace("__GLEAM__", GLEAM)
         .replace("__REFRESH__", &config::REFRESH_SECS.to_string())
         .replace("__TUCK_CONFIGURED__", &tuck_configured.to_string())

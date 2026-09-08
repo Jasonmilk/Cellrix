@@ -143,6 +143,31 @@ runAudit 初次落地遇到三个真实坑，全部由浏览器序列化事实�
 
 `html[data-tier="T2"] * { animation:none!important }` 停流转后 `animationend` 永不触发 → ripple-static 元素泄漏。修复：以 CSS 声明的动画时长 + 时钟兜底（`setTimeout(remove, dur+80)`），幂等双移除。原则：**反馈必须存在（因果不虚），元素不泄漏（物理事实）**。
 
+### D14: 会话管理深化（DSH 骨架 + 水之波光血统 + 400 红线解耦）
+
+用户点名"印痕深化的会话管理优先"，要求审查会话稳定性/鲁棒性、会话展示符合 DSH 设计理念与骨架、水之波光统一血统并沉淀组件资产、顺便更新 lumtract。
+
+**参考 DSH（dshbook ch.1）理念**：会话日志 = 持久事实（回放），实时事件 = 当前状态（snapshot）——两类分离；点击会话 = 恢复进度；上下文窗口裁剪由后端按需（lodestone）。
+
+**前端会话管理升级（`web/assets/session.html` 219 行，新独立资产）**：
+- 会话项结构 = 主标题（name > preview > 自动名"经历 09-07 18:42"，永不裸挂"无用户输入"）+ 元信息行（时间 · 事件数 · job 短 id）+ 预览行（有名字时作正文，避免重复）
+- 对话侧点击会话项 → **历史回放到对话空间** + 续接锚点（chatJobId）+ banner + 高亮——解决"对话无法加载到会话空间"
+- 内联重命名（弃原生 prompt）：✎ → 编辑态占主标题行 → 保存/取消（Enter/Esc）→ toast 反馈；留空 = 清 sidecar 恢复自动名 [ADR-0026]
+- "+ 新对话"按钮：清空消息流、恢复空态、取消续接锚点（banner 附 ✗ 也可退出续接）
+- 续接下拉沿用（toggleResume），标题统一 autoName
+
+**鲁棒性守卫（竞态/并发，物理事实优先）**：
+- `sesSeq`：列表请求序号守卫——慢的旧响应不覆盖新列表
+- `histSeq`：历史回放序号守卫——快速切换会话时旧事件流被丢弃
+- `chatBusy`：一轮思考未结防并发连发
+- 加载骨架屏（.sk 脉冲 = 进行中信号 [PHYS:C-003]）、双栏失败态、空态自证
+
+**400 红线解耦**：script.html 504 → 拆出 session.html（会话域独立资产），script.html 278；`showView` 经 `window.CxSession` 桥调用（IIFE 隔离）；全局 `toggleResume` 由 session.html 暴露（修复 script 先于 session 执行导致的 noop 时序 bug）。
+
+**组件资产沉淀（lumtract）**：新 `lumtract-sessions.css`（183 行，lumtact-ses- 前缀）：列表/项/内联编辑/图标按钮/骨架屏，只 var() 引用令牌零定义，reduced-motion 降速不停（骨架=等待可视化不可静止）、prefers-contrast 2px 边界承担层级。`npm run verify` 25/25 通过。
+
+**实测（live :8080）**：31 段经历真实列表；点击会话 → 历史回放（period-head + 消息）+ banner + 高亮 + chatJobId；内联重命名写入 sidecar 成功并显示为主标题、清空恢复自动名；新对话 → 空态 + banner 隐藏 + 锚点清空；续接模式真实发送"用计算器算 7 的 9 次方"→ Helix 调 calc 回传 **40353607**（7⁹ ✓，工具结果上屏）。
+
 ## 3. 备选方案与拒绝理由
 
 | 备选 | 拒绝理由 |
