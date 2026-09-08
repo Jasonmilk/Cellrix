@@ -516,138 +516,257 @@ fn index_html(cfg: &PanelConfig) -> String {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cellrix — Cockpit + Engram</title>
+  <meta name="color-scheme" content="dark light">
+  <script>
+  (function(){{
+    var K='cellrix-theme', R=document.documentElement, mq=matchMedia('(prefers-color-scheme: dark)');
+    function cur(){{ try{{ return localStorage.getItem(K)||'auto'; }}catch(e){{ return 'auto'; }} }}
+    function apply(m){{ var real=m==='auto'?(mq.matches?'dark':'light'):m; R.setAttribute('data-theme',real); }}
+    apply(cur());
+    window.__setTheme=function(m){{ try{{ localStorage.setItem(K,m); }}catch(e){{}} apply(m);
+      var bs=document.querySelectorAll('.theme-switch button');
+      for(var i=0;i<bs.length;i++){{ bs[i].className=bs[i].getAttribute('data-t')===m?'on':''; }} }};
+    if(mq.addEventListener) mq.addEventListener('change',function(){{ if(cur()==='auto') apply('auto'); }});
+  }})();
+  </script>
 <style>
-  :root {{ --bg:#16161a; --panel:#1e1e24; --line:#2c2c34; --text:#e8e8ec; --dim:#9a9aa4; --ok:#4ec9a0; --bad:#e06c75; --acc:#9eacEA; --warn:#e5c07b; }}
+  :root, [data-theme="dark"] {{ /* 令牌同源 lumtract-tokens.css（暗） */
+    --bg-base:#1A1A1A; --bg-surface:#1F1F1F; --bg-elevated:#262626;
+    --text-1:#EDEDED; --text-2:#A8A8A8; --text-3:#7A7A7A;
+    --line:#2E2E2E; --line-strong:#3D3D3D;
+    --brand:#2B8CBE; --brand-fg:#06131A;
+    --ok:#52C41A; --warn:#FAAD14; --bad:#EA6668;
+    --row-zebra:rgba(255,255,255,.02); --row-hover:rgba(43,140,190,.08); --row-sel:rgba(43,140,190,.14);
+    --chip-bg:rgba(255,255,255,.06); --shadow:0 4px 18px rgba(0,0,0,.35);
+    --r-sm:4px; --r-md:8px; --r-lg:12px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+    --dur-press:120ms; --dur-state:200ms; --dur-enter:260ms;
+    color-scheme: dark;
+  }}
+  [data-theme="light"] {{ /* 令牌同源 lumtract-tokens.css（浅：极性翻转——白底无上升空间，
+    层级靠变暗阴影/波纹反光承担） */
+    --bg-base:#F4F3EE; --bg-surface:#FFFFFF; --bg-elevated:#FFFFFF;
+    --text-1:#1A1B1C; --text-2:#4A4F58; --text-3:#6B7280;
+    --line:#E4E3DD; --line-strong:#C9C8C2;
+    --brand:#14506F; --brand-fg:#FFFFFF;
+    --ok:#1E7E34; --warn:#8A5A00; --bad:#B3261E;
+    --row-zebra:rgba(0,0,0,.02); --row-hover:rgba(20,80,111,.07); --row-sel:rgba(20,80,111,.12);
+    --chip-bg:rgba(0,0,0,.05); --shadow:0 4px 18px rgba(0,0,0,.12);
+    color-scheme: light;
+  }}
+  /* ================================================================
+     Cellrix WebUI · 水之波光化（Lumtact 设计体系 · v10.0.4）
+     推导：目的档案 cellrix-webui-purpose-2026-09-09 · 卷三推导引擎
+     关键裁决：
+     · 事件类型 badge 单色相中性 —— 10 种类型 10 种颜色 = 装饰性显著
+       性是噪音 [PHYS:P-016]；类型靠文字区分（层级单调 [PHYS:L-001]，
+       同层级外观一致 [PHYS:P-013]）。语义状态（Met/Unmet、PASS/FAIL、
+       ok/fail）保留语义色 [PHYS:L-002]（内容强制）。
+     · 选中行背景高亮，无彩色加粗左边框 —— [PHYS:D-003]（1px 彩色
+       分割线 / Pentile 彩边）。
+     · 状态点纯色静态（无呼吸动画）—— 面板常开，闲置动画违反
+       [PHYS:R-003]；「等待」保留确定性可视化 [PHYS:C-003]。
+     · 时间令牌 120/200/260ms —— [PHYS:P-004]（>100ms 因果下限）/
+       [PHYS:P-005]（200–350ms 舒适区）。
+     · 热区 ≥44px —— [PHYS:P-010]。
+     · 主题三段式（跟随/日/夜）—— [PHYS:D-006] 环境融合。
+     · 降级：reduced-motion 流转权降级、prefers-contrast 实色边界、
+       窄屏单列 —— 卷三 3.5.3 降级阶梯。
+     ================================================================ */
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  body {{ background:var(--bg); color:var(--text); font-family:'SF Mono','Menlo','PingFang SC',monospace; padding:20px; }}
-  h1 {{ font-size:16px; font-weight:600; color:var(--acc); margin-bottom:4px; }}
-  .sub {{ color:var(--dim); font-size:12px; margin-bottom:14px; }}
+  body {{ background:var(--bg-base); color:var(--text-1);
+    font-family:'SF Mono','Menlo','PingFang SC',monospace; padding:20px; }}
+  h1 {{ font-size:16px; font-weight:600; color:var(--brand); margin-bottom:4px; }}
+  .sub {{ color:var(--text-2); font-size:12px; margin-bottom:14px; }}
   .bar {{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }}
+  .theme-switch {{ display:flex; gap:2px; margin-left:auto; border:1px solid var(--line);
+    border-radius:var(--r-md); padding:2px; }}
+  .theme-switch button {{ background:transparent; border:0; color:var(--text-2);
+    font-size:11px; padding:4px 10px; min-height:32px; cursor:pointer;
+    border-radius:6px; font-family:inherit; }}
+  .theme-switch button.on {{ background:var(--row-sel); color:var(--brand); }}
   .chat-msgs {{ max-height:340px; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }}
-  .msg {{ max-width:85%; padding:8px 12px; border-radius:12px; font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }}
-  .msg.user {{ align-self:flex-end; background:rgba(158,172,234,.16); border:1px solid var(--acc); }}
-  .msg.helix {{ align-self:flex-start; background:var(--panel); border:1px solid var(--line); color:var(--text); }}
-  .msg .who {{ display:block; font-size:10px; color:var(--dim); margin-bottom:3px; }}
+  .msg {{ max-width:85%; padding:8px 12px; border-radius:var(--r-lg); font-size:12px; line-height:1.6;
+    white-space:pre-wrap; word-break:break-word; }}
+  .msg.user {{ align-self:flex-end; background:var(--row-sel); color:var(--text-1); }}
+  .msg.helix {{ align-self:flex-start; background:var(--bg-surface); border:1px solid var(--line); }}
+  .msg .who {{ display:block; font-size:10px; color:var(--text-2); margin-bottom:3px; }}
   .msg.err {{ border-color:var(--bad); color:var(--bad); }}
   .chat-input {{ position:relative; display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); }}
-  .chat-input input {{ flex:1; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; outline:none; }}
-  .chat-input input:focus {{ border-color:var(--acc); }}
+  .chat-input input {{ flex:1; background:var(--bg-base); color:var(--text-1);
+    border:1px solid var(--line); border-radius:var(--r-md); padding:10px; min-height:var(--hit,44px);
+    font-size:13px; font-family:inherit; outline:none; }}
+  .chat-input input:focus {{ border-color:var(--brand); }}
   .toast {{ position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:50;
-            background:#2a1f24; border:1px solid var(--bad); color:#ffb4b6;
-            padding:8px 16px; border-radius:10px; font-size:12px; max-width:70%;
-            box-shadow:0 4px 18px rgba(0,0,0,.35); }}
-  .msg .ts {{ float:right; margin-left:10px; font-size:10px; color:var(--dim); opacity:.75; }}
-  .btn {{ background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:6px 14px; font-size:12px; font-family:inherit; cursor:pointer; }}
-  .btn.on {{ color:var(--acc); border-color:var(--acc); background:rgba(158,172,234,.12); }}
-  .badge {{ padding:4px 12px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid var(--line); }}
-  .badge.partner {{ background:rgba(158,172,234,.15); color:var(--acc); border-color:var(--acc); }}
-  .badge.drive {{ background:rgba(156,204,169,.12); color:var(--ok); border-color:var(--ok); }}
-  .badge.survive {{ background:rgba(224,108,117,.12); color:var(--bad); border-color:var(--bad); }}
+    background:var(--bg-elevated); border:1px solid var(--bad); color:var(--bad);
+    padding:8px 16px; border-radius:10px; font-size:12px; max-width:70%; box-shadow:var(--shadow); }}
+  .msg .ts {{ float:right; margin-left:10px; font-size:10px; color:var(--text-2); opacity:.75; }}
+  .btn {{ background:var(--bg-surface); color:var(--text-2); border:1px solid var(--line);
+    border-radius:var(--r-md); padding:8px 14px; min-height:36px; font-size:12px; font-family:inherit;
+    cursor:pointer; position:relative; overflow:hidden;
+    transition:border-color var(--dur-state),color var(--dur-state); }}
+  .btn:hover {{ border-color:var(--brand); color:var(--brand); }}
+  .btn.on {{ color:var(--brand); border-color:var(--brand); background:var(--row-sel); }}
+  .badge {{ padding:4px 12px; border-radius:999px; font-size:12px; font-weight:600;
+    border:1px solid var(--line); }}
+  .badge.partner {{ background:var(--row-sel); color:var(--brand); border-color:var(--brand); }}
+  .badge.drive {{ background:rgba(30,126,52,.12); color:var(--ok); border-color:var(--ok); }}
+  .badge.survive {{ background:rgba(179,38,30,.12); color:var(--bad); border-color:var(--bad); }}
   .badge.live {{ color:var(--ok); }}
   .cards {{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }}
-  .card {{ flex:1 1 200px; min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; }}
-  .card .k {{ font-size:11px; color:var(--dim); margin-bottom:6px; }}
+  .card {{ flex:1 1 200px; min-width:0; background:var(--bg-surface); border:1px solid var(--line);
+    border-radius:var(--r-lg); padding:12px; }}
+  .card .k {{ font-size:11px; color:var(--text-2); margin-bottom:6px; }}
   .card .v {{ font-size:20px; font-weight:600; }}
   .card .v.small {{ font-size:13px; }}
-  .panel {{ background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; }}
-  .panel .head {{ padding:10px 12px; font-size:12px; color:var(--dim); border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }}
-  .ledger .entry {{ padding:10px 12px; border-bottom:1px solid var(--line); font-size:12px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }}
+  .panel {{ background:var(--bg-surface); border:1px solid var(--line);
+    border-radius:var(--r-lg); overflow:hidden; }}
+  .panel .head {{ padding:10px 12px; font-size:12px; color:var(--text-2);
+    border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }}
+  .ledger .entry {{ padding:10px 12px; border-bottom:1px solid var(--line); font-size:12px;
+    display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }}
   .ledger .entry:last-child {{ border-bottom:none; }}
-  .entry .st {{ font-weight:700; padding:1px 8px; border-radius:6px; font-size:11px; }}
-  .st.MET {{ color:var(--ok); background:rgba(78,201,160,.12); }}
-  .st.UNMET {{ color:var(--bad); background:rgba(224,108,117,.12); }}
-  .st.BLOCKED {{ color:var(--bad); background:rgba(224,108,117,.12); }}
-  /* Engram: proportional 2D grid — overview strip / timeline 2fr + detail 1fr */
-  .engram-overview {{ display:flex; gap:10px; flex-wrap:wrap; padding:10px 12px; font-size:12px; color:var(--dim); border-bottom:1px solid var(--line); align-items:center; }}
-  .engram-overview .k {{ color:var(--dim); }}
-  .engram-overview .v {{ color:var(--text); font-weight:600; }}
+  .entry .st {{ font-weight:700; padding:2px 8px; border-radius:6px; font-size:11px; }}
+  .st.MET {{ color:var(--ok); background:rgba(30,126,52,.12); }}
+  .st.UNMET {{ color:var(--bad); background:rgba(179,38,30,.12); }}
+  .st.BLOCKED {{ color:var(--bad); background:rgba(179,38,30,.12); }}
+  /* Engram：比例 2D 网格（概览 / 时间线 2fr + 明细 1fr） */
+  .engram-overview {{ display:flex; gap:10px; flex-wrap:wrap; padding:10px 12px; font-size:12px;
+    color:var(--text-2); border-bottom:1px solid var(--line); align-items:center; }}
+  .engram-overview .k {{ color:var(--text-2); }}
+  .engram-overview .v {{ color:var(--text-1); font-weight:600; }}
   .engram-filter {{ margin-left:auto; display:flex; gap:6px; }}
-  .engram-filter input {{ background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-size:12px; font-family:inherit; width:180px; }}
+  .engram-filter input {{ background:var(--bg-base); color:var(--text-1);
+    border:1px solid var(--line); border-radius:6px; padding:8px; min-height:36px;
+    font-size:12px; font-family:inherit; width:180px; }}
   .engram-main {{ display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:16px; }}
   .timeline {{ max-height:420px; overflow-y:auto; }}
-  .row {{ padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px; cursor:pointer; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }}
-  .row:hover {{ background:rgba(158,172,234,.06); }}
-  .row.sel {{ background:rgba(158,172,234,.14); border-left:3px solid var(--acc); }}
-  .redact {{ color:#EA6668; background:rgba(234,102,104,.09); border-radius:3px; padding:0 3px; font-weight:600; white-space:nowrap; }}
-  .row .seq {{ color:var(--dim); }}
-  .row .kind {{ color:var(--acc); font-weight:600; }}
-  .row .tid {{ color:var(--dim); }}
+  .row {{ padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px; cursor:pointer;
+    display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; min-height:36px; }}
+  .row:hover {{ background:var(--row-hover); }}
+  .row.sel {{ background:var(--row-sel); }} /* 选中=背景高亮，无彩色左边框 [PHYS:D-003] */
+  .redact {{ color:var(--bad); background:rgba(179,38,30,.09); border-radius:3px;
+    padding:0 3px; font-weight:600; white-space:nowrap; }}
+  .row .seq {{ color:var(--text-2); }}
+  .row .kind {{ color:var(--brand); font-weight:600; }}
+  .row .tid {{ color:var(--text-2); }}
   .row .ok {{ color:var(--ok); }} .row .bad {{ color:var(--bad); }}
-  .grp-head {{ padding:7px 12px; font-size:12px; cursor:pointer; background:rgba(158,172,234,.05); border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:baseline; user-select:none; }}
-  .grp-head:hover {{ background:rgba(158,172,234,.10); }}
+  .grp-head {{ padding:8px 12px; font-size:12px; cursor:pointer; background:var(--row-zebra);
+    border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:baseline; user-select:none; }}
+  .grp-head:hover {{ background:var(--row-hover); }}
   .ses-side {{ border-right:1px solid var(--line); padding-right:12px; max-height:480px; overflow-y:auto; }}
-  .ses-item {{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px; cursor:pointer; font-size:12px; }}
-  .ses-item:hover {{ border-color:var(--acc); }}
-  .ses-item.sel {{ border-color:var(--acc); background:rgba(158,172,234,.08); }}
-  .ses-item .t {{ color:var(--dim); font-size:11px; }}
-  .ses-item .p {{ margin-top:3px; color:var(--text); word-break:break-all; }}
-  .ses-stats {{ display:flex; gap:16px; padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px; flex-wrap:wrap; }}
-  .ses-stats span {{ color:var(--dim); }}
-  .ses-stats b {{ color:var(--text); font-weight:600; }}
-  .ev-row {{ padding:7px 12px; border-bottom:1px solid var(--line); font-size:12px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }}
-  .badge {{ font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; letter-spacing:.5px; }}
-  .badge.turn-start {{ background:rgba(154,154,164,.18); color:#c8c8d0; }}
-  .badge.user-message {{ background:rgba(158,172,234,.18); color:#9eacEA; }}
-  .badge.context-inject {{ background:rgba(197,167,232,.18); color:#c5a7e8; }}
-  .badge.assistant-attempt {{ background:rgba(78,201,160,.16); color:#4ec9a0; }}
-  .badge.tool-call {{ background:rgba(229,192,123,.18); color:#e5c07b; }}
-  .badge.tool-result {{ background:rgba(224,108,117,.16); color:#e06c75; }}
-  .badge.verdict-status {{ background:rgba(224,108,117,.22); color:#e06c75; }}
-  .badge.turn-end {{ background:rgba(154,154,164,.12); color:#9a9aa4; }}
-  .ev-row .body {{ color:var(--text); word-break:break-all; }}
+  .ses-item {{ padding:10px; border:1px solid var(--line); border-radius:var(--r-md);
+    margin-bottom:8px; cursor:pointer; font-size:12px; }}
+  .ses-item:hover {{ border-color:var(--brand); }}
+  .ses-item.sel {{ border-color:var(--brand); background:var(--row-sel); }}
+  .ses-item .t {{ color:var(--text-2); font-size:11px; }}
+  .ses-item .p {{ margin-top:3px; color:var(--text-1); word-break:break-all; }}
+  .ses-stats {{ display:flex; gap:16px; padding:8px 12px; border-bottom:1px solid var(--line);
+    font-size:12px; flex-wrap:wrap; }}
+  .ses-stats span {{ color:var(--text-2); }}
+  .ses-stats b {{ color:var(--text-1); font-weight:600; }}
+  .ev-row {{ padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px;
+    display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; min-height:36px; }}
+  /* 事件类型 badge：单色相中性 —— 类型靠文字区分 [PHYS:P-016]/[PHYS:L-001]。
+     语义状态（PASS/FAIL/Met/Unmet）由 body 内 .ok/.bad 承担 [PHYS:L-002]。 */
+  .ev-row .badge {{ font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px;
+    letter-spacing:.5px; background:var(--chip-bg); color:var(--text-2); border:1px solid var(--line); }}
+  .ev-row .badge.verdict-status {{ color:var(--bad); border-color:rgba(179,38,30,.4); }}
+  .ev-row .body {{ color:var(--text-1); word-break:break-all; }}
   .ev-row .ok {{ color:var(--ok); }} .ev-row .bad {{ color:var(--bad); }}
-  .btn.ghost {{ border:1px solid var(--line); background:transparent; color:var(--dim); }}
-  .btn.ghost:hover {{ border-color:var(--acc); color:var(--acc); }}
-  .rename-btn {{ margin-left:8px; font-size:11px; padding:0 5px; border-radius:5px; border:1px solid var(--line); background:transparent; color:var(--dim); cursor:pointer; }}
-  .rename-btn:hover {{ border-color:var(--acc); color:var(--acc); }}
-  .sa-core {{ color:var(--acc); font-weight:600; }}
-  .chip {{ display:inline-block; font-size:10px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); margin-right:4px; vertical-align:1px; }}
-  .chip.tier-L0 {{ background:rgba(154,154,164,.18); color:#c8c8d0; border-color:rgba(154,154,164,.45); }}
-  .chip.tier-L1 {{ background:rgba(158,172,234,.15); color:#9eacea; border-color:rgba(158,172,234,.45); }}
-  .chip.tier-L2 {{ background:rgba(229,192,123,.15); color:#e5c07b; border-color:rgba(229,192,123,.45); }}
-  .chip.tier-L3 {{ background:rgba(78,201,160,.15); color:#4ec9a0; border-color:rgba(78,201,160,.45); }}
-  .chip.mnode {{ background:rgba(78,201,160,.1); color:#4ec9a0; border-color:rgba(78,201,160,.3); }}
-  .chip.none {{ background:transparent; color:var(--dim); }}
-  .think-row {{ padding:6px 12px; font-size:11px; color:var(--dim); cursor:pointer; display:flex; gap:8px; align-items:baseline; border-bottom:1px solid var(--line); }}
-  .think-row .think-head {{ color:var(--acc); font-weight:600; flex-shrink:0; }}
+  .btn.ghost {{ border:1px solid var(--line); background:transparent; color:var(--text-2); }}
+  .btn.ghost:hover {{ border-color:var(--brand); color:var(--brand); }}
+  .rename-btn {{ margin-left:8px; font-size:11px; padding:4px 6px; min-height:28px;
+    border-radius:5px; border:1px solid var(--line); background:transparent; color:var(--text-2); cursor:pointer; }}
+  .rename-btn:hover {{ border-color:var(--brand); color:var(--brand); }}
+  .sa-core {{ color:var(--brand); font-weight:600; }}
+  /* 记忆层级 chip：单色相（brand 系）分级亮度 —— [PHYS:L-002] 语义 + 收敛 */
+  .chip {{ display:inline-block; font-size:10px; padding:2px 7px; border-radius:999px;
+    border:1px solid var(--line); margin-right:4px; vertical-align:1px;
+    color:var(--text-2); background:var(--chip-bg); }}
+  .chip.tier-L0 {{ color:var(--text-2); }}
+  .chip.tier-L1 {{ color:var(--brand); }}
+  .chip.tier-L2 {{ color:var(--brand); background:rgba(43,140,190,.12); }}
+  .chip.tier-L3 {{ color:var(--brand); background:rgba(43,140,190,.18); border-color:var(--brand); }}
+  .chip.mnode {{ color:var(--brand); background:rgba(43,140,190,.08); }}
+  .chip.none {{ background:transparent; color:var(--text-2); }}
+  .think-row {{ padding:8px 12px; font-size:11px; color:var(--text-2); cursor:pointer;
+    display:flex; gap:8px; align-items:baseline; border-bottom:1px solid var(--line); }}
+  .think-row .think-head {{ color:var(--brand); font-weight:600; flex-shrink:0; }}
   .think-row .think-body {{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:88%; }}
   .think-row.open .think-body {{ white-space:pre-wrap; word-break:break-all; max-height:200px; overflow:auto; }}
   .fold {{ display:inline-block; vertical-align:middle; cursor:pointer; }}
-  .fold .fold-head {{ color:var(--acc); font-weight:600; }}
-  .fold .fold-tip {{ color:var(--dim); }}
+  .fold .fold-head {{ color:var(--brand); font-weight:600; }}
+  .fold .fold-tip {{ color:var(--text-2); }}
   .fold.open .fold-tip {{ transform:rotate(90deg); display:inline-block; }}
   .fold .fold-body {{ display:none; }}
   .fold.open .fold-body {{ display:inline; }}
-  .fold .think-full {{ display:inline; white-space:pre-wrap; word-break:break-all; max-height:160px; overflow:auto; font-size:11px; color:var(--text); }}
-  .chip.gate.hard {{ background:rgba(234,102,104,.12); color:#b34146; }}
-  .chip.gate.soft {{ background:rgba(250,173,20,.15); color:#9a6b00; }}
-  .chip.judge {{ background:rgba(158,172,234,.15); color:#3d4a8f; }}
-  .sha {{ font-family:monospace; font-size:10px; color:var(--dim); }}
-  .period-head {{ padding:6px 12px; font-size:11px; color:var(--dim); border-bottom:1px solid var(--line); }}
-  .resume-list {{ position:absolute; right:12px; bottom:54px; width:280px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.3); z-index:10; max-height:260px; overflow:auto; }}
-  .resume-opt {{ padding:8px 10px; font-size:12px; cursor:pointer; border-bottom:1px solid var(--line); color:var(--text); word-break:break-all; }}
-  .resume-opt:hover {{ background:rgba(158,172,234,.12); }}
-  .mnode {{ color:var(--acc); }}
-  .cont-banner {{ padding:6px 12px; font-size:11px; color:var(--acc); border-bottom:1px solid var(--line); background:rgba(158,172,234,.07); }}
-  .grp-head .arrow {{ color:var(--acc); width:12px; display:inline-block; }}
-  .grp-head .tid {{ color:var(--acc); font-weight:600; }}
+  .fold .think-full {{ display:inline; white-space:pre-wrap; word-break:break-all;
+    max-height:160px; overflow:auto; font-size:11px; color:var(--text-1); }}
+  .chip.gate.hard {{ color:var(--bad); background:rgba(179,38,30,.1); border-color:rgba(179,38,30,.4); }}
+  .chip.gate.soft {{ color:var(--warn); background:rgba(138,90,0,.1); border-color:rgba(138,90,0,.4); }}
+  .chip.judge {{ color:var(--brand); background:rgba(43,140,190,.08); }}
+  .sha {{ font-family:monospace; font-size:10px; color:var(--text-2); }}
+  .period-head {{ padding:8px 12px; font-size:11px; color:var(--text-2); border-bottom:1px solid var(--line); }}
+  .resume-list {{ position:absolute; right:12px; bottom:54px; width:280px; background:var(--bg-surface);
+    border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow); z-index:10;
+    max-height:260px; overflow:auto; }}
+  .resume-opt {{ padding:10px; font-size:12px; cursor:pointer; border-bottom:1px solid var(--line);
+    color:var(--text-1); word-break:break-all; }}
+  .resume-opt:hover {{ background:var(--row-hover); }}
+  .mnode {{ color:var(--brand); }}
+  .cont-banner {{ padding:8px 12px; font-size:11px; color:var(--brand);
+    border-bottom:1px solid var(--line); background:var(--row-zebra); }}
+  .grp-head .arrow {{ color:var(--brand); width:12px; display:inline-block; }}
+  .grp-head .tid {{ color:var(--brand); font-weight:600; }}
   .grp-body .row {{ padding-left:22px; }}
   .detail {{ padding:12px; font-size:12px; }}
   .detail .line {{ margin-bottom:6px; display:flex; gap:8px; flex-wrap:wrap; }}
-  .detail .key {{ color:var(--dim); min-width:90px; }}
-  .detail .val {{ color:var(--text); word-break:break-all; }}
-  .detail pre {{ margin-top:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:11px; overflow-x:auto; max-height:260px; color:var(--text); white-space:pre-wrap; word-break:break-all; }}
-  .dim {{ color:var(--dim); }}
-  .empty {{ padding:14px 12px; font-size:12px; color:var(--dim); }}
-  .eco {{ display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--dim); padding:8px 0 4px; }}
+  .detail .key {{ color:var(--text-2); min-width:90px; }}
+  .detail .val {{ color:var(--text-1); word-break:break-all; }}
+  .detail pre {{ margin-top:8px; background:var(--bg-base); border:1px solid var(--line);
+    border-radius:var(--r-md); padding:10px; font-size:11px; overflow-x:auto; max-height:260px;
+    color:var(--text-1); white-space:pre-wrap; word-break:break-all; }}
+  .dim {{ color:var(--text-2); }}
+  .empty {{ padding:14px 12px; font-size:12px; color:var(--text-2); }}
+  .eco {{ display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--text-2); padding:8px 0 4px; }}
   .eco .c {{ display:inline-flex; align-items:center; gap:6px; }}
-  .eco .dot {{ width:9px; height:9px; border-radius:50%; display:inline-block; }}
-  .eco .dot.ok {{ background:var(--ok); box-shadow:0 0 6px rgba(78,201,160,.55); }}
-  .eco .dot.off {{ background:#444; }}
+  .eco .dot {{ width:10px; height:10px; border-radius:50%; display:inline-block; }}
+  .eco .dot.ok {{ background:var(--ok); }}
+  .eco .dot.off {{ background:var(--text-3); }}
   .eco .dot.starting {{ background:var(--warn); }}
   .eco .dot.error {{ background:var(--bad); }}
-  .foot {{ color:var(--dim); font-size:11px; margin-top:14px; }}
-  @media (max-width:800px) {{ .engram-main {{ grid-template-columns:1fr; }} .timeline {{ max-height:300px; }} }}
+  .foot {{ color:var(--text-2); font-size:11px; margin-top:14px; }}
+  /* 波纹反馈：果从因的位置长出 [PURPOSE] —— 涟漪四阶段（升起/扩散/消散/复原） */
+  .ripple {{ position:absolute; border-radius:50%; pointer-events:none;
+    background:var(--brand); opacity:.18; transform:scale(0);
+    animation:ripple-rip var(--dur-state) ease-out forwards; }}
+  @keyframes ripple-rip {{ to {{ transform:scale(3); opacity:0; }} }}
+  /* 等待可视化（不可降级 [PHYS:C-003]） */
+  .loading {{ display:inline-block; width:12px; height:12px; border:2px solid var(--line);
+    border-top-color:var(--brand); border-radius:50%; animation:spin 720ms linear infinite; }}
+  @keyframes spin {{ to {{ transform:rotate(360deg); }} }}
+  /* 降级 · 第一档：reduced-motion —— 流转权降级，识读/反馈权保留 [PHYS:R-005] */
+  @media (prefers-reduced-motion:reduce) {{
+    *,*::before,*::after {{ animation-duration:1ms!important; animation-iteration-count:1!important;
+      transition-duration:1ms!important; }}
+    .loading {{ animation-duration:720ms!important; }}
+  }}
+  /* 降级 · 第四档：高对比 —— 半透明剥离，层级靠实色边界 */
+  @media (prefers-contrast:more) {{
+    [data-theme="dark"] {{ --line:#7A8089; --line-strong:#A8AEB6; --text-2:#C7CDD4;
+      --brand:#8FC8E8; --ok:#7CE0B5; --bad:#F5A192; --warn:#FFD97A; }}
+    [data-theme="light"] {{ --line:#8A9099; --line-strong:#4A5058; --text-2:#33383F;
+      --brand:#14506F; --ok:#1E7E34; --bad:#96271A; --warn:#8A5A00; }}
+    .panel,.card,.ses-item,.btn,.msg,.chip {{ border-width:2px; }}
+  }}
+  /* 降级 · 窄屏：网格单列 [PHYS:P-012 接近性] */
+  @media (max-width:800px) {{
+    .engram-main {{ grid-template-columns:1fr; }}
+    .timeline {{ max-height:300px; }}
+    .ses-side {{ border-right:0; padding-right:0; max-height:220px; }}
+    body {{ padding:12px; }}
+  }}
+
 </style>
 </head>
 <body>
@@ -658,6 +777,11 @@ fn index_html(cfg: &PanelConfig) -> String {
     <button class="btn" id="v-engram" onclick="showView('engram')">印痕 Engram</button>
     <button class="btn" id="v-chat" onclick="showView('chat')">对话 Chat</button>
     <span class="badge" id="mode">…</span>
+    <div class="theme-switch" role="group" aria-label="主题">
+      <button type="button" data-t="auto" class="on" onclick="__setTheme('auto')">跟随</button>
+      <button type="button" data-t="light" onclick="__setTheme('light')">日间</button>
+      <button type="button" data-t="dark" onclick="__setTheme('dark')">暗黑</button>
+    </div>
     <span class="badge" id="state">…</span>
     <span class="badge" id="conn">…</span>
   </div>
@@ -738,7 +862,6 @@ fn index_html(cfg: &PanelConfig) -> String {
   // Explicit continuation (ADR-0026): while set, the next chat request
   // resumes this experience (`job_id`) instead of opening a fresh stranger.
   var chatJobId = null;
-  var CHAT_META = {{ 'turn-start':'#9a9aa4','user-message':'#9eacea','context-inject':'#c5a7e8','assistant-attempt':'#4ec9a0','tool-call':'#e5c07b','tool-result':'#e06c75','verdict-status':'#e06c75','turn-end':'#9a9aa4' }};
 
   function loadSessions() {{
     fetch('/api/sessions').then(function (r) {{ return r.json(); }}).then(function (j) {{
@@ -1162,6 +1285,26 @@ fn index_html(cfg: &PanelConfig) -> String {
   // the interactive entry points explicitly (they live in this IIFE).
   window.showView = showView;
   window.sendChat = sendChat;
+  // 主题按钮状态初始化（与 head 引导脚本对齐）
+  (function(){{ try{{
+    var K='cellrix-theme', cur=localStorage.getItem(K)||'auto';
+    var bs=document.querySelectorAll('.theme-switch button');
+    for(var i=0;i<bs.length;i++){{ bs[i].className=bs[i].getAttribute('data-t')===cur?'on':''; }}
+  }}catch(e){{}} }})();
+  // 波纹反馈：果从因的位置长出 —— 点击按钮处生成涟漪（[PURPOSE] 涟漪四阶段）
+  document.addEventListener('click', function(e){{
+    var btn=e.target.closest ? e.target.closest('.btn,.ses-item,.fold-head') : null;
+    if(!btn || btn.closest('input')) return;
+    var r=btn.getBoundingClientRect();
+    var rip=document.createElement('span');
+    rip.className='ripple';
+    var d=Math.max(r.width,r.height);
+    rip.style.width=rip.style.height=d+'px';
+    rip.style.left=(e.clientX-r.left-d/2)+'px';
+    rip.style.top=(e.clientY-r.top-d/2)+'px';
+    btn.appendChild(rip);
+    setTimeout(function(){{ rip.remove(); }}, 300);
+  }}, true);
   window.toggleResume = toggleResume;
   window.applyFilter = applyFilter;
   window.clearFilter = clearFilter;

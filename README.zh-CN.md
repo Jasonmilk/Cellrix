@@ -3,10 +3,21 @@
 > **一个意图驱动、确定性、空间语义的终端 UI 协议与高性能运行时。**
 > 遵循 **CommonIntents-144 (`CI-144`)** 协议家族。
 
+> **状态 2026-09-09（ADR-0015）**：WebUI 已按 **水之波光 · 触境（Lumtact）** 设计体系重做——
+> 设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 同源（暗/浅双主题，
+> 顶部「跟随/日间/暗黑」切换，[PHYS:D-006]）；波纹反馈从触发坐标生长；
+> 热区 ≥44px（[PHYS:P-010]）；时间 120/200/260ms（[PHYS:P-004/P-005]）。
+> 关键裁决：印痕**事件类型 badge 单色相中性**——类型靠文字区分，不再 10 种颜色
+> （装饰性显著性是噪音 [PHYS:P-016]、层级单调 [PHYS:L-001]）；语义状态
+> （Met/Unmet/PASS/FAIL/ok/fail）保留语义色（[PHYS:L-002]）。选中行只用背景高亮，
+> 无彩色加粗左边框（[PHYS:D-003]）。状态点纯色静态（闲置动画违反 [PHYS:R-003]）；
+> 降级阶梯覆盖 reduced-motion / 高对比 / 窄屏（卷三 3.5.3）。
+
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![Protocol](https://img.shields.io/badge/Protocol-CI--144-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
+[![Tests](https://img.shields.io/badge/tests-341-green.svg)]()
 
 ---
 

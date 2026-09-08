@@ -8,7 +8,7 @@
 [![Protocol](https://img.shields.io/badge/Protocol-CI--144%20v2.0-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
-[![Tests](https://img.shields.io/badge/tests-327-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-341-green.svg)]()
 [![Phases](https://img.shields.io/badge/phases-P0--P6%20complete-5B5FC7.svg)]()
 
 ---
@@ -25,6 +25,21 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
+> **Status 2026-09-09 (ADR-0015)**: WebUI redesigned under the
+> **水之波光 · 触境 (Lumtact)** design system — design tokens are sourced
+> one-to-one from `lumtract/web-viewer/src/design/lumtact-tokens.css`
+> (dark/light dual theme with `跟随/日间/暗黑` switcher, `[PHYS:D-006]`),
+> ripple feedback grows from the trigger coordinate, hit targets ≥44px
+> (`[PHYS:P-010]`), timings 120/200/260ms (`[PHYS:P-004/P-005]`).
+> Key ruling: Engram **event-type badges are single-hue neutral** (types
+> are distinguished by text, not by 10 colors — decorative salience is
+> noise `[PHYS:P-016]`, hierarchy is monotonic `[PHYS:L-001]`); semantic
+> status (Met/Unmet/PASS/FAIL/ok/fail) keeps semantic colors
+> (`[PHYS:L-002]`). Selected rows highlight with background only — no
+> colored bold left border (`[PHYS:D-003]`). Status dots are static
+> (idle animation violates `[PHYS:R-003]`); degradation ladder covers
+> reduced-motion / high-contrast / narrow screens (卷三 3.5.3).
+>
 > **Status 2026-09-08**: Web panel (:8080) is now the primary white-box
 > window (ADR-0033): 印痕 Engram is a DSH-style **turn outline** (not a
 > time-axis gantt) with SA-Core choice / L1–L3 memory-node **chip labels**;
