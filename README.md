@@ -25,24 +25,27 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-> **Status 2026-09-09 (ADR-0015)**: WebUI redesigned under the
+> **Status 2026-09-09 (ADR-0015 + 印痕 v3)**: WebUI redesigned under the
 > **水之波光 · 触境 (Lumtact)** design system — design tokens are sourced
 > one-to-one from `lumtract/web-viewer/src/design/lumtact-tokens.css`
 > (dark/light dual theme with `跟随/日间/暗黑` switcher, `[PHYS:D-006]`),
 > ripple feedback grows from the trigger coordinate, hit targets ≥44px
 > (`[PHYS:P-010]`), timings 120/200/260ms (`[PHYS:P-004/P-005]`).
-> Key ruling: Engram **event-type badges are single-hue neutral** (types
-> are distinguished by text, not by 10 colors — decorative salience is
-> noise `[PHYS:P-016]`, hierarchy is monotonic `[PHYS:L-001]`); semantic
-> status (Met/Unmet/PASS/FAIL/ok/fail) keeps semantic colors
+> **Engram v3** is the 水之波光 **Harness v11.2.0 trajectory skeleton**:
+> five-column event table (type/summary/status/duration/tokens) + Overview
+> three-track timeline (Input/Model/Tools sharing one horizontal ruler) +
+> toolbar (mono-width / fold turns / unfold calls / replay / search) +
+> bottom stats bar + right inspector drawer (Summary/Payload/Result/
+> Schema/Timing) — rendered from the standalone asset
+> `web/assets/engram.html` (`e-` prefixed tokens, view-scoped isolation).
+> Semantic status (Met/Unmet/PASS/FAIL/ok/fail) keeps semantic colors
 > (`[PHYS:L-002]`). Selected rows highlight with background only — no
 > colored bold left border (`[PHYS:D-003]`). Status dots are static
 > (idle animation violates `[PHYS:R-003]`); degradation ladder covers
 > reduced-motion / high-contrast / narrow screens (卷三 3.5.3).
 >
 > **Status 2026-09-08**: Web panel (:8080) is now the primary white-box
-> window (ADR-0033): 印痕 Engram is a DSH-style **turn outline** (not a
-> time-axis gantt) with SA-Core choice / L1–L3 memory-node **chip labels**;
+> window (ADR-0033): 印痕 Engram (pre-v3) was a DSH-style **turn outline**;
 > chat shows a collapsible **思考 (think) row** (streamed `think` field,
 > display-only, never judged) and the SSE stream is deterministically
 > drained (events before the terminal `{done,reply}`, reply is
@@ -343,15 +346,17 @@ cargo run --bin up -- --restart     # 或 target/debug/up --restart
 数据源 `/api/ecosystem`（TCP 探测 + HTTP health 双检，协议默认端口，
 无硬编码）。
 
-**印痕 Engram v3（经历时间线 · 白盒 + 甘特图 + 续聊，ADR-0026/0027）**：
+**印痕 Engram v3（水之波光 v11.2.0 轨迹骨架 · 白盒 + 三轨投影 + 检查器，ADR-0015/0033）**：
 左侧经历列表（每会话一条：时间 · 事件数 · 用户输入预览 + **继续**按钮），
-点击任意经历加载完整 turn 时间线——徽标按生态词汇
-（START / USER / CONTEXT / ATTEMPT / TOOL / RESULT / VERDICT / END）+
-统计条（Duration · Events · Tools · Verdict）+
-**甘特图**（纯 SVG 时间轴：每事件一条横条，tool/result 画执行耗时——DSH 式
-轨迹，Helix 自有词汇）。**CONTEXT 行展开 SA-Core 选择白盒**：
-`SA-Core 选择 {L1×2 L3×18}` + top 节点 `L3·id heat phase`——看到 Helix 从
-记忆捞了什么、信了几分（provenance only，绝不写节点正文）。
+点击任意经历加载全链路轨迹——**五列事件表**（类型/摘要/状态/耗时/Tokens）+
+**Overview 三轨时间线**（Input/Model/Tools 共用一根横向标尺：每一列在三轨上
+是同一步，空白 = 该轨确实空闲）+ 工具栏（等宽/折叠轮次/展开调用/重放/搜索）+
+底部统计栏（TURNS·STEPS·TOOL CALLS·耗时·TOKENS）+ **右侧检查器抽屉**
+（Summary/Payload/Result/Schema/Timing 五页签）。**CONTEXT 行展开
+SA-Core 选择白盒**：`SA-Core 选择 {L1×9 L3×11}` + top 节点短 id · heat ·
+相态——看到 Helix 从记忆捞了什么、信了几分（provenance only，绝不写节点正文）。
+**重放轨迹** = 按事件步进高亮（spin 按钮 + 行脉冲），搜索按事件类型/摘要/工具
+过滤（命中行高亮）。真实数据无 tokens 字段时显示 `—`（物理事实优先，不猜数）。
 **继续** = 显式续聊：带 `job_id` 发起新一轮，上一轮摘要作为 true history
 注入，新轮 `context/inject` 记 `resume_from`。会话 = 经历（ADR-0026），
 判据与行动同线——这是 Helix 相对 DSH 轨迹多出的一层（DSH 没有 verdict）。

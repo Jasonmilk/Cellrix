@@ -1,0 +1,59 @@
+        r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cellrix — Cockpit + Engram</title>
+  <meta name="color-scheme" content="dark light">
+  <script>
+  (function(){
+    var K='cellrix-theme', R=document.documentElement, mq=matchMedia('(prefers-color-scheme: dark)');
+    function cur(){ try{ return localStorage.getItem(K)||'auto'; }catch(e){ return 'auto'; } }
+    function apply(m){ var real=m==='auto'?(mq.matches?'dark':'light'):m; R.setAttribute('data-theme',real); }
+    apply(cur());
+    window.__setTheme=function(m){ try{ localStorage.setItem(K,m); }catch(e){} apply(m);
+      var bs=document.querySelectorAll('.theme-switch button');
+      for(var i=0;i<bs.length;i++){ bs[i].className=bs[i].getAttribute('data-t')===m?'on':''; } };
+    if(mq.addEventListener) mq.addEventListener('change',function(){ if(cur()==='auto') apply('auto'); });
+  })();
+  </script>
+  __STYLES__
+<body>
+  <h1>Cellrix — 驾驶舱 · 印痕</h1>
+  <div class="sub" id="sub">连接中…</div>
+  <div class="bar">
+    <button class="btn on" id="v-cockpit" onclick="showView('cockpit')">驾驶舱 Cockpit</button>
+    <button class="btn" id="v-engram" onclick="showView('engram')">印痕 Engram</button>
+    <button class="btn" id="v-chat" onclick="showView('chat')">对话 Chat</button>
+    <span class="badge" id="mode">…</span>
+    <div class="theme-switch" role="group" aria-label="主题">
+      <button type="button" data-t="auto" class="on" onclick="__setTheme('auto')">跟随</button>
+      <button type="button" data-t="light" onclick="__setTheme('light')">日间</button>
+      <button type="button" data-t="dark" onclick="__setTheme('dark')">暗黑</button>
+    </div>
+    <span class="badge" id="state">…</span>
+    <span class="badge" id="conn">…</span>
+  </div>
+  <div class="eco" id="eco">生态点亮探测中…</div>
+
+
+  <div id="view-cockpit">
+    __COCKPIT__
+  </div>
+
+  <div id="view-engram" style="display:none;">
+    <div class="head" style="margin-bottom:12px">印痕 Engram — 全链路可审计轨迹（会话 = 经历 · 判据与行动同线 · 水之波光 v11.2.0 骨架）</div>
+    <div class="engram-main" style="grid-template-columns:280px 1fr;">
+      <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
+      <div id="s-main">__ENGRAM__</div>
+    </div>
+  </div>
+
+  <div id="view-chat" style="display:none;">
+    __CHAT__
+  </div>
+
+    <div class="foot">数据源: Anaphase /v1/agent/snapshot（ADR-0010）· Tuck /v1/audit 链 · 自动刷新 __REFRESH__s · 视图切换同 TUI Ctrl+E · <a href="/api/snapshot" style="color:var(--acc);">snapshot JSON</a> · <a href="/api/audit" style="color:var(--acc);">audit JSON</a></div>
+__SCRIPT__
+</body>
+</html>

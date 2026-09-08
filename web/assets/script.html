@@ -1,0 +1,383 @@
+<script>
+(function () {
+  var refresh = __REFRESH__;
+  var tuckConfigured = __TUCK_CONFIGURED__;
+  var entries = [];
+  var selected = null;
+  document.addEventListener('keydown', function (e) {
+    if (e.target && e.target.id === 'chat-text' && e.key === 'Enter') { sendChat(); }
+    if (e.target && e.target.id === 'chat-text' && e.key === 'Escape') { document.getElementById('chat-text').value = ''; }
+  });
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function showView(v) {
+    document.getElementById('view-cockpit').style.display = v==='cockpit' ? '' : 'none';
+    document.getElementById('view-engram').style.display = v==='engram' ? '' : 'none';
+    document.getElementById('view-chat').style.display = v==='chat' ? '' : 'none';
+    document.getElementById('v-cockpit').className = 'btn' + (v==='cockpit' ? ' on' : '');
+    document.getElementById('v-engram').className = 'btn' + (v==='engram' ? ' on' : '');
+    document.getElementById('v-chat').className = 'btn' + (v==='chat' ? ' on' : '');
+    if (v==='chat') document.getElementById('chat-text').focus();
+    if (v==='engram' || v==='chat') loadSessions();
+  }
+
+  // === Engram v3 (水之波光 v11.2.0 骨架): experience sidebar + trajectory
+  // === One cognitive period = one `run-xxx` event stream, keyed by the same
+  // derived job id as the body trace and the Tuck audit chain. The sidebar
+  // lists periods (newest first); selecting one loads the trajectory
+  // skeleton rendered by assets/engram.html — badges, tracks, inspector.
+  var selectedPeriod = null;
+  // Explicit continuation (ADR-0026): while set, the next chat request
+  // resumes this experience (`job_id`) instead of opening a fresh stranger.
+  var chatJobId = null;
+
+  function loadSessions() {
+    fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
+      var periods = j.periods || [];
+      var empty = '<div class="empty">' + (j.configured ? '尚无经历（先和 Helix 说句话）' : '未开启会话事件流（Anaphase config `session_events_path`）') + '</div>';
+      renderSide('s-side', periods, empty);
+      renderSide('chat-side', periods, empty);
+    }).catch(function (e) {
+      document.getElementById('s-side').innerHTML = '<div class="empty">经历列表拉取失败: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderSide(id, periods, empty) {
+    var box = document.getElementById(id);
+    if (!periods.length) { box.innerHTML = empty; return; }
+    box.innerHTML = '';
+    periods.forEach(function (p) {
+      var div = document.createElement('div');
+      div.className = 'ses-item' + (selectedPeriod === p.job_id ? ' sel' : '');
+      var title = p.name || p.preview || '(无用户输入)';
+      div.innerHTML = '<div class="t">' + esc(p.first_ts.slice(5,19)) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id) + '</span>' +
+        '<button class="rename-btn" title="重命名">✎</button></div><div class="p">' + esc(title) + '</div>';
+      div.onclick = function () {
+        selectedPeriod = p.job_id;
+        window.__engramMeta = { job_id: p.job_id, name: p.name, preview: p.preview };
+        showView('engram');
+        selectPeriod(p.job_id);
+      };
+      var rn = div.querySelector('.rename-btn');
+      if (rn) rn.onclick = function (ev) {
+        ev.stopPropagation();
+        var cur = p.name || '';
+        var name = window.prompt('重命名这段经历（留空恢复自动名）', cur);
+        if (name === null) return;
+        fetch('/api/sessions/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_id: p.job_id, name: name })
+        }).then(function (r) { return r.json(); }).then(function () {
+          loadSessions();
+        });
+      };
+      box.appendChild(div);
+    });
+  }
+
+  function selectPeriod(jobId) {
+    // 印痕 v3（水之波光 v11.2.0 骨架）：轨迹视图由 engram.html 资产渲染。
+    // 会话元信息（名称/预览）通过 window.__engramMeta 桥接。
+    var meta = window.__engramMeta || null;
+    if (window.__engramLoad) window.__engramLoad(jobId, meta);
+  }
+
+  // One centered toast for system-level errors — never a Helix speech bubble
+  // (a transport failure is not Helix talking, it is the cockpit reporting).
+  function showError(msg) {
+    var old = document.querySelector('.toast');
+    if (old) old.remove();
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = '⚠ ' + msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 5000);
+  }
+
+  function nowTs() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function addMsg(who, text, isErr) {
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'msg ' + who + (isErr ? ' err' : '');
+    d.innerHTML = '<span class="who">' + (who==='user' ? '你' : 'Helix') + '<span class="ts">' + nowTs() + '</span></span>' + esc(text);
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // Streaming message element: created once per reply, text appended as
+  // SSE deltas arrive (typewriter). Returns the element to finalize.
+  function addStreamMsg() {
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'msg helix';
+    d.innerHTML = '<span class="who">Helix</span><span class="body"></span>';
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    return d.querySelector('.body');
+  }
+
+  // DSH-style reasoning disclosure (ReasoningRow): a collapsible think row
+  // above the answer. Streamed while running; click to expand/collapse.
+  function addThinkRow() {
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'think-row';
+    d.innerHTML = '<span class="think-head">思考</span><span class="think-body"></span>';
+    d.onclick = function () { d.classList.toggle('open'); };
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    return d.querySelector('.think-body');
+  }
+
+  // Load a past experience's history into the chat space (explicit resume):
+  // user turns and answers render as messages, then the next sentence
+  // continues the period (resume_from on the backend).
+  function loadPeriodToChat(jobId) {
+    fetch('/api/events?job_id=' + encodeURIComponent(jobId)).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.missing || !j.events) return;
+      var box = document.getElementById('chat-msgs');
+      var empty = box.querySelector('.empty');
+      if (empty) empty.remove();
+      var d = document.createElement('div');
+      d.className = 'period-head';
+      d.textContent = '—— 经历 ' + jobId + ' 的历史 ——';
+      box.appendChild(d);
+      j.events.forEach(function (e) {
+        if (e.type === 'user/message') addMsg('user', e.data.text || '', false);
+        else if (e.type === 'assistant/attempt') {
+          var a = document.createElement('div');
+          a.className = 'msg helix';
+          a.innerHTML = '<div class="who">Helix <span class="dim">(经历 ' + jobId.slice(0, 12) + ')</span></div><div class="text">' + esc((e.data.text || '').slice(0, 400)) + '</div>';
+          box.appendChild(a);
+        } else if (e.type === 'tool/result') {
+          var t = document.createElement('div');
+          t.className = 'msg helix';
+          t.innerHTML = '<div class="who">Helix <span class="dim">工具 · ' + esc(e.data.tool) + '</span></div><div class="text">' + esc((e.data.outcome || '').slice(0, 200)) + '</div>';
+          box.appendChild(t);
+        }
+      });
+      box.scrollTop = box.scrollHeight;
+    });
+  }
+
+  // Resume-from-experience dropdown: sits in the chat-input's bottom-right,
+  // listing the latest periods to continue (explicit, never implicit).
+  function toggleResume() {
+    var list = document.getElementById('resume-list');
+    if (list.style.display !== 'none') { list.style.display = 'none'; return; }
+    fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
+      var periods = (j.periods || []).slice(0, 8);
+      list.innerHTML = periods.map(function (p) {
+        var title = p.name || p.preview || '(无用户输入)';
+        return '<div class="resume-opt" data-job="' + esc(p.job_id) + '">' + esc(title) + ' <span class="dim">' + esc(p.job_id.slice(0, 20)) + '</span></div>';
+      }).join('') || '<div class="empty">尚无经历</div>';
+      list.style.display = '';
+      list.querySelectorAll('.resume-opt').forEach(function (el) {
+        el.onclick = function () {
+          chatJobId = el.getAttribute('data-job');
+          list.style.display = 'none';
+          var b = document.getElementById('cont-banner');
+          if (b) { b.style.display = ''; b.innerHTML = '续接经历 <span class="tid">' + esc(chatJobId) + '</span> —— 下一句话延续这段对话'; }
+          loadPeriodToChat(chatJobId);
+          document.getElementById('chat-text').focus();
+        };
+      });
+    }).catch(function () { list.innerHTML = '<div class="empty">经历列表拉取失败</div>'; list.style.display = ''; });
+  }
+
+  function sendChat() {
+    var input = document.getElementById('chat-text');
+    var text = input.value.trim();
+    if (!text) return;
+    addMsg('user', text, false);
+    input.value = '';
+    var btn = document.querySelector('.chat-input .btn');
+    btn.disabled = true; btn.textContent = '思考中…';
+    var done = false;
+    var job = chatJobId || null;
+    if (job) {
+      var b = document.getElementById('cont-banner');
+      if (b) b.innerHTML = '已续接 ' + esc(job) + ' —— 新经历已开启，本提示仍显示本次续接来源';
+    }
+    function finish() {
+      if (done) return;
+      done = true;
+      btn.disabled = false; btn.textContent = '发送';
+      input.focus();
+    }
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+      body: JSON.stringify({ message: text, job_id: job })
+    }).then(function (r) {
+      if (!r.body || !r.ok) { return r.json().then(function (j) {
+        throw new Error((j.error || 'HTTP ' + r.status) + (j.detail ? ' — ' + j.detail : ''));
+      }); }
+      var reader = r.body.getReader();
+      var dec = new TextDecoder();
+      var buf = '';
+      var bodyEl = null;
+      var thinkEl = null;
+      function pump() {
+        return reader.read().then(function (x) {
+          if (x.done) { finish(); return; }
+          buf += dec.decode(x.value, { stream: true });
+          var idx;
+          while ((idx = buf.indexOf('\n\n')) >= 0) {
+            var evt = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            var line = evt.trim();
+            if (line.indexOf('data:') !== 0) continue;
+            var payload = line.slice(5).trim();
+            if (!payload) continue;
+            var j;
+            try { j = JSON.parse(payload); } catch (e) { continue; }
+            if (j.error) {
+              // A transport fault is the cockpit's business, not Helix's.
+              // If the answer already streamed, keep it and finish quietly;
+              // only a fault with no content gets a toast.
+              if (!bodyEl && !thinkEl) showError(j.error);
+              finish(); return;
+            }
+            if (j.think) {
+              if (!thinkEl) thinkEl = addThinkRow();
+              thinkEl.textContent += j.think;
+              var box = document.getElementById('chat-msgs');
+              box.scrollTop = box.scrollHeight;
+            }
+            if (j.delta) {
+              if (!bodyEl) bodyEl = addStreamMsg();
+              bodyEl.textContent += j.delta;
+              var box = document.getElementById('chat-msgs');
+              box.scrollTop = box.scrollHeight;
+            }
+            if (j.done) {
+              if (!bodyEl) bodyEl = addStreamMsg();
+              // reply is the authoritative full text — overwrite the
+              // typewriter accumulation so a dropped delta can never leave
+              // a truncated answer on screen.
+              if (j.reply) bodyEl.textContent = j.reply;
+              finish(); return;
+            }
+          }
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (e) {
+      showError('发送失败: ' + e.message);
+    }).finally(function () {
+      finish();
+    });
+  }
+
+  function tick() {
+    fetch('/api/snapshot').then(function (r) {
+      if (!r.ok) { throw new Error('proxy ' + r.status); }
+      return r.json();
+    }).then(function (j) {
+      var snap = j.snapshot || null;
+      var mode = document.getElementById('mode');
+      var st = document.getElementById('state');
+      var conn = document.getElementById('conn');
+      var sub = document.getElementById('sub');
+      if (!snap) {
+        mode.textContent = 'NO SNAPSHOT';
+        st.textContent = j.status || '?';
+        conn.textContent = '✗ 未就绪';
+        conn.className = 'badge';
+        sub.textContent = 'Anaphase 未提供快照（' + (j.error || j.status || '未知') + '）——检查 up 是否在运行';
+        return;
+      }
+      var m = snap.mode || '?';
+      // Honest status line: success path must leave the "连接中…" placeholder.
+      sub.textContent = 'Anaphase 在线 · ' + m.toUpperCase() + ' · ' + (snap.episode || '暂无经历');
+      mode.textContent = m.toUpperCase();
+      mode.className = 'badge ' + m;
+      st.textContent = 'state: ' + (snap.state || '?');
+      conn.textContent = '● 在线';
+      conn.className = 'badge live';
+      document.getElementById('episode').textContent = snap.episode || '无';
+      var ledger = snap.ledger || [];
+      document.getElementById('nledger').textContent = ledger.length;
+      document.getElementById('tick').textContent = new Date().toLocaleTimeString();
+      var box = document.getElementById('entries');
+      if (!ledger.length) { box.innerHTML = '<div class="empty">暂无记录（Noop 模式 ledger 为空——配置 reasoning 后产生）</div>'; return; }
+      box.innerHTML = '';
+      ledger.slice().reverse().forEach(function (e) {
+        var div = document.createElement('div'); div.className = 'entry';
+        var status = (e.status || e.record_type || '?').toUpperCase();
+        var sts = document.createElement('span'); sts.className = 'st ' + status; sts.textContent = status;
+        var tid = document.createElement('span'); tid.textContent = esc(e.trace_id || e.episode_id || '');
+        var at = document.createElement('span'); at.className = 'dim'; at.textContent = esc(e.ts || e.created_at || '');
+        var call = document.createElement('span'); call.className = 'dim'; call.textContent = esc(e.tool || e.args || '');
+        div.appendChild(sts); div.appendChild(tid); div.appendChild(at); div.appendChild(call);
+        box.appendChild(div);
+      });
+    }).catch(function (e) {
+      var conn = document.getElementById('conn');
+      conn.textContent = '✗ 断开';
+      conn.className = 'badge';
+      document.getElementById('sub').textContent = 'snapshot 拉取失败: ' + e;
+    });
+  }
+
+  // Ecosystem status board: one dot per component (grey=off, yellow=up
+  // but unhealthy, green=healthy). Polled with the same cadence as tick.
+  function loadEcosystem() {
+    fetch('/api/ecosystem').then(function (r) { return r.json(); }).then(function (j) {
+      var box = document.getElementById('eco');
+      if (!box) return;
+      var html = '';
+      (j.components || []).forEach(function (c) {
+        html += '<span class="c"><span class="dot ' + esc(c.state) + '"></span>' + esc(c.name) + '</span>';
+      });
+      box.innerHTML = html;
+    }).catch(function () {
+      var box = document.getElementById('eco');
+      if (box) box.textContent = '生态探测不可用（proxy 未就绪）';
+    });
+  }
+
+  tick(); loadEcosystem();
+  setInterval(tick, refresh * 1000);
+  setInterval(loadEcosystem, refresh * 1000);
+  // Inline `onclick` attributes resolve against the global scope — expose
+  // the interactive entry points explicitly (they live in this IIFE).
+  window.showView = showView;
+  window.sendChat = sendChat;
+  // 主题按钮状态初始化（与 head 引导脚本对齐）
+  (function(){ try{
+    var K='cellrix-theme', cur=localStorage.getItem(K)||'auto';
+    var bs=document.querySelectorAll('.theme-switch button');
+    for(var i=0;i<bs.length;i++){ bs[i].className=bs[i].getAttribute('data-t')===cur?'on':''; }
+  }catch(e){} })();
+  // 波纹反馈：果从因的位置长出 —— 点击按钮处生成涟漪（[PURPOSE] 涟漪四阶段）
+  document.addEventListener('click', function(e){
+    var btn=e.target.closest ? e.target.closest('.btn,.ses-item,.fold-head') : null;
+    if(!btn || btn.closest('input')) return;
+    var r=btn.getBoundingClientRect();
+    var rip=document.createElement('span');
+    rip.className='ripple';
+    var d=Math.max(r.width,r.height);
+    rip.style.width=rip.style.height=d+'px';
+    rip.style.left=(e.clientX-r.left-d/2)+'px';
+    rip.style.top=(e.clientY-r.top-d/2)+'px';
+    btn.appendChild(rip);
+    setTimeout(function(){ rip.remove(); }, 300);
+  }, true);
+  window.toggleResume = toggleResume;
+})();
+</script>

@@ -1,0 +1,16 @@
+    <div class="panel">
+      <div class="head">对话（伙伴模式 · 单周期一轮 · 走 Tuck 网关审计）</div>
+      <div style="display:grid;grid-template-columns:240px 1fr;gap:12px;">
+        <div class="ses-side" id="chat-side"><div class="empty">经历列表加载中…</div></div>
+        <div>
+      <div id="cont-banner" class="cont-banner" style="display:none;"></div>
+      <div id="chat-msgs" class="chat-msgs"><div class="empty">说点什么吧——这是给 Helix 的一段新经历。</div></div>
+      <div class="chat-input">
+        <input id="chat-text" type="text" placeholder="输入消息，回车发送（Enter 发送 / Esc 清除）" autocomplete="off">
+        <button class="btn" onclick="sendChat()">发送</button>
+        <button class="btn ghost" onclick="toggleResume()" title="续接某段经历继续对话">续接</button>
+        <div id="resume-list" class="resume-list" style="display:none;"></div>
+      </div>
+        </div>
+      </div>
+    </div>

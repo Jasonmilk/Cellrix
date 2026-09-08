@@ -60,12 +60,46 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 
 生态状态点（在线/离线/启动/错误）为纯色静态圆点，无呼吸动画——面板常开，闲置动画违反 [PHYS:R-003]（GPU 持续合成耗电）。「等待」场景用旋转 loading（确定性可视化 [PHYS:C-003]，reduced-motion 下保留）。
 
+### D8: 视图资产化拼装（印痕 v3 · 解耦重构）
+
+`main.rs` 单文件巨型 `format!`（1323 行）是维护瓶颈——每改一处视图都触碰转义规则，违反极致解耦/按需加载。重构为**资产目录 = 唯一渲染源**：
+
+- `web/assets/base.html`（HTML 骨架 + 占位符）、`styles.html`（共享 CSS）、`cockpit.html` / `chat.html`（视图 HTML 片段）、`script.html`（共享 JS IIFE）、`engram.html`（印痕骨架，含自带 JS）
+- `index_html` 退化为 **replace 拼装器**（十几行）：`__STYLES__/__COCKPIT__/__CHAT__/__ENGRAM__/__SCRIPT__/__REFRESH__/__TUCK_CONFIGURED__` 逐个替换
+- **零 `format!` 转义**：资产内部 `{}` 自由书写，不再双写——消除转义地狱（[ENG] 工程约定，消除心智负担）
+- 动态值仅两处（刷新秒数、tuck 配置态），全量 replace 覆盖，无遗漏路径
+- 效果：`main.rs` 1323 → 633 行；新增视图 = 新增资产文件 + 一个占位符，不触碰主文件
+
+拒绝备选：
+- 引入 Node/框架构建链 → 面板是 std-only 单文件服务，构建依赖违反极致节能/按需加载
+- 按 `format!` 分块继续内嵌 → 仍是巨型函数，转义问题不消失
+
+### D8: 印痕 v3 = 水之波光 Harness v11.2.0 轨迹骨架（修订 ADR-0026/0027 的旧卡片形态）
+
+2026-09-09 用户核验了 `水之波光-Harness轨迹.html`（v11.2.0）与 `轨迹-ge1-20260909.html`（v11.0.2 修复验证版），判定旧交付形态（左侧经历列表 + 右侧事件卡片栈）与参照物跑偏，要求按骨架重做。本裁决取代此前「DSH-style turn outline」的旧形态。
+
+**骨架（借骨架、不借皮肤、不借哲学）**：
+- 五列事件表：类型/摘要/状态/耗时/Tokens（摘要列常驻，宽屏依次隐藏 Tokens→耗时，识读权 > 流转权 [PHYS:L-001]）
+- Overview 三轨时间线：Input/Model/Tools 共用一根横向标尺——每一列在三轨上是同一步，对齐=占位块、离散=gap:1px，两者正交；空白 = 该轨确实空闲
+- 三轨色相 + 图案双编码（横纹/实心/45°斜纹）[PHYS:L-001][PHYS:P-002]
+- 工具栏：等宽（伪时间轴/实际耗时切换）/折叠轮次/展开调用/重放/搜索
+- 底部统计栏（TURNS·STEPS·TOOL CALLS·LLM 耗时·工具耗时·TOKENS·缓存命中·TOK/S；grid gap:1px 生成分隔线）
+- 右侧检查器抽屉：Summary/Payload/Result/Schema/Timing 五页签；≥1180px 非模态无遮罩，窄视口模态化（aria-modal 如实反映）
+- 遮挡自证：四方向统一，贴在遮罩层（可见边界）不贴内容层
+- 卡住判定：连续同名工具连续失败 ≥3 次、只在链尾标一次、模型介入即断链、不用红色（红已被工具失败占用 [PHYS:L-002]）
+
+**实现方式（解耦决策）**：印痕整体为独立资产 `web/assets/engram.html`（e- 前缀令牌与类名全部限定在 `#view-engram` 下，隔离旧样式与驾驶舱/对话视图）。`main.rs` 仅 `include_str!` 拼装 + `selectPeriod` 桥接 `window.__engramLoad(jobId, meta)`。这是「哲学 → 组件资产 → 骨架 → 自动渲染」的第一步——后续驾驶舱/对话视图同样提取为独立资产，`main.rs` 退化为薄壳（路由 + API 代理 + 资产拼装），不重开项目、不引入构建依赖。
+
+**数据映射（物理事实优先）**：真实事件流 10 类型（turn/start·user/message·context/inject·assistant/think·assistant/attempt·tool/call·tool/result·check/status·verdict/status·turn/end）；tool/result 的 outcome 是 JSON 字符串（如 `{"ok":true,"result":"121"}`）非行内 HTML，按纯文本 esc 处理；无 tokens/缓存命中字段时显示 `—`（不猜数）；耗时 = 事件流内时间差（单一入口回合报 0——诚实，不猜测推理何时开始）。
+
 ## 3. 备选方案与拒绝理由
 
 | 备选 | 拒绝理由 |
 |---|---|
 | 保留 10 色事件 badge | 装饰性显著性是噪音 [PHYS:P-016]；语义色保留原则 [PHYS:L-002] 只覆盖状态不覆盖类型 |
 | 选中行保留彩色左边框 | 违反 [PHYS:D-003]（1px 彩色分割线） |
+| 印痕维持旧卡片栈（v2 形态） | 与用户核验的 v11.2.0 骨架跑偏；卡片栈逐条堆叠，轨迹/判据/时长的结构性关系不可读 |
+| 重开新壳/引入前端框架 | 价值在 anaphase/tuck 后端与数据流；独立资产化已解决 main.rs 膨胀；新壳引入构建依赖，违背 std-only 单文件约束 |
 | 引入外部 UI 框架（Tailwind 等） | 面板是 std-only 单文件服务；框架违反极致解耦/按需加载 |
 | 单一暗色主题 | 昼夜环境不同（[PHYS:D-006]），浅色主题是同一约束集的诚实解 |
 
