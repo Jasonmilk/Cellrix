@@ -92,6 +92,32 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 
 **数据映射（物理事实优先）**：真实事件流 10 类型（turn/start·user/message·context/inject·assistant/think·assistant/attempt·tool/call·tool/result·check/status·verdict/status·turn/end）；tool/result 的 outcome 是 JSON 字符串（如 `{"ok":true,"result":"121"}`）非行内 HTML，按纯文本 esc 处理；无 tokens/缓存命中字段时显示 `—`（不猜数）；耗时 = 事件流内时间差（单一入口回合报 0——诚实，不猜测推理何时开始）。
 
+### D9: 400 行解耦红线（main.rs 633 → 220，模块化）
+
+用户哲学（2026-09-09，写入 DNA v1.1 铁律 2 + phyt-DNA 铁律 6）：**代码超 400 行必须解耦**，否则膨胀。`main.rs` 完成资产化拼装后仍 633 行，继续拆：
+
+- `web/src/config.rs`（58 行）：`PanelConfig` + 协议默认常量（argv → env → defaults）
+- `web/src/server.rs`（385 行）：`route`/`handle`（10 Route 分支）/`respond`/`health_check`/`panel_already_up`
+- `web/src/main.rs`（220 行）：入口 + `index_html` 资产拼装 + 单元测试（测试文件豁免红线）
+- 三个文件全部 < 400 行；测试 6 项全绿；live 输出 85KB 级不变
+
+拒绝备选：
+- 保持单文件 633 行 → 违反用户批准的红线，后续每加一个 Route 都是膨胀
+- 测试段移出为独立文件 → 测试与逻辑同仓更简洁（[ENG]），红线豁免已写明
+
+### D10: 驾驶舱 v2 = 水之波光组件化（统计条 + Ledger 结构化表格）
+
+印痕 v3 新世代后，驾驶舱仍是旧时代（三张大数字卡片 + Ledger 纯文本列表），"一半旧时代一半新世代"。用户指令：**重构整个驾驶舱，全部重新设计，统一水之波光设计血统**（"是重构整个驾驶舱，而不是对话"）。
+
+**组件语言（与印痕事件表同构——碳硅同看同一账本）**：
+- 统计条 `.stats-bar`：经历 EPISODE / LEDGER 记录 / 刷新 TICK，grid gap:1px 生成分隔线（同印痕统计栏）
+- Ledger 白盒 `.ledger-tbl`：五列结构化表格（状态/时间/trace_id/调用/说明）+ 语义色 chip（e-ok/e-warn/e-bad）+ 点击行展开 raw payload（`.lt-detail` 复用 fold 原语）——不再是一个个纯文本 `<span>` 堆叠
+- 视图头 `.view-head` 与印痕 head 同语言；旧 `.cards/.card/.entry/.st` 死代码彻底删除（无幽灵约束）
+- 窄屏降级：五列 → 两列堆叠（trace_id/说明 全宽）[卷三 3.5.3]；高对比降级覆盖新组件 [PHYS:D-001]
+- 空态自证保留（Noop 模式 ledger 为空——诚实，不猜数）
+
+**解耦纪律**：驾驶舱视图 = `cockpit.html` 资产（视图 HTML）+ `script.html` 渲染函数 + `styles.html` 组件样式，主程序零改动——印证"哲学 → 组件资产 → 骨架 → 自动渲染"路径（D8 的后续步）。
+
 ## 3. 备选方案与拒绝理由
 
 | 备选 | 拒绝理由 |

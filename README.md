@@ -25,12 +25,17 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-> **Status 2026-09-09 (ADR-0015 + 印痕 v3)**: WebUI redesigned under the
+> **Status 2026-09-09 (ADR-0015 + 印痕 v3 + 驾驶舱 v2)**: WebUI redesigned under the
 > **水之波光 · 触境 (Lumtact)** design system — design tokens are sourced
 > one-to-one from `lumtract/web-viewer/src/design/lumtact-tokens.css`
 > (dark/light dual theme with `跟随/日间/暗黑` switcher, `[PHYS:D-006]`),
 > ripple feedback grows from the trigger coordinate, hit targets ≥44px
 > (`[PHYS:P-010]`), timings 120/200/260ms (`[PHYS:P-004/P-005]`).
+> **Cockpit v2** (2026-09-09): old stat cards + plain ledger list are gone —
+> stats bar (episode / ledger count / refresh tick) + Ledger white-box as a
+> structured five-column table (status / time / trace_id / call / note),
+> semantic chips, click-to-expand payload — same table language as the
+> Engram event table (one ledger, two projections).
 > **Engram v3** is the 水之波光 **Harness v11.2.0 trajectory skeleton**:
 > five-column event table (type/summary/status/duration/tokens) + Overview
 > three-track timeline (Input/Model/Tools sharing one horizontal ruler) +
@@ -467,7 +472,12 @@ cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
 # -> http://127.0.0.1:8080  (WEB_PORT / --port override)
 ```
 
-- Top bar buttons switch Cockpit ↔ Engram (mirrors the TUI `Ctrl+E`)
+- Top bar buttons switch Cockpit ↔ Engram ↔ Chat (mirrors the TUI `Ctrl+E`)
+- **Cockpit v2 — Water's Gleam (2026-09-09)**: stats bar (episode / ledger
+  count / refresh tick) + the Ledger white-box as a structured five-column
+  table (status / time / trace_id / call / note): semantic status chips,
+  click a row to expand the raw payload. Same table language as the Engram
+  event table — silicon and carbon read the same ledger, no ambiguity.
 - Engram panel: overview strip / timeline `2fr` + detail `1fr` proportional
   grid; click a row for the full imprint (caller / destination / status /
   verdicts / prev_hash / hash + raw payload)

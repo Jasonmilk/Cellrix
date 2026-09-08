@@ -144,6 +144,9 @@
   .grp-head { padding:8px 12px; font-size:12px; cursor:pointer; background:var(--row-zebra);
     border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:baseline; user-select:none; }
   .grp-head:hover { background:var(--row-hover); }
+  /* 对话：会话侧栏 + 消息列（组件类化，内联样式清零） */
+  .chat-grid { display:grid; grid-template-columns:240px 1fr; gap:12px; padding:12px; }
+  .chat-col { min-width:0; }
   .ses-side { border-right:1px solid var(--line); padding-right:12px; max-height:480px; overflow-y:auto; }
   .ses-item { padding:10px; border:1px solid var(--line); border-radius:var(--r-md);
     margin-bottom:8px; cursor:pointer; font-size:12px; }
