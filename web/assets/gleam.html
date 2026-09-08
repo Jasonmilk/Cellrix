@@ -1,0 +1,212 @@
+<script>
+/* ================================================================
+   水之波光组件行为（Cellrix 子集）
+   涟漪 · TIER 探针 · 表格裁切自证 · 契约自检
+   探针纪律：仅 pointerdown 后测量（常驻 rAF 让 GPU 睡不着 = 违 R-003）
+   ================================================================ */
+(function(){
+  'use strict';
+  var reduceMQ = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)');
+  var DOC = document.documentElement;
+
+  /* ---------- 涟漪：果从因的位置长出 [公理二] ----------
+     pointerdown 起（非 click —— 键盘激活也要反馈，用 :active 兜底）
+     reduced-motion → 去位移明暗起伏（ripple-static），反馈不删除 [FIX-12] */
+  document.addEventListener('pointerdown', function(e){
+    var hit = e.target && e.target.closest ? e.target.closest('.btn,.ses-item,.fold-head,.grp-head,.think-row,.row,.lt-row') : null;
+    if(!hit || hit.disabled || hit.getAttribute('aria-disabled')==='true') return;
+    var r = hit.getBoundingClientRect();
+    if(r.width < 8 || r.height < 8) return;
+    var useStatic = DOC.getAttribute('data-tier')==='T2' || (reduceMQ && reduceMQ.matches);
+    var el = document.createElement('span');
+    if(useStatic){
+      el.className = 'ripple-static';
+    }else{
+      el.className = 'ripple';
+      var d = Math.max(r.width, r.height);
+      el.style.width = d+'px'; el.style.height = d+'px';
+      el.style.left = (e.clientX - r.left)+'px'; el.style.top = (e.clientY - r.top)+'px';
+    }
+    hit.appendChild(el);
+    /* 物理事实：动画终结点移除。T2 停流转后 animationend 永不触发，
+       以 CSS 声明的时长 + 时钟兜底（反馈存在，元素不泄漏） */
+    var dur = useStatic ? 200 : 460;
+    el.addEventListener('animationend', function(){ el.remove(); });
+    setTimeout(function(){ if(el.parentNode) el.remove(); }, dur + 80);
+  });
+
+  /* ---------- TIER 探针（运行时重协商 [卷三 3.5.2]） ----------
+     reduced-motion = 生存权优先，直接 T2，不测量。
+     测量协议：warm-up 丢首帧 · ≥8 帧判定 · 上限 1.5s · 8fps 滞回带
+     T1 FPS<46 流转缩短 / T2 FPS<28 停流转（反馈权不降） */
+  function setTier(t){ DOC.setAttribute('data-tier', t); }
+  setTier(reduceMQ && reduceMQ.matches ? 'T2' : 'T0');
+  var measured = false;
+  document.addEventListener('pointerdown', function(){
+    if(measured || (reduceMQ && reduceMQ.matches)) return;
+    measured = true;
+    var frames = [], start = performance.now(), first = true, raf, done = false;
+    function sample(ts){
+      if(done) return;
+      if(first){ first = false; raf = requestAnimationFrame(sample); return; }
+      frames.push(ts);
+      if(frames.length >= 9 || ts - start > 1500){
+        done = true;
+        var span = (frames[frames.length-1] - frames[0]) / 1000;
+        var fps = span > 0 ? (frames.length-1) / span : 0;
+        if(fps < 28) setTier('T2');
+        else if(fps < 46) setTier('T1');
+        return;
+      }
+      raf = requestAnimationFrame(sample);
+    }
+    raf = requestAnimationFrame(sample);
+    /* 滞回：一次性测量后的升档检查 —— 每 5s 至多一次，成本可忽略 */
+    setTimeout(function(){
+      var frames2 = [], s2 = performance.now(), first2 = true, raf2, done2 = false;
+      function s2f(ts){
+        if(done2) return;
+        if(first2){ first2 = false; raf2 = requestAnimationFrame(s2f); return; }
+        frames2.push(ts);
+        if(frames2.length >= 9 || ts - s2 > 1500){
+          done2 = true;
+          var span = (frames2[frames2.length-1] - frames2[0]) / 1000;
+          var f2 = span > 0 ? (frames2.length-1) / span : 0;
+          if(DOC.getAttribute('data-tier')==='T2' && f2 >= 36) setTier('T1');
+          else if(DOC.getAttribute('data-tier')==='T1' && f2 >= 54) setTier('T0');
+          return;
+        }
+        raf2 = requestAnimationFrame(s2f);
+      }
+      raf2 = requestAnimationFrame(s2f);
+    }, 5000);
+  });
+
+  /* ---------- 表格裁切自证 [PHYS:P-014] ----------
+     滚动指示（data-more-l/r）由实际几何派生：scrollLeft/scrollWidth 事实，
+     不靠猜。.tbl-scroll 键盘可聚焦（Scroll 目标需可聚焦 [FIX-11]）。 */
+  function syncFades(){
+    [].forEach.call(document.querySelectorAll('.tbl-shell'), function(shell){
+      var sc = shell.querySelector('.tbl-scroll');
+      if(!sc) return;
+      var left = sc.scrollLeft > 1 ? '1' : '0';
+      var right = (sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 1) ? '1' : '0';
+      shell.setAttribute('data-more-l', left);
+      shell.setAttribute('data-more-r', right);
+    });
+  }
+  document.addEventListener('scroll', function(e){
+    if(e.target && e.target.classList && e.target.classList.contains('tbl-scroll')) syncFades();
+  }, true);
+  var syncTimer = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(syncTimer); syncTimer = setTimeout(syncFades, 120);
+  });
+  /* 每次渲染后同步（script.html render 调用此函数） */
+  window.syncFades = syncFades;
+
+  /* ---------- 契约自检（锁钻石，不锁陶土） ----------
+     只检查契约：对比度 / 热区 / 焦点 / 降级后反馈仍在 / token 外零硬编码。
+     输出到 console + 页脚徽标。不检查像素 —— 圆角与间距是陶土。 */
+  function lin(c){ c/=255; return c<=0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+  function lum(str){
+    var m = (str||'').match(/rgba?\(([^)]+)\)/); if(!m) return null;
+    var p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    var rgb = [p[0],p[1],p[2]], a = p.length>3 ? p[3] : 1;
+    return {rgb:rgb, a:a};
+  }
+  function ratio(fgStr, bgStr){
+    var fg = lum(fgStr), bg = lum(bgStr);
+    if(!fg || !bg) return null;
+    var frgb = fg.a<1 ? fg.rgb.map(function(v,i){ return v*fg.a + bg.rgb[i]*(1-fg.a); }) : fg.rgb;
+    var l1 = 0.2126*lin(frgb[0]) + 0.7152*lin(frgb[1]) + 0.0722*lin(frgb[2]);
+    var l2 = 0.2126*lin(bg.rgb[0]) + 0.7152*lin(bg.rgb[1]) + 0.0722*lin(bg.rgb[2]);
+    var hi = Math.max(l1,l2), lo = Math.min(l1,l2);
+    return (hi+0.05)/(lo+0.05);
+  }
+  function resolve(v){
+    var probe = document.createElement('span');
+    probe.style.color = 'var('+v+')';
+    document.body.appendChild(probe);
+    var c = getComputedStyle(probe).color; probe.remove(); return c;
+  }
+  function cssHas(sel){
+    /* 遍历全部匹配：任一规则真正声明 outline 即通过 —— 首个匹配
+       可能是浏览器扩展规则（如 [data-sonner-toast]），不许它抢先裁决 */
+    var anyOutline = false;
+    function scan(rules){
+      for(var j=0;j<rules.length;j++){
+        var r = rules[j];
+        if(r.selectorText && r.selectorText.indexOf(sel)>-1){
+          if(/outline/.test(r.style.cssText||'')) anyOutline = true;
+        }
+        if(r.cssRules) scan(r.cssRules);
+      }
+    }
+    for(var i=0;i<document.styleSheets.length;i++){
+      var rules; try{ rules = document.styleSheets[i].cssRules; }catch(e){ continue; }
+      scan(rules);
+    }
+    return anyOutline ? {cssText:'outline declared'} : null;
+  }
+  function mediaHas(mq, text){
+    /* 序列化会把 `animation:spin` 写成 `animation: spin`：去空白比较，
+       不看浏览器/扩展的中间样式表（条件名精确匹配才继续） */
+    mq = mq.replace(/\s+/g,'');
+    text = text.replace(/\s+/g,'');
+    for(var i=0;i<document.styleSheets.length;i++){
+      var rules; try{ rules = document.styleSheets[i].cssRules; }catch(e){ continue; }
+      for(var j=0;j<rules.length;j++){
+        var r = rules[j];
+        if(r.type===CSSRule.MEDIA_RULE &&
+           String(r.conditionText||'').replace(/\s+/g,'').indexOf(mq)>-1 &&
+           String(r.cssText||'').replace(/\s+/g,'').indexOf(text)>-1) return true;
+      }
+    }
+    return false;
+  }
+  window.runAudit = function(){
+    var fails = [];
+    function add(name, pass, detail){
+      if(!pass) fails.push(name + (detail ? ' · ' + detail : ''));
+    }
+    var pairs = [
+      ['正文/页底', '--text', '--bg'],
+      ['次要/卡片', '--text-dim', '--surface'],
+      ['主钮/主钮底', '--on-accent', '--accent'],
+      ['危钮/危钮底', '--on-danger', '--danger']
+    ];
+    pairs.forEach(function(p){
+      var r = ratio(resolve(p[1]), resolve(p[2]));
+      add(p[0]+' ≥4.5:1', r!==null && r>=4.5, r ? r.toFixed(2)+':1' : 'n/a');
+    });
+    var els = document.querySelectorAll('.btn:not([disabled]), .inp');
+    var small = 0, min = Infinity;
+    els.forEach(function(el){
+      var h = el.getBoundingClientRect().height;
+      if(h>0){ if(h<min) min=h; if(h<43.5) small++; }
+    });
+    add('热区 ≥44px', small===0, small ? small+' 个不足（min '+Math.round(min)+'px）' : '');
+    var fr = cssHas(':focus-visible');
+    add(':focus-visible', !!(fr && /outline/.test(fr.cssText)), fr ? '' : '缺失');
+    /* WebKit 把 `animation:spin` 序列化为展开式（... running spin）—— 查动画名 */
+    var rm = mediaHas('prefers-reduced-motion', 'spin');
+    add('reduced-motion 反馈仍在', rm, rm ? '' : '因果断裂');
+    if(fails.length){
+      console.warn('[Audit] FAIL · ' + fails.join(' | '));
+      var f = document.getElementById('audit');
+      if(f){ f.textContent = '审计 ' + fails.length + ' 违约'; f.className = 'tag risk'; f.title = fails.join('\n'); }
+    }else{
+      console.info('[Audit] PASS · 对比度/热区/焦点/降级反馈 全契约通过');
+      var p2 = document.getElementById('audit');
+      if(p2){ p2.textContent = '审计 PASS'; p2.className = 'tag ok'; }
+    }
+  };
+  var raTimer = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(raTimer); raTimer = setTimeout(window.runAudit, 300);
+  });
+  if(document.readyState==='complete'||document.readyState==='interactive') setTimeout(window.runAudit, 80);
+  else document.addEventListener('DOMContentLoaded', function(){ setTimeout(window.runAudit, 80); });
+})();
+</script>

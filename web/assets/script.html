@@ -314,10 +314,10 @@
       document.getElementById('nledger').textContent = ledger.length;
       document.getElementById('tick').textContent = new Date().toLocaleTimeString();
       var box = document.getElementById('entries');
-      if (!ledger.length) { box.innerHTML = '<div class="empty">暂无记录（Noop 模式 ledger 为空——配置 reasoning 后产生）</div>'; return; }
+      if (!ledger.length) { box.innerHTML = '<tr><td colspan="5"><div class="empty">暂无记录（Noop 模式 ledger 为空——配置 reasoning 后产生）</div></td></tr>'; return; }
       // 水之波光 Ledger 表格：状态/时间/trace_id/调用/说明 五列 + 点击展开 payload。
       // 与印痕事件表同构（碳硅同看同一账本），但数据源是 Tuck 审计链。
-      var head = '<div class="lt-row lt-head"><span class="lt-c st">状态</span><span class="lt-c ts">时间</span><span class="lt-c tid">trace_id</span><span class="lt-c call">调用</span><span class="lt-c note">说明</span></div>';
+      // ≤620px 降级为纵向卡片堆叠（td data-label 标签在上/值在下，首列自明）。
       var rows = '';
       ledger.slice().reverse().forEach(function (e) {
         var status = (e.status || e.record_type || '?').toUpperCase();
@@ -326,15 +326,16 @@
         var call = e.tool || e.args || '';
         var note = e.summary || e.verdict || e.reason || '';
         var payload = JSON.stringify(e.data || e.payload || e, null, 1);
-        rows += '<div class="lt-row" tabindex="0" role="button" aria-expanded="false" onclick="this.classList.toggle(\'open\')">' +
-          '<span class="lt-c st"><span class="chip ' + cls + '">' + esc(status) + '</span></span>' +
-          '<span class="lt-c ts">' + esc(String(e.ts || e.created_at || '').slice(0, 19)) + '</span>' +
-          '<span class="lt-c tid">' + esc(tid) + '</span>' +
-          '<span class="lt-c call">' + esc(call) + '</span>' +
-          '<span class="lt-c note">' + esc(note) + '</span>' +
-          '<div class="lt-detail"><pre>' + esc(payload) + '</pre></div></div>';
+        rows += '<tr class="lt-row" tabindex="0" role="button" aria-expanded="false" onclick="var t=this;t.classList.toggle(\'lt-open\');var ex=t.nextElementSibling;if(ex&&ex.classList.contains(\'lt-exp\')){ex.hidden=!ex.hidden;}">' +
+          '<td data-label="状态"><span class="chip ' + cls + '">' + esc(status) + '</span></td>' +
+          '<td class="lt-c-ts" data-label="时间">' + esc(String(e.ts || e.created_at || '').slice(0, 19)) + '</td>' +
+          '<td class="lt-c-tid" data-label="trace_id">' + esc(tid) + '</td>' +
+          '<td class="lt-c-call" data-label="调用">' + esc(call) + '</td>' +
+          '<td class="lt-c-note" data-label="说明">' + esc(note) + '</td></tr>' +
+          '<tr class="lt-exp" hidden><td colspan="5"><pre>' + esc(payload) + '</pre></td></tr>';
       });
-      box.innerHTML = head + rows;
+      box.innerHTML = rows;
+      if (window.syncFades) window.syncFades();
     }).catch(function (e) {
       var conn = document.getElementById('conn');
       conn.textContent = '✗ 断开';
@@ -373,20 +374,7 @@
     var bs=document.querySelectorAll('.theme-switch button');
     for(var i=0;i<bs.length;i++){ bs[i].className=bs[i].getAttribute('data-t')===cur?'on':''; }
   }catch(e){} })();
-  // 波纹反馈：果从因的位置长出 —— 点击按钮处生成涟漪（[PURPOSE] 涟漪四阶段）
-  document.addEventListener('click', function(e){
-    var btn=e.target.closest ? e.target.closest('.btn,.ses-item,.fold-head') : null;
-    if(!btn || btn.closest('input')) return;
-    var r=btn.getBoundingClientRect();
-    var rip=document.createElement('span');
-    rip.className='ripple';
-    var d=Math.max(r.width,r.height);
-    rip.style.width=rip.style.height=d+'px';
-    rip.style.left=(e.clientX-r.left-d/2)+'px';
-    rip.style.top=(e.clientY-r.top-d/2)+'px';
-    btn.appendChild(rip);
-    setTimeout(function(){ rip.remove(); }, 300);
-  }, true);
+  // 涟漪/降级探针/表格自证/契约自检 已下沉至 gleam.html（组件行为资产）
   window.toggleResume = toggleResume;
 })();
 </script>

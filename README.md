@@ -25,12 +25,24 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
-> **Status 2026-09-09 (ADR-0015 + 印痕 v3 + 驾驶舱 v2)**: WebUI redesigned under the
-> **水之波光 · 触境 (Lumtact)** design system — design tokens are sourced
-> one-to-one from `lumtract/web-viewer/src/design/lumtact-tokens.css`
-> (dark/light dual theme with `跟随/日间/暗黑` switcher, `[PHYS:D-006]`),
-> ripple feedback grows from the trigger coordinate, hit targets ≥44px
-> (`[PHYS:P-010]`), timings 120/200/260ms (`[PHYS:P-004/P-005]`).
+> **Status 2026-09-09 (ADR-0015 D11-D13)**: WebUI fully rebuilt under the
+> **水之波光 · 触境 (Lumtact)** component language — the **道** layer, not
+> just the skin: `web/assets/` split into `tokens.html` (design tokens,
+> 132 lines) + `components.html` (component assets — button family with
+> currentColor ripple, `.inp` 44px inputs with focus halo, `.tbl-shell`
+> table system with sticky 2px headers + scroll-fade self-proof,
+> **≤620px vertical card stacking via `data-label`**, zero-state `.empty`
+> orb that self-proves "empty ≠ broken") + `gleam.html` (component
+> behavior — **TIER runtime probe** T0/T1/T2 with reduced-motion straight
+> to T2, ripple-static degradation, contract self-check `runAudit` that
+> verifies contrast ≥4.5:1 / hit area ≥44px / focus-visible /
+> degradation keeps feedback, footer badge + console). Live audit PASS:
+> text/bg 15.54:1 · dim/surface 6.62:1 · onAccent 6.69:1 ·
+> onDanger/danger **6.02:1** (FIX-02 target). Ledger white-box upgraded
+> from grid rows to a real `<table>` (5-column sticky header + row click
+> expand). All files <400 lines (DNA v1.1). Degradation is
+> **re-negotiation, not deletion** — feedback survives every tier.
+> 
 > **Cockpit v2** (2026-09-09): old stat cards + plain ledger list are gone —
 > stats bar (episode / ledger count / refresh tick) + Ledger white-box as a
 > structured five-column table (status / time / trace_id / call / note),

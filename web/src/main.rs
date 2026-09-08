@@ -8,12 +8,11 @@
 mod config;
 mod server;
 
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::thread;
 
-use config::{PanelConfig, ANAPHASE_ENDPOINT_DEFAULT, TUCK_LIMIT_DEFAULT, WEB_PORT_DEFAULT};
-use server::{handle, health_check, panel_already_up, route, Route};
+use config::{PanelConfig, WEB_PORT_DEFAULT};
+use server::{handle, health_check, panel_already_up};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -99,19 +98,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// 资产内部 `{}` 自由书写。动态值仅 __REFRESH__ / __TUCK_CONFIGURED__。
 fn index_html(cfg: &PanelConfig) -> String {
     const BASE: &str = include_str!("../assets/base.html");
-    const STYLES: &str = include_str!("../assets/styles.html");
+    const TOKENS: &str = include_str!("../assets/tokens.html");
+    const COMPONENTS: &str = include_str!("../assets/components.html");
     const COCKPIT: &str = include_str!("../assets/cockpit.html");
     const CHAT: &str = include_str!("../assets/chat.html");
     const ENGRAM: &str = include_str!("../assets/engram.html");
     const SCRIPT: &str = include_str!("../assets/script.html");
+    const GLEAM: &str = include_str!("../assets/gleam.html");
 
     let tuck_configured = cfg.tuck_endpoint.is_some();
     BASE
-        .replace("__STYLES__", STYLES)
+        .replace("__TOKENS__", TOKENS)
+        .replace("__COMPONENTS__", COMPONENTS)
         .replace("__COCKPIT__", COCKPIT)
         .replace("__CHAT__", CHAT)
         .replace("__ENGRAM__", ENGRAM)
         .replace("__SCRIPT__", SCRIPT)
+        .replace("__GLEAM__", GLEAM)
         .replace("__REFRESH__", &config::REFRESH_SECS.to_string())
         .replace("__TUCK_CONFIGURED__", &tuck_configured.to_string())
 }
@@ -119,6 +122,10 @@ fn index_html(cfg: &PanelConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+
+    use config::{ANAPHASE_ENDPOINT_DEFAULT, TUCK_LIMIT_DEFAULT};
+    use server::{route, Route};
 
     #[test]
     fn route_index_and_snapshots() {

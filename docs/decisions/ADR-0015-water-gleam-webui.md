@@ -118,6 +118,31 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 
 **解耦纪律**：驾驶舱视图 = `cockpit.html` 资产（视图 HTML）+ `script.html` 渲染函数 + `styles.html` 组件样式，主程序零改动——印证"哲学 → 组件资产 → 骨架 → 自动渲染"路径（D8 的后续步）。
 
+### D11: 水之波光组件资产层（"道"层重构，styles.html 拆分为三）
+
+用户核验印痕 v3 后批评驾驶舱/对话"只学到皮，没学到道"，要求整个见面（驾驶舱+对话+印痕外围）统一到 `水之波光-组件与理念.html`（v10.0.4）的组件语言；随后明确"实现必须考虑优先级（一层套一层）+ 适配不同设备的降级策略"。
+
+**资产重构（`web/assets/`，全部 <400 行，400 红线适用）**：
+- `tokens.html`（132 行）：令牌层 —— `--bg/--surface/--surface-sunk/--surface-hover/--surface-press/--line/--line-strong/--text/--text-dim/--accent(-hover/-press/-soft)/--on-accent/--danger(-hover/-press/-soft)/--on-danger/--ok/--warn/--risk/--r-sm/md/lg/--dur/--ease/--shadow-1/2/--fade-l/r/--gleam`，日间 `#F4F6F8/#FFFFFF/#121212` 暗黑，`--on-danger` 暗黑 `#2A0F0A` 6.02:1（硬编码白字 2.98:1 触及生存权 → FIX-02）；基础布局 + 主题三段式
+- `components.html`（~300 行）：组件层 —— 按钮体系（.btn 44px 热区/.btn-primary/-secondary/-ghost/-danger，状态互斥背景覆盖非半透明叠加 [PHYS:R-001]，涟漪 currentColor 460ms，reduced-motion 降级 `.ripple-static` 去位移留反馈 [FIX-12]）；输入框 `.inp`（44px，focus 3px accent-soft 光环）；表格体系 `.tbl-shell/.tbl-scroll`（粘性表头 2px 线 [FIX-11]，裁切自证 data-more-l/r 渐变 [PHYS:P-014]，**≤620px 纵向卡片堆叠** data-label 标签在上/值在下 [FIX-09]）；零态 `.empty`（orb+标题+说明，空≠坏 [PHYS:P-14/P-003]）；语义 `.badge/.chip` 单色相分级亮度 [PHYS:L-002]
+- `gleam.html`（~195 行）：组件行为层 —— 涟漪（pointerdown 起，animationend 移除，T2 动画禁用时 CSS 声明时长+时钟兜底防泄漏）；**TIER 探针**（reduced-motion 直接 T2 不测量；仅首次 pointerdown 后测量，warm-up 丢首帧、≥8 帧判定、上限 1.5s、8fps 滞回带 T1<46/T2<28，升档 ≥54/≥36）；表格裁切自证 syncFades（scrollLeft/scrollWidth 几何派生）；**契约自检 runAudit**（锁钻石不锁陶土：对比度 4 对 ≥4.5:1 / 热区 ≥44px / :focus-visible / reduced-motion 下反馈仍在 / token 外零硬编码，页脚徽标 + console）
+- `script.html`（379 行）：应用逻辑（poll/render/view 切换/会话）—— Ledger 渲染改真 `<table>`（thead 5 列 + tbody tr/td data-label + tr.lt-exp 展开行 hidden 切换）
+- `base.html`：占位符 `__TOKENS__/__COMPONENTS__/__GLEAM__`（原 `__STYLES__` 拆三）；导航 `.nav` + 视图按钮 `type=button` 语义化
+- `styles.html` 删除（幽灵约束清除 [卷三 3.3]）
+
+**审计实测（live 页面）**：text/bg 15.54:1 · dim/surface 6.62:1 · onAccent/accent 6.69:1 · onDanger/danger 6.02:1 —— 四项全过 4.5 钻石线；T2 降级自动生效（系统 reduced-motion 时探针直接落 T2，涟漪降级为 ripple-static 并按时移除）；对话全链路实测：Helix 真实回复（L0 基因锁生效）。
+
+### D12: 契约自检的序列化陷阱（审计修复记录）
+
+runAudit 初次落地遇到三个真实坑，全部由浏览器序列化事实驱动修复（物理事实优先）：
+1. **浏览器扩展样式表抢答**：`cssHas(':focus-visible')` 首规则命中扩展的 `[data-sonner-toast]:focus-visible`（box-shadow 无 outline）→ 改为遍历全部规则，任一含 outline 即通过
+2. **WebKit 展开 animation 简写**：`animation:spin` 序列化为 `animation: 720ms ... running spin` → 检查动画名关键字 `spin` 而非简写
+3. **media conditionText 带括号**：`(prefers-reduced-motion: reduce)` 精确等值失败 → 去空白后 indexOf
+
+### D13: T2 停流转后的涟漪元素泄漏修复
+
+`html[data-tier="T2"] * { animation:none!important }` 停流转后 `animationend` 永不触发 → ripple-static 元素泄漏。修复：以 CSS 声明的动画时长 + 时钟兜底（`setTimeout(remove, dur+80)`），幂等双移除。原则：**反馈必须存在（因果不虚），元素不泄漏（物理事实）**。
+
 ## 3. 备选方案与拒绝理由
 
 | 备选 | 拒绝理由 |

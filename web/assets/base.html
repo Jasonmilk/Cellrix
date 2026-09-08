@@ -17,22 +17,25 @@
     if(mq.addEventListener) mq.addEventListener('change',function(){ if(cur()==='auto') apply('auto'); });
   })();
   </script>
-  __STYLES__
+  __TOKENS__
+  __COMPONENTS__
 <body>
   <h1>Cellrix — 驾驶舱 · 印痕</h1>
   <div class="sub" id="sub">连接中…</div>
   <div class="bar">
-    <button class="btn on" id="v-cockpit" onclick="showView('cockpit')">驾驶舱 Cockpit</button>
-    <button class="btn" id="v-engram" onclick="showView('engram')">印痕 Engram</button>
-    <button class="btn" id="v-chat" onclick="showView('chat')">对话 Chat</button>
-    <span class="badge" id="mode">…</span>
+    <nav class="nav" aria-label="视图">
+      <button type="button" class="btn on" id="v-cockpit" onclick="showView('cockpit')">驾驶舱 Cockpit</button>
+      <button type="button" class="btn" id="v-engram" onclick="showView('engram')">印痕 Engram</button>
+      <button type="button" class="btn" id="v-chat" onclick="showView('chat')">对话 Chat</button>
+    </nav>
+    <span class="badge info" id="mode">…</span>
     <div class="theme-switch" role="group" aria-label="主题">
       <button type="button" data-t="auto" class="on" onclick="__setTheme('auto')">跟随</button>
       <button type="button" data-t="light" onclick="__setTheme('light')">日间</button>
       <button type="button" data-t="dark" onclick="__setTheme('dark')">暗黑</button>
     </div>
-    <span class="badge" id="state">…</span>
-    <span class="badge" id="conn">…</span>
+    <span class="badge info" id="state">…</span>
+    <span class="badge info" id="conn">…</span>
   </div>
   <div class="eco" id="eco">生态点亮探测中…</div>
 
@@ -53,7 +56,8 @@
     __CHAT__
   </div>
 
-    <div class="foot">数据源: Anaphase /v1/agent/snapshot（ADR-0010）· Tuck /v1/audit 链 · 自动刷新 __REFRESH__s · 视图切换同 TUI Ctrl+E · <a href="/api/snapshot" style="color:var(--acc);">snapshot JSON</a> · <a href="/api/audit" style="color:var(--acc);">audit JSON</a></div>
+    <div class="foot">数据源: Anaphase /v1/agent/snapshot（ADR-0010）· Tuck /v1/audit 链 · 自动刷新 __REFRESH__s · 视图切换同 TUI Ctrl+E · <span id="audit" class="tag ok">…</span> · <a href="/api/snapshot">snapshot JSON</a> · <a href="/api/audit">audit JSON</a></div>
 __SCRIPT__
+__GLEAM__
 </body>
 </html>

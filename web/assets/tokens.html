@@ -1,0 +1,132 @@
+<style>
+  /* ================================================================
+     Cellrix WebUI · 水之波光 · 触境 v10.0.4 —— 令牌层
+     同源：lumtract-tokens.css + 水之波光-组件与理念.html 卷四实例档案
+     推导：目的档案 cellrix-webui-purpose-2026-09-09 · 卷三推导引擎
+     关键裁决：
+     · 事件类型 badge 单色相中性 —— 10 种类型 10 种颜色 = 装饰性显著
+       性是噪音 [PHYS:P-016]；类型靠文字区分（层级单调 [PHYS:L-001]，
+       同层级外观一致 [PHYS:P-013]）。语义状态保留语义色 [PHYS:L-002]。
+     · 选中行背景高亮，无彩色加粗左边框 —— [PHYS:D-003]。
+     · 状态点纯色静态 —— [PHYS:R-003]；等待保留确定性可视化 [PHYS:C-003]。
+     · 时间令牌 120/200/260ms —— [PHYS:P-004]/[PHYS:P-005]。
+     · 热区 ≥44px —— [PHYS:P-010]。
+     · 主题三段式 —— [PHYS:D-006]。
+     · 降级：TIER 阶梯（T0/T1/T2）+ reduced-motion + prefers-contrast
+       + 窄屏 —— 卷三 3.5.3。
+     ================================================================ */
+  :root{
+    --bg:#F4F6F8; --surface:#FFFFFF; --surface-sunk:#F7F8FA;
+    --surface-hover:#F0F2F5; --surface-press:#E6E9EE;
+    --line:#E3E6EB; --line-strong:#C9CED6;
+    --text:#14171C; --text-dim:#5A626E; --text-3:#8A929E;
+
+    --accent:#1F6F9B; --accent-hover:#1A5F86; --accent-press:#165272;
+    --accent-soft:rgba(31,111,155,.10);
+    --on-accent:#FFFFFF;              /* 5.52:1 [PHYS:P-003] */
+
+    --danger:#C0392B; --danger-hover:#A93226; --danger-press:#91291F;
+    --danger-soft:rgba(192,57,43,.10);
+    --on-danger:#FFFFFF;              /* 5.44:1 */
+
+    --ok:#1E7A45; --warn:#8A5A00; --risk:#A93226;
+
+    --r-sm:6px; --r-md:8px; --r-lg:14px;
+    --dur:200ms; --dur-press:120ms; --dur-enter:260ms;
+    --ease:cubic-bezier(.2,.7,.3,1);
+
+    --bg-rgb:244,246,248;
+    --shim:rgba(255,255,255,.72);
+
+    /* 可滚动指示：日间 = 薄阴影（光被遮挡成影），强度压在「暗示」级 */
+    --fade-w:26px;
+    --fade-l:linear-gradient(to right,
+        rgba(16,20,28,.12) 0%, rgba(16,20,28,.075) 30%,
+        rgba(16,20,28,.028) 62%, rgba(16,20,28,0) 100%);
+    --fade-r:linear-gradient(to left,
+        rgba(16,20,28,.12) 0%, rgba(16,20,28,.075) 30%,
+        rgba(16,20,28,.028) 62%, rgba(16,20,28,0) 100%);
+
+    --shadow-1:0 1px 2px rgba(16,20,28,.06), 0 2px 8px rgba(16,20,28,.05);
+    --shadow-2:0 2px 4px rgba(16,20,28,.07), 0 8px 22px rgba(16,20,28,.09);
+
+    --gleam:rgba(255,255,255,.62);
+    color-scheme: light;
+  }
+  [data-theme="dark"]{
+    --bg:#121212; --surface:#1A1B1E; --surface-sunk:#16171A;
+    --surface-hover:#24262A; --surface-press:#2C2F34;
+    --line:#2A2D33; --line-strong:#3A3E46;
+    --text:#E8EAED; --text-dim:#9AA1AC; --text-3:#6B7280;
+
+    --accent:#4FA8D8; --accent-hover:#63B5E0; --accent-press:#7CC2E7;
+    --accent-soft:rgba(79,168,216,.14);
+    --on-accent:#0B1A22;              /* 暗底上浅色需提亮 6.69:1 */
+
+    --danger:#E8735F; --danger-hover:#EC8471; --danger-press:#F09382;
+    --danger-soft:rgba(232,115,95,.14);
+    --on-danger:#2A0F0A;              /* 6.02:1 —— 硬编码 #fff 只 2.98:1 */
+
+    --ok:#5FCC8C; --warn:#E0B357; --risk:#EC8471;
+
+    /* 暗黑 = 微光（水面反射的光）[PHYS:D-004] */
+    --fade-l:linear-gradient(to right,
+        rgba(150,205,240,.14) 0%, rgba(150,205,240,.085) 30%,
+        rgba(150,205,240,.03) 62%, rgba(150,205,240,0) 100%);
+    --fade-r:linear-gradient(to left,
+        rgba(150,205,240,.14) 0%, rgba(150,205,240,.085) 30%,
+        rgba(150,205,240,.03) 62%, rgba(150,205,240,0) 100%);
+
+    --bg-rgb:18,18,18;
+    --shim:rgba(255,255,255,.07);
+
+    --shadow-1:0 1px 2px rgba(0,0,0,.5), 0 2px 10px rgba(0,0,0,.35);
+    --shadow-2:0 2px 6px rgba(0,0,0,.55), 0 12px 30px rgba(0,0,0,.45);
+
+    --gleam:rgba(226,244,255,.52);
+    color-scheme: dark;
+  }
+
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text);
+    font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",
+          "Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; padding:20px;
+    transition:background var(--dur) var(--ease), color var(--dur) var(--ease); }
+  h1 { font-size:16px; font-weight:600; color:var(--accent); margin-bottom:4px; }
+  .sub { color:var(--text-dim); font-size:12px; margin-bottom:14px; }
+  .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .theme-switch { display:flex; gap:2px; margin-left:auto; border:1px solid var(--line);
+    border-radius:var(--r-md); padding:2px; }
+  .theme-switch button { appearance:none; background:transparent; border:0; color:var(--text-dim);
+    font-size:11px; padding:0 10px; min-height:32px; cursor:pointer; border-radius:6px; font-family:inherit; }
+  .theme-switch button:hover { color:var(--text); }
+  .theme-switch button.on { background:var(--accent-soft); color:var(--accent); }
+  .theme-switch button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  /* 视图切换（导航 ≤5 项 [PHYS:P-020] 工作记忆 ~4 组块） */
+  .nav { display:flex; gap:8px; }
+  .eco { display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); padding:8px 0 4px; }
+  .eco .c { display:inline-flex; align-items:center; gap:6px; }
+  .eco .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .eco .dot.ok { background:var(--ok); }
+  .eco .dot.off { background:var(--text-3); }
+  .eco .dot.starting { background:var(--warn); }
+  .eco .dot.error { background:var(--risk); }
+  .foot { color:var(--text-dim); font-size:11px; margin-top:14px; }
+  .foot a { color:var(--accent); }
+  /* 视图级头（不在面板内）：层级同构 [PURPOSE] */
+  .view-head { font-size:12px; color:var(--text-dim); margin-bottom:12px;
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .panel { background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-1); }
+  .panel .head { padding:10px 12px; font-size:12px; color:var(--text-dim);
+    border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  /* 统计条：grid gap:1px 生成分隔线（同印痕统计栏） */
+  .stats-bar { display:flex; gap:1px; background:var(--line); border:1px solid var(--line);
+    border-radius:var(--r-md); overflow:hidden; margin-bottom:16px; }
+  .stat { flex:1 1 0; min-width:0; background:var(--surface); padding:10px 12px; }
+  .stat .k { display:block; font-size:10px; letter-spacing:.06em; color:var(--text-dim); margin-bottom:4px; }
+  .stat .v { font-size:18px; font-weight:600; color:var(--text); }
+  .stat .v.small { font-size:12px; font-weight:400; color:var(--text-dim); }
+  .dim { color:var(--text-dim); }
+</style>

@@ -6,7 +6,16 @@
     </div>
     <div class="panel ledger">
       <div class="head">Ledger 白盒（append-only · 哈希链 · 可逐条展开审查）</div>
-      <div class="ledger-tbl" id="entries">
-        <div class="empty">等待数据…</div>
+      <div class="tbl-shell" id="ltShell" data-more-l="0" data-more-r="0">
+        <div class="tbl-scroll" id="ltScroll" tabindex="0" aria-label="Ledger 审计链（可滚动）">
+          <table>
+            <thead>
+              <tr><th scope="col">状态</th><th scope="col">时间</th><th scope="col">trace_id</th><th scope="col">调用</th><th scope="col">说明</th></tr>
+            </thead>
+            <tbody id="entries">
+              <tr><td colspan="5"><div class="empty">等待数据…</div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
