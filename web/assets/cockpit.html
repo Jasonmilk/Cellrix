@@ -1,9 +1,12 @@
-    <div class="cards">
-      <div class="card"><div class="k">经历 episode</div><div class="v small" id="episode">…</div></div>
-      <div class="card"><div class="k">Ledger 记录</div><div class="v" id="nledger">…</div></div>
-      <div class="card"><div class="k">刷新</div><div class="v small" id="tick">…</div></div>
+    <div class="head view-head">驾驶舱 Cockpit — 生态态势 · Anaphase 快照（ADR-0010）· Ledger 白盒审计链</div>
+    <div class="stats-bar" id="cockpit-stats">
+      <div class="stat"><span class="k">经历 EPISODE</span><span class="v" id="episode">…</span></div>
+      <div class="stat"><span class="k">LEDGER 记录</span><span class="v" id="nledger">…</span></div>
+      <div class="stat"><span class="k">刷新 TICK</span><span class="v small" id="tick">…</span></div>
     </div>
     <div class="panel ledger">
-      <div class="head">Ledger 白盒（append-only，可逐条审查）</div>
-      <div id="entries"><div class="empty">等待数据…</div></div>
+      <div class="head">Ledger 白盒（append-only · 哈希链 · 可逐条展开审查）</div>
+      <div class="ledger-tbl" id="entries">
+        <div class="empty">等待数据…</div>
+      </div>
     </div>

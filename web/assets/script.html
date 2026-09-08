@@ -315,17 +315,26 @@
       document.getElementById('tick').textContent = new Date().toLocaleTimeString();
       var box = document.getElementById('entries');
       if (!ledger.length) { box.innerHTML = '<div class="empty">暂无记录（Noop 模式 ledger 为空——配置 reasoning 后产生）</div>'; return; }
-      box.innerHTML = '';
+      // 水之波光 Ledger 表格：状态/时间/trace_id/调用/说明 五列 + 点击展开 payload。
+      // 与印痕事件表同构（碳硅同看同一账本），但数据源是 Tuck 审计链。
+      var head = '<div class="lt-row lt-head"><span class="lt-c st">状态</span><span class="lt-c ts">时间</span><span class="lt-c tid">trace_id</span><span class="lt-c call">调用</span><span class="lt-c note">说明</span></div>';
+      var rows = '';
       ledger.slice().reverse().forEach(function (e) {
-        var div = document.createElement('div'); div.className = 'entry';
         var status = (e.status || e.record_type || '?').toUpperCase();
-        var sts = document.createElement('span'); sts.className = 'st ' + status; sts.textContent = status;
-        var tid = document.createElement('span'); tid.textContent = esc(e.trace_id || e.episode_id || '');
-        var at = document.createElement('span'); at.className = 'dim'; at.textContent = esc(e.ts || e.created_at || '');
-        var call = document.createElement('span'); call.className = 'dim'; call.textContent = esc(e.tool || e.args || '');
-        div.appendChild(sts); div.appendChild(tid); div.appendChild(at); div.appendChild(call);
-        box.appendChild(div);
+        var cls = status.indexOf('ERR') > -1 || status === 'BLOCK' ? 'e-bad' : (status.indexOf('WARN') > -1 ? 'e-warn' : 'e-ok');
+        var tid = e.trace_id || e.episode_id || '';
+        var call = e.tool || e.args || '';
+        var note = e.summary || e.verdict || e.reason || '';
+        var payload = JSON.stringify(e.data || e.payload || e, null, 1);
+        rows += '<div class="lt-row" tabindex="0" role="button" aria-expanded="false" onclick="this.classList.toggle(\'open\')">' +
+          '<span class="lt-c st"><span class="chip ' + cls + '">' + esc(status) + '</span></span>' +
+          '<span class="lt-c ts">' + esc(String(e.ts || e.created_at || '').slice(0, 19)) + '</span>' +
+          '<span class="lt-c tid">' + esc(tid) + '</span>' +
+          '<span class="lt-c call">' + esc(call) + '</span>' +
+          '<span class="lt-c note">' + esc(note) + '</span>' +
+          '<div class="lt-detail"><pre>' + esc(payload) + '</pre></div></div>';
       });
+      box.innerHTML = head + rows;
     }).catch(function (e) {
       var conn = document.getElementById('conn');
       conn.textContent = '✗ 断开';

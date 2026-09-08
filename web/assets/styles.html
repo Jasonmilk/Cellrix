@@ -81,23 +81,45 @@
   .badge.drive { background:rgba(30,126,52,.12); color:var(--ok); border-color:var(--ok); }
   .badge.survive { background:rgba(179,38,30,.12); color:var(--bad); border-color:var(--bad); }
   .badge.live { color:var(--ok); }
-  .cards { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
-  .card { flex:1 1 200px; min-width:0; background:var(--bg-surface); border:1px solid var(--line);
-    border-radius:var(--r-lg); padding:12px; }
-  .card .k { font-size:11px; color:var(--text-2); margin-bottom:6px; }
-  .card .v { font-size:20px; font-weight:600; }
-  .card .v.small { font-size:13px; }
+  /* 驾驶舱 v2（水之波光）：统计条 + Ledger 结构化表格 —— 与印痕统计栏/
+     事件表同构，碳硅同看同一账本 */
+  .stats-bar { display:flex; gap:1px; background:var(--line); border:1px solid var(--line);
+    border-radius:var(--r-md); overflow:hidden; margin-bottom:16px; }
+  .stat { flex:1 1 0; min-width:0; background:var(--bg-surface); padding:10px 12px; }
+  .stat .k { display:block; font-size:10px; letter-spacing:.06em; color:var(--text-2); margin-bottom:4px; }
+  .stat .v { font-size:18px; font-weight:600; color:var(--text-1); }
+  .stat .v.small { font-size:12px; font-weight:400; color:var(--text-2); }
   .panel { background:var(--bg-surface); border:1px solid var(--line);
     border-radius:var(--r-lg); overflow:hidden; }
   .panel .head { padding:10px 12px; font-size:12px; color:var(--text-2);
     border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .ledger .entry { padding:10px 12px; border-bottom:1px solid var(--line); font-size:12px;
-    display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
-  .ledger .entry:last-child { border-bottom:none; }
-  .entry .st { font-weight:700; padding:2px 8px; border-radius:6px; font-size:11px; }
-  .st.MET { color:var(--ok); background:rgba(30,126,52,.12); }
-  .st.UNMET { color:var(--bad); background:rgba(179,38,30,.12); }
-  .st.BLOCKED { color:var(--bad); background:rgba(179,38,30,.12); }
+  /* 视图级头（不在面板内）：与印痕 head 同语言 [PURPOSE 层级同构] */
+  .view-head { font-size:12px; color:var(--text-2); margin-bottom:12px;
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  /* Ledger 白盒：五列（状态/时间/trace_id/调用/说明）+ 点击展开 payload */
+  .ledger-tbl { font-size:12px; }
+  .lt-row { display:grid; grid-template-columns:84px 128px 1fr 1.2fr 1.4fr;
+    align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--line);
+    cursor:pointer; }
+  .lt-row:last-of-type { border-bottom:none; }
+  .lt-row:hover { background:var(--row-hover); }
+  .lt-row.open { background:var(--row-sel); }
+  .lt-head { cursor:default; color:var(--text-2); font-size:10px; letter-spacing:.06em;
+    background:var(--bg-base); }
+  .lt-c { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lt-c.ts { color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .lt-c.tid { font-family:ui-monospace,monospace; font-size:11px; color:var(--text-2); }
+  .lt-c.call { color:var(--text-1); }
+  .lt-c.note { color:var(--text-2); }
+  .chip { display:inline-block; padding:1px 7px; border-radius:6px; font-size:10px; font-weight:700; }
+  .chip.e-ok { color:var(--ok); background:rgba(30,126,52,.12); }
+  .chip.e-warn { color:var(--warn); background:rgba(138,90,0,.12); }
+  .chip.e-bad { color:var(--bad); background:rgba(179,38,30,.12); }
+  .lt-detail { display:none; grid-column:1 / -1; padding:8px 10px; background:var(--bg-base);
+    border-radius:var(--r-sm); }
+  .lt-row.open .lt-detail { display:block; }
+  .lt-detail pre { white-space:pre-wrap; word-break:break-all; font-size:11px;
+    font-family:ui-monospace,monospace; color:var(--text-1); margin:0; }
   /* Engram：比例 2D 网格（概览 / 时间线 2fr + 明细 1fr） */
   .engram-overview { display:flex; gap:10px; flex-wrap:wrap; padding:10px 12px; font-size:12px;
     color:var(--text-2); border-bottom:1px solid var(--line); align-items:center; }
@@ -226,13 +248,16 @@
       --brand:#8FC8E8; --ok:#7CE0B5; --bad:#F5A192; --warn:#FFD97A; }
     [data-theme="light"] { --line:#8A9099; --line-strong:#4A5058; --text-2:#33383F;
       --brand:#14506F; --ok:#1E7E34; --bad:#96271A; --warn:#8A5A00; }
-    .panel,.card,.ses-item,.btn,.msg,.chip { border-width:2px; }
+    .panel,.ses-item,.btn,.msg,.chip { border-width:2px; }
   }
   /* 降级 · 窄屏：网格单列 [PHYS:P-012 接近性] */
   @media (max-width:800px) {
     .engram-main { grid-template-columns:1fr; }
     .timeline { max-height:300px; }
     .ses-side { border-right:0; padding-right:0; max-height:220px; }
+    .lt-row { grid-template-columns:1fr 1fr; }
+    .lt-c.tid { grid-column:1 / -1; }
+    .lt-c.note { grid-column:1 / -1; }
     body { padding:12px; }
   }
 
