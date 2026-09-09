@@ -162,16 +162,21 @@
     var resp = kinds.response || 0;
     var dests = st.destinations || {};
     var actions = st.actions || {};
+    var tiers = st.tiers || {};
     var destHtml = Object.keys(dests).map(function (k) {
       return '<div class="kv"><span>' + esc(k) + '</span><b>' + dests[k] + '</b></div>';
     }).join('');
     var actHtml = Object.keys(actions).map(function (k) {
       return '<div class="kv"><span>' + esc(k) + '</span><b>' + actions[k] + '</b></div>';
     }).join('');
+    var tierHtml = Object.keys(tiers).map(function (k) {
+      return '<div class="kv"><span>' + esc(k) + '</span><b>' + tiers[k] + '</b></div>';
+    }).join('');
     el.innerHTML =
       '<div class="fl-num">' + (st.total || 0) + ' <small>条审计</small></div>' +
       '<div class="kv" style="margin-top:8px"><span>请求</span><b>' + req + '</b></div>' +
       '<div class="kv"><span>响应</span><b>' + resp + '</b></div>' +
+      '<h4 style="margin-top:10px">路由层</h4>' + (tierHtml || '<div class="fl-empty">无</div>') +
       '<h4 style="margin-top:10px">目的地</h4>' + (destHtml || '<div class="fl-empty">无</div>') +
       '<h4 style="margin-top:10px">动作</h4>' + (actHtml || '<div class="fl-empty">无</div>');
     var rec = st.last_requests || [];
