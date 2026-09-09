@@ -25,6 +25,7 @@ pub struct PanelConfig {
     pub tuck_endpoint: Option<String>,
     pub tuck_key: Option<String>,
     pub tuck_limit: usize,
+    pub flowmodus_url: Option<String>,
 }
 
 impl PanelConfig {
@@ -49,11 +50,14 @@ impl PanelConfig {
             .or_else(|| env("TUCK_LIMIT").and_then(|v| v.parse().ok()))
             .unwrap_or(TUCK_LIMIT_DEFAULT);
 
+        let flowmodus_url = flag("--flowmodus-url").or_else(|| env("FLOWMODUS_URL"));
+
         Self {
             anaphase_endpoint,
             tuck_endpoint,
             tuck_key,
             tuck_limit,
+            flowmodus_url,
         }
     }
 }

@@ -24,6 +24,7 @@ pub enum Route {
     SessionsRename,
     Events,
     Ecosystem,
+    Flows,
     Chat,
     NotFound,
 }
@@ -41,6 +42,7 @@ pub fn route(path: &str) -> Route {
         "/api/sessions/rename" => Route::SessionsRename,
         "/api/events" => Route::Events,
         "/api/ecosystem" => Route::Ecosystem,
+        "/api/flows" => Route::Flows,
         "/api/chat" => Route::Chat,
         _ => Route::NotFound,
     }
@@ -196,6 +198,24 @@ pub fn handle(
                     respond(&mut stream, 502, "application/json", msg.as_bytes())?;
                 }
             }
+        }
+        Route::Flows => {
+            // 检定台数据面板：FlowModus 供应商池/路由 + Tuck 审计统计。
+            // 任一未配置/失败 → null（前端零态自证，按需加载）。
+            let fm = match &cfg.flowmodus_url {
+                Some(ep) => cellrix_web::fetch_json(ep, "/api/status", None).ok(),
+                None => None,
+            };
+            let stats = match &cfg.tuck_endpoint {
+                Some(ep) => cellrix_web::fetch_json(ep, "/v1/stats", cfg.tuck_key.as_deref()).ok(),
+                None => None,
+            };
+            let body = format!(
+                "{{\"flows\":{},\"stats\":{}}}",
+                fm.unwrap_or_else(|| "null".into()),
+                stats.unwrap_or_else(|| "null".into())
+            );
+            respond(&mut stream, 200, "application/json", body.as_bytes())?;
         }
         Route::Ecosystem => {
             // Ecosystem status board: probe every component's port; the two

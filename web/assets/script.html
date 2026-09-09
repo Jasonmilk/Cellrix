@@ -14,11 +14,14 @@
     document.getElementById('view-cockpit').style.display = v==='cockpit' ? '' : 'none';
     document.getElementById('view-engram').style.display = v==='engram' ? '' : 'none';
     document.getElementById('view-chat').style.display = v==='chat' ? '' : 'none';
+    document.getElementById('view-flows').style.display = v==='flows' ? '' : 'none';
     document.getElementById('v-cockpit').className = 'btn' + (v==='cockpit' ? ' on' : '');
     document.getElementById('v-engram').className = 'btn' + (v==='engram' ? ' on' : '');
     document.getElementById('v-chat').className = 'btn' + (v==='chat' ? ' on' : '');
+    document.getElementById('v-flows').className = 'btn' + (v==='flows' ? ' on' : '');
     if (v==='chat') document.getElementById('chat-text').focus();
     if ((v==='engram' || v==='chat') && window.CxSession) window.CxSession.loadSessions();
+    if (v==='flows' && window.CxFlows) window.CxFlows.load();
   }
 
   // === 共享状态（session.html 与 sendChat 同源）：续接锚点 + 竞态守卫

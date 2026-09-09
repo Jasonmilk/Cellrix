@@ -106,6 +106,7 @@ fn index_html(cfg: &PanelConfig) -> String {
     const SCRIPT: &str = include_str!("../assets/script.html");
     const SESSION: &str = include_str!("../assets/session.html");
     const GLEAM: &str = include_str!("../assets/gleam.html");
+    const FLOWS: &str = include_str!("../assets/flows.html");
 
     let tuck_configured = cfg.tuck_endpoint.is_some();
     BASE
@@ -117,6 +118,7 @@ fn index_html(cfg: &PanelConfig) -> String {
         .replace("__SCRIPT__", SCRIPT)
         .replace("__SESSION__", SESSION)
         .replace("__GLEAM__", GLEAM)
+        .replace("__FLOWS__", FLOWS)
         .replace("__REFRESH__", &config::REFRESH_SECS.to_string())
         .replace("__TUCK_CONFIGURED__", &tuck_configured.to_string())
 }
@@ -208,6 +210,7 @@ mod tests {
             tuck_endpoint: Some("http://127.0.0.1:60052".to_string()),
             tuck_key: Some("tk-local-gate".to_string()),
             tuck_limit: 200,
+            flowmodus_url: Some("http://127.0.0.1:60053".to_string()),
         };
         let html = index_html(&cfg);
         assert!(html.contains("驾驶舱 Cockpit"));

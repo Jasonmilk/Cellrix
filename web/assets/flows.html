@@ -1,0 +1,202 @@
+<!-- === 检定台 Flows（Model Nexus 式）：当前路由 / 供应商池 / Tuck 审计统计 ===
+     水之波光血统：行结构铁轨（网格对齐 P-022）、零态自证、按需加载
+     （进入视图才 fetch）、触境反馈（刷新按钮 → 骨架 → 就地更新）。
+     数据经 Cellrix 代理 /api/flows 聚合（极致解耦：不碰文件路径）。
+     flowmodus / tuck 未配置或不可达 → null → 零态自证，不伪装。 -->
+<style>
+  #view-flows .fl-body { display:grid; grid-template-columns:1fr 1fr; gap:14px;
+    align-items:start; }
+  #view-flows .fl-card { background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--r-lg); padding:14px 16px; min-height:120px; }
+  #view-flows .fl-card h3 { margin:0 0 10px; font-size:13px; font-weight:600;
+    color:var(--text); display:flex; align-items:center; gap:8px; }
+  #view-flows .fl-row { display:flex; align-items:baseline; gap:8px; padding:5px 0;
+    border-bottom:1px solid var(--line); }
+  #view-flows .fl-row:last-child { border-bottom:none; }
+  #view-flows .fl-k { color:var(--text-3); font-size:11px; min-width:64px; }
+  #view-flows .fl-v { color:var(--text); font-weight:600; word-break:break-all; }
+  #view-flows .fl-v .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    color:var(--text-dim); font-weight:400; }
+  #view-flows .fl-pool { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+  #view-flows .fl-item { display:flex; align-items:center; justify-content:space-between;
+    gap:8px; padding:9px 0; border-bottom:1px solid var(--line); }
+  #view-flows .fl-item:last-child { border-bottom:none; }
+  #view-flows .fl-item .nm { font-weight:600; color:var(--text); font-size:12px; }
+  #view-flows .fl-item .sub { color:var(--text-3); font-size:11px; margin-top:2px; }
+  #view-flows .fl-badge { font-size:11px; padding:2px 8px; border-radius:999px;
+    color:var(--on-accent); background:var(--accent); white-space:nowrap; }
+  #view-flows .fl-badge.ok { background:var(--ok); }
+  #view-flows .fl-badge.warn { background:var(--warn); color:#fff; }
+  #view-flows .fl-num { font-size:24px; font-weight:700; color:var(--text); }
+  #view-flows .fl-num small { font-size:12px; font-weight:400; color:var(--text-3); }
+  #view-flows .fl-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:14px; }
+  #view-flows .fl-mini { background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--r-lg); padding:12px 14px; }
+  #view-flows .fl-mini h4 { margin:0 0 8px; font-size:12px; color:var(--text-dim); font-weight:600; }
+  #view-flows .fl-mini .kv { display:flex; justify-content:space-between; font-size:11px;
+    padding:3px 0; color:var(--text-dim); }
+  #view-flows .fl-mini .kv b { color:var(--text); font-weight:600; }
+  #view-flows .fl-list { margin-top:14px; }
+  #view-flows .fl-list .row { display:grid; grid-template-columns:auto 1fr auto auto auto;
+    gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line);
+    font-size:11px; color:var(--text-dim); }
+  #view-flows .fl-list .row:last-child { border-bottom:none; }
+  #view-flows .fl-list .row .ts { font-family:ui-monospace,Menlo,monospace; }
+  #view-flows .fl-empty { color:var(--text-3); font-size:12px; padding:18px 0; text-align:center; }
+  #view-flows .fl-bar { display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:12px; }
+  #view-flows .fl-refresh { min-width:44px; height:44px; padding:0 14px; }
+  @media (max-width:760px) {
+    #view-flows .fl-body, #view-flows .fl-pool, #view-flows .fl-stats { grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="head" style="margin-bottom:12px">检定台 Flows — 供应商池与路由 · 审计统计（水之波光 v11.2.0 血统）</div>
+
+<div class="fl-body">
+  <div class="fl-card">
+    <h3>当前路由 <span class="fl-badge" id="fl-route-badge">…</span></h3>
+    <div id="fl-route"><div class="fl-empty">加载中…</div></div>
+  </div>
+  <div class="fl-card">
+    <h3>审计统计 <span id="fl-stat-badge"></span></h3>
+    <div id="fl-stats"><div class="fl-empty">加载中…</div></div>
+  </div>
+</div>
+
+<div class="fl-pool">
+  <div class="fl-card">
+    <h3>免费池 <span class="fl-badge ok" id="fl-free-n">0</span></h3>
+    <div id="fl-free"><div class="fl-empty">加载中…</div></div>
+  </div>
+  <div class="fl-card">
+    <h3>付费池 <span class="fl-badge" id="fl-paid-n">0</span></h3>
+    <div id="fl-paid"><div class="fl-empty">加载中…</div></div>
+  </div>
+</div>
+
+<div class="fl-list fl-card">
+  <h3>最近推理调用（Tuck 审计 · 仅路由可见字段，不泄 prompt）</h3>
+  <div id="fl-recent"><div class="fl-empty">加载中…</div></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var view = document.getElementById('view-flows');
+  if (!view) return;
+  var seq = 0;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function zero(el, msg) { el.innerHTML = '<div class="fl-empty">' + esc(msg || '暂无数据') + '</div>'; }
+
+  function load() {
+    var my = ++seq;
+    zero(document.getElementById('fl-route'), '加载中…');
+    zero(document.getElementById('fl-stats'), '加载中…');
+    zero(document.getElementById('fl-free'), '加载中…');
+    zero(document.getElementById('fl-paid'), '加载中…');
+    zero(document.getElementById('fl-recent'), '加载中…');
+    fetch('/api/flows').then(function (r) { return r.json(); }).then(function (d) {
+      if (my !== seq) return;
+      renderFlows(d.flows);
+      renderStats(d.stats);
+    }).catch(function (e) {
+      if (my !== seq) return;
+      zero(document.getElementById('fl-route'), '拉取失败: ' + e.message);
+    });
+  }
+
+  function renderFlows(fm) {
+    var routeEl = document.getElementById('fl-route');
+    var badge = document.getElementById('fl-route-badge');
+    if (!fm) { zero(routeEl, 'FlowModus 未配置或不可达（--flowmodus-url）'); badge.textContent = '未配置'; badge.className = 'fl-badge warn'; return; }
+    var cur = fm.current || {};
+    if (cur.error) {
+      zero(routeEl, '路由决策失败: ' + cur.error);
+      badge.textContent = '不可用'; badge.className = 'fl-badge warn';
+    } else {
+      routeEl.innerHTML =
+        '<div class="fl-row"><span class="fl-k">供应商</span><span class="fl-v">' + esc(cur.supplier_id) + '</span></div>' +
+        '<div class="fl-row"><span class="fl-k">模型</span><span class="fl-v">' + esc(cur.model_id) + '</span></div>' +
+        '<div class="fl-row"><span class="fl-k">端点</span><span class="fl-v mono">' + esc(cur.endpoint_url) + '</span></div>' +
+        '<div class="fl-row"><span class="fl-k">成本</span><span class="fl-v mono">$ ' + esc(Number(cur.estimated_cost_usd || 0).toFixed(6)) + '/请求</span></div>';
+      badge.textContent = cur.supplier_id + ' · ' + (cur.model_id || '').split('/').pop();
+      badge.className = 'fl-badge ok';
+    }
+    var tiers = fm.tiers || {};
+    var free = tiers.free || [];
+    var paid = tiers.paid || [];
+    document.getElementById('fl-free-n').textContent = free.length;
+    document.getElementById('fl-paid-n').textContent = paid.length;
+    renderPool(document.getElementById('fl-free'), free, true);
+    renderPool(document.getElementById('fl-paid'), paid, false);
+  }
+
+  function renderPool(el, list, isFree) {
+    if (!list.length) { zero(el, '暂无供应商（flowmodus supplier add）'); return; }
+    el.innerHTML = list.map(function (s) {
+      var m = (s.models || [])[0] || {};
+      var b = m.billing || {};
+      var inCost = b.token_input != null ? b.token_input : 0;
+      var outCost = b.token_output != null ? b.token_output : 0;
+      var ep = (s.endpoints || [])[0] || {};
+      return '<div class="fl-item">' +
+        '<div><div class="nm">' + esc(s.supplier_id || s.id) + '</div>' +
+        '<div class="sub">' + esc(m.model_id || m.id || '') + ' · $' + esc(Number(inCost || 0).toFixed(4)) + '/in · $' + esc(Number(outCost || 0).toFixed(4)) + '/out</div>' +
+        '<div class="sub mono">' + esc(ep.base_url || '') + '</div></div>' +
+        (isFree ? '<span class="fl-badge ok">FREE</span>' : '<span class="fl-badge">PAID</span>') +
+        '</div>';
+    }).join('');
+  }
+
+  function renderStats(st) {
+    var el = document.getElementById('fl-stats');
+    if (!st) { zero(el, 'Tuck 未配置或不可达（--tuck-endpoint）'); return; }
+    var kinds = st.kinds || {};
+    var req = kinds.request || 0;
+    var resp = kinds.response || 0;
+    var dests = st.destinations || {};
+    var actions = st.actions || {};
+    var destHtml = Object.keys(dests).map(function (k) {
+      return '<div class="kv"><span>' + esc(k) + '</span><b>' + dests[k] + '</b></div>';
+    }).join('');
+    var actHtml = Object.keys(actions).map(function (k) {
+      return '<div class="kv"><span>' + esc(k) + '</span><b>' + actions[k] + '</b></div>';
+    }).join('');
+    el.innerHTML =
+      '<div class="fl-num">' + (st.total || 0) + ' <small>条审计</small></div>' +
+      '<div class="kv" style="margin-top:8px"><span>请求</span><b>' + req + '</b></div>' +
+      '<div class="kv"><span>响应</span><b>' + resp + '</b></div>' +
+      '<h4 style="margin-top:10px">目的地</h4>' + (destHtml || '<div class="fl-empty">无</div>') +
+      '<h4 style="margin-top:10px">动作</h4>' + (actHtml || '<div class="fl-empty">无</div>');
+    var rec = st.last_requests || [];
+    var recEl = document.getElementById('fl-recent');
+    if (!rec.length) { zero(recEl, '暂无推理调用'); return; }
+    recEl.innerHTML = rec.map(function (r) {
+      return '<div class="row"><span class="ts">#' + r.seq + '</span><span>' + esc(r.ts || '') + '</span>' +
+        '<span>' + esc(r.destination || '') + '</span>' +
+        '<span>' + esc(r.action || '') + '</span>' +
+        '<span class="fl-badge ' + (r.status === 200 ? 'ok' : 'warn') + '">' + (r.status == null ? '-' : r.status) + '</span></div>';
+    }).join('');
+  }
+
+  // 触境：刷新按钮 → 重新拉取（行结构铁轨，就地更新）
+  var bar = view.querySelector('.fl-bar');
+  var btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'btn fl-refresh'; btn.textContent = '刷新';
+  btn.onclick = load;
+  var head = view.querySelector('.head');
+  var headRow = document.createElement('div');
+  headRow.className = 'fl-bar';
+  headRow.appendChild(document.createElement('span'));
+  headRow.appendChild(btn);
+  head.parentNode.insertBefore(headRow, head.nextSibling);
+
+  window.CxFlows = { load: load };
+})();
+</script>

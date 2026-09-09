@@ -532,6 +532,9 @@ fn restart_all(
         .arg(port.to_string());
     cmd.arg("--tuck-endpoint").arg(tuck_endpoint);
     cmd.arg("--tuck-key").arg(tuck_key);
+    if let Some(fm) = flag(args, "--flowmodus-url") {
+        cmd.arg("--flowmodus-url").arg(fm);
+    }
     if !cfg.no_open {
         cmd.arg("--open");
     }

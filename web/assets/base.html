@@ -27,6 +27,7 @@
       <button type="button" class="btn on" id="v-cockpit" onclick="showView('cockpit')">驾驶舱 Cockpit</button>
       <button type="button" class="btn" id="v-engram" onclick="showView('engram')">印痕 Engram</button>
       <button type="button" class="btn" id="v-chat" onclick="showView('chat')">对话 Chat</button>
+      <button type="button" class="btn" id="v-flows" onclick="showView('flows')">检定台 Flows</button>
     </nav>
     <span class="badge info" id="mode">…</span>
     <div class="theme-switch" role="group" aria-label="主题">
@@ -54,6 +55,10 @@
 
   <div id="view-chat" style="display:none;">
     __CHAT__
+  </div>
+
+  <div id="view-flows" style="display:none;">
+    __FLOWS__
   </div>
 
     <div class="foot">数据源: Anaphase /v1/agent/snapshot（ADR-0010）· Tuck /v1/audit 链 · 自动刷新 __REFRESH__s · 视图切换同 TUI Ctrl+E · <span id="audit" class="tag ok">…</span> · <a href="/api/snapshot">snapshot JSON</a> · <a href="/api/audit">audit JSON</a></div>
