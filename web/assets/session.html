@@ -11,11 +11,10 @@
     return '<div class="sk"><div class="sk-l1"></div><div class="sk-l2"></div></div>';
   }
 
-  // auto name: 经历 09-07 15:19 (first event ts), stable per job — never
-  // shows raw "无用户输入" as a title (a session needs a name, DSH-style).
+  // auto name: 经历 + 首事件时间。标题行恒定 = 人名 > 自动名（永不裸挂
+  // "无用户输入"）；preview 恒在正文行（行结构铁轨，P-022 空间记忆）。
   function autoName(p) {
     if (p.name) return p.name;
-    if (p.preview) return p.preview;
     var ts = String(p.first_ts || '');
     return '经历 ' + ts.slice(5, 10) + ' ' + ts.slice(11, 16);
   }
@@ -61,12 +60,12 @@
       var div = document.createElement('div');
       var sel = (chatMode ? st.chatJobId : null) === p.job_id;
       div.className = 'ses-item' + (sel ? ' sel' : '');
+      div.setAttribute('data-ts', p.first_ts || '');
       var ts = String(p.first_ts || '');
       var disp = ts.slice(5, 10) + ' ' + ts.slice(11, 16);
-      // 主标题 = 名字（人起的）> 预览（机器抓的）> 自动名——永不裸挂 "(无用户输入)"
+      // 行结构恒定（铁轨）：标题 .nm + 时间 .t + 正文 .p，重命名只换标题文本
       var nm = autoName(p);
-      // 有名字时，预览作为正文行展示；无名字时预览已作标题，避免重复
-      var preview = p.name && p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
+      var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
       div.innerHTML =
         '<div class="nm">' + esc(nm) + '</div>' +
         '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' +
@@ -95,45 +94,68 @@
     });
   }
 
-  // Inline rename (no native prompt): edit row -> save/cancel, toast the
-  // outcome. Empty name = clear sidecar (auto name returns) [ADR-0026].
+  // Inline rename — 零跳变（水之波光：行结构铁轨，编辑只换标题文本）：
+  // 输入框 1:1 占据 .nm（同盒模型），✓/✗ 替换行尾 ✎（同尺寸），
+  // 保存成功就地更新文本（不 loadSessions，无骨架闪烁/重排）；
+  // 失败恢复原文 + toast，不跳转（触境：因果完成，反馈稳定可预期）。
   function beginRename(item, jobId, current) {
     if (item.querySelector('.ses-edit')) return;
     var nm = item.querySelector('.nm');
     var t = item.querySelector('.t');
     var act = t && t.querySelector('.act');
+    var original = nm ? nm.textContent : '';
     var edit = document.createElement('div');
     edit.className = 'ses-edit';
-    edit.innerHTML = '<input class="inp" value="' + esc(current) + '" placeholder="自动名：经历 + 时间" maxlength="80">' +
-      '<button type="button" class="btn-icon sm" data-save title="保存">✓</button>' +
-      '<button type="button" class="btn-icon sm" data-cancel title="取消">✗</button>';
-    if (act) act.style.display = 'none';
-    // 编辑态占据主标题行（.nm），时间行保持可见
-    if (nm) { nm.textContent = ''; nm.appendChild(edit); } else { t.insertBefore(edit, t.firstChild); }
+    edit.innerHTML = '<input class="inp" value="' + esc(current) + '" placeholder="自动名：经历 + 时间" maxlength="80">';
+    if (nm) { nm.textContent = ''; nm.appendChild(edit); }
+    item.classList.add('editing');
+    var ren = act && act.querySelector('[data-ren]');
+    if (ren) ren.style.display = 'none';
+    var save = null, cancel = null;
+    if (act) {
+      save = document.createElement('button');
+      save.type = 'button'; save.className = 'btn-icon sm'; save.title = '保存'; save.textContent = '✓';
+      cancel = document.createElement('button');
+      cancel.type = 'button'; cancel.className = 'btn-icon sm'; cancel.title = '取消'; cancel.textContent = '✗';
+      act.appendChild(save);
+      act.appendChild(cancel);
+    }
     var inp = edit.querySelector('.inp');
     inp.focus(); inp.select();
-    var save = edit.querySelector('[data-save]');
-    var cancel = edit.querySelector('[data-cancel]');
-    function done() { if (nm) nm.textContent = ''; edit.remove(); if (act) act.style.display = ''; }
+    function done(restore) {
+      if (nm) nm.textContent = restore !== undefined ? restore : original;
+      edit.remove();
+      if (ren) ren.style.display = '';
+      if (save) save.remove();
+      if (cancel) cancel.remove();
+      item.classList.remove('editing');
+    }
     cancel.onclick = function (ev) { ev.stopPropagation(); done(); };
     save.onclick = function (ev) {
       ev.stopPropagation();
       var name = inp.value.trim();
+      var btn = save;
+      if (btn) btn.disabled = true;
       fetch('/api/sessions/rename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_id: jobId, name: name })
       }).then(function (r) { return r.json(); }).then(function (j) {
-        done();
-        if (j.ok) { Cx.showToast(name ? '已重命名' : '已恢复自动名'); loadSessions(); }
-        else Cx.showToast('重命名失败: ' + (j.error || 'unknown'));
+        if (j.ok) {
+          done(name || autoName({ first_ts: String(item.getAttribute('data-ts') || '') }));
+          Cx.showToast(name ? '已重命名' : '已恢复自动名');
+        } else {
+          done();
+          Cx.showToast('重命名失败: ' + (j.error || 'unknown'));
+        }
       }).catch(function (e) {
-        done(); Cx.showToast('重命名失败: ' + e.message);
+        done();
+        Cx.showToast('重命名失败: ' + e.message);
       });
     };
     inp.onkeydown = function (ev) {
-      if (ev.key === 'Enter') { ev.stopPropagation(); save.click(); }
-      if (ev.key === 'Escape') { ev.stopPropagation(); cancel.click(); }
+      if (ev.key === 'Enter') { ev.stopPropagation(); if (save) save.click(); }
+      if (ev.key === 'Escape') { ev.stopPropagation(); if (cancel) cancel.click(); }
     };
   }
 
