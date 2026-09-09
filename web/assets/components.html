@@ -168,16 +168,26 @@
     padding:2px 2px 6px; font-size:11px; color:var(--text-dim); }
   .ses-item { padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-md);
     cursor:pointer; font-size:12px; background:var(--surface); position:relative;
+    --ses-bg: var(--surface); /* 操作区遮罩跟随卡片态（涟漪同色消散） */
+    min-height:44px; /* P-010 热区 44px：操作按钮垂直居中的稳定容器 */
     transition:border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
-  .ses-item:hover { border-color:var(--accent); background:var(--surface-hover); }
-  .ses-item.sel { border-color:var(--accent); background:var(--accent-soft); }
+  .ses-item:hover { border-color:var(--accent); background:var(--surface-hover); --ses-bg: var(--surface-hover); }
+  .ses-item.sel { border-color:var(--accent); background:var(--accent-soft); --ses-bg: var(--accent-soft); }
   .ses-item .nm { color:var(--text); font-weight:600; word-break:break-all;
     display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;
     margin-bottom:2px; }
   .ses-item .t { color:var(--text-dim); font-size:11px; display:flex; align-items:center;
     gap:6px; flex-wrap:wrap; }
-  .ses-item .t .act { margin-left:auto; display:none; gap:4px; }
-  .ses-item:hover .t .act, .ses-item.sel .t .act { display:flex; }
+  /* iOS swipe 风格操作区：绝对定位右缘浮出（滑入），不占文档流 → 内容零挤压。
+     渐变遮罩 = 涟漪消散：按钮盖住文本尾部时平滑过渡，不穿帮 */
+  .ses-item .t .act { position:absolute; right:12px; top:0; bottom:0; margin:auto;
+    height:fit-content; display:flex; align-items:center; gap:4px; opacity:0;
+    transform:translateX(10px); pointer-events:none;
+    background:linear-gradient(90deg, transparent, var(--ses-bg) 14px, var(--ses-bg));
+    padding-left:22px;
+    transition:opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
+  .ses-item:hover .t .act, .ses-item.sel .t .act,
+  .ses-item.editing .t .act { opacity:1; transform:none; pointer-events:auto; }
   .ses-item .p { margin-top:3px; color:var(--text); word-break:break-all;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .ses-item .p.dim { color:var(--text-dim); font-style:italic; }
