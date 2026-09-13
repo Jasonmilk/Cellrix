@@ -88,10 +88,11 @@
       var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
       // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
       var reply = p.reply ? '<div class="p rp">' + esc(p.reply) + '</div>' : '';
+      var mdl = p.model ? '<span class="mdl">' + esc(p.model) + '</span>' : '';
       var tag = isChild ? '<span class="cont">↳ 续接</span>' : '';
       div.innerHTML =
         '<div class="nm">' + tag + esc(nm) + '</div>' +
-        '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' +
+        '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' + mdl +
         '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.job_id) + '" title="重命名">✎</button></span></div>' +
         preview + reply;
       div.onclick = function () {
@@ -197,22 +198,34 @@
         return;
       }
       box.innerHTML = '';
+      var pendingTool = null;
+      var sawReply = false; // assistant/reply is the deliverable; turn/end
+                            // only backfills periods written before it existed
       var d = document.createElement('div');
       d.className = 'period-head';
       d.textContent = '—— 经历 ' + jobId + ' 的历史 ——';
       box.appendChild(d);
       j.events.forEach(function (e) {
-        if (e.type === 'user/message') Cx.addMsg('user', e.data.text || '', false);
-        else if (e.type === 'assistant/attempt') {
-          var a = document.createElement('div');
-          a.className = 'msg helix';
-          a.innerHTML = '<div class="who">Helix <span class="dim">(经历 ' + esc(jobId.slice(0, 12)) + ')</span></div><div class="text">' + esc((e.data.text || '').slice(0, 400)) + '</div>';
-          box.appendChild(a);
-        } else if (e.type === 'tool/result') {
-          var t = document.createElement('div');
-          t.className = 'msg helix';
-          t.innerHTML = '<div class="who">Helix <span class="dim">工具 · ' + esc(e.data.tool) + '</span></div><div class="text">' + esc((e.data.outcome || '').slice(0, 200)) + '</div>';
-          box.appendChild(t);
+        if (e.type === 'user/message') { Cx.addMsg('user', e.data.text || '', false); }
+        else if (e.type === 'assistant/think') { Cx.foldRow('思考', e.data.text || ''); }
+        else if (e.type === 'assistant/attempt') { Cx.foldRow('计划', e.data.text || ''); }
+        else if (e.type === 'tool/call') {
+          // tool/call + tool/result pair into ONE fold row (no duplicate
+          // helix messages): buffer the call, render on the matching result.
+          pendingTool = { tool: e.data.tool || '', args: e.data.args || '' };
+        }
+        else if (e.type === 'tool/result') {
+          var t = pendingTool || { tool: e.data.tool || '', args: '' };
+          pendingTool = null;
+          var label = '工具 · ' + t.tool + (e.data.ok === false ? ' · 失败' : '');
+          var text = (t.args ? '调用 ' + JSON.stringify(t.args) + '\n' : '') + (e.data.outcome || '');
+          Cx.foldRow(label, text);
+        }
+        else if (e.type === 'assistant/reply') { sawReply = true; Cx.addReplyMsg(e.data.text || '', e.data.model || ''); }
+        else if (e.type === 'turn/end') {
+          // Legacy fallback only: periods written before assistant/reply
+          // carried the answer on turn/end alone. Never duplicate.
+          if (!sawReply && e.data && e.data.reply) Cx.addReplyMsg(e.data.reply, e.data.model || '');
         }
       });
       box.scrollTop = box.scrollHeight;

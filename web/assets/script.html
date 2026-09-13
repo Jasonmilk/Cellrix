@@ -98,6 +98,40 @@
     return d.querySelector('.think-body');
   }
 
+  // Unified collapsible row (水之波光：一种能力，全场景复用 — DSH 过程折叠)：
+  // process rows (思考/计划/工具) are one component; click to expand/collapse.
+  // label = short tag, text = full payload (truncated to one line when closed).
+  function foldRow(label, text) {
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'think-row fold';
+    d.innerHTML = '<span class="think-head">' + esc(label) + '</span><span class="think-body"></span>';
+    d.querySelector('.think-body').textContent = text || '';
+    d.onclick = function () { d.classList.toggle('open'); };
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    return d;
+  }
+
+  // The deliverable is the protagonist (DSH: the reply is the message body,
+  // process is collapsible above it). Full text, never truncated; model tag
+  // (physical fact from the gateway chain) shown when available.
+  function addReplyMsg(text, model) {
+    var box = document.getElementById('chat-msgs');
+    var empty = box.querySelector('.empty');
+    if (empty) empty.remove();
+    var d = document.createElement('div');
+    d.className = 'msg helix';
+    var who = 'Helix';
+    if (model) who += ' · <span class="mdl">' + esc(model) + '</span>';
+    d.innerHTML = '<span class="who">' + who + '<span class="ts">' + nowTs() + '</span></span>' + esc(text);
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    return d;
+  }
+
   function sendChat() {
     var input = document.getElementById('chat-text');
     var text = input.value.trim();
@@ -273,6 +307,10 @@
   // the interactive entry points explicitly (they live in this IIFE).
   window.showView = showView;
   window.sendChat = sendChat;
+  // 追加共享能力（Cx 已在 IIFE 头定义）：交付物主消息 + 通用折叠行
+  window.Cx.addReplyMsg = addReplyMsg;
+  window.Cx.foldRow = foldRow;
+  window.Cx.addThinkRow = addThinkRow;
   // 主题按钮状态初始化（与 head 引导脚本对齐）
   (function(){ try{
     var K='cellrix-theme', cur=localStorage.getItem(K)||'auto';

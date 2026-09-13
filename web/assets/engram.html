@@ -173,6 +173,13 @@
   #view-engram .e-st.pending{color:var(--e-pend)} #view-engram .e-st.done{color:var(--e-dim)}
   /* 摘要列：fixed 布局下占剩余宽度，单行省略号 —— 绝不溢出框 [ENG: table-layout:fixed] */
   #view-engram .e-summ{width:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  /* REPLY = 交付物：行内点击展开全文（再点收起），悬浮预览（统一交互，非补丁）。
+     短/全两态预渲染，CSS 切换 —— 展开显示的必须是完整回答，不是截断摘要。 */
+  #view-engram tr.ev.e-reply{cursor:pointer}
+  #view-engram tr.ev.e-reply .e-full{display:none}
+  #view-engram tr.ev.e-reply.open .e-short{display:none}
+  #view-engram tr.ev.e-reply.open .e-full{display:block;white-space:pre-wrap;word-break:break-all;
+    max-height:340px;overflow:auto;line-height:1.55}
   #view-engram .e-dur,#view-engram .e-tok{text-align:right;font-variant-numeric:tabular-nums;
     font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--e-dim);white-space:nowrap}
   #view-engram .e-c-ty{width:120px} #view-engram .e-c-st{width:96px}
@@ -420,7 +427,10 @@
       return s;
     }
     if (t === 'assistant/think') return '思考：' + firstLine(d.text, 100);
-    if (t === 'assistant/reply') return '回答：' + firstLine(d.text, 140);
+    if (t === 'assistant/reply') {
+      var tag = d.model ? '[' + d.model + '] ' : '';
+      return '回答：' + tag + firstLine(d.text, 140) + '（点击展开全文）';
+    }
     if (t === 'assistant/attempt') {
       if (d.empty) return '（空回复 — 诚实标记，未编造）';
       var txt = String(d.text || '');
@@ -460,7 +470,7 @@
     var d = e.data || {}, t = e.type;
     if (t === 'user/message') return jsonOf({ role: 'user', content: d.text });
     if (t === 'assistant/think') return jsonOf({ role: 'assistant', stage: 'think', text: d.text });
-    if (t === 'assistant/reply') return jsonOf({ role: 'assistant', stage: 'reply', text: d.text, chars: d.chars });
+    if (t === 'assistant/reply') return jsonOf({ role: 'assistant', stage: 'reply', text: d.text, chars: d.chars, model: d.model });
     if (t === 'assistant/attempt') return jsonOf(d.empty ? { empty: true, text: '' } : { text: d.text });
     return jsonOf(d);
   }
@@ -543,6 +553,9 @@
         dur: dur, tok: null, tool: toolName(e),
         summary: summarize(e), status: statusOf(e),
         payload: payloadOf(e), result: resultOf(e),
+        // REPLY full deliverable: kept verbatim so inline expand shows the
+        // complete answer, not the truncated summary (no fake expand).
+        full: e.type === 'assistant/reply' ? (e.data.text || '') : '',
         schema: SCHEMA_NOTE[e.type] || e.type, seq: e.seq, time: e.time
       });
     });
@@ -608,12 +621,15 @@
       var st = STATUS[it.status] || STATUS.done;
       var isSel = (S.sel === it.id);
       var isRunning = (S.replayIdx >= 0 && i === S.replayIdx);
-      var cls = 'ev' + (isRunning ? ' e-running' : '');
+      var cls = 'ev' + (isRunning ? ' e-running' : '') + (it.type === 'REPLY' ? ' e-reply' : '');
       var isHit = S.q && (it.summary + ' ' + (it.tool || '') + ' ' + it.type).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
       h += '<tr class="' + cls + (isHit ? ' e-row-hit' : '') + '" data-e-ev="' + it.id + '" tabindex="0"' +
         (isSel ? ' aria-current="true"' : '') + '>' +
         '<td><span class="e-ty ' + it.type + '">' + it.type + '</span></td>' +
-        '<td class="e-summ">' + hl(it.summary) +
+        '<td class="e-summ"' + (it.type === 'REPLY' && it.payload ? ' title="' + esc(String(it.payload).slice(0, 300)) + '"' : '') + '>' +
+        (it.type === 'REPLY' && it.full
+          ? '<span class="e-short">' + hl(it.summary) + '</span><span class="e-full">' + esc(it.full) + '</span>'
+          : hl(it.summary)) +
         (it.repeat ? '<span class="e-rep">卡住 ×' + it.repeat + '</span>' : '') + '</td>' +
         '<td><span class="e-st ' + st.c + '"><span class="d"></span>' + st.t + '</span></td>' +
         '<td class="e-dur">' + fmtDur(it.dur) + '</td>' +
@@ -816,7 +832,17 @@
     var row = e.target.closest && e.target.closest('tr.ev[data-e-ev]');
     var tg = e.target.closest && e.target.closest('[data-e-turntoggle]');
     if (blk) { openInsp(blk.dataset.ev); return; }
-    if (row) { openInsp(row.dataset.ev); return; }
+    if (row) {
+      // REPLY = the deliverable: click toggles the full answer inline
+      // (DSH: the answer is the body, detail is one tap away). Other rows
+      // open the inspector as before.
+      if (row.classList.contains('e-reply')) {
+        row.classList.toggle('open');
+        if (row.classList.contains('open')) row.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      openInsp(row.dataset.ev); return;
+    }
     if (tg) {
       var id = tg.dataset.turntoggle;
       S.openTurns[id] = !S.openTurns[id];
