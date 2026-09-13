@@ -138,12 +138,13 @@
 
   /* ---------- 事件表 ---------- */
   #view-engram .e-scroll{max-height:520px;overflow:auto;overscroll-behavior:contain;background:var(--e-surface)}
-  #view-engram .e-scroll table{width:100%;border-collapse:collapse;font-size:13px}
+  #view-engram .e-scroll table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
   #view-engram .e-scroll thead th{position:sticky;top:0;z-index:5;background:var(--e-sunk);color:var(--e-dim);
     font-size:11px;font-weight:700;letter-spacing:.5px;text-align:left;padding:7px 10px;
     white-space:nowrap;border-bottom:2px solid var(--e-line2)}
   @supports not (position:sticky){ #view-engram .e-scroll thead th{position:static} }
-  #view-engram .e-scroll td{padding:0 10px;height:44px;border-bottom:1px solid var(--e-line);vertical-align:middle}
+  #view-engram .e-scroll td{padding:0 10px;height:44px;border-bottom:1px solid var(--e-line);vertical-align:middle;
+    overflow:hidden}
   #view-engram .e-scroll tr.ev{cursor:pointer;transition:background var(--e-dur) var(--e-ease)}
   #view-engram .e-scroll tr.ev:hover td{background:var(--e-hover)}
   /* 选中态：背景 + 左侧标线双通道 [PHYS:L-001]；aria-current 在任意元素合法 */
@@ -161,6 +162,7 @@
   #view-engram .e-ty{display:inline-flex;font-family:ui-monospace,Menlo,Consolas,monospace;
     font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:2px 6px;border-radius:4px;
     border:1px solid var(--e-line2);color:var(--e-dim);background:var(--e-sunk);white-space:nowrap}
+  #view-engram .e-ty.REPLY{color:var(--e-ok);border-color:var(--e-ok)}
   #view-engram .e-ty.ASSISTANT{color:var(--e-accent);border-color:var(--e-accent)}
   #view-engram .e-ty.USER{color:var(--e-trk-in);border-color:var(--e-trk-in)}
   #view-engram .e-ty.TOOL{color:var(--e-trk-tl);border-color:var(--e-trk-tl)}
@@ -169,7 +171,8 @@
   #view-engram .e-st .d{width:7px;height:7px;border-radius:50%;background:currentColor}
   #view-engram .e-st.ok{color:var(--e-ok)} #view-engram .e-st.fail{color:var(--e-risk)}
   #view-engram .e-st.pending{color:var(--e-pend)} #view-engram .e-st.done{color:var(--e-dim)}
-  #view-engram .e-summ{max-width:1px;width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* 摘要列：fixed 布局下占剩余宽度，单行省略号 —— 绝不溢出框 [ENG: table-layout:fixed] */
+  #view-engram .e-summ{width:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   #view-engram .e-dur,#view-engram .e-tok{text-align:right;font-variant-numeric:tabular-nums;
     font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--e-dim);white-space:nowrap}
   #view-engram .e-c-ty{width:120px} #view-engram .e-c-st{width:96px}
@@ -386,6 +389,7 @@
     'tool/result': 'tool/result — 工具执行结果；outcome 为业务产物（不含协议字段）',
     'check/status': 'check/status — 判据裁决（hard 拦截 / soft 记账）',
     'verdict/status': 'verdict/status — 本周期判决（Met / Unmet）',
+    'assistant/reply': 'assistant/reply — 模型最终回答（本周期交付物，闭环链终点）',
     'turn/end': 'turn/end — 认知周期结束（done/success/impasse）'
   };
   var TYPES = {
@@ -398,6 +402,7 @@
     'tool/result': { type: 'TOOL', track: 'tool' },
     'check/status': { type: 'CHECK', track: 'tool' },
     'verdict/status': { type: 'VERDICT', track: 'tool' },
+    'assistant/reply': { type: 'REPLY', track: 'model' },
     'turn/end': { type: 'END', track: 'model' }
   };
 
@@ -415,6 +420,7 @@
       return s;
     }
     if (t === 'assistant/think') return '思考：' + firstLine(d.text, 100);
+    if (t === 'assistant/reply') return '回答：' + firstLine(d.text, 140);
     if (t === 'assistant/attempt') {
       if (d.empty) return '（空回复 — 诚实标记，未编造）';
       var txt = String(d.text || '');
@@ -454,6 +460,7 @@
     var d = e.data || {}, t = e.type;
     if (t === 'user/message') return jsonOf({ role: 'user', content: d.text });
     if (t === 'assistant/think') return jsonOf({ role: 'assistant', stage: 'think', text: d.text });
+    if (t === 'assistant/reply') return jsonOf({ role: 'assistant', stage: 'reply', text: d.text, chars: d.chars });
     if (t === 'assistant/attempt') return jsonOf(d.empty ? { empty: true, text: '' } : { text: d.text });
     return jsonOf(d);
   }
@@ -475,6 +482,7 @@
     if (t === 'verdict/status') return d.reason || '—';
     if (t === 'user/message' || t === 'turn/end' || t === 'turn/start') return '—';
     if (t === 'assistant/think') return '（思考全文见 Payload）';
+    if (t === 'assistant/reply') return d.chars != null ? d.chars + ' 字符' : '（回答全文见 Payload）';
     if (t === 'assistant/attempt') return '（意图与调用见 Payload）';
     return '—';
   }

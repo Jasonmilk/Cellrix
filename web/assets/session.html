@@ -46,7 +46,26 @@
   function renderSide(id, periods, empty, chatMode) {
     var box = document.getElementById(id);
     if (!periods.length) { box.innerHTML = empty; return; }
-    var head = '<div class="ses-head"><span>' + periods.length + ' 段经历</span>' +
+    // 会话聚合（线程化）：period.parent 指向续接来源（context/inject
+    // resume_from）。根（parent 为 null 或不在列表）为会话主卡，续接轮
+    // 次缩进跟随 —— 连续对话不再被截断成互不相干的独立条目。
+    var byJob = {};
+    periods.forEach(function (p) { byJob[p.job_id] = p; });
+    var roots = [], children = {};
+    periods.forEach(function (p) {
+      var par = p.parent && byJob[p.parent] ? p.parent : null;
+      if (par) { (children[par] = children[par] || []).push(p); }
+      else { roots.push(p); }
+    });
+    // 根按列表序（时间倒序）在前，其续接线程紧随；孤儿（父不在列表）
+    // 已按根处理。连续对话 = 一个根 + 一串续接，不再被截断。
+    var chain = [];
+    roots.forEach(function (r) {
+      chain.push(r);
+      (children[r.job_id] || []).forEach(function (c) { chain.push(c); });
+    });
+    var rootCount = roots.length;
+    var head = '<div class="ses-head"><span>' + rootCount + ' 个对话 · ' + periods.length + ' 轮</span>' +
       (chatMode ? '<button type="button" class="btn btn-sm btn-ghost" id="btn-newchat">+ 新对话</button>' : '') +
       '</div>';
     box.innerHTML = head;
@@ -56,21 +75,25 @@
       ev.stopPropagation();
       newChat();
     };
-    periods.forEach(function (p) {
+    chain.forEach(function (p) {
       var div = document.createElement('div');
       var sel = (chatMode ? st.chatJobId : null) === p.job_id;
-      div.className = 'ses-item' + (sel ? ' sel' : '');
+      var isChild = !!p.parent;
+      div.className = 'ses-item' + (sel ? ' sel' : '') + (isChild ? ' child' : '');
       div.setAttribute('data-ts', p.first_ts || '');
       var ts = String(p.first_ts || '');
       var disp = ts.slice(5, 10) + ' ' + ts.slice(11, 16);
       // 行结构恒定（铁轨）：标题 .nm + 时间 .t + 正文 .p，重命名只换标题文本
       var nm = autoName(p);
       var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
+      // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
+      var reply = p.reply ? '<div class="p rp">' + esc(p.reply) + '</div>' : '';
+      var tag = isChild ? '<span class="cont">↳ 续接</span>' : '';
       div.innerHTML =
-        '<div class="nm">' + esc(nm) + '</div>' +
+        '<div class="nm">' + tag + esc(nm) + '</div>' +
         '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' +
         '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.job_id) + '" title="重命名">✎</button></span></div>' +
-        preview;
+        preview + reply;
       div.onclick = function () {
         if (chatMode) {
           // 恢复进度到对话空间（DSH：点击会话 = 回放过去 + 从此续写）
