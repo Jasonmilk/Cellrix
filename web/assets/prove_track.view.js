@@ -198,7 +198,7 @@
     S.session.forEach(function (e) { if (e.id === id) ev = e; });
     if (!ev) return;
     var ae = document.activeElement;
-    S.lastFocusEv = (ae && ae.dataset && ae.dataset.ev) ? ae.dataset.ev : null;
+    S.lastFocusEv = (ae && ae.dataset && ae.dataset.eEv) ? ae.dataset.eEv : null;
     if (!S.lastFocusEv) {
       var rebuilt = ae && ae.closest && (ae.closest('#eTbody') || ae.closest('.e-lane'));
       S.lastFocusEl = (ae && !rebuilt && ae !== document.body) ? ae : null;

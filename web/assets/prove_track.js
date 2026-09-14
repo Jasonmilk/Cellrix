@@ -15,11 +15,13 @@
       applyModality = PT.applyModality, stopReplay = PT.stopReplay, startReplay = PT.startReplay;
 
   /* ---------- Event binding ---------- */
+  /* dataset key mapping: data-e-ev -> eEv, data-e-turntoggle -> eTurntoggle
+     (HTML dataset drops the data- prefix and camel-cases the rest). */
   document.addEventListener('click', function (e) {
     var blk = e.target.closest && e.target.closest('.e-blk[data-e-ev]');
     var row = e.target.closest && e.target.closest('tr.ev[data-e-ev]');
     var tg = e.target.closest && e.target.closest('[data-e-turntoggle]');
-    if (blk) { openInsp(blk.dataset.ev); return; }
+    if (blk) { openInsp(blk.dataset.eEv); return; }
     if (row) {
       // REPLY = the deliverable: click toggles the full answer inline
       // (the answer is the body; detail is one tap away). Other rows open
@@ -29,10 +31,10 @@
         if (row.classList.contains('open')) row.scrollIntoView({ block: 'nearest' });
         return;
       }
-      openInsp(row.dataset.ev); return;
+      openInsp(row.dataset.eEv); return;
     }
     if (tg) {
-      var id = tg.dataset.turntoggle;
+      var id = tg.dataset.eTurntoggle;
       S.openTurns[id] = !S.openTurns[id];
       renderTable(); syncTurnBtn();
     }
@@ -42,7 +44,7 @@
     var blk = e.target.closest && e.target.closest('.e-blk[data-e-ev]');
     var row = e.target.closest && e.target.closest('tr.ev[data-e-ev]');
     if ((blk || row) && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault(); openInsp((blk || row).dataset.ev); return;
+      e.preventDefault(); openInsp((blk || row).dataset.eEv); return;
     }
     if (e.key === 'Escape' && S.sel) closeInsp();
   });
