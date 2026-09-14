@@ -27,6 +27,15 @@
     return b;
   }
 
+  /* Sender line of a Helix message. The model tag names the LLM that served
+   * the turn — the physical model from the gateway chain (ADR-0036), never
+   * the configured declaration. One slot, two sources of the same fact:
+   * history replay reads it off the event stream, the live path off the SSE
+   * terminal line. Shown only when a caller actually knows it. */
+  function helixWho(model) {
+    return 'Helix' + (model ? ' · <span class="mdl">' + Cx.esc(model) + '</span>' : '');
+  }
+
   function addMsg(who, text, isErr) {
     var b = box();
     var d = document.createElement('div');
@@ -43,7 +52,7 @@
     var b = box();
     var d = document.createElement('div');
     d.className = 'msg helix';
-    d.innerHTML = '<span class="who">Helix</span><span class="body"></span>';
+    d.innerHTML = '<span class="who">' + helixWho(null) + '</span><span class="body"></span>';
     b.appendChild(d);
     b.scrollTop = b.scrollHeight;
     return d.querySelector('.body');
@@ -79,15 +88,12 @@
   }
 
   // The deliverable is the protagonist: the reply is the message body, process
-  // is collapsible above it. Full text, never truncated; model tag (physical
-  // fact from the gateway chain) shown when available.
+  // is collapsible above it. Full text, never truncated.
   function addReplyMsg(text, model) {
     var b = box();
     var d = document.createElement('div');
     d.className = 'msg helix';
-    var who = 'Helix';
-    if (model) who += ' · <span class="mdl">' + Cx.esc(model) + '</span>';
-    d.innerHTML = '<span class="who">' + who +
+    d.innerHTML = '<span class="who">' + helixWho(model) +
       '<span class="ts">' + nowTs() + '</span></span>' + Cx.esc(text);
     b.appendChild(d);
     b.scrollTop = b.scrollHeight;
@@ -163,6 +169,14 @@
               // typewriter accumulation so a dropped delta can never leave
               // a truncated answer on screen.
               if (j.reply) bodyEl.textContent = j.reply;
+              // Name the LLM that served this turn. The streaming row is
+              // built before the model is known (it arrives with the terminal
+              // line), so the sender slot is filled in here — the same slot
+              // history replay fills from the event stream.
+              if (j.model) {
+                var who = bodyEl.parentElement && bodyEl.parentElement.querySelector('.who');
+                if (who) who.innerHTML = helixWho(j.model);
+              }
               // Continuation anchor (ADR-0026): this period's job becomes
               // the next resume_from, so consecutive messages stay ONE
               // conversation (threaded in the ProveTrack session list), never
