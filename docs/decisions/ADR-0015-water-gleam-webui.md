@@ -3,7 +3,7 @@
 - **状态**: Accepted
 - **日期**: 2026-09-09
 - **取代**: ADR-0014（web-panel）的视觉实现（令牌与组件样式整体替换；面板功能与交互协议不变）
-- **关联**: ADR-0014（web panel）、ADR-0026（Engram v2 经历时间线）、ADR-0028（会话续接/重命名）、ADR-0029（fold 原语 + think/check/outcome 渲染）、水之波光 · 触境 v10.0.4（Lumtract 设计体系四卷）
+- **关联**: ADR-0014（web panel）、ADR-0026（ProveTrack v2 经历时间线）、ADR-0028（会话续接/重命名）、ADR-0029（fold 原语 + think/check/outcome 渲染）、水之波光 · 触境 v10.0.4（Lumtract 设计体系四卷）
 
 ## 1. 背景与问题
 
@@ -11,7 +11,7 @@ Cellrix WebUI 此前使用自定义深色令牌（`--bg:#16161a` 等）。用户
 
 同时修复两个视觉缺陷（同一哲学裁决，两处落地）：
 
-1. **印痕明细「每列加颜色 + 加粗左边框」**——事件行 badge 10 种类型 10 种颜色 + `font-weight:700`，视觉上每一行都是一条彩色加粗前缀；
+1. **证轨明细「每列加颜色 + 加粗左边框」**——事件行 badge 10 种类型 10 种颜色 + `font-weight:700`，视觉上每一行都是一条彩色加粗前缀；
 2. **根目录水之波光 html 窄屏表格降级**——每列 `::before` 加粗（600）列名 + 语义色，等于每列一条彩色加粗左边框。
 
 两者违反同一组硬边界：[PHYS:D-003]（1px 彩色分割线 / Pentile 彩边）、[PHYS:P-016]（装饰性显著性是噪音）。
@@ -29,7 +29,7 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 
 ### D2: 事件类型 badge 单色相中性（核心裁决）
 
-印痕时间线的**事件类型**（START/USER/CONTEXT/THINK/ATTEMPT/TOOL/RESULT/CHECK/VERDICT/END）不再是 10 种颜色——统一为中性 chip（`--chip-bg` + `--text-2`），类型靠文字区分。
+证轨时间线的**事件类型**（START/USER/CONTEXT/THINK/ATTEMPT/TOOL/RESULT/CHECK/VERDICT/END）不再是 10 种颜色——统一为中性 chip（`--chip-bg` + `--text-2`），类型靠文字区分。
 
 依据：
 - [PHYS:P-016] 装饰性显著性是噪音——10 种类型 10 种颜色 = 过度显著性，预测误差
@@ -54,18 +54,18 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 
 - `prefers-reduced-motion`：流转权降级（动画/过渡 1ms），等待可视化保留 [PHYS:C-003]
 - `prefers-contrast:more`：半透明剥离，层级靠实色边界（面板/卡片/按钮边框 2px）
-- 窄屏 ≤800px：Engram 网格单列、会话侧栏收窄 [PHYS:P-012]
+- 窄屏 ≤800px：ProveTrack 网格单列、会话侧栏收窄 [PHYS:P-012]
 
 ### D7: 状态点纯色静态
 
 生态状态点（在线/离线/启动/错误）为纯色静态圆点，无呼吸动画——面板常开，闲置动画违反 [PHYS:R-003]（GPU 持续合成耗电）。「等待」场景用旋转 loading（确定性可视化 [PHYS:C-003]，reduced-motion 下保留）。
 
-### D8: 视图资产化拼装（印痕 v3 · 解耦重构）
+### D8: 视图资产化拼装（证轨 v3 · 解耦重构）
 
 `main.rs` 单文件巨型 `format!`（1323 行）是维护瓶颈——每改一处视图都触碰转义规则，违反极致解耦/按需加载。重构为**资产目录 = 唯一渲染源**：
 
-- `web/assets/base.html`（HTML 骨架 + 占位符）、`styles.html`（共享 CSS）、`cockpit.html` / `chat.html`（视图 HTML 片段）、`script.html`（共享 JS IIFE）、`engram.html`（印痕骨架，含自带 JS）
-- `index_html` 退化为 **replace 拼装器**（十几行）：`__STYLES__/__COCKPIT__/__CHAT__/__ENGRAM__/__SCRIPT__/__REFRESH__/__TUCK_CONFIGURED__` 逐个替换
+- `web/assets/base.html`（HTML 骨架 + 占位符）、`styles.html`（共享 CSS）、`cockpit.html` / `chat.html`（视图 HTML 片段）、`script.html`（共享 JS IIFE）、`prove_track.html`（证轨骨架，含自带 JS）
+- `index_html` 退化为 **replace 拼装器**（十几行）：`__STYLES__/__COCKPIT__/__CHAT__/__PROVE_TRACK__/__SCRIPT__/__REFRESH__/__TUCK_CONFIGURED__` 逐个替换
 - **零 `format!` 转义**：资产内部 `{}` 自由书写，不再双写——消除转义地狱（[ENG] 工程约定，消除心智负担）
 - 动态值仅两处（刷新秒数、tuck 配置态），全量 replace 覆盖，无遗漏路径
 - 效果：`main.rs` 1323 → 633 行；新增视图 = 新增资产文件 + 一个占位符，不触碰主文件
@@ -74,7 +74,7 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 - 引入 Node/框架构建链 → 面板是 std-only 单文件服务，构建依赖违反极致节能/按需加载
 - 按 `format!` 分块继续内嵌 → 仍是巨型函数，转义问题不消失
 
-### D8: 印痕 v3 = 水之波光 Harness v11.2.0 轨迹骨架（修订 ADR-0026/0027 的旧卡片形态）
+### D8: 证轨 v3 = 水之波光 Harness v11.2.0 轨迹骨架（修订 ADR-0026/0027 的旧卡片形态）
 
 2026-09-09 用户核验了 `水之波光-Harness轨迹.html`（v11.2.0）与 `轨迹-ge1-20260909.html`（v11.0.2 修复验证版），判定旧交付形态（左侧经历列表 + 右侧事件卡片栈）与参照物跑偏，要求按骨架重做。本裁决取代此前「DSH-style turn outline」的旧形态。
 
@@ -88,7 +88,7 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 - 遮挡自证：四方向统一，贴在遮罩层（可见边界）不贴内容层
 - 卡住判定：连续同名工具连续失败 ≥3 次、只在链尾标一次、模型介入即断链、不用红色（红已被工具失败占用 [PHYS:L-002]）
 
-**实现方式（解耦决策）**：印痕整体为独立资产 `web/assets/engram.html`（e- 前缀令牌与类名全部限定在 `#view-engram` 下，隔离旧样式与驾驶舱/对话视图）。`main.rs` 仅 `include_str!` 拼装 + `selectPeriod` 桥接 `window.__engramLoad(jobId, meta)`。这是「哲学 → 组件资产 → 骨架 → 自动渲染」的第一步——后续驾驶舱/对话视图同样提取为独立资产，`main.rs` 退化为薄壳（路由 + API 代理 + 资产拼装），不重开项目、不引入构建依赖。
+**实现方式（解耦决策）**：证轨整体为独立资产 `web/assets/prove_track.html`（e- 前缀令牌与类名全部限定在 `#view-prove-track` 下，隔离旧样式与驾驶舱/对话视图）。`main.rs` 仅 `include_str!` 拼装 + `selectPeriod` 桥接 `window.__proveTrackLoad(jobId, meta)`。这是「哲学 → 组件资产 → 骨架 → 自动渲染」的第一步——后续驾驶舱/对话视图同样提取为独立资产，`main.rs` 退化为薄壳（路由 + API 代理 + 资产拼装），不重开项目、不引入构建依赖。
 
 **数据映射（物理事实优先）**：真实事件流 10 类型（turn/start·user/message·context/inject·assistant/think·assistant/attempt·tool/call·tool/result·check/status·verdict/status·turn/end）；tool/result 的 outcome 是 JSON 字符串（如 `{"ok":true,"result":"121"}`）非行内 HTML，按纯文本 esc 处理；无 tokens/缓存命中字段时显示 `—`（不猜数）；耗时 = 事件流内时间差（单一入口回合报 0——诚实，不猜测推理何时开始）。
 
@@ -107,12 +107,12 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 
 ### D10: 驾驶舱 v2 = 水之波光组件化（统计条 + Ledger 结构化表格）
 
-印痕 v3 新世代后，驾驶舱仍是旧时代（三张大数字卡片 + Ledger 纯文本列表），"一半旧时代一半新世代"。用户指令：**重构整个驾驶舱，全部重新设计，统一水之波光设计血统**（"是重构整个驾驶舱，而不是对话"）。
+证轨 v3 新世代后，驾驶舱仍是旧时代（三张大数字卡片 + Ledger 纯文本列表），"一半旧时代一半新世代"。用户指令：**重构整个驾驶舱，全部重新设计，统一水之波光设计血统**（"是重构整个驾驶舱，而不是对话"）。
 
-**组件语言（与印痕事件表同构——碳硅同看同一账本）**：
-- 统计条 `.stats-bar`：经历 EPISODE / LEDGER 记录 / 刷新 TICK，grid gap:1px 生成分隔线（同印痕统计栏）
+**组件语言（与证轨事件表同构——碳硅同看同一账本）**：
+- 统计条 `.stats-bar`：经历 EPISODE / LEDGER 记录 / 刷新 TICK，grid gap:1px 生成分隔线（同证轨统计栏）
 - Ledger 白盒 `.ledger-tbl`：五列结构化表格（状态/时间/trace_id/调用/说明）+ 语义色 chip（e-ok/e-warn/e-bad）+ 点击行展开 raw payload（`.lt-detail` 复用 fold 原语）——不再是一个个纯文本 `<span>` 堆叠
-- 视图头 `.view-head` 与印痕 head 同语言；旧 `.cards/.card/.entry/.st` 死代码彻底删除（无幽灵约束）
+- 视图头 `.view-head` 与证轨 head 同语言；旧 `.cards/.card/.entry/.st` 死代码彻底删除（无幽灵约束）
 - 窄屏降级：五列 → 两列堆叠（trace_id/说明 全宽）[卷三 3.5.3]；高对比降级覆盖新组件 [PHYS:D-001]
 - 空态自证保留（Noop 模式 ledger 为空——诚实，不猜数）
 
@@ -120,7 +120,7 @@ WebUI 全部设计令牌与 `lumtract/web-viewer/src/design/lumtact-tokens.css` 
 
 ### D11: 水之波光组件资产层（"道"层重构，styles.html 拆分为三）
 
-用户核验印痕 v3 后批评驾驶舱/对话"只学到皮，没学到道"，要求整个见面（驾驶舱+对话+印痕外围）统一到 `水之波光-组件与理念.html`（v10.0.4）的组件语言；随后明确"实现必须考虑优先级（一层套一层）+ 适配不同设备的降级策略"。
+用户核验证轨 v3 后批评驾驶舱/对话"只学到皮，没学到道"，要求整个见面（驾驶舱+对话+证轨外围）统一到 `水之波光-组件与理念.html`（v10.0.4）的组件语言；随后明确"实现必须考虑优先级（一层套一层）+ 适配不同设备的降级策略"。
 
 **资产重构（`web/assets/`，全部 <400 行，400 红线适用）**：
 - `tokens.html`（132 行）：令牌层 —— `--bg/--surface/--surface-sunk/--surface-hover/--surface-press/--line/--line-strong/--text/--text-dim/--accent(-hover/-press/-soft)/--on-accent/--danger(-hover/-press/-soft)/--on-danger/--ok/--warn/--risk/--r-sm/md/lg/--dur/--ease/--shadow-1/2/--fade-l/r/--gleam`，日间 `#F4F6F8/#FFFFFF/#121212` 暗黑，`--on-danger` 暗黑 `#2A0F0A` 6.02:1（硬编码白字 2.98:1 触及生存权 → FIX-02）；基础布局 + 主题三段式
@@ -145,7 +145,7 @@ runAudit 初次落地遇到三个真实坑，全部由浏览器序列化事实�
 
 ### D14: 会话管理深化（DSH 骨架 + 水之波光血统 + 400 红线解耦）
 
-用户点名"印痕深化的会话管理优先"，要求审查会话稳定性/鲁棒性、会话展示符合 DSH 设计理念与骨架、水之波光统一血统并沉淀组件资产、顺便更新 lumtract。
+用户点名"证轨深化的会话管理优先"，要求审查会话稳定性/鲁棒性、会话展示符合 DSH 设计理念与骨架、水之波光统一血统并沉淀组件资产、顺便更新 lumtract。
 
 **参考 DSH（dshbook ch.1）理念**：会话日志 = 持久事实（回放），实时事件 = 当前状态（snapshot）——两类分离；点击会话 = 恢复进度；上下文窗口裁剪由后端按需（lodestone）。
 
@@ -174,7 +174,7 @@ runAudit 初次落地遇到三个真实坑，全部由浏览器序列化事实�
 |---|---|
 | 保留 10 色事件 badge | 装饰性显著性是噪音 [PHYS:P-016]；语义色保留原则 [PHYS:L-002] 只覆盖状态不覆盖类型 |
 | 选中行保留彩色左边框 | 违反 [PHYS:D-003]（1px 彩色分割线） |
-| 印痕维持旧卡片栈（v2 形态） | 与用户核验的 v11.2.0 骨架跑偏；卡片栈逐条堆叠，轨迹/判据/时长的结构性关系不可读 |
+| 证轨维持旧卡片栈（v2 形态） | 与用户核验的 v11.2.0 骨架跑偏；卡片栈逐条堆叠，轨迹/判据/时长的结构性关系不可读 |
 | 重开新壳/引入前端框架 | 价值在 anaphase/tuck 后端与数据流；独立资产化已解决 main.rs 膨胀；新壳引入构建依赖，违背 std-only 单文件约束 |
 | 引入外部 UI 框架（Tailwind 等） | 面板是 std-only 单文件服务；框架违反极致解耦/按需加载 |
 | 单一暗色主题 | 昼夜环境不同（[PHYS:D-006]），浅色主题是同一约束集的诚实解 |
