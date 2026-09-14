@@ -1,42 +1,48 @@
 <script>
+/* Shell — the frame every view shares: view switch, shared namespace, the
+ * status line and the ecosystem board. View-specific rendering lives in its
+ * own asset (chat.js / cockpit.js / session.html / flows.html / prove_track.*),
+ * and a view declares its own enter hook via Cx.onEnter, so this file never
+ * names a view it does not own.
+ */
 (function () {
   var refresh = __REFRESH__;
-  var tuckConfigured = __TUCK_CONFIGURED__;
-  var entries = [];
-  var selected = null;
-  document.addEventListener('keydown', function (e) {
-    if (e.target && e.target.id === 'chat-text' && e.key === 'Enter') { sendChat(); }
-    if (e.target && e.target.id === 'chat-text' && e.key === 'Escape') { document.getElementById('chat-text').value = ''; }
-  });
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  /* ---- view switch ------------------------------------------------------
+   * The view list has exactly one source of truth: base.html's nav carries
+   * `data-view` on every button. Adding a view = one nav entry + one
+   * `#view-<name>` container + one asset file. This function never changes.
+   * [GENE] 0 硬编码 —— 视图清单不写死在壳里。 */
+  function navButtons() { return document.querySelectorAll('.nav [data-view]'); }
+
+  /* Enter hooks are declared by the view assets themselves (Cx.onEnter), so
+   * the shell never names a view it does not own. */
+  var ENTER = {};
   function showView(v) {
-    document.getElementById('view-cockpit').style.display = v==='cockpit' ? '' : 'none';
-    document.getElementById('view-prove-track').style.display = v==='prove-track' ? '' : 'none';
-    document.getElementById('view-chat').style.display = v==='chat' ? '' : 'none';
-    document.getElementById('view-flows').style.display = v==='flows' ? '' : 'none';
-    document.getElementById('v-cockpit').className = 'btn' + (v==='cockpit' ? ' on' : '');
-    document.getElementById('v-prove-track').className = 'btn' + (v==='prove-track' ? ' on' : '');
-    document.getElementById('v-chat').className = 'btn' + (v==='chat' ? ' on' : '');
-    document.getElementById('v-flows').className = 'btn' + (v==='flows' ? ' on' : '');
-    if (v==='chat') document.getElementById('chat-text').focus();
-    if ((v==='prove-track' || v==='chat') && window.CxSession) window.CxSession.loadSessions();
-    if (v==='flows' && window.CxFlows) window.CxFlows.load();
+    var bs = navButtons(), i, n;
+    for (i = 0; i < bs.length; i++) {
+      n = bs[i].getAttribute('data-view');
+      var el = document.getElementById('view-' + n);
+      if (el) el.style.display = (n === v) ? '' : 'none';
+      bs[i].className = 'btn' + (n === v ? ' on' : '');
+    }
+    var hooks = ENTER[v] || [];
+    for (i = 0; i < hooks.length; i++) hooks[i]();
   }
 
-  // === 共享状态（session.html 与 sendChat 同源）：续接锚点 + 竞态守卫
-  // Explicit continuation (ADR-0026): chatJobId 置位时，下一句续接该经历。
-  var selectedPeriod = null;
   window.Cx = {
     state: { chatJobId: null, sesSeq: 0, histSeq: 0, chatBusy: false },
     esc: esc,
     showView: showView,
+    // Explicit continuation (ADR-0026): chatJobId 置位时，下一句续接该经历。
     selectPeriod: function (jobId) {
       var meta = window.__proveTrackMeta || null;
       if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, meta);
     },
-    addMsg: addMsg,
-    showToast: showToast
+    showToast: showToast,
+    onEnter: function (name, fn) { (ENTER[name] = ENTER[name] || []).push(fn); }
   };
 
   // One centered toast for system-level errors — never a Helix speech bubble
@@ -50,178 +56,8 @@
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 5000);
   }
-  function showError(msg) { showToast(msg); }
 
-  function nowTs() {
-    var d = new Date();
-    function p(n) { return (n < 10 ? '0' : '') + n; }
-    return p(d.getHours()) + ':' + p(d.getMinutes());
-  }
-
-  function addMsg(who, text, isErr) {
-    var box = document.getElementById('chat-msgs');
-    var empty = box.querySelector('.empty');
-    if (empty) empty.remove();
-    var d = document.createElement('div');
-    d.className = 'msg ' + who + (isErr ? ' err' : '');
-    d.innerHTML = '<span class="who">' + (who==='user' ? '你' : 'Helix') + '<span class="ts">' + nowTs() + '</span></span>' + esc(text);
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
-  }
-
-  // Streaming message element: created once per reply, text appended as
-  // SSE deltas arrive (typewriter). Returns the element to finalize.
-  function addStreamMsg() {
-    var box = document.getElementById('chat-msgs');
-    var empty = box.querySelector('.empty');
-    if (empty) empty.remove();
-    var d = document.createElement('div');
-    d.className = 'msg helix';
-    d.innerHTML = '<span class="who">Helix</span><span class="body"></span>';
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
-    return d.querySelector('.body');
-  }
-
-  // DSH-style reasoning disclosure (ReasoningRow): a collapsible think row
-  // above the answer. Streamed while running; click to expand/collapse.
-  function addThinkRow() {
-    var box = document.getElementById('chat-msgs');
-    var empty = box.querySelector('.empty');
-    if (empty) empty.remove();
-    var d = document.createElement('div');
-    d.className = 'think-row';
-    d.innerHTML = '<span class="think-head">思考</span><span class="think-body"></span>';
-    d.onclick = function () { d.classList.toggle('open'); };
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
-    return d.querySelector('.think-body');
-  }
-
-  // Unified collapsible row (水之波光：一种能力，全场景复用 — DSH 过程折叠)：
-  // process rows (思考/计划/工具) are one component; click to expand/collapse.
-  // label = short tag, text = full payload (truncated to one line when closed).
-  function foldRow(label, text) {
-    var box = document.getElementById('chat-msgs');
-    var empty = box.querySelector('.empty');
-    if (empty) empty.remove();
-    var d = document.createElement('div');
-    d.className = 'think-row fold';
-    d.innerHTML = '<span class="think-head">' + esc(label) + '</span><span class="think-body"></span>';
-    d.querySelector('.think-body').textContent = text || '';
-    d.onclick = function () { d.classList.toggle('open'); };
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
-    return d;
-  }
-
-  // The deliverable is the protagonist (DSH: the reply is the message body,
-  // process is collapsible above it). Full text, never truncated; model tag
-  // (physical fact from the gateway chain) shown when available.
-  function addReplyMsg(text, model) {
-    var box = document.getElementById('chat-msgs');
-    var empty = box.querySelector('.empty');
-    if (empty) empty.remove();
-    var d = document.createElement('div');
-    d.className = 'msg helix';
-    var who = 'Helix';
-    if (model) who += ' · <span class="mdl">' + esc(model) + '</span>';
-    d.innerHTML = '<span class="who">' + who + '<span class="ts">' + nowTs() + '</span></span>' + esc(text);
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
-    return d;
-  }
-
-  function sendChat() {
-    var input = document.getElementById('chat-text');
-    var text = input.value.trim();
-    if (!text) return;
-    if (window.Cx.state.chatBusy) return; // 一轮思考未结，防并发连发
-    var btn = document.querySelector('.chat-input .btn');
-    addMsg('user', text, false);
-    input.value = '';
-    window.Cx.state.chatBusy = true;
-    btn.disabled = true; btn.textContent = '思考中…';
-    var done = false;
-    var job = window.Cx.state.chatJobId || null;
-    function finish() {
-      if (done) return;
-      done = true;
-      window.Cx.state.chatBusy = false;
-      btn.disabled = false; btn.textContent = '发送';
-      input.focus();
-    }
-    fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-      body: JSON.stringify({ message: text, job_id: job })
-    }).then(function (r) {
-      if (!r.body || !r.ok) { return r.json().then(function (j) {
-        throw new Error((j.error || 'HTTP ' + r.status) + (j.detail ? ' — ' + j.detail : ''));
-      }); }
-      var reader = r.body.getReader();
-      var dec = new TextDecoder();
-      var buf = '';
-      var bodyEl = null;
-      var thinkEl = null;
-      function pump() {
-        return reader.read().then(function (x) {
-          if (x.done) { finish(); return; }
-          buf += dec.decode(x.value, { stream: true });
-          var idx;
-          while ((idx = buf.indexOf('\n\n')) >= 0) {
-            var evt = buf.slice(0, idx);
-            buf = buf.slice(idx + 2);
-            var line = evt.trim();
-            if (line.indexOf('data:') !== 0) continue;
-            var payload = line.slice(5).trim();
-            if (!payload) continue;
-            var j;
-            try { j = JSON.parse(payload); } catch (e) { continue; }
-            if (j.error) {
-              // A transport fault is the cockpit's business, not Helix's.
-              // If the answer already streamed, keep it and finish quietly;
-              // only a fault with no content gets a toast.
-              if (!bodyEl && !thinkEl) showError(j.error);
-              finish(); return;
-            }
-            if (j.think) {
-              if (!thinkEl) thinkEl = addThinkRow();
-              thinkEl.textContent += j.think;
-              var box = document.getElementById('chat-msgs');
-              box.scrollTop = box.scrollHeight;
-            }
-            if (j.delta) {
-              if (!bodyEl) bodyEl = addStreamMsg();
-              bodyEl.textContent += j.delta;
-              var box = document.getElementById('chat-msgs');
-              box.scrollTop = box.scrollHeight;
-            }
-            if (j.done) {
-              if (!bodyEl) bodyEl = addStreamMsg();
-              // reply is the authoritative full text — overwrite the
-              // typewriter accumulation so a dropped delta can never leave
-              // a truncated answer on screen.
-              if (j.reply) bodyEl.textContent = j.reply;
-              // Continuation anchor (ADR-0026): this period's job becomes
-              // the next resume_from, so consecutive messages stay ONE
-              // conversation (threaded in the ProveTrack session list), never
-              // fragments. Cleared only by "+ 新对话".
-              if (j.job_id) window.Cx.state.chatJobId = j.job_id;
-              finish(); return;
-            }
-          }
-          return pump();
-        });
-      }
-      return pump();
-    }).catch(function (e) {
-      showError('发送失败: ' + e.message);
-    }).finally(function () {
-      finish();
-    });
-  }
-
+  /* ---- status line (shell scope: shown in every view) ------------------- */
   function tick() {
     fetch('/api/snapshot').then(function (r) {
       if (!r.ok) { throw new Error('proxy ' + r.status); }
@@ -248,33 +84,9 @@
       st.textContent = 'state: ' + (snap.state || '?');
       conn.textContent = '● 在线';
       conn.className = 'badge live';
-      document.getElementById('episode').textContent = snap.episode || '无';
-      var ledger = snap.ledger || [];
-      document.getElementById('nledger').textContent = ledger.length;
-      document.getElementById('tick').textContent = new Date().toLocaleTimeString();
-      var box = document.getElementById('entries');
-      if (!ledger.length) { box.innerHTML = '<tr><td colspan="5"><div class="empty">暂无记录（Noop 模式 ledger 为空——配置 reasoning 后产生）</div></td></tr>'; return; }
-      // 水之波光 Ledger 表格：状态/时间/trace_id/调用/说明 五列 + 点击展开 payload。
-      // 与证轨事件表同构（碳硅同看同一账本），但数据源是 Tuck 审计链。
-      // ≤620px 降级为纵向卡片堆叠（td data-label 标签在上/值在下，首列自明）。
-      var rows = '';
-      ledger.slice().reverse().forEach(function (e) {
-        var status = (e.status || e.record_type || '?').toUpperCase();
-        var cls = status.indexOf('ERR') > -1 || status === 'BLOCK' ? 'e-bad' : (status.indexOf('WARN') > -1 ? 'e-warn' : 'e-ok');
-        var tid = e.trace_id || e.episode_id || '';
-        var call = e.tool || e.args || '';
-        var note = e.summary || e.verdict || e.reason || '';
-        var payload = JSON.stringify(e.data || e.payload || e, null, 1);
-        rows += '<tr class="lt-row" tabindex="0" role="button" aria-expanded="false" onclick="var t=this;t.classList.toggle(\'lt-open\');var ex=t.nextElementSibling;if(ex&&ex.classList.contains(\'lt-exp\')){ex.hidden=!ex.hidden;}">' +
-          '<td data-label="状态"><span class="chip ' + cls + '">' + esc(status) + '</span></td>' +
-          '<td class="lt-c-ts" data-label="时间">' + esc(String(e.ts || e.created_at || '').slice(0, 19)) + '</td>' +
-          '<td class="lt-c-tid" data-label="trace_id">' + esc(tid) + '</td>' +
-          '<td class="lt-c-call" data-label="调用">' + esc(call) + '</td>' +
-          '<td class="lt-c-note" data-label="说明">' + esc(note) + '</td></tr>' +
-          '<tr class="lt-exp" hidden><td colspan="5"><pre>' + esc(payload) + '</pre></td></tr>';
-      });
-      box.innerHTML = rows;
-      if (window.syncFades) window.syncFades();
+      // The situation view renders its own content; the shell only hands the
+      // snapshot over (按需驱动：不替别的视图做渲染决定).
+      if (window.CxCockpit) window.CxCockpit.render(snap);
     }).catch(function (e) {
       var conn = document.getElementById('conn');
       conn.textContent = '✗ 断开';
@@ -300,17 +112,26 @@
     });
   }
 
+  /* Nav buttons are wired here from `data-view` — the markup declares the
+   * view, the shell only connects it. No inline onclick means a new view
+   * needs no shell edit at all. */
+  (function () {
+    var bs = navButtons();
+    for (var i = 0; i < bs.length; i++) {
+      (function (b) {
+        b.addEventListener('click', function () {
+          showView(b.getAttribute('data-view'));
+        });
+      })(bs[i]);
+    }
+  })();
+
   tick(); loadEcosystem();
   setInterval(tick, refresh * 1000);
   setInterval(loadEcosystem, refresh * 1000);
-  // Inline `onclick` attributes resolve against the global scope — expose
-  // the interactive entry points explicitly (they live in this IIFE).
+  // Inline `onclick` attributes resolve against the global scope — expose the
+  // interactive entry points explicitly (they live in this IIFE).
   window.showView = showView;
-  window.sendChat = sendChat;
-  // 追加共享能力（Cx 已在 IIFE 头定义）：交付物主消息 + 通用折叠行
-  window.Cx.addReplyMsg = addReplyMsg;
-  window.Cx.foldRow = foldRow;
-  window.Cx.addThinkRow = addThinkRow;
   // 主题按钮状态初始化（与 head 引导脚本对齐）
   (function(){ try{
     var K='cellrix-theme', cur=localStorage.getItem(K)||'auto';
@@ -319,5 +140,6 @@
   }catch(e){} })();
   // 涟漪/降级探针/表格自证/契约自检 已下沉至 gleam.html（组件行为资产）
   // 会话管理（列表/重命名/续接/新对话）独立资产 session.html
+  // 对话域 独立资产 chat.js · 态势域 独立资产 cockpit.js
 })();
 </script>

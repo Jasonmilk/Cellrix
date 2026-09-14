@@ -95,8 +95,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///
 /// 资产化拼装（ADR-0015 D8 / 解耦）：视图 HTML/CSS/JS 全部独立为
 /// web/assets/*.html，宿主只做 replace 拼装——零 format! 转义，
-/// 资产内部 `{}` 自由书写。动态值仅 __REFRESH__ / __TUCK_CONFIGURED__。
-fn index_html(cfg: &PanelConfig) -> String {
+/// Assets may write `{}` freely. The only dynamic value is __REFRESH__, which
+/// comes from a constant rather than from the config.
+///
+/// Nothing from `PanelConfig` is injected today, so the parameter is unused —
+/// it stays so callers don't churn when the first dynamic value lands (e.g.
+/// injecting the flowmodus endpoint for the Flows view).
+fn index_html(_cfg: &PanelConfig) -> String {
     const BASE: &str = include_str!("../assets/base.html");
     const TOKENS: &str = include_str!("../assets/tokens.html");
     const COMPONENTS: &str = include_str!("../assets/components.html");
@@ -112,11 +117,16 @@ fn index_html(cfg: &PanelConfig) -> String {
     const PROVE_TRACK_VIEW: &str = include_str!("../assets/prove_track.view.js");
     const PROVE_TRACK_CTRL: &str = include_str!("../assets/prove_track.js");
     const SCRIPT: &str = include_str!("../assets/script.html");
+    // View-owned assets (ADR-0015 D8 follow-through): the shell keeps the
+    // frame, each view owns its own rendering. Load order is a hard
+    // constraint — the shell defines `window.Cx`, and every view asset reads
+    // it at IIFE time, so __SCRIPT__ must come first in base.html.
+    const CHAT_JS: &str = include_str!("../assets/chat.js");
+    const COCKPIT_JS: &str = include_str!("../assets/cockpit.js");
     const SESSION: &str = include_str!("../assets/session.html");
     const GLEAM: &str = include_str!("../assets/gleam.html");
     const FLOWS: &str = include_str!("../assets/flows.html");
 
-    let tuck_configured = cfg.tuck_endpoint.is_some();
     BASE
         .replace("__TOKENS__", TOKENS)
         .replace("__COMPONENTS__", COMPONENTS)
@@ -128,11 +138,12 @@ fn index_html(cfg: &PanelConfig) -> String {
         .replace("__PROVE_TRACK_VIEW__", PROVE_TRACK_VIEW)
         .replace("__PROVE_TRACK_CTRL__", PROVE_TRACK_CTRL)
         .replace("__SCRIPT__", SCRIPT)
+        .replace("__CHAT_JS__", CHAT_JS)
+        .replace("__COCKPIT_JS__", COCKPIT_JS)
         .replace("__SESSION__", SESSION)
         .replace("__GLEAM__", GLEAM)
         .replace("__FLOWS__", FLOWS)
         .replace("__REFRESH__", &config::REFRESH_SECS.to_string())
-        .replace("__TUCK_CONFIGURED__", &tuck_configured.to_string())
 }
 
 #[cfg(test)]
@@ -246,13 +257,46 @@ mod tests {
         // which pushed DOCTYPE off byte 0 (quirks mode) and rendered a literal
         // `r#"` on screen. Every assertion above used `contains` and never saw it.
         assert!(html.starts_with("<!DOCTYPE html>"));
-        // No asset placeholder may survive (the whole assembly chain is intact).
-        assert!(!html.contains("__PROVE_TRACK"));
+        // Derived invariant: every `__NAME__` token appearing in base.html is a
+        // placeholder the assembly must consume. Deriving the list from BASE
+        // (instead of hardcoding it) means a newly added placeholder is covered
+        // automatically — forget its replace() and this fails, instead of
+        // shipping a literal `__FOO__` into the DOM. The old assertion only
+        // looked for `__PROVE_TRACK`, so any other placeholder could slip by.
+        let base = include_str!("../assets/base.html");
+        let mut i = 0;
+        let mut checked = 0usize;
+        while let Some(off) = base[i..].find("__") {
+            let start = i + off;
+            let rest = &base[start + 2..];
+            if let Some(end) = rest.find("__") {
+                let name = &rest[..end];
+                if !name.is_empty()
+                    && name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
+                {
+                    let token = &base[start..start + 2 + end + 2];
+                    assert!(!html.contains(token), "placeholder {token} survived assembly");
+                    checked += 1;
+                }
+            }
+            i = start + 2;
+        }
+        // The scan must have found them — otherwise it would pass vacuously.
+        assert!(checked >= 16, "placeholder scan found only {checked} tokens");
         // ADR-0016: all four split assets must land in the page.
         assert!(html.contains("--e-trk-tl")); // prove_track.css (tokens)
         assert!(html.contains("function buildSession")); // prove_track.data.js
         assert!(html.contains("function renderTable")); // prove_track.view.js
         assert!(html.contains("window.CxProveTrack")); // cross-asset bridge
         assert!(html.contains("__proveTrackClear")); // prove_track.js (ctrl)
+        // ADR-0015 D8 follow-through: the split view assets land too, and the
+        // shell's view switch is driven by the markup rather than by a
+        // hardcoded list (adding a view must not touch the shell).
+        assert!(html.contains("window.CxCockpit")); // cockpit.js
+        assert!(html.contains("window.sendChat")); // chat.js
+        assert!(html.contains("Cx.onEnter")); // view-registration seam
+        assert!(html.contains("data-view=\"cockpit\"")); // base.html nav
+        assert!(!html.contains("onclick=\"showView(")); // nav no longer inlines it
+        assert!(html.contains("__CHAT_JS__") == false); // and it was substituted
     }
 }

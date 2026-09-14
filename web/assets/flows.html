@@ -203,5 +203,9 @@
   head.parentNode.insertBefore(headRow, head.nextSibling);
 
   window.CxFlows = { load: load };
+
+  /* The shell never names a view it does not own — declare this view's enter
+   * hook here (ADR-0015 D8 follow-through). */
+  if (window.Cx && window.Cx.onEnter) window.Cx.onEnter('flows', load);
 })();
 </script>

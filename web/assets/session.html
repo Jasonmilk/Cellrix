@@ -283,6 +283,15 @@
   window.CxSession = { loadSessions: loadSessions, toggleResume: toggleResume, newChat: newChat };
   window.toggleResume = toggleResume; // chat.html onclick 内联依赖全局
 
+  /* The shell never names a view it does not own — a view asset declares its
+   * own enter hook (ADR-0015 D8 follow-through). The experience list feeds
+   * both the ProveTrack sidebar and the Chat sidebar, so this asset claims
+   * both views; the shell just asks the registry. */
+  if (Cx.onEnter) {
+    Cx.onEnter('prove-track', loadSessions);
+    Cx.onEnter('chat', loadSessions);
+  }
+
   // 页面就绪即加载一次列表（默认停在 cockpit，切换视图再刷新）——
   // 对话/证轨侧栏不因"没切过视图"而停留在"加载中"。
   if (document.getElementById('s-side')) loadSessions();
