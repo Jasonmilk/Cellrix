@@ -16,7 +16,17 @@ ADR-0015 完成 WebUI 水之波光化（令牌/组件/行为三层资产 + 驾�
 - 跨资产经 `window.CxProveTrack` 命名空间桥接（沿用 ADR-0015 D14 `window.CxSession` 先例）；加载序 data → view → ctrl → `script.html` 为硬约束；对外接口名 `__proveTrackLoad/Clear` 不变，调用点零改动
 - 同轮修复 `base.html` 首字节残留 `        r#"`（把 DOCTYPE 挤出首位 → quirks mode + 页面顶部渲染字面量 `r#"`），并补 `assert!(html.starts_with("<!DOCTYPE html>"))` 回归网
 
-**下一步候选**：会话管理深化（继续对话选择 + 状态栏耗时/token）／结晶闭环实施（Unmet≥2 → 判据候选 → Tuck hard 规则）／生态加固（项目生命周期管理、tuck 小白引导、WebUI 一键重启）／身份绑定（anaphase 1对1 JWT 绑定）
+**下一步候选**：
+
+- **事件族装配层（`ADR-0018`，Accepted 2026-09-15，T0 未做）** —— 同一持久事件族 →
+  target-neutral 装配层 → 多 target（证轨 / 会话）；装配层**只发布不 fold**，坐标由共享纯函数
+  `deriveCoordinates(eventWindow)` 派生（移给证轨会违反 D2 互不导入）。契约含服务端 seq、
+  幂等 upsert on `(kind,id)`、丢弃 `seq ≤ lastSeq`、缺口回拉、`watermark = {lastSeq, gaps}`、
+  `digest()`。加载序 `__ASSEMBLY__` → data → view → ctrl → `__SCRIPT__` 为硬约束。
+  pending 有界（上限 + TTL + 可见 + **按 seq 排序释放**）；**变更驱动**，非时钟驱动。
+- 会话管理深化（继续对话选择 + 状态栏耗时/token）／结晶闭环实施（Unmet≥2 → 判据候选 →
+  Tuck hard 规则）／生态加固（项目生命周期管理、tuck 小白引导、WebUI 一键重启）／身份绑定
+  （anaphase 1对1 JWT 绑定）
 
 **状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
 

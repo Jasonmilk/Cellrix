@@ -1,0 +1,72 @@
+# Web asset verification harness
+
+The panel's frontend is not built. `web/assets/*` is assembled at **compile
+time**: `web/src/main.rs` reads `base.html`, substitutes each `__PLACEHOLDER__`
+with the asset's bytes via `include_str!`, and serves the result. A static diff
+plus `cargo test` therefore proves nothing about what a browser actually
+receives — the asset is burnt into the binary, and the binary may be older than
+the asset.
+
+This directory holds the checks that close that gap. They are co-located with
+the artifact they verify on purpose: every script here reads `../assets/*` or
+the assembled page served by a running panel.
+
+## Layout
+
+| Script | Proves | Needs the stack |
+|---|---|---|
+| `verify_live.py <snapshot> <assets-dir>` | The served page is the current assets, byte for byte: first byte is `<!DOCTYPE html>`, zero placeholder residue, tags balanced, anchor counts, load order strictly increasing, and each asset appears **verbatim** inside its section | no |
+| `coupling_audit.py <snapshot> <assets-dir>` | Derived coupling invariants: every `dataset.X` **read** is supplied by some `data-*` attribute or a runtime assignment; placeholder scan is non-vacuous (`checked >= 16`) | no |
+| `all_views_test.js <base_url> <job_id>` | Real render through a real user path (click a session → switch view → pick a period), then asserts the inspector opens, the turn collapses, and inspector field names are ASCII-only | yes |
+| `chat_model_test.js <base_url>` | The live chat names the LLM that served the turn. The SSE transport is stubbed, so this asserts **our** contract, not a vendor's availability. Tests both directions: value present → shown, absent → honestly omitted | yes |
+| `render_test.js <base_url>` | Full-view render smoke test | yes |
+| `pt_replay.js` | ProveTrack `data.js` pure-function replay (no DOM, no state) | no |
+| `snapshot.js <base_url>` | Freezes a live page plus its API responses into one self-contained HTML file | yes |
+| `snapshot_selftest.js <file>` | The snapshot is actually self-contained | no |
+| `probe_bug.js` | Minimal reproduction of a reported defect | no |
+| `start-panel.sh [port]` / `--stop` | Brings the six-component stack up in dependency order and stops it by PID | — |
+
+## Running
+
+```bash
+# Non-live checks — no services needed.
+python3 web/tests/verify_live.py <snapshot.html> web/assets
+
+# Live checks — bring the stack up first, then point at it.
+./web/tests/start-panel.sh          # tuck -> tentacle -> mind -> flowmodus -> anaphase -> panel
+node web/tests/all_views_test.js http://127.0.0.1:18932 <job_id>
+./web/tests/start-panel.sh --stop
+```
+
+`node` must see `jsdom`. Install it into a managed workspace and point
+`NODE_PATH` at it — never `npm install -g`:
+
+```bash
+NODE_PATH=/path/to/node/workspace/node_modules node web/tests/render_test.js http://127.0.0.1:18932
+```
+
+`jsdom` needs two shims or the page dies during bootstrap: `window.fetch`
+(proxy relative paths to the live server) and `window.matchMedia` (the theme
+bootstrap in `base.html`).
+
+## Method
+
+- **A/B, always.** If the binary's mtime is older than the asset's, it still
+  carries the old asset: run the check against it first and expect **failure**.
+  That is what proves the check is not vacuous. Then rebuild and run again.
+- **Walk the real user path.** Drive the DOM the way a person does — click the
+  session in the sidebar, switch the view, pick the period. Calling an internal
+  loader directly bypasses the visibility guards and produces false reds.
+- **CJK assertions only in the chrome scope.** Event payloads legitimately
+  contain the user's own Chinese text; asserting "no CJK" over a whole view
+  fails on the data, not on the bug.
+- **Stub the transport when a vendor is in the path.** A check whose reliability
+  depends on a third party's uptime and a paid key is not a regression net.
+- **Never stop services with `pkill -f`.** It matches the whole command line and
+  will kill unrelated processes. `start-panel.sh --stop` kills by PID file.
+
+## What is deliberately not here
+
+Runtime output stays outside the repository: the stack's logs go to
+`<workspace>/.workbuddy-ai/tools/prove-track-verify/logs/`, and generated
+snapshots are not committed. Only the harness itself belongs in the repo.
