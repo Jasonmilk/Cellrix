@@ -1,8 +1,8 @@
 /* ============================================================
-  Cellrix · 证轨 ProveTrack — 样式层（ADR-0016 D1）
-  作用域：#view-prove-track（e- 前缀令牌，不外泄全局）
-  主题：随全局 data-theme 切换（日间/暗黑）+ prefers-contrast / forced-colors 降级
-  来源：由 prove_track.html 原第 7–289 行迁出，声明零改动
+  Cellrix · ProveTrack — style layer (ADR-0016 D1)
+  Scope: #view-prove-track (e- prefixed tokens, never leaked globally)
+  Theme: follows the global data-theme (light/dark) + prefers-contrast / forced-colors degradation
+  Origin: moved out of prove_track.html (formerly lines 7-289), declarations unchanged
   ============================================================ */
   #view-prove-track{
     --e-bg:#F4F6F8; --e-surface:#FFFFFF; --e-sunk:#F7F8FA;
@@ -35,7 +35,7 @@
     --e-trk-in:#8496AB; --e-trk-md:#4FA8D8; --e-trk-tl:#E0B357;
     --e-bg-rgb:18,18,18;
     --e-gleam:rgba(226,244,255,.52);
-    /* 暗底无光可挡，"阴影"不成立 → 重协商为微光 [PHYS:D-004] */
+    /* On a dark ground nothing blocks light, so "shadow" does not hold → renegotiated as a faint glow [PHYS:D-004] */
     --e-fade:rgba(150,205,240,.50);
     --e-sh1:0 1px 2px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.35);
     --e-sh2:0 2px 6px rgba(0,0,0,.55),0 12px 30px rgba(0,0,0,.45);
@@ -43,7 +43,7 @@
   #view-prove-track :focus{outline:2px solid var(--e-accent);outline-offset:2px}
   @supports selector(:focus-visible){ #view-prove-track :focus:not(:focus-visible){outline:none} }
 
-  /* ---------- 遮挡自证 · 四方向统一 ---------- */
+  /* ---------- Occlusion self-evidence · one rule for four directions ---------- */
   #view-prove-track .e-vp{position:relative;--e-vp-r:0px;border-radius:var(--e-vp-r)}
   @supports (overflow:clip){ #view-prove-track .e-vp{overflow:clip} }
   #view-prove-track .e-eg{position:absolute;pointer-events:none;z-index:6;opacity:0;
@@ -63,7 +63,7 @@
   #view-prove-track .e-vp[data-t="1"] .e-eg.t,#view-prove-track .e-vp[data-b="1"] .e-eg.b,
   #view-prove-track .e-vp[data-l="1"] .e-eg.l,#view-prove-track .e-vp[data-r="1"] .e-eg.r{opacity:1}
 
-  /* ---------- 轨迹：一个闭环对象 ---------- */
+  /* ---------- Trajectory: one closed-loop object ---------- */
   #view-prove-track .e-traj{border:1px solid var(--e-line);border-radius:var(--e-r-l);overflow:hidden;
     background:var(--e-surface)}
   #view-prove-track .e-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;
@@ -89,7 +89,7 @@
   #view-prove-track .e-search .clr:hover{background:var(--e-hover);color:var(--e-text)}
   #view-prove-track .e-hit{background:var(--e-warn);color:var(--e-surface);border-radius:2px;padding:0 1px;font-weight:700}
 
-  /* ---------- Overview：三轨共用一根标尺 ---------- */
+  /* ---------- Overview: three lanes share one ruler ---------- */
   #view-prove-track .e-ov{background:var(--e-surface);border-bottom:1px solid var(--e-line);padding:12px 14px}
   #view-prove-track .e-ov-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;flex-wrap:wrap}
   #view-prove-track .e-ov-t{font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--e-dim)}
@@ -127,7 +127,7 @@
   [data-theme="dark"] #view-prove-track .e-legend i.input{background-image:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.28) 2px 3px)}
   [data-theme="dark"] #view-prove-track .e-legend i.tool{background-image:repeating-linear-gradient(45deg,transparent 0 3px,rgba(0,0,0,.26) 3px 5px)}
 
-  /* ---------- 滚动条：说容器的语言 ---------- */
+  /* ---------- Scrollbar: speaks the container's language ---------- */
   #view-prove-track .e-scroll,#view-prove-track .e-insp-bd,#view-prove-track pre{scrollbar-width:thin;scrollbar-color:var(--e-line2) transparent}
   #view-prove-track .e-scroll::-webkit-scrollbar,#view-prove-track .e-insp-bd::-webkit-scrollbar,#view-prove-track pre::-webkit-scrollbar{width:9px;height:9px}
   #view-prove-track .e-scroll::-webkit-scrollbar-track,#view-prove-track .e-insp-bd::-webkit-scrollbar-track,#view-prove-track pre::-webkit-scrollbar-track{background:transparent}
@@ -135,7 +135,7 @@
     background:var(--e-line2);border-radius:999px;
     border:3px solid transparent;background-clip:content-box}
 
-  /* ---------- 事件表 ---------- */
+  /* ---------- Event table ---------- */
   #view-prove-track .e-scroll{max-height:520px;overflow:auto;overscroll-behavior:contain;background:var(--e-surface)}
   #view-prove-track .e-scroll table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
   #view-prove-track .e-scroll thead th{position:sticky;top:0;z-index:5;background:var(--e-sunk);color:var(--e-dim);
@@ -146,7 +146,7 @@
     overflow:hidden}
   #view-prove-track .e-scroll tr.ev{cursor:pointer;transition:background var(--e-dur) var(--e-ease)}
   #view-prove-track .e-scroll tr.ev:hover td{background:var(--e-hover)}
-  /* 选中态：背景 + 左侧标线双通道 [PHYS:L-001]；aria-current 在任意元素合法 */
+  /* Selected state: background + left marker, two channels [PHYS:L-001]; aria-current is valid on any element */
   #view-prove-track .e-scroll tr.ev[aria-current="true"] td{background:var(--e-soft);
     box-shadow:inset 3px 0 0 var(--e-accent)}
   #view-prove-track .e-scroll tr.ev:focus-visible{outline:2px solid var(--e-accent);outline-offset:-2px}
@@ -170,10 +170,10 @@
   #view-prove-track .e-st .d{width:7px;height:7px;border-radius:50%;background:currentColor}
   #view-prove-track .e-st.ok{color:var(--e-ok)} #view-prove-track .e-st.fail{color:var(--e-risk)}
   #view-prove-track .e-st.pending{color:var(--e-pend)} #view-prove-track .e-st.done{color:var(--e-dim)}
-  /* 摘要列：fixed 布局下占剩余宽度，单行省略号 —— 绝不溢出框 [ENG: table-layout:fixed] */
+  /* Summary column: under fixed layout it takes the remaining width, single-line ellipsis — never overflows the box [ENG: table-layout:fixed] */
   #view-prove-track .e-summ{width:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-  /* REPLY = 交付物：行内点击展开全文（再点收起），悬浮预览（统一交互，非补丁）。
-     短/全两态预渲染，CSS 切换 —— 展开显示的必须是完整回答，不是截断摘要。 */
+  /* REPLY = the deliverable: click the row to expand the full text (click again to collapse), hover to preview (one interaction, not a patch).
+     Both states are pre-rendered and switched by CSS — what expands must be the complete answer, not a truncated summary. */
   #view-prove-track tr.ev.e-reply{cursor:pointer}
   #view-prove-track tr.ev.e-reply .e-full{display:none}
   #view-prove-track tr.ev.e-reply.open .e-short{display:none}
@@ -201,7 +201,7 @@
     animation:eRippleStatic 200ms var(--e-ease) forwards}
   @keyframes eRippleStatic{from{opacity:.20}to{opacity:0}}
 
-  /* ---------- 统计栏：gap 生成分隔线，永不落在外沿 ---------- */
+  /* ---------- Stats bar: gap generates the dividers, never on the outer edge ---------- */
   #view-prove-track .e-stats{display:grid;grid-template-columns:repeat(8,1fr);gap:1px;background:var(--e-line);
     border-top:1px solid var(--e-line2)}
   @media (max-width:1040px){ #view-prove-track .e-stats{grid-template-columns:repeat(4,1fr)} }
@@ -210,7 +210,7 @@
   #view-prove-track .e-stat b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
   #view-prove-track .e-stat span{font-size:11px;color:var(--e-dim);letter-spacing:.3px}
 
-  /* ---------- 检查器（右侧抽屉，模态性随视口重协商） ---------- */
+  /* ---------- Inspector (right drawer, modality renegotiated with the viewport) ---------- */
   #view-prove-track .e-insp{position:fixed;top:0;right:0;bottom:0;width:430px;max-width:100vw;
     width:min(430px,100vw);z-index:70;
     background:var(--e-surface);border-left:1px solid var(--e-line2);box-shadow:var(--e-sh2);
@@ -232,7 +232,7 @@
     padding:9px 11px;overflow:auto;max-height:230px;margin:0;font-size:11.5px;line-height:1.6;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;
     color:var(--e-text)}
-  /* ANSI 色是工具输出的内容，不是界面 token [PHYS:L-002]；不折行，天生横向滚动 */
+  /* ANSI colors are tool output content, not interface tokens [PHYS:L-002]; no wrapping, horizontal scroll is native */
   #view-prove-track pre.e-term{background:#0E1116;color:#D5DAE1;border-color:#22262D;white-space:pre}
   #view-prove-track .e-tpre{position:relative;--e-vp-r:var(--e-r-m)}
   #view-prove-track pre.e-term .e-c-e{color:#F08C7C} #view-prove-track pre.e-term .e-c-g{color:#6FCF97}
@@ -242,11 +242,11 @@
   #view-prove-track .e-scrim.on{opacity:1;visibility:visible;transition-delay:0s}
   @media (min-width:1180px){ #view-prove-track .e-scrim{display:none} }
 
-  /* ---------- 空态：自证"空"而非"坏" [PHYS:P-014][PHYS:C-002] ---------- */
+  /* ---------- Empty state: proves "empty" rather than "broken" [PHYS:P-014][PHYS:C-002] ---------- */
   #view-prove-track .e-empty{padding:48px 20px;text-align:center;color:var(--e-dim);font-size:13px;
     background:var(--e-surface);border:1px solid var(--e-line);border-radius:var(--e-r-l)}
 
-  /* ---------- 降级 ---------- */
+  /* ---------- Degradation ---------- */
   @media (pointer:coarse){
     #view-prove-track .e-btn,#view-prove-track .e-search input{min-height:44px}
     #view-prove-track .e-search .clr{width:44px;height:44px}
@@ -255,7 +255,7 @@
     #view-prove-track .e-turn-btn{min-height:48px}
   }
   @media (max-width:720px){ #view-prove-track .e-summ{width:42%} #view-prove-track .e-insp{width:100vw} }
-  /* 窄屏让位：Tokens → 耗时依次隐藏，摘要列常驻（最小信息集） */
+  /* Narrow viewport yields: Tokens then duration hide in turn, the summary column stays (minimum information set) */
   @media (max-width:680px){ #view-prove-track .e-c-tok,#view-prove-track .e-tok{display:none} }
   @media (max-width:520px){
     #view-prove-track .e-c-ty,#view-prove-track .e-c-st,#view-prove-track .e-c-dur{width:auto}
@@ -267,7 +267,7 @@
   @media (prefers-reduced-motion:reduce){
     #view-prove-track *,#view-prove-track *::before,#view-prove-track *::after{animation-duration:1ms!important;
       animation-iteration-count:1!important;transition-duration:1ms!important}
-    /* 信息类持续动效不可降级 [PHYS:C-003]：静止暗示完成 = 不确定性 = 焦虑 */
+    /* Informational continuous motion cannot be degraded [PHYS:C-003]: standing still implies completion = uncertainty = anxiety */
     #view-prove-track .e-spin{animation:eSpin 720ms linear infinite!important}
     #view-prove-track .e-blk.wait::before{animation:eWaitPulse 1.6s var(--e-ease) infinite!important}
   }

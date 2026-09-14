@@ -1,7 +1,7 @@
 /* ============================================================
-  Cellrix 证轨视图层（ADR-0016 D1）— 状态 + 渲染 + 交互件
-  状态 S / 能力探测 HAS 归本层独占；数据层保持零状态（D6）。
-  跨资产经 window.CxProveTrack 命名空间通信（ADR-0016 D2）。
+  Cellrix ProveTrack view layer (ADR-0016 D1) — state + rendering + interaction
+  State S and capability probe HAS are owned solely by this layer; the data layer stays stateless (D6).
+  Cross-asset communication goes through the window.CxProveTrack namespace (ADR-0016 D2).
   ============================================================ */
 (function () {
   'use strict';
@@ -9,7 +9,7 @@
   var $ = PT.$, esc = PT.esc, STATUS = PT.STATUS,
       fmtDur = PT.fmtDur, fmtTok = PT.fmtTok, resultIsTerm = PT.resultIsTerm;
 
-  /* ---------- 状态 ---------- */
+  /* ---------- State ---------- */
   var S = {
     session: [], turnIds: [], turnIndex: {},
     durMode: 'equal', openTurns: {}, callsOpen: true, q: '',
@@ -33,14 +33,14 @@
     io: !!window.IntersectionObserver
   };
 
-  /* ---------- 高亮（消费 S.q） ---------- */
+  /* ---------- Highlight (consumes S.q) ---------- */
   function hl(s) {
     if (!S.q) return esc(s);
     var q = S.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return esc(s).replace(new RegExp('(' + q + ')', 'gi'), '<span class="e-hit">$1</span>');
   }
 
-  /* ---------- 统计 ---------- */
+  /* ---------- Stats ---------- */
   function renderStats() {
     var evs = S.session.filter(function (e) { return e.kind === 'ev'; });
     var turns = S.session.filter(function (e) { return e.kind === 'turn'; }).length;
@@ -55,14 +55,14 @@
       '<div class="e-stat"><b>' + turns + '</b><span>TURNS</span></div>' +
       '<div class="e-stat"><b>' + evs.length + '</b><span>STEPS</span></div>' +
       '<div class="e-stat"><b>' + calls + '</b><span>TOOL CALLS</span></div>' +
-      '<div class="e-stat"><b>' + fmtDur(llm) + '</b><span>LLM 耗时</span></div>' +
-      '<div class="e-stat"><b>' + fmtDur(toolT) + '</b><span>工具耗时</span></div>' +
+      '<div class="e-stat"><b>' + fmtDur(llm) + '</b><span>LLM TIME</span></div>' +
+      '<div class="e-stat"><b>' + fmtDur(toolT) + '</b><span>TOOL TIME</span></div>' +
       '<div class="e-stat"><b>' + fmtTok(u && u.total) + '</b><span>TOKENS</span></div>' +
-      '<div class="e-stat"><b>' + fmtTok(u && u.cached) + '</b><span>缓存命中</span></div>' +
-      '<div class="e-stat"><b>' + fmtTok(u && u.input) + '</b><span>输入 TOK</span></div>';
+      '<div class="e-stat"><b>' + fmtTok(u && u.cached) + '</b><span>CACHE HIT</span></div>' +
+      '<div class="e-stat"><b>' + fmtTok(u && u.input) + '</b><span>INPUT TOK</span></div>';
   }
 
-  /* ---------- 表格 ---------- */
+  /* ---------- Table ---------- */
   function renderTable() {
     var h = '', COLS = 5;
     for (var i = 0; i < S.session.length; i++) {
@@ -75,7 +75,7 @@
           '<button type="button" class="e-turn-btn" data-e-turntoggle="' + it.id + '" aria-expanded="' + isOpen + '">' +
           '<span style="display:inline-block;width:14px" aria-hidden="true">' + (isOpen ? '▾' : '▸') + '</span>' +
           '<span>Turn ' + it.index + ' · ' + esc(it.note) + '</span>' +
-          '<span class="cnt"> · ' + cnt + ' 事件 · ' + fmtDur(tl) + '</span>' +
+          '<span class="cnt"> · ' + cnt + ' events · ' + fmtDur(tl) + '</span>' +
           '</button></td></tr>';
         continue;
       }
@@ -94,7 +94,7 @@
         (it.type === 'REPLY' && it.full
           ? '<span class="e-short">' + hl(it.summary) + '</span><span class="e-full">' + esc(it.full) + '</span>'
           : hl(it.summary)) +
-        (it.repeat ? '<span class="e-rep">卡住 ×' + it.repeat + '</span>' : '') + '</td>' +
+        (it.repeat ? '<span class="e-rep">stuck ×' + it.repeat + '</span>' : '') + '</td>' +
         '<td><span class="e-st ' + st.c + '"><span class="d"></span>' + st.t + '</span></td>' +
         '<td class="e-dur">' + fmtDur(it.dur) + '</td>' +
         '<td class="e-tok">' + fmtTok(it.tok) + '</td></tr>';
@@ -103,7 +103,7 @@
     updTbl();
   }
 
-  /* ---------- 三轨：共用一根标尺 ---------- */
+  /* ---------- Three lanes: one shared ruler ---------- */
   function renderLanes() {
     var lanes = { input: [], model: [], tool: [] }, evs = [];
     S.session.forEach(function (e) { if (e.kind === 'ev') evs.push(e); });
@@ -114,7 +114,7 @@
       var v = e.dur > 0 ? e.dur : (e.tok / (maxTok || 1)) * maxDur * 0.5;
       return Math.max(1.2, (v / (maxDur || 1)) * 22);
     });
-    /* 待应答保底可见：无限等待按耗时投射会被压成不可见 */
+    /* Pending must stay visible: projected by duration, an unbounded wait would collapse to invisible */
     var PEND_MIN = 0.05, pendIdx = [];
     evs.forEach(function (e, i) { if (e.status === 'pending') pendIdx.push(i); });
     if (pendIdx.length) {
@@ -137,7 +137,7 @@
             (e.status === 'pending' ? ' wait' : '') + (isSel ? ' sel' : '') +
             (S.q && !hit ? ' dim' : '');
           lanes[k].push('<div class="' + cls + '" data-e-ev="' + e.id + '" aria-hidden="true" ' +
-            'title="第 ' + (idx + 1) + ' 步 · ' + esc(e.type + ' · ' + e.summary) + '" ' +
+            'title="step ' + (idx + 1) + ' · ' + esc(e.type + ' · ' + e.summary) + '" ' +
             'style="flex:0 0 ' + wPct + '"></div>');
         } else {
           lanes[k].push('<div class="e-blk e-blk-empty" aria-hidden="true" style="flex:0 0 ' + wPct + '"></div>');
@@ -148,10 +148,10 @@
     $('eLaneModel').innerHTML = lanes.model.join('');
     $('eLaneTool').innerHTML = lanes.tool.join('');
     $('eOvNote').textContent = S.durMode === 'actual'
-      ? '实际耗时：看哪个最慢（最宽 = 最久）' : '等宽：看发生了什么（忽略时长）';
+      ? 'actual time: see which is slowest (widest = longest)' : 'equal width: see what happened (duration ignored)';
   }
 
-  /* ---------- 遮挡自证：四方向统一 ---------- */
+  /* ---------- Occlusion self-evidence: one rule for four directions ---------- */
   function initEdges(vp, sc, opt) {
     opt = opt || {};
     function upd() {
@@ -181,7 +181,7 @@
     }
   }
 
-  /* ---------- 模态性随视口重协商 ---------- */
+  /* ---------- Modality renegotiated with the viewport ---------- */
   var narrowMQ = HAS.mq ? matchMedia('(max-width:1179px)') : null;
   function isModal() { return !!(narrowMQ && narrowMQ.matches); }
   function applyModality() {
@@ -192,7 +192,7 @@
     else if (narrowMQ.addListener) narrowMQ.addListener(applyModality);
   }
 
-  /* ---------- 检查器 ---------- */
+  /* ---------- Inspector ---------- */
   function openInsp(id) {
     var ev = null;
     S.session.forEach(function (e) { if (e.id === id) ev = e; });
@@ -218,18 +218,18 @@
       : '<pre>' + esc(ev.result) + '</pre>';
     $('eInspB').innerHTML =
       '<div class="e-sec"><h4>Summary</h4><dl class="e-kv">' +
-      '<dt>类型</dt><dd>' + ev.type + '</dd>' +
-      (ev.tool ? '<dt>工具</dt><dd><code>' + esc(ev.tool) + '</code></dd>' : '') +
-      '<dt>状态</dt><dd><span class="e-st ' + st.c + '"><span class="d"></span>' + st.t + '</span></dd>' +
-      '<dt>所属轮次</dt><dd>Turn ' + turnIdx + '</dd>' +
-      (ev.repeat ? '<dt>连续卡住</dt><dd style="color:var(--e-warn);font-weight:700">第 ' + ev.repeat + ' 次同类调用</dd>' : '') +
+      '<dt>Type</dt><dd>' + ev.type + '</dd>' +
+      (ev.tool ? '<dt>Tool</dt><dd><code>' + esc(ev.tool) + '</code></dd>' : '') +
+      '<dt>Status</dt><dd><span class="e-st ' + st.c + '"><span class="d"></span>' + st.t + '</span></dd>' +
+      '<dt>Turn</dt><dd>' + turnIdx + '</dd>' +
+      (ev.repeat ? '<dt>Stuck streak</dt><dd style="color:var(--e-warn);font-weight:700">' + ev.repeat + ' consecutive identical calls</dd>' : '') +
       '</dl></div>' +
       '<div class="e-sec"><h4>Payload</h4><pre>' + esc(ev.payload || '—') + '</pre></div>' +
       '<div class="e-sec"><h4>Result</h4>' + resultHtml + '</div>' +
       '<div class="e-sec"><h4>Schema</h4><pre>' + esc(ev.schema || '—') + '</pre></div>' +
       '<div class="e-sec"><h4>Timing</h4><dl class="e-kv">' +
-      '<dt>耗时</dt><dd>' + fmtDur(ev.dur) + '</dd>' +
-      '<dt>占全程</dt><dd>' + pct + '%</dd>' +
+      '<dt>Duration</dt><dd>' + fmtDur(ev.dur) + '</dd>' +
+      '<dt>Share</dt><dd>' + pct + '%</dd>' +
       '<dt>Tokens</dt><dd>' + fmtTok(ev.tok) + '</dd>' +
       '</dl></div>';
     applyModality();
@@ -259,13 +259,13 @@
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 
-  /* ---------- 重放（微光只在活跃期搭车） ---------- */
+  /* ---------- Replay (the glow only rides along while active) ---------- */
   var replayInView = true;
   function stopReplay() {
     if (S.replayTimer) { clearInterval(S.replayTimer); S.replayTimer = null; }
     S.replayIdx = -1;
     $('eReplayBtn').classList.remove('e-btn-primary');
-    $('eReplayBtn').textContent = '重放轨迹';
+    $('eReplayBtn').textContent = 'Replay';
     renderTable();
   }
   function startReplay() {
@@ -273,7 +273,7 @@
     S.session.forEach(function (e, i) { if (e.kind === 'ev') evs.push(i); });
     var i = 0;
     $('eReplayBtn').classList.add('e-btn-primary');
-    $('eReplayBtn').innerHTML = '<span class="e-spin" aria-hidden="true"></span>重放中';
+    $('eReplayBtn').innerHTML = '<span class="e-spin" aria-hidden="true"></span>Replaying';
     S.replayTimer = setInterval(function () {
       if (!replayInView || document.hidden) return;
       if (i >= evs.length) { stopReplay(); return; }
@@ -290,7 +290,7 @@
     if (document.hidden && S.replayTimer) stopReplay();
   });
 
-  /* ---------- 对外导出（供 ctrl 层消费） ---------- */
+  /* ---------- Exports (consumed by the ctrl layer) ---------- */
   PT.S = S; PT.HAS = HAS;
   PT.renderStats = renderStats; PT.renderTable = renderTable; PT.renderLanes = renderLanes;
   PT.bindTermEdges = bindTermEdges; PT.isModal = isModal; PT.applyModality = applyModality;

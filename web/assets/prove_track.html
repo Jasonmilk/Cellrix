@@ -1,84 +1,84 @@
 <!-- ============================================================
-  Cellrix · 证轨 ProveTrack — 骨架层（ADR-0016 D1）
-  数据：/api/sessions + /api/events（Anaphase 真实事件流）
-  样式见 prove_track.css · 逻辑见 prove_track.data.js / prove_track.view.js / prove_track.js
+  Cellrix · ProveTrack — skeleton layer (ADR-0016 D1)
+  Data: /api/sessions + /api/events (the real Anaphase event stream)
+  Styles in prove_track.css · logic in prove_track.data.js / prove_track.view.js / prove_track.js
   ============================================================ -->
-<div class="e-wrap" id="eWrap">
-  <div class="e-empty" id="eEmpty">左侧选择一段经历，证轨在这里展开为可审计的轨迹。</div>
+<div class="e-wrap" id="eWrap" data-page-node-id="DNEKux8bmSFKA09IUUT2C5">
+  <div class="e-empty" id="eEmpty" data-page-node-id="90zESMZQsF5u0dfPdQJKZl">Pick a session on the left; the trajectory unfolds here as an auditable trace.</div>
 
-  <div class="e-traj" id="eTraj" style="display:none">
-    <div class="e-tools">
-      <button type="button" class="e-btn e-btn-sm" id="eDurBtn" data-e-ripple aria-pressed="false">
-        <span id="eDurLbl">等宽</span>
+  <div class="e-traj" id="eTraj" style="display:none" data-page-node-id="2A1k4uZZA1YMyObsruak9d">
+    <div class="e-tools" data-page-node-id="njlbgVfgL9blifmY5tcrAS">
+      <button type="button" class="e-btn e-btn-sm" id="eDurBtn" data-e-ripple aria-pressed="false" data-page-node-id="x4oC0JOoNRBdMMjr911zrH">
+        <span id="eDurLbl" data-page-node-id="rFCkFQDfjRzDsBxPF7A4DU">Equal width</span>
       </button>
-      <button type="button" class="e-btn e-btn-sm" id="eTurnBtn" data-e-ripple aria-pressed="true">全部折叠轮次</button>
-      <button type="button" class="e-btn e-btn-sm" id="eCallBtn" data-e-ripple aria-pressed="true">全部展开调用</button>
-      <button type="button" class="e-btn e-btn-sm e-btn-primary" id="eReplayBtn" data-e-ripple>重放轨迹</button>
-      <div class="sp"></div>
-      <div class="e-search">
-        <span class="ico" aria-hidden="true">⌕</span>
-        <input id="eQ" placeholder="在轨迹中搜索…" aria-label="搜索轨迹">
-        <button type="button" class="clr" id="eQClr" aria-label="清除搜索">✕</button>
+      <button type="button" class="e-btn e-btn-sm" id="eTurnBtn" data-e-ripple aria-pressed="true" data-page-node-id="DslTO0jjcqJAB05V0pUkDH">Collapse all turns</button>
+      <button type="button" class="e-btn e-btn-sm" id="eCallBtn" data-e-ripple aria-pressed="true" data-page-node-id="zIj04LNSTDCncIx8RuRLTT">Expand all calls</button>
+      <button type="button" class="e-btn e-btn-sm e-btn-primary" id="eReplayBtn" data-e-ripple data-page-node-id="06HntzRvRq4JEusG7mhoLF">Replay</button>
+      <div class="sp" data-page-node-id="CH5ZWrhe64j04qAiWdXnv7"></div>
+      <div class="e-search" data-page-node-id="waV1SuUH9azdsARyjIg0FH">
+        <span class="ico" aria-hidden="true" data-page-node-id="c85X5q8sUN86F1za6o4UH1">⌕</span>
+        <input id="eQ" placeholder="Search the trajectory…" aria-label="Search trajectory" data-page-node-id="sW2AFIc0i4c9NVcFR7gZyA">
+        <button type="button" class="clr" id="eQClr" aria-label="Clear search" data-page-node-id="OnmjY4dQqKaBkcnZz1FUyS">✕</button>
       </div>
     </div>
 
-    <div class="e-ov">
-      <div class="e-ov-hd">
-        <span class="e-ov-t">OVERVIEW · 时间投影</span>
-        <span class="e-mini" id="eOvNote" style="margin:0">等宽：看发生了什么</span>
+    <div class="e-ov" data-page-node-id="RGT07tBbD4RGebpTy32L4H">
+      <div class="e-ov-hd" data-page-node-id="HRU7GIn6PYioApnLPk9Rfy">
+        <span class="e-ov-t" data-page-node-id="qY0Er3znyD6JoF41xcsvbO">OVERVIEW · time projection</span>
+        <span class="e-mini" id="eOvNote" style="margin:0" data-page-node-id="zTVcSdI57raQaOLYTOJEqq">Equal width: see what happened</span>
       </div>
-      <div class="e-trk"><span class="e-trk-nm">Input</span><div class="e-lane" id="eLaneInput"></div></div>
-      <div class="e-trk"><span class="e-trk-nm">Model</span><div class="e-lane" id="eLaneModel"></div></div>
-      <div class="e-trk"><span class="e-trk-nm">Tools</span><div class="e-lane" id="eLaneTool"></div></div>
-      <div class="e-legend">
-        <span><i class="input"></i>用户输入 / 上下文注入</span>
-        <span><i class="model"></i>模型推理</span>
-        <span><i class="tool"></i>工具执行 / 判据</span>
-        <span style="color:var(--e-risk)">▮ 描边 = 失败</span>
-        <span style="color:var(--e-warn)">▮ 脉冲 = 等待应答</span>
+      <div class="e-trk" data-page-node-id="vJAl7mMKjnLsY5yOrZqm8o"><span class="e-trk-nm" data-page-node-id="GEKJtUvUgxDuwTrVM3tHxU">Input</span><div class="e-lane" id="eLaneInput" data-page-node-id="AGQTMBztewaYMQHW6uEmfL"></div></div>
+      <div class="e-trk" data-page-node-id="2pULeYzLPynmZOdhnMLZu8"><span class="e-trk-nm" data-page-node-id="q5Gpm2nK8sa6qsDYuxyvoE">Model</span><div class="e-lane" id="eLaneModel" data-page-node-id="pvhIQ8CVz9F6x7lksd4ABX"></div></div>
+      <div class="e-trk" data-page-node-id="wexaZ6hdTWsdAkqnATBNUm"><span class="e-trk-nm" data-page-node-id="qf7K7FglXBM2NzGpIFdWbM">Tools</span><div class="e-lane" id="eLaneTool" data-page-node-id="XPP1qlElkN6giuCVhg6zjS"></div></div>
+      <div class="e-legend" data-page-node-id="gaSYW5isJBYIngBl5CRdET">
+        <span data-page-node-id="rVAC5AikOJguRh10n0oma3"><i class="input" data-page-node-id="CSJCJN4YCVHG3lbIo6irdd"></i>user input / context injection</span>
+        <span data-page-node-id="t3QoQI7mYEX4AZHm5Ad4VR"><i class="model" data-page-node-id="yyFwey4srObOOFMzjOVQZf"></i>model reasoning</span>
+        <span data-page-node-id="mGYWbjGVl0gr9j98VVNo7R"><i class="tool" data-page-node-id="hdZzfiUFWsVIDuVKukifdI"></i>tool execution / criterion</span>
+        <span style="color:var(--e-risk)" data-page-node-id="7e3nmI0vscA79OP9onyH85">▮ outline = failure</span>
+        <span style="color:var(--e-warn)" data-page-node-id="f6Miss38SSrfCYv2hdDh87">▮ pulse = awaiting response</span>
       </div>
-      <p class="e-mini" style="margin:8px 0 0">
-        三轨共用一根横向标尺：每一列在三轨上是同一步。空白处不是"没画"，
-        是<b>那一步这条轨确实空闲</b>——工具跑 8 秒时模型轨是空的，这件事现在能读出来了。
+      <p class="e-mini" style="margin:8px 0 0" data-page-node-id="mij1UiZunwVqvSg960LXSl">
+        The three lanes share one horizontal ruler: each column is the same step on all three. A blank is not "unpainted";
+        it is <b data-page-node-id="N75maCmmH9ap479I6SiDoa">that lane being genuinely idle at that step</b> — while a tool ran for 8 seconds the model lane was empty, and that is now legible.
       </p>
     </div>
 
-    <div class="e-vp" id="eTblVp">
-      <div class="e-scroll" id="eTblScroll" tabindex="0" role="region" aria-label="轨迹事件表">
-        <table>
-          <caption class="e-sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">轨迹事件表，按轮次组织</caption>
-          <thead><tr>
-            <th scope="col" class="e-c-ty">类型</th>
-            <th scope="col">摘要</th>
-            <th scope="col" class="e-c-st">状态</th>
-            <th scope="col" class="e-c-dur">耗时</th>
-            <th scope="col" class="e-c-tok">Tokens</th>
+    <div class="e-vp" id="eTblVp" data-page-node-id="RRUDu0XP7GqoeFWz0oDwle">
+      <div class="e-scroll" id="eTblScroll" tabindex="0" role="region" aria-label="trajectory event table" data-page-node-id="eAvmUUHTjORgcSoxJqYqsN">
+        <table data-page-node-id="A2Sya03yHnuHlZJPvHtc1c">
+          <caption class="e-sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)" data-page-node-id="aIPv8IjzEm2cwtlqLw8E19">Trajectory event table, organized by turn</caption>
+          <thead data-page-node-id="sIze0ByGE9FAkaek7uRVFR"><tr data-page-node-id="3FB0ymFSMS8gShrAX4OGfO">
+            <th scope="col" class="e-c-ty" data-page-node-id="FFHFrA57TbKL7pN6Q1eluL">Type</th>
+            <th scope="col" data-page-node-id="ERQYPlQbaQMFnyOWSAvAb6">Summary</th>
+            <th scope="col" class="e-c-st" data-page-node-id="Enm9QGAbWFVwEE6qhw8G43">Status</th>
+            <th scope="col" class="e-c-dur" data-page-node-id="o7YqncWTxmrEhv3utlKNcV">Duration</th>
+            <th scope="col" class="e-c-tok" data-page-node-id="osQP5DTqVjFFx2pix0yLcC">Tokens</th>
           </tr></thead>
-          <tbody id="eTbody"></tbody>
+          <tbody id="eTbody" data-page-node-id="i8XUjiZ3VLLjgbtsSzIuD8"></tbody>
         </table>
       </div>
-      <i class="e-eg t" aria-hidden="true"></i><i class="e-eg b" aria-hidden="true"></i>
-      <i class="e-eg l" aria-hidden="true"></i><i class="e-eg r" aria-hidden="true"></i>
+      <i class="e-eg t" aria-hidden="true" data-page-node-id="7GLQnMxQ8ejbmlPdKUDTFs"></i><i class="e-eg b" aria-hidden="true" data-page-node-id="nTUL7uzuhGalZqso9DRADI"></i>
+      <i class="e-eg l" aria-hidden="true" data-page-node-id="Ftm0utL8MXFgJeqy05l5BP"></i><i class="e-eg r" aria-hidden="true" data-page-node-id="pk3iuCW8njYKqFbMkkHwq0"></i>
     </div>
 
-    <div class="e-stats" id="eStats"></div>
+    <div class="e-stats" id="eStats" data-page-node-id="60z3UeaPJCpNCt8lZhKpG5"></div>
   </div>
 
-  <p class="e-mini" style="margin-top:12px" id="eHint" style="display:none">
-    点任意一行 → 右侧检查器展开该事件的 <b>Summary / Payload / Result / Schema / Timing</b>。
-    整条轨迹是一个闭环对象。表格只纵向滚动，被遮住的下边浮起一道极窄的暗示。
+  <p class="e-mini" style="margin-top:12px" id="eHint" style="display:none" data-page-node-id="QIhgZ0e0fru2Ia76OOfGws">
+    Click any row → the inspector on the right unfolds that event's <b data-page-node-id="O0UmLjUEYL4nYzc1HxBP0O">Summary / Payload / Result / Schema / Timing</b>.
+    The whole trajectory is one closed-loop object. The table scrolls vertically only; a covered bottom edge lifts into a very narrow hint.
   </p>
 </div>
 
-<div class="e-scrim" id="eScrim"></div>
-<aside class="e-insp" id="eInsp" role="dialog" aria-labelledby="eInspT">
-  <div class="e-insp-hd">
-    <div><h3 id="eInspT">事件</h3><div class="sb" id="eInspS"></div></div>
-    <button type="button" class="e-btn e-btn-sm" id="eInspX" data-e-ripple aria-label="关闭检查器">✕</button>
+<div class="e-scrim" id="eScrim" data-page-node-id="Wi1wmGBfijShVFnPhZeDZK"></div>
+<aside class="e-insp" id="eInsp" role="dialog" aria-labelledby="eInspT" data-page-node-id="yKzNGAWMmz0WtDY3XOohhY">
+  <div class="e-insp-hd" data-page-node-id="LhyLUEXZZEXnIqXi7JUIM8">
+    <div data-page-node-id="ocMBFuNM3WqiO6fDhSxvTJ"><h3 id="eInspT" data-page-node-id="henC4MklxlXeK88CFdnDo3">Event</h3><div class="sb" id="eInspS" data-page-node-id="IQ4KurKduyRVTQy7rMbY14"></div></div>
+    <button type="button" class="e-btn e-btn-sm" id="eInspX" data-e-ripple aria-label="Close inspector" data-page-node-id="iBrQEiUtvTl0I7H0n5F8cN">✕</button>
   </div>
-  <div class="e-vp" style="flex:1 1 auto;min-height:0">
-    <div class="e-insp-bd" id="eInspB"></div>
-    <i class="e-eg t" aria-hidden="true"></i><i class="e-eg b" aria-hidden="true"></i>
-    <i class="e-eg l" aria-hidden="true"></i><i class="e-eg r" aria-hidden="true"></i>
+  <div class="e-vp" style="flex:1 1 auto;min-height:0" data-page-node-id="RRiZVX1Ed05RPOHFYhtyQG">
+    <div class="e-insp-bd" id="eInspB" data-page-node-id="JyIfhLfcgEr2QMKOJSTcEi"></div>
+    <i class="e-eg t" aria-hidden="true" data-page-node-id="sI8CsOGnHdcGwloVUEdRMI"></i><i class="e-eg b" aria-hidden="true" data-page-node-id="6sYicJAgZst6OJQQDhAgtv"></i>
+    <i class="e-eg l" aria-hidden="true" data-page-node-id="tbc7ZBUyZV4z832BjBJvUV"></i><i class="e-eg r" aria-hidden="true" data-page-node-id="G4H4VQGJGmOhGmDtYnQZRr"></i>
   </div>
 </aside>
