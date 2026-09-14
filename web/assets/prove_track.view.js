@@ -14,7 +14,8 @@
     session: [], turnIds: [], turnIndex: {},
     durMode: 'equal', openTurns: {}, callsOpen: true, q: '',
     sel: null, replayIdx: -1, replayTimer: null,
-    lastFocusEv: null, lastFocusEl: null, meta: null
+    lastFocusEv: null, lastFocusEl: null, meta: null,
+    usage: null
   };
 
   var HAS = {
@@ -46,15 +47,19 @@
     var calls = evs.filter(function (e) { return e.type === 'TOOL' && e.status === 'pending'; }).length;
     var llm = evs.reduce(function (a, e) { return a + ((e.type === 'THINK' || e.type === 'ATTEMPT') ? e.dur : 0); }, 0);
     var toolT = evs.reduce(function (a, e) { return a + (e.type === 'TOOL' ? e.dur : 0); }, 0);
+    // The metering cells read the derived result of derivePeriodUsage
+    // (computed by the control layer at load time). No data means em dash —
+    // never an estimate (ADR-0038 D11).
+    var u = S.usage;
     $('eStats').innerHTML =
       '<div class="e-stat"><b>' + turns + '</b><span>TURNS</span></div>' +
       '<div class="e-stat"><b>' + evs.length + '</b><span>STEPS</span></div>' +
       '<div class="e-stat"><b>' + calls + '</b><span>TOOL CALLS</span></div>' +
       '<div class="e-stat"><b>' + fmtDur(llm) + '</b><span>LLM 耗时</span></div>' +
       '<div class="e-stat"><b>' + fmtDur(toolT) + '</b><span>工具耗时</span></div>' +
-      '<div class="e-stat"><b>—</b><span>TOKENS</span></div>' +
-      '<div class="e-stat"><b>—</b><span>缓存命中</span></div>' +
-      '<div class="e-stat"><b>—</b><span>TOK/S</span></div>';
+      '<div class="e-stat"><b>' + fmtTok(u && u.total) + '</b><span>TOKENS</span></div>' +
+      '<div class="e-stat"><b>' + fmtTok(u && u.cached) + '</b><span>缓存命中</span></div>' +
+      '<div class="e-stat"><b>' + fmtTok(u && u.input) + '</b><span>输入 TOK</span></div>';
   }
 
   /* ---------- 表格 ---------- */

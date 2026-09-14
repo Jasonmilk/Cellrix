@@ -9,6 +9,7 @@
   var PT = window.CxProveTrack || {};
   var $ = PT.$, esc = PT.esc, S = PT.S, HAS = PT.HAS,
       buildSession = PT.buildSession, computeRepeats = PT.computeRepeats,
+      derivePeriodUsage = PT.derivePeriodUsage,
       renderStats = PT.renderStats, renderTable = PT.renderTable, renderLanes = PT.renderLanes,
       openInsp = PT.openInsp, closeInsp = PT.closeInsp, isModal = PT.isModal,
       applyModality = PT.applyModality, stopReplay = PT.stopReplay, startReplay = PT.startReplay;
@@ -21,8 +22,8 @@
     if (blk) { openInsp(blk.dataset.ev); return; }
     if (row) {
       // REPLY = the deliverable: click toggles the full answer inline
-      // (DSH: the answer is the body, detail is one tap away). Other rows
-      // open the inspector as before.
+      // (the answer is the body; detail is one tap away). Other rows open
+      // the inspector as before.
       if (row.classList.contains('e-reply')) {
         row.classList.toggle('open');
         if (row.classList.contains('open')) row.scrollIntoView({ block: 'nearest' });
@@ -103,7 +104,7 @@
   window.__proveTrackClear = function () {
     stopReplay();
     if (S.sel) closeInsp();
-    S.session = []; S.turnIds = []; S.turnIndex = {};
+    S.session = []; S.turnIds = []; S.turnIndex = {}; S.usage = null;
     S.q = ''; $('eQ').value = '';
     $('eTraj').style.display = 'none';
     $('eEmpty').style.display = '';
@@ -126,6 +127,7 @@
         return;
       }
       S.session = buildSession(j.events, meta);
+      S.usage = derivePeriodUsage(j.events);
       S.turnIds = [];
       S.session.forEach(function (e) { if (e.kind === 'turn') { S.turnIds.push(e.id); S.turnIndex[e.id] = e.index; } });
       S.turnIds.forEach(function (id) { S.openTurns[id] = true; });
