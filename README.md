@@ -48,8 +48,8 @@
 > now guards it. `cargo test --no-fail-fast` = **341 passed / 0 failed**.
 >
 > **Status 2026-09-09 (ADR-0015 D14)**: Session management deepened under
-> the **水之波光 · 触境** component language, **DSH skeleton** (dshbook ch.1:
-> session log = durable facts, click = resume progress). Chat sidebar now
+> the **水之波光 · 触境** component language, on a **durable-session-log skeleton**
+> (the log is the fact; a click resumes progress). Chat sidebar now
 > **loads a period's history into the chat space** on click (period-head +
 > messages + resume anchor + banner + highlight), inline rename (✎ →
 > edit-in-place on the title row, Enter save / Esc cancel, toast feedback,
@@ -82,7 +82,7 @@
 > reduced-motion / high-contrast / narrow screens (卷三 3.5.3).
 >
 > **Status 2026-09-08**: Web panel (:8080) is now the primary white-box
-> window (ADR-0033): 证轨 ProveTrack (pre-v3) was a DSH-style **turn outline**;
+> window (ADR-0033): 证轨 ProveTrack (pre-v3) was a **turn outline**;
 > chat shows a collapsible **思考 (think) row** (streamed `think` field,
 > display-only, never judged) and the SSE stream is deterministically
 > drained (events before the terminal `{done,reply}`, reply is
@@ -396,7 +396,7 @@ SA-Core 选择白盒**：`SA-Core 选择 {L1×9 L3×11}` + top 节点短 id · h
 过滤（命中行高亮）。真实数据无 tokens 字段时显示 `—`（物理事实优先，不猜数）。
 **继续** = 显式续聊：带 `job_id` 发起新一轮，上一轮摘要作为 true history
 注入，新轮 `context/inject` 记 `resume_from`。会话 = 经历（ADR-0026），
-判据与行动同线——这是 Helix 相对 DSH 轨迹多出的一层（DSH 没有 verdict）。
+判据与行动同线——这是 Helix 证轨比通用轨迹多出的一层（通用轨迹没有 verdict）。
 对话视图同一经历列表（一份数据两个入口）。
 
 ### 6.8 界面选择（2026-09-07）
