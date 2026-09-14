@@ -455,6 +455,7 @@ fn restart_all(
     anaphase_endpoint: &str,
     tuck_endpoint: &str,
     tuck_key: &str,
+    args: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!();
     println!("  ─────────────────────────────────────");
@@ -575,6 +576,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &anaphase_endpoint,
             &tuck_endpoint,
             &tuck_key,
+            &args,
         );
     }
 
