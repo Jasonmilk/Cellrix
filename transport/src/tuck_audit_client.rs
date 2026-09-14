@@ -1,4 +1,4 @@
-//! Tuck audit client — fetches the Engram imprint from `GET /v1/audit`.
+//! Tuck audit client — fetches the ProveTrack imprint from `GET /v1/audit`.
 //!
 //! The gateway's audit endpoint is read-only and identity-gated
 //! (fail-closed: no credential → 401). The caller credential is the Tuck
@@ -14,7 +14,7 @@
 //! - **极致解耦**: this client only knows the HTTP contract; rendering and
 //!   state live in cellrix-ui.
 
-use cellrix_protocol::engram::EngramQuery;
+use cellrix_protocol::prove_track::ProveTrackQuery;
 use serde::Serialize;
 
 /// Error surfaced to the UI layer.
@@ -43,7 +43,7 @@ pub struct AuditQuery {
 #[async_trait::async_trait]
 pub trait TuckAuditFetcher: Send + Sync {
     /// Fetch entries matching `q`.
-    async fn fetch(&self, q: &AuditQuery) -> Result<EngramQuery, AuditClientError>;
+    async fn fetch(&self, q: &AuditQuery) -> Result<ProveTrackQuery, AuditClientError>;
 }
 
 /// HTTP client for the Tuck governance gateway's read-only audit endpoint.
@@ -71,7 +71,7 @@ impl TuckAuditClient {
     /// fragment separator; reqwest percent-encodes it in the query string
     /// (`%23`) — we pass the raw id and let the encoder do the right thing
     /// (pre-encoding here would double-encode the `%`).
-    pub async fn query(&self, q: &AuditQuery) -> Result<EngramQuery, AuditClientError> {
+    pub async fn query(&self, q: &AuditQuery) -> Result<ProveTrackQuery, AuditClientError> {
         let mut params: Vec<(String, String)> = Vec::new();
         if let Some(t) = &q.trace_id {
             params.push(("trace_id".into(), t.clone()));
@@ -109,7 +109,7 @@ impl TuckAuditClient {
 
 #[async_trait::async_trait]
 impl TuckAuditFetcher for TuckAuditClient {
-    async fn fetch(&self, q: &AuditQuery) -> Result<EngramQuery, AuditClientError> {
+    async fn fetch(&self, q: &AuditQuery) -> Result<ProveTrackQuery, AuditClientError> {
         self.query(q).await
     }
 }
@@ -142,7 +142,7 @@ mod tests {
 
     /// End-to-end over a real TCP loopback server: proves the Bearer
     /// credential is attached, the `#` trace id is percent-encoded, and the
-    /// response deserializes into `EngramQuery` — no mocks in the client.
+    /// response deserializes into `ProveTrackQuery` — no mocks in the client.
     /// All I/O is async (`tokio::net`): a blocking std socket would starve
     /// the current-thread runtime and deadlock the test.
     #[tokio::test]

@@ -12,15 +12,15 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function showView(v) {
     document.getElementById('view-cockpit').style.display = v==='cockpit' ? '' : 'none';
-    document.getElementById('view-engram').style.display = v==='engram' ? '' : 'none';
+    document.getElementById('view-prove-track').style.display = v==='prove-track' ? '' : 'none';
     document.getElementById('view-chat').style.display = v==='chat' ? '' : 'none';
     document.getElementById('view-flows').style.display = v==='flows' ? '' : 'none';
     document.getElementById('v-cockpit').className = 'btn' + (v==='cockpit' ? ' on' : '');
-    document.getElementById('v-engram').className = 'btn' + (v==='engram' ? ' on' : '');
+    document.getElementById('v-prove-track').className = 'btn' + (v==='prove-track' ? ' on' : '');
     document.getElementById('v-chat').className = 'btn' + (v==='chat' ? ' on' : '');
     document.getElementById('v-flows').className = 'btn' + (v==='flows' ? ' on' : '');
     if (v==='chat') document.getElementById('chat-text').focus();
-    if ((v==='engram' || v==='chat') && window.CxSession) window.CxSession.loadSessions();
+    if ((v==='prove-track' || v==='chat') && window.CxSession) window.CxSession.loadSessions();
     if (v==='flows' && window.CxFlows) window.CxFlows.load();
   }
 
@@ -32,8 +32,8 @@
     esc: esc,
     showView: showView,
     selectPeriod: function (jobId) {
-      var meta = window.__engramMeta || null;
-      if (window.__engramLoad) window.__engramLoad(jobId, meta);
+      var meta = window.__proveTrackMeta || null;
+      if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, meta);
     },
     addMsg: addMsg,
     showToast: showToast
@@ -205,7 +205,7 @@
               if (j.reply) bodyEl.textContent = j.reply;
               // Continuation anchor (ADR-0026): this period's job becomes
               // the next resume_from, so consecutive messages stay ONE
-              // conversation (threaded in the Engram session list), never
+              // conversation (threaded in the ProveTrack session list), never
               // fragments. Cleared only by "+ 新对话".
               if (j.job_id) window.Cx.state.chatJobId = j.job_id;
               finish(); return;
@@ -255,7 +255,7 @@
       var box = document.getElementById('entries');
       if (!ledger.length) { box.innerHTML = '<tr><td colspan="5"><div class="empty">暂无记录（Noop 模式 ledger 为空——配置 reasoning 后产生）</div></td></tr>'; return; }
       // 水之波光 Ledger 表格：状态/时间/trace_id/调用/说明 五列 + 点击展开 payload。
-      // 与印痕事件表同构（碳硅同看同一账本），但数据源是 Tuck 审计链。
+      // 与证轨事件表同构（碳硅同看同一账本），但数据源是 Tuck 审计链。
       // ≤620px 降级为纵向卡片堆叠（td data-label 标签在上/值在下，首列自明）。
       var rows = '';
       ledger.slice().reverse().forEach(function (e) {

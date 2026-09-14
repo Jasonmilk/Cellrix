@@ -41,7 +41,7 @@
   }
 
   // `chatMode` drives the click behaviour: the chat sidebar loads the
-  // period's history into the chat space (resume), the engram sidebar
+  // period's history into the chat space (resume), the prove_track sidebar
   // opens its trajectory. One component, two intents [极致复用].
   function renderSide(id, periods, empty, chatMode) {
     var box = document.getElementById(id);
@@ -104,8 +104,8 @@
           setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
           document.getElementById('chat-text').focus();
         } else {
-          window.__engramMeta = { job_id: p.job_id, name: p.name, preview: p.preview };
-          Cx.showView('engram');
+          window.__proveTrackMeta = { job_id: p.job_id, name: p.name, preview: p.preview };
+          Cx.showView('prove-track');
           Cx.selectPeriod(p.job_id);
         }
       };
@@ -284,7 +284,7 @@
   window.toggleResume = toggleResume; // chat.html onclick 内联依赖全局
 
   // 页面就绪即加载一次列表（默认停在 cockpit，切换视图再刷新）——
-  // 对话/印痕侧栏不因"没切过视图"而停留在"加载中"。
+  // 对话/证轨侧栏不因"没切过视图"而停留在"加载中"。
   if (document.getElementById('s-side')) loadSessions();
 })();
 </script>

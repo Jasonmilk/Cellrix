@@ -1,10 +1,10 @@
-//! Engram — the full-chain audit imprint view (ADR-0004 D9/D11/D12).
+//! ProveTrack — the full-chain audit imprint view (ADR-0004 D9/D11/D12).
 //!
-//! An "engram" is the physical trace Helix leaves behind: every governed
+//! An "prove_track" is the physical trace Helix leaves behind: every governed
 //! call (request + response), its detection verdicts, the caller identity,
 //! the destination class, and the tamper-evident hash chain. The audit
 //! chain never stores request/response bodies (that would be a sensitive
-//! data lake — ADR-0004), so an engram is metadata + chain integrity, not
+//! data lake — ADR-0004), so an prove_track is metadata + chain integrity, not
 //! a replay of content.
 //!
 //! # Design principles
@@ -22,9 +22,9 @@ use serde_json::Value;
 
 /// One `GET /v1/audit` response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EngramQuery {
+pub struct ProveTrackQuery {
     /// Entries, oldest first (the chain order).
-    pub entries: Vec<EngramEntry>,
+    pub entries: Vec<ProveTrackEntry>,
     /// Number of entries returned by this query.
     pub count: usize,
     /// Caller identity that performed the query (audited itself).
@@ -33,13 +33,13 @@ pub struct EngramQuery {
 
 /// One audit-chain entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EngramEntry {
+pub struct ProveTrackEntry {
     /// Monotonic sequence — the chain cursor.
     pub seq: u64,
     /// RFC3339 timestamp from the gateway's clock.
     pub ts: String,
     /// The payload (request / response / event).
-    pub payload: EngramPayload,
+    pub payload: ProveTrackPayload,
     /// SHA-256 of the previous entry ("" for the genesis entry).
     pub prev_hash: String,
     /// SHA-256 of this entry — the tamper-evidence link.
@@ -48,7 +48,7 @@ pub struct EngramEntry {
 
 /// The payload of one chain entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EngramPayload {
+pub struct ProveTrackPayload {
     /// Entry kind: "request" | "response" | ... (open).
     pub kind: String,
     /// Derived trace id (`{job_id}#{index}`) — joins this imprint to the
@@ -61,7 +61,7 @@ pub struct EngramPayload {
     pub data: Value,
 }
 
-impl EngramEntry {
+impl ProveTrackEntry {
     /// Short one-line summary for the timeline column.
     pub fn summary(&self) -> String {
         let action = self
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn parses_real_audit_shape() {
-        let q: EngramQuery = serde_json::from_str(SAMPLE).unwrap();
+        let q: ProveTrackQuery = serde_json::from_str(SAMPLE).unwrap();
         assert_eq!(q.count, 1);
         let e = &q.entries[0];
         assert_eq!(e.payload.kind, "request");
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn response_entry_has_status() {
-        let q: EngramQuery = serde_json::from_str(SAMPLE).unwrap();
+        let q: ProveTrackQuery = serde_json::from_str(SAMPLE).unwrap();
         let e = &q.entries[0];
         assert_eq!(e.status(), None); // request entry has no status
         assert!(e.summary().contains("e2e#1"));

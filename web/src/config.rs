@@ -2,7 +2,7 @@
 //!
 //! Zero-hardcoding: endpoint defaults are the documented protocol defaults
 //! (ADR-0010 / Tuck gateway); `--tuck-limit` default 200 matches the CLI
-//! contract; unset tuck -> Engram shows a setup hint.
+//! contract; unset tuck -> ProveTrack shows a setup hint.
 
 /// Web panel listening port when no `--port`/`WEB_PORT` is given (this
 /// panel's documented protocol default; unassigned common HTTP port).

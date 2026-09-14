@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cellrix — Cockpit + Engram</title>
+<title>Cellrix — Cockpit + ProveTrack</title>
   <meta name="color-scheme" content="dark light">
   <script>
   (function(){
@@ -20,12 +20,12 @@
   __TOKENS__
   __COMPONENTS__
 <body>
-  <h1>Cellrix — 驾驶舱 · 印痕</h1>
+  <h1>Cellrix — 驾驶舱 · 证轨</h1>
   <div class="sub" id="sub">连接中…</div>
   <div class="bar">
     <nav class="nav" aria-label="视图">
       <button type="button" class="btn on" id="v-cockpit" onclick="showView('cockpit')">驾驶舱 Cockpit</button>
-      <button type="button" class="btn" id="v-engram" onclick="showView('engram')">印痕 Engram</button>
+      <button type="button" class="btn" id="v-prove-track" onclick="showView('prove-track')">证轨 ProveTrack</button>
       <button type="button" class="btn" id="v-chat" onclick="showView('chat')">对话 Chat</button>
       <button type="button" class="btn" id="v-flows" onclick="showView('flows')">检定台 Flows</button>
     </nav>
@@ -45,11 +45,11 @@
     __COCKPIT__
   </div>
 
-  <div id="view-engram" style="display:none;">
-    <div class="head" style="margin-bottom:12px">印痕 Engram — 全链路可审计轨迹（会话 = 经历 · 判据与行动同线 · 水之波光 v11.2.0 骨架）</div>
-    <div class="engram-main" style="grid-template-columns:280px 1fr;">
+  <div id="view-prove-track" style="display:none;">
+    <div class="head" style="margin-bottom:12px">证轨 ProveTrack — 全链路可审计轨迹（会话 = 经历 · 判据与行动同线 · 水之波光 v11.2.0 骨架）</div>
+    <div class="prove-track-main" style="grid-template-columns:280px 1fr;">
       <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
-      <div id="s-main">__ENGRAM__</div>
+      <div id="s-main">__PROVE_TRACK__</div>
     </div>
   </div>
 

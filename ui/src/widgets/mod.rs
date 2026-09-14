@@ -13,7 +13,7 @@ mod code_diff;
 mod metrics;
 mod fallback;
 mod audit;
-pub mod engram;
+pub mod prove_track;
 mod pfp_widget;
 mod security_notification;
 mod helix_mind_widget;
@@ -29,7 +29,7 @@ pub use code_diff::CodeDiffWidget;
 pub use metrics::MetricsWidget;
 pub use fallback::FallbackWidget;
 pub use audit::{AuditLogState, AuditLogWidget, AuditStatsWidget, AuditDetailWidget, AuditFilter};
-pub use engram::{EngramViewState, render_engram};
+pub use prove_track::{ProveTrackViewState, render_prove_track};
 pub use pfp_widget::{PFPWidget, RiskLevelIndicator, PFPStatusBar};
 pub use security_notification::{
     SecurityEvent, SecurityEventType, SecurityEventStatus, SecurityEventQueue,

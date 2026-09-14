@@ -19,22 +19,22 @@
   （run-8bba24c5ee368a4a#0 三判据全过）→ Web 透传可见
 - Cellrix 316 → 319 全绿；React 孤儿组件（HolographicGrid 等）留待优化期
 
-## 健康快照 #11：Engram（印痕）审计面板（2026-09-07）
+## 健康快照 #11：ProveTrack（证轨）审计面板（2026-09-07）
 
-**变异类型**：全链路审计印痕视图——用户"轨迹改名为 Engram-印痕，因为我们是全链路的审计"；"Cellrix用自己的方式展示面板，二维网格按比例布局，按需加载按需驱动"
+**变异类型**：全链路审计证轨视图——用户"轨迹改名为 ProveTrack-证轨，因为我们是全链路的审计"；"Cellrix用自己的方式展示面板，二维网格按比例布局，按需加载按需驱动"
 
-- `protocol/src/engram.rs`：真实 `/v1/audit` 链格式（seq/ts/payload/prev_hash/hash，trace_id 派生非 UUID）
+- `protocol/src/prove_track.rs`：真实 `/v1/audit` 链格式（seq/ts/payload/prev_hash/hash，trace_id 派生非 UUID）
 - `transport/src/tuck_audit_client.rs`：TuckAuditClient + TuckAuditFetcher trait（Bearer 注入、`#`→reqwest 自动 %23、limit 窗口）
-- `ui/src/widgets/engram.rs`：EngramViewState + render_engram 纯函数（概览/时间线/详情三面板比例网格、虚拟列表、本地 trace 过滤）
-- `ui/src/app.rs`：attach_engram 轮询 + `state.set_engram`；handler Ctrl+E 切换视图，f/g/↑/↓/Esc
+- `ui/src/widgets/prove_track.rs`：ProveTrackViewState + render_prove_track 纯函数（概览/时间线/详情三面板比例网格、虚拟列表、本地 trace 过滤）
+- `ui/src/app.rs`：attach_prove_track 轮询 + `state.set_prove_track`；handler Ctrl+E 切换视图，f/g/↑/↓/Esc
 - 物理验证：TCP loopback 端到端（Bearer + %23 + 解析）+ **live 真实网关**（`--ignored live`：链完整性逐条校验 hash==prev_hash）
 - 排障记录：std 阻塞 accept 卡死 current_thread runtime（改 tokio::net）；`replace('#','%23')` 双重编码（交 reqwest 自动编码）；header 大小写（hyper 小写化）
-- Cellrix 321 → **325** 全绿（`--all-features`，0 failed）；Engram 数据层/状态层纯逻辑，Web 端可同构复用（TUI=Web 单一状态模型）
+- Cellrix 321 → **325** 全绿（`--all-features`，0 failed）；ProveTrack 数据层/状态层纯逻辑，Web 端可同构复用（TUI=Web 单一状态模型）
 
 
-## 健康快照 #13：印痕 v3 —— 甘特图 + SA-Core 白盒 + 会话续聊（2026-09-07）
+## 健康快照 #13：证轨 v3 —— 甘特图 + SA-Core 白盒 + 会话续聊（2026-09-07）
 
-**变异类型**：印痕三深化（用户："没有 DSH 的甘特图 / 会话无法选择继续聊 /
+**变异类型**：证轨三深化（用户："没有 DSH 的甘特图 / 会话无法选择继续聊 /
 我们是不是可以做得更深？SA-Core 选择了什么？"）
 
 - **Anaphase 侧（ADR-0027）**：`QueryResult.nodes` → `Vec<MemoryNode>`
@@ -284,16 +284,16 @@ README（输入框交互）｜ GROWTH｜ ECOSYSTEM v1.57
 ### 状态
 🧬 已完成
 
-## 记录 31：Web 同构映射——Engram 印痕上 Web（2026-09-07）
+## 记录 31：Web 同构映射——ProveTrack 证轨上 Web（2026-09-07）
 
 ### 触发条件
-Engram TUI 面板落地后，用户拍板顺序 ②：Web 同构映射（DSH 风格参考，TUI=Web 单一状态模型——"同一个真相的两个投影，硅基/碳基都可参看，无歧义"）。
+ProveTrack TUI 面板落地后，用户拍板顺序 ②：Web 同构映射（DSH 风格参考，TUI=Web 单一状态模型——"同一个真相的两个投影，硅基/碳基都可参看，无歧义"）。
 
 ### 变更性质
-- **cellrix-web 双视图**：Cockpit（Anaphase snapshot）/ Engram（Tuck /v1/audit 链）——顶栏按钮切换，镜像 TUI 的 Ctrl+E
+- **cellrix-web 双视图**：Cockpit（Anaphase snapshot）/ ProveTrack（Tuck /v1/audit 链）——顶栏按钮切换，镜像 TUI 的 Ctrl+E
 - **/api/audit Bearer 代理**：`--tuck-endpoint/--tuck-key/--tuck-limit`（default 200，CLI 契约）+ env（TUCK_*）；身份凭证只留在 server 侧，浏览器永远拿不到
-- **同构数据模型**：proxy 透传 Tuck EngramQuery（entries[]: seq/ts/payload{kind,trace_id,data}/prev_hash/hash）——与 TUI TuckAuditFetcher 解析同一响应、同一字段语义
-- **Engram 面板**：overview 条（链游标/count/queried_by/错误）+ 比例网格 timeline 2fr / detail 1fr；点击行 → 完整印痕（caller/destination/status/verdicts/prev_hash/hash + 原始 payload JSON）；trace_id 过滤框（Enter 应用/Esc 清）；窄屏单列降级
+- **同构数据模型**：proxy 透传 Tuck ProveTrackQuery（entries[]: seq/ts/payload{kind,trace_id,data}/prev_hash/hash）——与 TUI TuckAuditFetcher 解析同一响应、同一字段语义
+- **ProveTrack 面板**：overview 条（链游标/count/queried_by/错误）+ 比例网格 timeline 2fr / detail 1fr；点击行 → 完整证轨（caller/destination/status/verdicts/prev_hash/hash + 原始 payload JSON）；trace_id 过滤框（Enter 应用/Esc 清）；窄屏单列降级
 - **测试**：web 3→5（audit route/config 派生/tuck 未配置/index 双视图字段），Cellrix 325→**327** 全绿
 - **真实验证**：cellrix-web 起 8099 → /api/audit 拉真链 count 6、SHA-256 64 位、trace_id join 就位；内嵌 JS `node --check` 语法通过
 
@@ -303,10 +303,10 @@ README（§7.3 Web projection）｜ PLAN 当前阶段｜ ECOSYSTEM v1.61（Cellr
 ### 状态
 🧬 已完成（下一步：Web 优化——DSH 风格深化轨迹回放）
 
-## 记录 32：Engram 全文回放——正文上 Web（2026-09-07）
+## 记录 32：ProveTrack 全文回放——正文上 Web（2026-09-07）
 
 ### 触发条件
-顺序② Web 同构落地后，用户拍板①（Engram 最后一公里）：点审计条目能看到该轮思考正文。
+顺序② Web 同构落地后，用户拍板①（ProveTrack 最后一公里）：点审计条目能看到该轮思考正文。
 
 ### 变更性质
 - **web `/api/trace` 代理**：透传 `trace_id` query → Anaphase `/v1/trace`（正文在 Anaphase 侧，写入时已脱敏——凭证不经过本条路径）
@@ -441,13 +441,13 @@ README（bind 节）｜ GROWTH｜ ECOSYSTEM v1.68（Anaphase 225 / Cellrix 336�
 ## 记录 39：面板对话视图 + up 默认探测 Tuck（2026-09-07）
 
 ### 触发条件
-小白全流程实测两缺口：①面板无输入框无法对话；②无参数 up 不探测 Tuck（engram off，fail-closed 盲区）。
+小白全流程实测两缺口：①面板无输入框无法对话；②无参数 up 不探测 Tuck（ProveTrack off，fail-closed 盲区）。
 
 ### 变更性质
 - **面板第三视图「对话 Chat」**：消息流 + 输入框（回车发送/Esc 清除）+ /api/chat 代理 → Anaphase /v1/chat（绑定后签名）
 - **Anaphase /v1/chat**（同仓库）：POST {message} → gate_ok → build_agent → 单周期 run_cycle → {reply}
-- **up Tuck 协议默认**：无参数也探测/启动 Tuck（60052 + tk-local-gate，来源 = Tuck 协议），面板 engram 始终接线
-- **真实验证**：首跑（命令一次→绑定→面板）；二次零输入直达；Tuck ✅ + engram 25 条审计；对话 200 真实 LLM 回复 ×2
+- **up Tuck 协议默认**：无参数也探测/启动 Tuck（60052 + tk-local-gate，来源 = Tuck 协议），面板 ProveTrack 始终接线
+- **真实验证**：首跑（命令一次→绑定→面板）；二次零输入直达；Tuck ✅ + ProveTrack 25 条审计；对话 200 真实 LLM 回复 ×2
 
 ### 状态
 🧬 已完成
@@ -542,11 +542,11 @@ WebUI 偶发 EAGAIN 的真根因是**旧进程残留**（18:20 面板 + 18:32 an
 ### 状态
 🧬 已完成
 
-## [2026-09-07] Engram 全链路 join 打通 + UI 增强
+## [2026-09-07] ProveTrack 全链路 join 打通 + UI 增强
 
 ### 变更性质
 - **trace_id 对齐**：Anaphase 推理经 `x-tuck-trace` 头传 derive_job_id（run-xxx）→ Tuck 审计链记录同一 id（缺头回退 live#N）→ 审计链、正文 trace、ledger 三者共用一键
-- **正文 trace 开启**：Anaphase config `reasoning_trace_path`（.helix/traces/reasoning.jsonl，redacted + 4096 截断）——Engram 详情"正文回放"展示 prompt/response/model/ts
+- **正文 trace 开启**：Anaphase config `reasoning_trace_path`（.helix/traces/reasoning.jsonl，redacted + 4096 截断）——ProveTrack 详情"正文回放"展示 prompt/response/model/ts
 - **UI 增强**：分组头加组内耗时（RFC3339 差）；最新一组默认展开（DSH 轨迹式）；其余组折叠
 - 物理实测：`run-8e2615...` 审计 + 正文回放（configured:True，prompt 2071 chars / response 完整）
 
@@ -555,18 +555,18 @@ WebUI 偶发 EAGAIN 的真根因是**旧进程残留**（18:20 面板 + 18:32 an
 - Cellrix cargo test 全绿；cellrix-web 重启后 self-check ok
 
 ### 待办
-- 状态流转（perception→reasoning→execution→reflection）入 Engram 时间线（现链只含 request/response 网关条目）
+- 状态流转（perception→reasoning→execution→reflection）入 ProveTrack 时间线（现链只含 request/response 网关条目）
 
-## [2026-09-07] Engram v2：会话经历时间线 + 会话管理侧栏（ADR-0026）
+## [2026-09-07] ProveTrack v2：会话经历时间线 + 会话管理侧栏（ADR-0026）
 
 ### 变更性质
-- **印痕视图重画**：左侧经历列表（/api/sessions：时间 · 事件数 · 用户输入预览）+ 右侧 turn 时间线（/api/events?job_id=）
+- **证轨视图重画**：左侧经历列表（/api/sessions：时间 · 事件数 · 用户输入预览）+ 右侧 turn 时间线（/api/events?job_id=）
 - **DSH 式徽标**（生态词汇）：START / USER / CONTEXT / ATTEMPT / TOOL / RESULT / VERDICT / END，统计条（Duration · Events · Tools · Verdict）
-- **Chat 视图加经历侧栏**：同一数据源（极致复用），点击切印痕看详情——会话管理的第一个 UI 形态
+- **Chat 视图加经历侧栏**：同一数据源（极致复用），点击切证轨看详情——会话管理的第一个 UI 形态
 - **proxy**：/api/sessions + /api/events 路由（Bearer 注入，同 trace 模式）
 
 ### 验收
-- 端到端：Chat 发消息 → 印痕出现新经历 → 点击渲染完整 turn 时间线（质量守恒轮 5 事件）✓
+- 端到端：Chat 发消息 → 证轨出现新经历 → 点击渲染完整 turn 时间线（质量守恒轮 5 事件）✓
 - Cellrix 测试全绿（路由新增 Sessions/Events）
 
 ## [2026-09-07] 生态点亮 + 一键重启（up --restart）
@@ -577,7 +577,7 @@ WebUI 偶发 EAGAIN 的真根因是**旧进程残留**（18:20 面板 + 18:32 an
   （绿=健康 / 黄=启动未联通 / 灰=未运行 / 红=错误）——四色语义对齐自检规范
 - **up --restart**：全生态一键重启（停止逆依赖序 → 启动依赖序 → 每步健康检查）。
   修复 SIGTERM 杀不净问题：6s 未释放自动 SIGKILL 兜底，端口释放确认后才继续
-- **清理**：删除旧审计链分组渲染（renderAudit/pollAudit/a-*）——Engram v2
+- **清理**：删除旧审计链分组渲染（renderAudit/pollAudit/a-*）——ProveTrack v2
   时间线替代；Tuck 审计链仍经 /api/audit 可查（foot 链接）
 
 ### 验收

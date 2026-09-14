@@ -62,8 +62,8 @@ pub struct KeyMap {
     pub tab_prev: (KeyCode, KeyModifiers),
     pub agent_next: (KeyCode, KeyModifiers),
     pub agent_prev: (KeyCode, KeyModifiers),
-    /// Toggle between the cockpit view and the Engram imprint view.
-    pub engram_toggle: (KeyCode, KeyModifiers),
+    /// Toggle between the cockpit view and the ProveTrack imprint view.
+    pub prove_track_toggle: (KeyCode, KeyModifiers),
 }
 
 impl Default for KeyMap {
@@ -77,7 +77,7 @@ impl Default for KeyMap {
             tab_prev: (KeyCode::Left, KeyModifiers::ALT),
             agent_next: (KeyCode::Char('n'), KeyModifiers::ALT),
             agent_prev: (KeyCode::Char('p'), KeyModifiers::ALT),
-            engram_toggle: (KeyCode::Char('e'), KeyModifiers::CONTROL),
+            prove_track_toggle: (KeyCode::Char('e'), KeyModifiers::CONTROL),
         }
     }
 }
@@ -170,37 +170,37 @@ impl InputHandler {
             }
         }
 
-        // Engram view: capture view-local keys before the global keymap.
-        // Chat box still owns typing when focused; the Engram keys are the
-        // same physical keys, but scoped to the Engram view only.
-        if state.active_view == ActiveView::Engram {
-            if state.engram.filter_input.is_some() {
+        // ProveTrack view: capture view-local keys before the global keymap.
+        // Chat box still owns typing when focused; the ProveTrack keys are the
+        // same physical keys, but scoped to the ProveTrack view only.
+        if state.active_view == ActiveView::ProveTrack {
+            if state.prove_track.filter_input.is_some() {
                 // In filter-typing mode: chars go to the filter buffer.
                 match code {
                     KeyCode::Char(c)
                         if modifiers == KeyModifiers::NONE
                             || modifiers == KeyModifiers::SHIFT => {
-                        state.engram.filter_input.as_mut().unwrap().push(c);
+                        state.prove_track.filter_input.as_mut().unwrap().push(c);
                         return Ok(None);
                     }
                     KeyCode::Backspace => {
-                        state.engram.filter_input.as_mut().unwrap().pop();
+                        state.prove_track.filter_input.as_mut().unwrap().pop();
                         return Ok(None);
                     }
                     KeyCode::Enter => {
                         let f = state
-                            .engram
+                            .prove_track
                             .filter_input
                             .take()
                             .map(|s| s.trim().to_string())
                             .filter(|s| !s.is_empty());
-                        state.engram.applied_filter = f;
-                        state.engram.reset_entries();
-                        state.engram.loading = true;
+                        state.prove_track.applied_filter = f;
+                        state.prove_track.reset_entries();
+                        state.prove_track.loading = true;
                         return Ok(None);
                     }
                     KeyCode::Esc => {
-                        state.engram.filter_input = None;
+                        state.prove_track.filter_input = None;
                         return Ok(None);
                     }
                     _ => {}
@@ -208,28 +208,28 @@ impl InputHandler {
             }
             match code {
                 KeyCode::Up => {
-                    let idx = state.engram.selected.unwrap_or(0);
-                    if !state.engram.entries.is_empty() {
-                        state.engram.selected = Some(idx.saturating_sub(1));
+                    let idx = state.prove_track.selected.unwrap_or(0);
+                    if !state.prove_track.entries.is_empty() {
+                        state.prove_track.selected = Some(idx.saturating_sub(1));
                     }
                     return Ok(None);
                 }
                 KeyCode::Down => {
-                    let n = state.engram.entries.len();
-                    let idx = state.engram.selected.unwrap_or(0);
+                    let n = state.prove_track.entries.len();
+                    let idx = state.prove_track.selected.unwrap_or(0);
                     if n > 0 {
-                        state.engram.selected = Some((idx + 1).min(n - 1));
+                        state.prove_track.selected = Some((idx + 1).min(n - 1));
                     }
                     return Ok(None);
                 }
                 KeyCode::Char('f') if modifiers == KeyModifiers::NONE => {
-                    state.engram.filter_input = Some(String::new());
+                    state.prove_track.filter_input = Some(String::new());
                     return Ok(None);
                 }
                 KeyCode::Char('g') if modifiers == KeyModifiers::NONE => {
-                    let n = state.engram.entries.len();
+                    let n = state.prove_track.entries.len();
                     if n > 0 {
-                        state.engram.selected = Some(n - 1);
+                        state.prove_track.selected = Some(n - 1);
                     }
                     return Ok(None);
                 }
@@ -291,10 +291,10 @@ impl InputHandler {
             Self::cycle_active_agent(state, transport, req_map, -1).await;
             return Ok(None);
         }
-        if key == key_map.engram_toggle {
+        if key == key_map.prove_track_toggle {
             state.active_view = match state.active_view {
-                ActiveView::Cockpit => ActiveView::Engram,
-                ActiveView::Engram => ActiveView::Cockpit,
+                ActiveView::Cockpit => ActiveView::ProveTrack,
+                ActiveView::ProveTrack => ActiveView::Cockpit,
             };
             return Ok(None);
         }

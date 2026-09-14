@@ -1,4 +1,4 @@
-//! Engram widget — the full-chain audit imprint panel (ADR-0004 D9/D11/D12).
+//! ProveTrack widget — the full-chain audit imprint panel (ADR-0004 D9/D11/D12).
 //!
 //! Three panels arranged by ratio (ratatui `Constraint` — the Cellrix
 //! "grid by proportion" way):
@@ -30,14 +30,14 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Widget, Wrap},
 };
 
-use cellrix_protocol::engram::EngramEntry;
+use cellrix_protocol::prove_track::ProveTrackEntry;
 
-/// Interactive state for the Engram panel (owned by AppState; the widget is
+/// Interactive state for the ProveTrack panel (owned by AppState; the widget is
 /// a pure projection of it).
 #[derive(Debug, Default, Clone)]
-pub struct EngramViewState {
+pub struct ProveTrackViewState {
     /// Entries of the last query, chain order (oldest first).
-    pub entries: Vec<EngramEntry>,
+    pub entries: Vec<ProveTrackEntry>,
     /// Index of the selected timeline row.
     pub selected: Option<usize>,
     /// Pending trace_id filter while typing (Some = filter-typing mode).
@@ -54,7 +54,7 @@ pub struct EngramViewState {
     pub list_state: ListState,
 }
 
-impl EngramViewState {
+impl ProveTrackViewState {
     /// Reset everything except the applied filter (used on filter change).
     pub fn reset_entries(&mut self) {
         self.entries.clear();
@@ -65,8 +65,8 @@ impl EngramViewState {
     }
 }
 
-/// Renders the Engram panel into `area`.
-pub fn render_engram(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
+/// Renders the ProveTrack panel into `area`.
+pub fn render_prove_track(state: &ProveTrackViewState, area: Rect, buf: &mut Buffer) {
     // Grid by proportion: overview strip / timeline+detail row.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -77,8 +77,8 @@ pub fn render_engram(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
     render_body(state, chunks[1], buf);
 }
 
-fn render_overview(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
-    let block = Block::default().borders(Borders::ALL).title(" Engram — 全链路审计印痕 ");
+fn render_overview(state: &ProveTrackViewState, area: Rect, buf: &mut Buffer) {
+    let block = Block::default().borders(Borders::ALL).title(" ProveTrack — 全链路审计证轨 ");
     let inner = block.inner(area);
 
     let mut status = if let Some(e) = &state.error {
@@ -106,10 +106,10 @@ fn render_overview(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
     block.render(area, buf);
 }
 
-fn render_body(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
+fn render_body(state: &ProveTrackViewState, area: Rect, buf: &mut Buffer) {
     if filtered_len(state) == 0 && state.error.is_none() && !state.loading {
         let para = Paragraph::new("no imprints yet — run a governed call (the gateway /v1/audit will record it)")
-            .block(Block::default().borders(Borders::ALL).title(" Engram "))
+            .block(Block::default().borders(Borders::ALL).title(" ProveTrack "))
             .wrap(Wrap { trim: true });
         para.render(area, buf);
         return;
@@ -124,7 +124,7 @@ fn render_body(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
     render_detail(state, chunks[1], buf);
 }
 
-fn render_timeline(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
+fn render_timeline(state: &ProveTrackViewState, area: Rect, buf: &mut Buffer) {
     let items: Vec<ListItem> = filtered(state)
         .iter()
         .map(|e| {
@@ -154,7 +154,7 @@ fn render_timeline(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
     ratatui::widgets::StatefulWidget::render(list, area, buf, &mut list_state);
 }
 
-fn render_detail(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
+fn render_detail(state: &ProveTrackViewState, area: Rect, buf: &mut Buffer) {
     let block = Block::default().borders(Borders::ALL).title(" Detail ");
     let inner = block.inner(area);
     block.render(area, buf);
@@ -224,7 +224,7 @@ fn render_detail(state: &EngramViewState, area: Rect, buf: &mut Buffer) {
 }
 
 /// Entries after applying the local trace filter (empty filter = all).
-fn filtered(state: &EngramViewState) -> Vec<&EngramEntry> {
+fn filtered(state: &ProveTrackViewState) -> Vec<&ProveTrackEntry> {
     match &state.applied_filter {
         Some(f) => state
             .entries
@@ -235,7 +235,7 @@ fn filtered(state: &EngramViewState) -> Vec<&EngramEntry> {
     }
 }
 
-fn filtered_len(state: &EngramViewState) -> usize {
+fn filtered_len(state: &ProveTrackViewState) -> usize {
     filtered(state).len()
 }
 

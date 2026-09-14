@@ -240,11 +240,11 @@
     cursor:pointer; font-family:inherit; }
   .rename-btn:hover { border-color:var(--accent); color:var(--accent); }
 
-  /* 印痕比例 2D 网格（概览 / 明细）—— 具体列比由视图内联 style 裁决 */
-  .engram-main { display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:16px; }
+  /* 证轨比例 2D 网格（概览 / 明细）—— 具体列比由视图内联 style 裁决 */
+  .prove-track-main { display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:16px; }
   .timeline { max-height:420px; overflow-y:auto; }
 
-  /* ---------- 事件行与印痕共享行（驾驶舱详情 / 会话） ---------- */
+  /* ---------- 事件行与证轨共享行（驾驶舱详情 / 会话） ---------- */
   .ev-row { padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px;
     display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; min-height:36px; }
   .ev-row:hover { background:var(--surface-hover); }
@@ -343,7 +343,7 @@
   }
   /* ---------- 降级 · 窄屏（≤800px）：侧栏单列 [PHYS:P-012] ---------- */
   @media (max-width:800px){
-    .engram-main { grid-template-columns:1fr; }
+    .prove-track-main { grid-template-columns:1fr; }
     .ses-side { border-right:0; padding-right:0; max-height:220px; }
     .chat-grid { grid-template-columns:1fr; }
     body { padding:12px; }

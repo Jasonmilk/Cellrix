@@ -27,11 +27,11 @@ enum Command {
         socket: Option<PathBuf>,
         #[arg(long, help = "Anaphase snapshot endpoint (e.g. http://127.0.0.1:28330) to enable the cockpit")]
         anaphase_endpoint: Option<String>,
-        #[arg(long, help = "Tuck governance gateway base (e.g. http://127.0.0.1:60052) to enable the Engram imprint panel")]
+        #[arg(long, help = "Tuck governance gateway base (e.g. http://127.0.0.1:60052) to enable the ProveTrack imprint panel")]
         tuck_endpoint: Option<String>,
         #[arg(long, help = "Tuck identity credential (Bearer) for /v1/audit — never the upstream secret")]
         tuck_key: Option<String>,
-        #[arg(long, default_value_t = 200, help = "Engram poll window: newest N chain entries per fetch (CLI contract default)")]
+        #[arg(long, default_value_t = 200, help = "ProveTrack poll window: newest N chain entries per fetch (CLI contract default)")]
         tuck_limit: usize,
     },
     /// Test manifest fetch (via connect)
@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
                     std::time::Duration::from_secs(2),
                 );
             }
-            // Engram: attach the audit poller when the gateway is given.
+            // ProveTrack: attach the audit poller when the gateway is given.
             // The key has no default — the gateway is fail-closed; without
             // a credential the panel simply shows the gateway error.
             if let Some(ep) = tuck_endpoint.as_deref().filter(|s| !s.is_empty()) {
@@ -102,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
                 let client = std::sync::Arc::new(
                     cellrix_transport::tuck_audit_client::TuckAuditClient::new(ep, key),
                 );
-                app.attach_engram(client, std::time::Duration::from_secs(3), tuck_limit);
+                app.attach_prove_track(client, std::time::Duration::from_secs(3), tuck_limit);
             }
             if let Err(e) = app.run().await {
                 match e {

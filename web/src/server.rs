@@ -3,7 +3,7 @@
 //! injection happens here (proxy pattern, ADR-0010/0014).
 //!
 //! Two projections of one truth: the **Cockpit** view (Anaphase
-//! `/v1/agent/snapshot`, ADR-0010) and the **Engram** imprint view (Tuck
+//! `/v1/agent/snapshot`, ADR-0010) and the **ProveTrack** imprint view (Tuck
 //! `/v1/audit` chain). The browser renders the *same data model* the TUI
 //! shows, so the silicon and carbon sides read the same picture with no
 //! ambiguity (TUI=Web isomorphic projection).
@@ -93,7 +93,7 @@ pub fn handle(
         }
         Route::Audit => {
             // Isomorphic with the TUI's TuckAuditFetcher: same query window,
-            // same EngramQuery JSON shape (entries/count/queried_by).
+            // same ProveTrackQuery JSON shape (entries/count/queried_by).
             match &cfg.tuck_endpoint {
                 Some(ep) => {
                     let q = format!("/v1/audit?limit={}", cfg.tuck_limit);
@@ -117,7 +117,7 @@ pub fn handle(
             }
         }
         Route::Trace => {
-            // Engram body half: proxy the Anaphase reasoning-trace query,
+            // ProveTrack body half: proxy the Anaphase reasoning-trace query,
             // passing the browser's query string (trace_id=...) through.
             // The Anaphase side answers with redacted bodies — no
             // credential ever rides this path (Redaction ran on write).
@@ -142,7 +142,7 @@ pub fn handle(
             }
         }
         Route::Sessions => {
-            // Session-management sidebar (Engram v2): proxy the Anaphase
+            // Session-management sidebar (ProveTrack v2): proxy the Anaphase
             // period list (one summary per cognitive period, newest first).
             let auth = cellrix_web::client_bearer();
             let target = "/v1/sessions?limit=50";
@@ -177,7 +177,7 @@ pub fn handle(
             }
         }
         Route::Events => {
-            // One period's event stream (Engram turn timeline): pass the
+            // One period's event stream (ProveTrack turn timeline): pass the
             // browser's job_id= query through to Anaphase /v1/events.
             let q = text
                 .lines()

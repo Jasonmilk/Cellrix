@@ -3,7 +3,7 @@ use std::time::Instant;
 use cellrix_protocol::SemanticSnapshot;
 use cellrix_protocol::anaphase::AgentSnapshot;
 use cellrix_layout::FocusManager;
-use crate::widgets::engram::EngramViewState;
+use crate::widgets::prove_track::ProveTrackViewState;
 
 /// One chat message in the conversation record. TUI and WebUI render the
 /// same conversation semantics: who, timestamp, text.
@@ -25,8 +25,8 @@ pub enum ChatWho {
 pub enum ActiveView {
     /// The snapshot-driven cockpit (nodes / layout engine).
     Cockpit,
-    /// The Engram imprint panel (Tuck audit chain).
-    Engram,
+    /// The ProveTrack imprint panel (Tuck audit chain).
+    ProveTrack,
 }
 
 /// Pure logical state machine for Cellrix UI.
@@ -37,10 +37,10 @@ pub struct AppState {
     /// Anaphase cockpit projection (candidate G) — refreshed by the CLI
     /// poller; rendered by the cockpit widget when present.
     pub cockpit: Option<AgentSnapshot>,
-    /// Engram imprint state (Tuck audit chain) — refreshed by the CLI
+    /// ProveTrack imprint state (Tuck audit chain) — refreshed by the CLI
     /// poller on filter submit / poll tick.
-    pub engram: EngramViewState,
-    /// Which view is active (Ctrl+E toggles Cockpit/Engram).
+    pub prove_track: ProveTrackViewState,
+    /// Which view is active (Ctrl+E toggles Cockpit/ProveTrack).
     pub active_view: ActiveView,
     pub error: Option<String>,
     pub focus_manager: FocusManager,
@@ -86,7 +86,7 @@ impl AppState {
         Self {
             snapshot: None,
             cockpit: None,
-            engram: EngramViewState::default(),
+            prove_track: ProveTrackViewState::default(),
             active_view: ActiveView::Cockpit,
             error: None,
             focus_manager: FocusManager::new(),
@@ -115,16 +115,16 @@ impl AppState {
         self.cockpit = Some(snapshot);
     }
 
-    /// Replace the Engram entries (chain order), keeping the selection
+    /// Replace the ProveTrack entries (chain order), keeping the selection
     /// clamped to the new length.
-    pub fn set_engram(&mut self, query: cellrix_protocol::engram::EngramQuery) {
-        self.engram.entries = query.entries;
-        self.engram.queried_by = query.queried_by;
-        self.engram.error = None;
-        self.engram.loading = false;
-        if let Some(idx) = self.engram.selected {
-            self.engram.selected =
-                Some(idx.min(self.engram.entries.len().saturating_sub(1)));
+    pub fn set_prove_track(&mut self, query: cellrix_protocol::prove_track::ProveTrackQuery) {
+        self.prove_track.entries = query.entries;
+        self.prove_track.queried_by = query.queried_by;
+        self.prove_track.error = None;
+        self.prove_track.loading = false;
+        if let Some(idx) = self.prove_track.selected {
+            self.prove_track.selected =
+                Some(idx.min(self.prove_track.entries.len().saturating_sub(1)));
         }
     }
 }

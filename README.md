@@ -45,14 +45,14 @@
 > stats bar (episode / ledger count / refresh tick) + Ledger white-box as a
 > structured five-column table (status / time / trace_id / call / note),
 > semantic chips, click-to-expand payload — same table language as the
-> Engram event table (one ledger, two projections).
-> **Engram v3** is the 水之波光 **Harness v11.2.0 trajectory skeleton**:
+> ProveTrack event table (one ledger, two projections).
+> **ProveTrack v3** is the 水之波光 **Harness v11.2.0 trajectory skeleton**:
 > five-column event table (type/summary/status/duration/tokens) + Overview
 > three-track timeline (Input/Model/Tools sharing one horizontal ruler) +
 > toolbar (mono-width / fold turns / unfold calls / replay / search) +
 > bottom stats bar + right inspector drawer (Summary/Payload/Result/
 > Schema/Timing) — rendered from the standalone asset
-> `web/assets/engram.html` (`e-` prefixed tokens, view-scoped isolation).
+> `web/assets/prove_track.html` (`e-` prefixed tokens, view-scoped isolation).
 > Semantic status (Met/Unmet/PASS/FAIL/ok/fail) keeps semantic colors
 > (`[PHYS:L-002]`). Selected rows highlight with background only — no
 > colored bold left border (`[PHYS:D-003]`). Status dots are static
@@ -60,7 +60,7 @@
 > reduced-motion / high-contrast / narrow screens (卷三 3.5.3).
 >
 > **Status 2026-09-08**: Web panel (:8080) is now the primary white-box
-> window (ADR-0033): 印痕 Engram (pre-v3) was a DSH-style **turn outline**;
+> window (ADR-0033): 证轨 ProveTrack (pre-v3) was a DSH-style **turn outline**;
 > chat shows a collapsible **思考 (think) row** (streamed `think` field,
 > display-only, never judged) and the SSE stream is deterministically
 > drained (events before the terminal `{done,reply}`, reply is
@@ -89,14 +89,14 @@
 > prompts, the panel opens at http://127.0.0.1:8080/ (or `up --restart`
 > to restart the whole ecosystem; bind/1-to-1 pairing happens on first
 > launch).
-> **全链路正文回放**：Anaphase 设 `reasoning_trace_path`（本地 config）后，Engram 详情可回放每轮 prompt/response（写前脱敏 + 截断）；推理经 `x-tuck-trace` 头把 `run-xxx` id 传给 Tuck 审计链，链与正文共用一键 join。
+> **全链路正文回放**：Anaphase 设 `reasoning_trace_path`（本地 config）后，ProveTrack 详情可回放每轮 prompt/response（写前脱敏 + 截断）；推理经 `x-tuck-trace` 头把 `run-xxx` id 传给 Tuck 审计链，链与正文共用一键 join。
 
 **Test Coverage**: 327 tests (实测 `cargo test --workspace --all-features`, 2026-09-07, 0 failed)
-- `cellrix-protocol`: 137 tests (incl. `engram` real-chain shapes)
+- `cellrix-protocol`: 137 tests (incl. `ProveTrack` real-chain shapes)
 - `cellrix-transport`: 95 tests (incl. `tuck_audit_client` e2e + live gateway)
 - `cellrix-ui`: 90 tests
 - cockpit live roundtrip: `transport/tests/anaphase_live.rs` (#[ignore], needs live Anaphase)
-- Engram live gateway: `transport/src/tuck_audit_client.rs` `live_fetch_from_real_gateway` (#[ignore], needs the Tuck gateway on :60052)
+- ProveTrack live gateway: `transport/src/tuck_audit_client.rs` `live_fetch_from_real_gateway` (#[ignore], needs the Tuck gateway on :60052)
 - cockpit TUI (real render): see §6.4 (stdio/uds, verified 2026-09-06 both channels)
 - Other: 5 tests
 
@@ -324,7 +324,7 @@ cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
 
 ### 6.9 操作方式（2026-09-07）
 
-**Web 面板**：鼠标点击顶部标签切换（驾驶舱/印痕/对话）；对话页输入框打字后
+**Web 面板**：鼠标点击顶部标签切换（驾驶舱/证轨/对话）；对话页输入框打字后
 回车发送（或点「发送」）。回复以 **SSE 流式**逐字渲染（打字机效果）——浏览器
 请求带 `Accept: text/event-stream`，面板按字节管道透传 Anaphase 的流式输出
 （`delta` 增量 + `done` 收尾行）；旧客户端 / curl 不带该头时自动回落一次性
@@ -338,7 +338,7 @@ JSON（同一契约两种传输）。
 - 底部面板显示对话记录（谁 + HH:MM + 内容），与 WebUI 消息流同构。
 
 **同构契约**（TUI ↔ WebUI）：同一数据源（Anaphase snapshot / Tuck audit /
-同一对话语义），同一视图结构（驾驶舱 / 印痕 / 对话），错误一律不进对话流
+同一对话语义），同一视图结构（驾驶舱 / 证轨 / 对话），错误一律不进对话流
 （TUI 状态行红字 = WebUI 居中 toast）。差异仅限渲染介质（终端 vs 浏览器）：
 TUI 走 stdio 语义树，WebUI 走 HTTP + SSE——语义一致，传输不同。
 
@@ -361,7 +361,7 @@ cargo run --bin up -- --restart     # 或 target/debug/up --restart
 数据源 `/api/ecosystem`（TCP 探测 + HTTP health 双检，协议默认端口，
 无硬编码）。
 
-**印痕 Engram v3（水之波光 v11.2.0 轨迹骨架 · 白盒 + 三轨投影 + 检查器，ADR-0015/0033）**：
+**证轨 ProveTrack v3（水之波光 v11.2.0 轨迹骨架 · 白盒 + 三轨投影 + 检查器，ADR-0015/0033）**：
 左侧经历列表（每会话一条：时间 · 事件数 · 用户输入预览 + **继续**按钮），
 点击任意经历加载全链路轨迹——**五列事件表**（类型/摘要/状态/耗时/Tokens）+
 **Overview 三轨时间线**（Input/Model/Tools 共用一根横向标尺：每一列在三轨上
@@ -392,7 +392,7 @@ stdio`，自带一个 Anaphase 子进程，与 Web 的 daemon 不冲突）。
 
 打开面板后点「对话 Chat」——输入消息回车即发送。Anaphase `/v1/chat`
 每次请求装配一个全新 Helix 跑单周期（同潜意识、同黑盒），回复走 Tuck
-网关审计（Engram 可查）。当前每轮无跨轮记忆（对话连续性属未来 Memory
+网关审计（ProveTrack 可查）。当前每轮无跨轮记忆（对话连续性属未来 Memory
 /L3 情景），Helix 会诚实告诉你"没有之前的记录"。
 
 ### 6.5 从零开始（推荐 · 一个入口，之后只有回车）
@@ -446,24 +446,24 @@ Following Google’s strict hermetic testing conventions, all integration tests 
 
 | Crate | Tests | Coverage |
 |---|---|---|
-| `cellrix-protocol` | 137 | PFP/SAP parser, snapshot, action protocol, helix_mind data structures, tuck_audit, **engram (real audit-chain shapes)** |
+| `cellrix-protocol` | 137 | PFP/SAP parser, snapshot, action protocol, helix_mind data structures, tuck_audit, **ProveTrack (real audit-chain shapes)** |
 | `cellrix-ui` | 90 | State tree, chat input lifecycle, text panel, audit widgets, PFP widgets, security notifications, helix_mind widgets |
 | `cellrix-transport` | 95 | UDS multiplexing, stdio frames, action round trips, helix_mind client (trait + mock), **tuck_audit_client (e2e + live gateway)** |
 | Other | 3 | Integration tests |
 
-### 7.3 Engram (印痕) — the audit imprint panel
+### 7.3 ProveTrack (证轨) — the audit imprint panel
 
-Engram is the full-chain audit imprint view: what Helix *actually* did,
+ProveTrack is the full-chain audit imprint view: what Helix *actually* did,
 governed by Tuck's gateway, hash-linked so any tampering breaks the chain.
 
 ```bash
-# Run with the cockpit + Engram (Tuck gateway on :60052 by default):
+# Run with the cockpit + ProveTrack (Tuck gateway on :60052 by default):
 cellrix-cli run --mode stdio --exec ./target/debug/mock-agent \
   --anaphase-endpoint http://127.0.0.1:50061 \
   --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
 ```
 
-- `Ctrl+E` — toggle cockpit / Engram view
+- `Ctrl+E` — toggle cockpit / ProveTrack view
 - `↑` / `↓` — move the timeline selection (virtual list, only visible rows render)
 - `f` — type a trace_id filter, `Enter` applies, `Esc` cancels (filtered locally — the gateway is never spammed)
 - `g` — jump to the newest entry
@@ -482,13 +482,13 @@ cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
 # -> http://127.0.0.1:8080  (WEB_PORT / --port override)
 ```
 
-- Top bar buttons switch Cockpit ↔ Engram ↔ Chat (mirrors the TUI `Ctrl+E`)
+- Top bar buttons switch Cockpit ↔ ProveTrack ↔ Chat (mirrors the TUI `Ctrl+E`)
 - **Cockpit v2 — Water's Gleam (2026-09-09)**: stats bar (episode / ledger
   count / refresh tick) + the Ledger white-box as a structured five-column
   table (status / time / trace_id / call / note): semantic status chips,
-  click a row to expand the raw payload. Same table language as the Engram
+  click a row to expand the raw payload. Same table language as the ProveTrack
   event table — silicon and carbon read the same ledger, no ambiguity.
-- Engram panel: overview strip / timeline `2fr` + detail `1fr` proportional
+- ProveTrack panel: overview strip / timeline `2fr` + detail `1fr` proportional
   grid; click a row for the full imprint (caller / destination / status /
   verdicts / prev_hash / hash + raw payload)
 - **Full-text replay** (2026-09-07): clicking an audit row also fetches that

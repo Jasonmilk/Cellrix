@@ -1,4 +1,4 @@
-//! `cellrix-web` — Anaphase cockpit + Engram web panel (candidate G2, ADR-0014).
+//! `cellrix-web` — Anaphase cockpit + ProveTrack web panel (candidate G2, ADR-0014).
 //!
 //! Thin entry: config + server modules carry the logic; this file holds the
 //! entry point, the asset-assembled index page and the unit tests. Per the
@@ -25,11 +25,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or_else(|| std::env::var("WEB_PORT").ok().and_then(|v| v.parse().ok()))
         .unwrap_or(WEB_PORT_DEFAULT);
 
-    println!("cellrix-web: cockpit+engram panel on http://127.0.0.1:{port}");
+    println!("cellrix-web: cockpit+prove_track panel on http://127.0.0.1:{port}");
     println!("             anaphase snapshot @ {}", cfg.anaphase_endpoint);
     match &cfg.tuck_endpoint {
-        Some(ep) => println!("             engram chain @ {ep} (limit {})", cfg.tuck_limit),
-        None => println!("             engram: off (pass --tuck-endpoint + --tuck-key to enable)"),
+        Some(ep) => println!("             prove_track chain @ {ep} (limit {})", cfg.tuck_limit),
+        None => println!("             prove_track: off (pass --tuck-endpoint + --tuck-key to enable)"),
     }
     health_check(&cfg);
 
@@ -102,7 +102,7 @@ fn index_html(cfg: &PanelConfig) -> String {
     const COMPONENTS: &str = include_str!("../assets/components.html");
     const COCKPIT: &str = include_str!("../assets/cockpit.html");
     const CHAT: &str = include_str!("../assets/chat.html");
-    const ENGRAM: &str = include_str!("../assets/engram.html");
+    const PROVE_TRACK: &str = include_str!("../assets/prove_track.html");
     const SCRIPT: &str = include_str!("../assets/script.html");
     const SESSION: &str = include_str!("../assets/session.html");
     const GLEAM: &str = include_str!("../assets/gleam.html");
@@ -114,7 +114,7 @@ fn index_html(cfg: &PanelConfig) -> String {
         .replace("__COMPONENTS__", COMPONENTS)
         .replace("__COCKPIT__", COCKPIT)
         .replace("__CHAT__", CHAT)
-        .replace("__ENGRAM__", ENGRAM)
+        .replace("__PROVE_TRACK__", PROVE_TRACK)
         .replace("__SCRIPT__", SCRIPT)
         .replace("__SESSION__", SESSION)
         .replace("__GLEAM__", GLEAM)
@@ -204,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn index_html_contains_both_views_and_engram_fields() {
+    fn index_html_contains_both_views_and_prove_track_fields() {
         let cfg = PanelConfig {
             anaphase_endpoint: ANAPHASE_ENDPOINT_DEFAULT.to_string(),
             tuck_endpoint: Some("http://127.0.0.1:60052".to_string()),
@@ -214,14 +214,14 @@ mod tests {
         };
         let html = index_html(&cfg);
         assert!(html.contains("驾驶舱 Cockpit"));
-        assert!(html.contains("印痕 Engram"));
+        assert!(html.contains("证轨 ProveTrack"));
         assert!(html.contains("/api/audit"));
         assert!(html.contains("Ledger 白盒"));
-        // Engram v3: experience sidebar + trajectory skeleton (v11.2.0).
+        // ProveTrack v3: experience sidebar + trajectory skeleton (v11.2.0).
         assert!(html.contains("id=\"s-side\""));
         assert!(html.contains("id=\"s-main\""));
         assert!(html.contains("id=\"chat-side\""));
-        assert!(html.contains("__engramLoad"));
+        assert!(html.contains("__proveTrackLoad"));
         assert!(html.contains("id=\"eTblVp\""));
         assert!(html.contains("id=\"eLaneInput\""));
         assert!(html.contains("id=\"eInsp\""));

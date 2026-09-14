@@ -40,8 +40,8 @@ pub struct App {
     pub heartbeat_timeout: Duration,
     /// Candidate G: cockpit projection channel (poller -> UI).
     cockpit_rx: Option<mpsc::Receiver<AgentSnapshot>>,
-    /// Engram: audit-query projection channel (poller -> UI).
-    engram_rx: Option<mpsc::Receiver<cellrix_protocol::engram::EngramQuery>>,
+    /// ProveTrack: audit-query projection channel (poller -> UI).
+    prove_track_rx: Option<mpsc::Receiver<cellrix_protocol::prove_track::ProveTrackQuery>>,
 }
 
 impl App {
@@ -64,7 +64,7 @@ impl App {
 
         Ok(Self {
             cockpit_rx: None,
-            engram_rx: None,
+            prove_track_rx: None,
             transport,
             renderer: Renderer::new(),
             event_rx,
@@ -98,12 +98,12 @@ impl App {
         self.cockpit_rx = Some(rx);
     }
 
-    /// Engram: attach the audit poller. A background task refetches the
+    /// ProveTrack: attach the audit poller. A background task refetches the
     /// latest `limit` chain entries on a fixed interval (one `/v1/audit`
     /// fetch per tick, always newest-first view); the UI drains the latest
     /// value before each frame. The trace filter is applied locally by the
     /// widget — the gateway is never spammed with filter churn.
-    pub fn attach_engram(
+    pub fn attach_prove_track(
         &mut self,
         client: Arc<dyn cellrix_transport::tuck_audit_client::TuckAuditFetcher>,
         poll_interval: Duration,
@@ -128,7 +128,7 @@ impl App {
                 }
             }
         });
-        self.engram_rx = Some(rx);
+        self.prove_track_rx = Some(rx);
     }
 
     pub async fn run(&mut self) -> Result<(), UiError> {
@@ -265,10 +265,10 @@ impl App {
                 }
             }
 
-            // Engram: drain the latest audit projection before drawing.
-            if let Some(rx) = &mut self.engram_rx {
+            // ProveTrack: drain the latest audit projection before drawing.
+            if let Some(rx) = &mut self.prove_track_rx {
                 while let Ok(query) = rx.try_recv() {
-                    self.state.set_engram(query);
+                    self.state.set_prove_track(query);
                 }
             }
 
@@ -291,14 +291,14 @@ impl App {
                 let main_area = chunks[0];
                 let status_area = chunks[1];
 
-                // Engram view: the audit imprint panel owns the whole main
+                // ProveTrack view: the audit imprint panel owns the whole main
                 // area (its own grid by proportion); the snapshot-driven
                 // renderer is bypassed entirely.
-                if self.state.active_view == ActiveView::Engram {
+                if self.state.active_view == ActiveView::ProveTrack {
                     // The audit imprint panel owns the whole main area (its
                     // own grid by proportion); the snapshot-driven renderer
                     // is bypassed. Status bar + chat box still render below.
-                    crate::widgets::engram::render_engram(&self.state.engram, main_area, f.buffer_mut());
+                    crate::widgets::prove_track::render_prove_track(&self.state.prove_track, main_area, f.buffer_mut());
                 } else if let Some(snap) = &self.state.snapshot {
                     let zen_node_id = if self.state.is_zen_mode {
                         self.state.focus_manager.current_focus()
