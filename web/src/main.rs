@@ -103,6 +103,14 @@ fn index_html(cfg: &PanelConfig) -> String {
     const COCKPIT: &str = include_str!("../assets/cockpit.html");
     const CHAT: &str = include_str!("../assets/chat.html");
     const PROVE_TRACK: &str = include_str!("../assets/prove_track.html");
+    // ADR-0016: ProveTrack split by concern — bare CSS/JS assets are wrapped by
+    // base.html (`<style>` in head, `<script>` before __SCRIPT__). Load order
+    // data → view → ctrl is a hard constraint (ctrl defines __proveTrackLoad,
+    // which script.html's selectPeriod calls).
+    const PROVE_TRACK_CSS: &str = include_str!("../assets/prove_track.css");
+    const PROVE_TRACK_DATA: &str = include_str!("../assets/prove_track.data.js");
+    const PROVE_TRACK_VIEW: &str = include_str!("../assets/prove_track.view.js");
+    const PROVE_TRACK_CTRL: &str = include_str!("../assets/prove_track.js");
     const SCRIPT: &str = include_str!("../assets/script.html");
     const SESSION: &str = include_str!("../assets/session.html");
     const GLEAM: &str = include_str!("../assets/gleam.html");
@@ -115,6 +123,10 @@ fn index_html(cfg: &PanelConfig) -> String {
         .replace("__COCKPIT__", COCKPIT)
         .replace("__CHAT__", CHAT)
         .replace("__PROVE_TRACK__", PROVE_TRACK)
+        .replace("__PROVE_TRACK_CSS__", PROVE_TRACK_CSS)
+        .replace("__PROVE_TRACK_DATA__", PROVE_TRACK_DATA)
+        .replace("__PROVE_TRACK_VIEW__", PROVE_TRACK_VIEW)
+        .replace("__PROVE_TRACK_CTRL__", PROVE_TRACK_CTRL)
         .replace("__SCRIPT__", SCRIPT)
         .replace("__SESSION__", SESSION)
         .replace("__GLEAM__", GLEAM)
@@ -228,5 +240,19 @@ mod tests {
         assert!(html.contains("loadEcosystem"));
         assert!(html.contains("id=\"eco\""));
         assert!(html.contains("/api/ecosystem"));
+
+        // ADR-0016: first-byte regression net. base.html once carried a stray
+        // `        r#"` prefix — left over from extracting the Rust raw string —
+        // which pushed DOCTYPE off byte 0 (quirks mode) and rendered a literal
+        // `r#"` on screen. Every assertion above used `contains` and never saw it.
+        assert!(html.starts_with("<!DOCTYPE html>"));
+        // No asset placeholder may survive (the whole assembly chain is intact).
+        assert!(!html.contains("__PROVE_TRACK"));
+        // ADR-0016: all four split assets must land in the page.
+        assert!(html.contains("--e-trk-tl")); // prove_track.css (tokens)
+        assert!(html.contains("function buildSession")); // prove_track.data.js
+        assert!(html.contains("function renderTable")); // prove_track.view.js
+        assert!(html.contains("window.CxProveTrack")); // cross-asset bridge
+        assert!(html.contains("__proveTrackClear")); // prove_track.js (ctrl)
     }
 }

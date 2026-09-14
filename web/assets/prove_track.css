@@ -1,0 +1,287 @@
+/* ============================================================
+  Cellrix · 证轨 ProveTrack — 样式层（ADR-0016 D1）
+  作用域：#view-prove-track（e- 前缀令牌，不外泄全局）
+  主题：随全局 data-theme 切换（日间/暗黑）+ prefers-contrast / forced-colors 降级
+  来源：由 prove_track.html 原第 7–289 行迁出，声明零改动
+  ============================================================ */
+  #view-prove-track{
+    --e-bg:#F4F6F8; --e-surface:#FFFFFF; --e-sunk:#F7F8FA;
+    --e-hover:#F0F2F5; --e-press:#E6E9EE;
+    --e-line:#E3E6EB; --e-line2:#C9CED6;
+    --e-text:#14171C; --e-dim:#5A626E;
+    --e-accent:#1F6F9B; --e-accent-h:#1A5F86; --e-accent-p:#165272;
+    --e-soft:rgba(31,111,155,.10); --e-onacc:#FFFFFF;
+    --e-ok:#1E7A45; --e-warn:#8A5A00; --e-risk:#A93226; --e-pend:#5A626E;
+    --e-trk-in:#5A6B80; --e-trk-md:#1F6F9B; --e-trk-tl:#8A5A00;
+    --e-fade:rgba(16,20,28,.32); --e-fade-w:4px;
+    --e-gleam:rgba(255,255,255,.62);
+    --e-r-s:6px; --e-r-m:8px; --e-r-l:14px;
+    --e-dur:200ms; --e-ease:cubic-bezier(.2,.7,.3,1);
+    --e-bg-rgb:244,246,248;
+    --e-sh1:0 1px 2px rgba(16,20,28,.06),0 2px 8px rgba(16,20,28,.05);
+    --e-sh2:0 2px 4px rgba(16,20,28,.07),0 8px 22px rgba(16,20,28,.09);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    color:var(--e-text);
+    -webkit-font-smoothing:antialiased;
+  }
+  [data-theme="dark"] #view-prove-track{
+    --e-bg:#121212; --e-surface:#1A1B1E; --e-sunk:#16171A;
+    --e-hover:#24262A; --e-press:#2C2F34;
+    --e-line:#2A2D33; --e-line2:#3A3E46;
+    --e-text:#E8EAED; --e-dim:#9AA1AC;
+    --e-accent:#4FA8D8; --e-accent-h:#63B5E0; --e-accent-p:#7CC2E7;
+    --e-soft:rgba(79,168,216,.14); --e-onacc:#0B1A22;
+    --e-ok:#5FCC8C; --e-warn:#E0B357; --e-risk:#EC8471; --e-pend:#9AA1AC;
+    --e-trk-in:#8496AB; --e-trk-md:#4FA8D8; --e-trk-tl:#E0B357;
+    --e-bg-rgb:18,18,18;
+    --e-gleam:rgba(226,244,255,.52);
+    /* 暗底无光可挡，"阴影"不成立 → 重协商为微光 [PHYS:D-004] */
+    --e-fade:rgba(150,205,240,.50);
+    --e-sh1:0 1px 2px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.35);
+    --e-sh2:0 2px 6px rgba(0,0,0,.55),0 12px 30px rgba(0,0,0,.45);
+  }
+  #view-prove-track :focus{outline:2px solid var(--e-accent);outline-offset:2px}
+  @supports selector(:focus-visible){ #view-prove-track :focus:not(:focus-visible){outline:none} }
+
+  /* ---------- 遮挡自证 · 四方向统一 ---------- */
+  #view-prove-track .e-vp{position:relative;--e-vp-r:0px;border-radius:var(--e-vp-r)}
+  @supports (overflow:clip){ #view-prove-track .e-vp{overflow:clip} }
+  #view-prove-track .e-eg{position:absolute;pointer-events:none;z-index:6;opacity:0;
+    transition:opacity 160ms var(--e-ease)}
+  #view-prove-track .e-eg.t{top:0;left:0;right:0;height:var(--e-fade-w);
+    border-radius:var(--e-vp-r) var(--e-vp-r) 0 0;
+    background:linear-gradient(to bottom,var(--e-fade),transparent)}
+  #view-prove-track .e-eg.b{bottom:0;left:0;right:0;height:var(--e-fade-w);
+    border-radius:0 0 var(--e-vp-r) var(--e-vp-r);
+    background:linear-gradient(to top,var(--e-fade),transparent)}
+  #view-prove-track .e-eg.l{left:0;top:0;bottom:0;width:var(--e-fade-w);
+    border-radius:var(--e-vp-r) 0 0 var(--e-vp-r);
+    background:linear-gradient(to right,var(--e-fade),transparent)}
+  #view-prove-track .e-eg.r{right:0;top:0;bottom:0;width:var(--e-fade-w);
+    border-radius:0 var(--e-vp-r) var(--e-vp-r) 0;
+    background:linear-gradient(to left,var(--e-fade),transparent)}
+  #view-prove-track .e-vp[data-t="1"] .e-eg.t,#view-prove-track .e-vp[data-b="1"] .e-eg.b,
+  #view-prove-track .e-vp[data-l="1"] .e-eg.l,#view-prove-track .e-vp[data-r="1"] .e-eg.r{opacity:1}
+
+  /* ---------- 轨迹：一个闭环对象 ---------- */
+  #view-prove-track .e-traj{border:1px solid var(--e-line);border-radius:var(--e-r-l);overflow:hidden;
+    background:var(--e-surface)}
+  #view-prove-track .e-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;
+    background:var(--e-surface);border-bottom:1px solid var(--e-line)}
+  #view-prove-track .e-tools .sp{flex:1 1 auto;min-width:0}
+  #view-prove-track .e-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;
+    gap:7px;min-height:36px;padding:0 13px;border:1px solid transparent;border-radius:var(--e-r-m);
+    font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;user-select:none;
+    background:var(--e-sunk);color:var(--e-text);
+    transition:background var(--e-dur) var(--e-ease),transform 90ms var(--e-ease)}
+  #view-prove-track .e-btn:hover{background:var(--e-hover)}
+  #view-prove-track .e-btn:active{background:var(--e-press);transform:scale(.985)}
+  #view-prove-track .e-btn-primary{background:var(--e-accent);color:var(--e-onacc)}
+  #view-prove-track .e-btn-primary:hover{background:var(--e-accent-h)}
+  #view-prove-track .e-btn-sm{min-height:36px;padding:0 11px;font-size:12.5px}
+  #view-prove-track .e-search{position:relative;flex:0 1 250px;min-width:150px}
+  #view-prove-track .e-search input{width:100%;min-height:36px;padding:0 32px;border:1px solid var(--e-line2);
+    border-radius:var(--e-r-m);background:var(--e-sunk);color:var(--e-text);font:inherit;font-size:13px}
+  #view-prove-track .e-search input:focus{outline:0;border-color:var(--e-accent);box-shadow:0 0 0 3px var(--e-soft)}
+  #view-prove-track .e-search .ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--e-dim);pointer-events:none}
+  #view-prove-track .e-search .clr{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:36px;height:36px;
+    display:grid;place-items:center;border:0;background:transparent;color:var(--e-dim);cursor:pointer;border-radius:var(--e-r-s)}
+  #view-prove-track .e-search .clr:hover{background:var(--e-hover);color:var(--e-text)}
+  #view-prove-track .e-hit{background:var(--e-warn);color:var(--e-surface);border-radius:2px;padding:0 1px;font-weight:700}
+
+  /* ---------- Overview：三轨共用一根标尺 ---------- */
+  #view-prove-track .e-ov{background:var(--e-surface);border-bottom:1px solid var(--e-line);padding:12px 14px}
+  #view-prove-track .e-ov-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+  #view-prove-track .e-ov-t{font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--e-dim)}
+  #view-prove-track .e-mini{font-size:12.5px;color:var(--e-dim);line-height:1.75;margin:0}
+  #view-prove-track .e-trk{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  #view-prove-track .e-trk-nm{flex:0 0 58px;font-size:11px;font-weight:600;color:var(--e-dim);letter-spacing:.4px}
+  #view-prove-track .e-lane{flex:1 1 auto;display:flex;gap:1px;height:24px;border-radius:5px;overflow:hidden;
+    background:var(--e-sunk);border:1px solid var(--e-line)}
+  #view-prove-track .e-blk{position:relative;height:100%;min-width:2px;transition:opacity 140ms var(--e-ease)}
+  #view-prove-track .e-blk.sel{outline:2px solid var(--e-text);outline-offset:-2px;z-index:4}
+  #view-prove-track .e-blk.dim{opacity:.22}
+  #view-prove-track .e-blk-empty{background:transparent}
+  #view-prove-track .e-blk.input{background:var(--e-trk-in)}
+  #view-prove-track .e-blk.input::after{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,255,255,.34) 2px 3px)}
+  #view-prove-track .e-blk.model{background:var(--e-trk-md)}
+  #view-prove-track .e-blk.tool{background:var(--e-trk-tl)}
+  #view-prove-track .e-blk.tool::after{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(45deg,transparent 0 3px,rgba(255,255,255,.30) 3px 5px)}
+  [data-theme="dark"] #view-prove-track .e-blk.input::after{background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.28) 2px 3px)}
+  [data-theme="dark"] #view-prove-track .e-blk.tool::after{background:repeating-linear-gradient(45deg,transparent 0 3px,rgba(0,0,0,.26) 3px 5px)}
+  #view-prove-track .e-blk.fail{box-shadow:inset 0 0 0 2px var(--e-risk)}
+  #view-prove-track .e-blk.wait{box-shadow:inset 0 0 0 2px var(--e-warn)}
+  #view-prove-track .e-blk.wait::before{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(90deg,transparent 0 3px,rgba(255,255,255,.55) 3px 6px);
+    animation:eWaitPulse 1.6s var(--e-ease) infinite}
+  [data-theme="dark"] #view-prove-track .e-blk.wait::before{background:repeating-linear-gradient(90deg,transparent 0 3px,rgba(0,0,0,.42) 3px 6px)}
+  @keyframes eWaitPulse{0%,100%{opacity:.35}50%{opacity:.9}}
+  #view-prove-track .e-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+  #view-prove-track .e-legend span{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--e-dim)}
+  #view-prove-track .e-legend i{width:22px;height:11px;border-radius:3px;display:inline-block}
+  #view-prove-track .e-legend i.input{background:var(--e-trk-in);background-image:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,255,255,.34) 2px 3px)}
+  #view-prove-track .e-legend i.model{background:var(--e-trk-md)}
+  #view-prove-track .e-legend i.tool{background:var(--e-trk-tl);background-image:repeating-linear-gradient(45deg,transparent 0 3px,rgba(255,255,255,.30) 3px 5px)}
+  [data-theme="dark"] #view-prove-track .e-legend i.input{background-image:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.28) 2px 3px)}
+  [data-theme="dark"] #view-prove-track .e-legend i.tool{background-image:repeating-linear-gradient(45deg,transparent 0 3px,rgba(0,0,0,.26) 3px 5px)}
+
+  /* ---------- 滚动条：说容器的语言 ---------- */
+  #view-prove-track .e-scroll,#view-prove-track .e-insp-bd,#view-prove-track pre{scrollbar-width:thin;scrollbar-color:var(--e-line2) transparent}
+  #view-prove-track .e-scroll::-webkit-scrollbar,#view-prove-track .e-insp-bd::-webkit-scrollbar,#view-prove-track pre::-webkit-scrollbar{width:9px;height:9px}
+  #view-prove-track .e-scroll::-webkit-scrollbar-track,#view-prove-track .e-insp-bd::-webkit-scrollbar-track,#view-prove-track pre::-webkit-scrollbar-track{background:transparent}
+  #view-prove-track .e-scroll::-webkit-scrollbar-thumb,#view-prove-track .e-insp-bd::-webkit-scrollbar-thumb,#view-prove-track pre::-webkit-scrollbar-thumb{
+    background:var(--e-line2);border-radius:999px;
+    border:3px solid transparent;background-clip:content-box}
+
+  /* ---------- 事件表 ---------- */
+  #view-prove-track .e-scroll{max-height:520px;overflow:auto;overscroll-behavior:contain;background:var(--e-surface)}
+  #view-prove-track .e-scroll table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  #view-prove-track .e-scroll thead th{position:sticky;top:0;z-index:5;background:var(--e-sunk);color:var(--e-dim);
+    font-size:11px;font-weight:700;letter-spacing:.5px;text-align:left;padding:7px 10px;
+    white-space:nowrap;border-bottom:2px solid var(--e-line2)}
+  @supports not (position:sticky){ #view-prove-track .e-scroll thead th{position:static} }
+  #view-prove-track .e-scroll td{padding:0 10px;height:44px;border-bottom:1px solid var(--e-line);vertical-align:middle;
+    overflow:hidden}
+  #view-prove-track .e-scroll tr.ev{cursor:pointer;transition:background var(--e-dur) var(--e-ease)}
+  #view-prove-track .e-scroll tr.ev:hover td{background:var(--e-hover)}
+  /* 选中态：背景 + 左侧标线双通道 [PHYS:L-001]；aria-current 在任意元素合法 */
+  #view-prove-track .e-scroll tr.ev[aria-current="true"] td{background:var(--e-soft);
+    box-shadow:inset 3px 0 0 var(--e-accent)}
+  #view-prove-track .e-scroll tr.ev:focus-visible{outline:2px solid var(--e-accent);outline-offset:-2px}
+  #view-prove-track .e-scroll tr.e-turn-hd td{background:var(--e-sunk);height:44px;padding:0 10px}
+  #view-prove-track .e-scroll tr.e-turn-hd:hover td{background:var(--e-hover)}
+  #view-prove-track .e-turn-btn{appearance:none;border:0;background:transparent;color:var(--e-dim);
+    display:flex;align-items:center;gap:6px;width:100%;min-height:44px;padding:0;
+    text-align:left;font:inherit;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer;
+    border-radius:var(--e-r-s)}
+  #view-prove-track .e-turn-btn .cnt{font-weight:400;font-size:11.5px}
+  #view-prove-track .e-row-hit td{background:var(--e-press)}
+  #view-prove-track .e-ty{display:inline-flex;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:2px 6px;border-radius:4px;
+    border:1px solid var(--e-line2);color:var(--e-dim);background:var(--e-sunk);white-space:nowrap}
+  #view-prove-track .e-ty.REPLY{color:var(--e-ok);border-color:var(--e-ok)}
+  #view-prove-track .e-ty.ASSISTANT{color:var(--e-accent);border-color:var(--e-accent)}
+  #view-prove-track .e-ty.USER{color:var(--e-trk-in);border-color:var(--e-trk-in)}
+  #view-prove-track .e-ty.TOOL{color:var(--e-trk-tl);border-color:var(--e-trk-tl)}
+  #view-prove-track .e-ty.SYSTEM{color:var(--e-dim)}
+  #view-prove-track .e-st{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;white-space:nowrap}
+  #view-prove-track .e-st .d{width:7px;height:7px;border-radius:50%;background:currentColor}
+  #view-prove-track .e-st.ok{color:var(--e-ok)} #view-prove-track .e-st.fail{color:var(--e-risk)}
+  #view-prove-track .e-st.pending{color:var(--e-pend)} #view-prove-track .e-st.done{color:var(--e-dim)}
+  /* 摘要列：fixed 布局下占剩余宽度，单行省略号 —— 绝不溢出框 [ENG: table-layout:fixed] */
+  #view-prove-track .e-summ{width:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  /* REPLY = 交付物：行内点击展开全文（再点收起），悬浮预览（统一交互，非补丁）。
+     短/全两态预渲染，CSS 切换 —— 展开显示的必须是完整回答，不是截断摘要。 */
+  #view-prove-track tr.ev.e-reply{cursor:pointer}
+  #view-prove-track tr.ev.e-reply .e-full{display:none}
+  #view-prove-track tr.ev.e-reply.open .e-short{display:none}
+  #view-prove-track tr.ev.e-reply.open .e-full{display:block;white-space:pre-wrap;word-break:break-all;
+    max-height:340px;overflow:auto;line-height:1.55}
+  #view-prove-track .e-dur,#view-prove-track .e-tok{text-align:right;font-variant-numeric:tabular-nums;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--e-dim);white-space:nowrap}
+  #view-prove-track .e-c-ty{width:120px} #view-prove-track .e-c-st{width:96px}
+  #view-prove-track .e-c-dur{width:78px;text-align:right} #view-prove-track .e-c-tok{width:74px;text-align:right}
+  #view-prove-track .e-rep{display:inline-flex;align-items:center;font-size:11px;font-weight:700;color:var(--e-warn);
+    border:1px solid var(--e-warn);border-radius:999px;padding:1px 7px;margin-left:6px;white-space:nowrap}
+  #view-prove-track .e-running{position:relative;overflow:hidden}
+  #view-prove-track .e-running::after{content:"";position:absolute;top:0;bottom:0;left:0;width:42%;
+    background:linear-gradient(90deg,transparent,var(--e-gleam),transparent);
+    animation:eGleam 1.4s var(--e-ease) infinite;pointer-events:none}
+  @keyframes eGleam{0%{transform:translateX(-110%)}100%{transform:translateX(340%)}}
+  #view-prove-track .e-spin{width:13px;height:13px;border-radius:50%;border:2px solid currentColor;
+    border-top-color:transparent;animation:eSpin 720ms linear infinite;display:inline-block}
+  @keyframes eSpin{to{transform:rotate(360deg)}}
+  #view-prove-track .e-ripple{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.24;
+    transform:translate(-50%,-50%) scale(0);animation:eRipple 460ms var(--e-ease) forwards}
+  @keyframes eRipple{0%{transform:translate(-50%,-50%) scale(0);opacity:.26}
+    55%{opacity:.17}100%{transform:translate(-50%,-50%) scale(2.6);opacity:0}}
+  #view-prove-track .e-ripple-static{position:absolute;inset:0;pointer-events:none;background:currentColor;opacity:.20;
+    animation:eRippleStatic 200ms var(--e-ease) forwards}
+  @keyframes eRippleStatic{from{opacity:.20}to{opacity:0}}
+
+  /* ---------- 统计栏：gap 生成分隔线，永不落在外沿 ---------- */
+  #view-prove-track .e-stats{display:grid;grid-template-columns:repeat(8,1fr);gap:1px;background:var(--e-line);
+    border-top:1px solid var(--e-line2)}
+  @media (max-width:1040px){ #view-prove-track .e-stats{grid-template-columns:repeat(4,1fr)} }
+  @media (max-width:560px){ #view-prove-track .e-stats{grid-template-columns:repeat(2,1fr)} }
+  #view-prove-track .e-stat{background:var(--e-sunk);padding:10px 12px;min-width:0}
+  #view-prove-track .e-stat b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
+  #view-prove-track .e-stat span{font-size:11px;color:var(--e-dim);letter-spacing:.3px}
+
+  /* ---------- 检查器（右侧抽屉，模态性随视口重协商） ---------- */
+  #view-prove-track .e-insp{position:fixed;top:0;right:0;bottom:0;width:430px;max-width:100vw;
+    width:min(430px,100vw);z-index:70;
+    background:var(--e-surface);border-left:1px solid var(--e-line2);box-shadow:var(--e-sh2);
+    display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;
+    transition:transform 220ms var(--e-ease),visibility 0s linear 220ms;
+    color:var(--e-text)}
+  #view-prove-track .e-insp.on{transform:translateX(0);visibility:visible;transition-delay:0s}
+  #view-prove-track .e-insp-hd{padding:12px 14px;border-bottom:1px solid var(--e-line);display:flex;
+    align-items:flex-start;justify-content:space-between;gap:10px}
+  #view-prove-track .e-insp-hd h3{font-size:14px;margin:0 0 3px;color:var(--e-text)}
+  #view-prove-track .e-insp-hd .sb{font-size:12px;color:var(--e-dim)}
+  #view-prove-track .e-insp-bd{flex:1 1 auto;overflow:auto;padding:12px 14px}
+  #view-prove-track .e-sec{margin-bottom:16px}
+  #view-prove-track .e-sec > h4{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--e-dim);
+    text-transform:uppercase;margin:0 0 6px}
+  #view-prove-track .e-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px;margin:0}
+  #view-prove-track .e-kv dt{color:var(--e-dim)} #view-prove-track .e-kv dd{margin:0;color:var(--e-text)}
+  #view-prove-track pre{background:var(--e-sunk);border:1px solid var(--e-line);border-radius:var(--e-r-m);
+    padding:9px 11px;overflow:auto;max-height:230px;margin:0;font-size:11.5px;line-height:1.6;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;
+    color:var(--e-text)}
+  /* ANSI 色是工具输出的内容，不是界面 token [PHYS:L-002]；不折行，天生横向滚动 */
+  #view-prove-track pre.e-term{background:#0E1116;color:#D5DAE1;border-color:#22262D;white-space:pre}
+  #view-prove-track .e-tpre{position:relative;--e-vp-r:var(--e-r-m)}
+  #view-prove-track pre.e-term .e-c-e{color:#F08C7C} #view-prove-track pre.e-term .e-c-g{color:#6FCF97}
+  #view-prove-track pre.e-term .e-c-y{color:#E0B357} #view-prove-track pre.e-term .e-c-d{color:#7A828C}
+  #view-prove-track .e-scrim{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:65;opacity:0;visibility:hidden;
+    transition:opacity var(--e-dur) var(--e-ease),visibility 0s linear var(--e-dur)}
+  #view-prove-track .e-scrim.on{opacity:1;visibility:visible;transition-delay:0s}
+  @media (min-width:1180px){ #view-prove-track .e-scrim{display:none} }
+
+  /* ---------- 空态：自证"空"而非"坏" [PHYS:P-014][PHYS:C-002] ---------- */
+  #view-prove-track .e-empty{padding:48px 20px;text-align:center;color:var(--e-dim);font-size:13px;
+    background:var(--e-surface);border:1px solid var(--e-line);border-radius:var(--e-r-l)}
+
+  /* ---------- 降级 ---------- */
+  @media (pointer:coarse){
+    #view-prove-track .e-btn,#view-prove-track .e-search input{min-height:44px}
+    #view-prove-track .e-search .clr{width:44px;height:44px}
+    #view-prove-track .e-lane{height:44px}
+    #view-prove-track .e-scroll td,#view-prove-track .e-scroll tr.e-turn-hd td{height:48px}
+    #view-prove-track .e-turn-btn{min-height:48px}
+  }
+  @media (max-width:720px){ #view-prove-track .e-summ{width:42%} #view-prove-track .e-insp{width:100vw} }
+  /* 窄屏让位：Tokens → 耗时依次隐藏，摘要列常驻（最小信息集） */
+  @media (max-width:680px){ #view-prove-track .e-c-tok,#view-prove-track .e-tok{display:none} }
+  @media (max-width:520px){
+    #view-prove-track .e-c-ty,#view-prove-track .e-c-st,#view-prove-track .e-c-dur{width:auto}
+    #view-prove-track .e-scroll td{padding:0 8px}
+    #view-prove-track .e-scroll thead th{padding:7px 8px}
+    #view-prove-track .e-ty{font-size:10px;padding:2px 4px}
+    #view-prove-track .e-trk-nm{flex:0 0 44px;font-size:10px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #view-prove-track *,#view-prove-track *::before,#view-prove-track *::after{animation-duration:1ms!important;
+      animation-iteration-count:1!important;transition-duration:1ms!important}
+    /* 信息类持续动效不可降级 [PHYS:C-003]：静止暗示完成 = 不确定性 = 焦虑 */
+    #view-prove-track .e-spin{animation:eSpin 720ms linear infinite!important}
+    #view-prove-track .e-blk.wait::before{animation:eWaitPulse 1.6s var(--e-ease) infinite!important}
+  }
+  @media (prefers-contrast:more){
+    #view-prove-track{--e-line:#8A9099;--e-line2:#4A5058;--e-dim:#33383F;
+      --e-trk-in:#3B4757;--e-trk-md:#14506F;--e-trk-tl:#6B4400;--e-fade:transparent}
+    [data-theme="dark"] #view-prove-track{--e-line:#7A8089;--e-line2:#A8AEB6;--e-dim:#C7CDD4;
+      --e-trk-in:#A7B6C8;--e-trk-md:#8FC8E8;--e-trk-tl:#F0C87A;--e-fade:transparent}
+    #view-prove-track .e-blk::after,#view-prove-track .e-eg{display:none}
+  }
+  @media (forced-colors:active){
+    #view-prove-track .e-blk{forced-color-adjust:none;border:1px solid CanvasText}
+    #view-prove-track .e-blk::after{display:none}
+    #view-prove-track .e-eg{display:none}
+    #view-prove-track .e-ty,#view-prove-track .e-st{border:1px solid CanvasText}
+    #view-prove-track .e-traj,#view-prove-track .e-insp{border:1px solid CanvasText}
+  }

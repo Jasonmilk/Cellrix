@@ -1,13 +1,22 @@
 # Cellrix 开发导航牌（PLAN）
 
-> **版本**：v1.0
-> **日期**：2026-08-30
+> **版本**：v1.2
+> **日期**：2026-09-14
 > **所属方法论**：phyt-DNA v1.0
 > **性质**：本文件是 Cellrix 的当前生长阶段导航牌。只含当前阶段 + 下一阶段预览 + 阶段总览。已完成的详细内容移入 GROWTH.md。
 
 ---
 
-## 当前阶段：P0-P6 完成 + 驾驶舱（G-2..G-6）+ Web 面板 G2 首拉 + **CI-144 stdio 闭环（ADR-0017）** + **ProveTrack（证轨）审计面板（2026-09-07：Tuck /v1/audit 真实链消费，Ctrl+E 切换，时间线/详情/链完整性，本地 trace 过滤，虚拟列表，live 链校验全过）** + **Web 同构映射（2026-09-07：cellrix-web 双视图 Cockpit/ProveTrack，/api/audit Bearer 代理与 TUI 同一 ProveTrackEntry 数据模型，比例网格 timeline 2fr/detail 1fr，trace 过滤，327 全绿）**——**全文回放（2026-09-07：/api/trace 代理 + detail 正文区，点审计条目看该轮 prompt/response）**——**时间线按轮分组（2026-09-07：同 trace_id 合成一轮，组头折叠，最新轮在上）**——**up 引导模式（2026-09-07：无参数→选择题回车即选→首次输入命令持久化 ~/.cellrix/up.toml(0600)→之后零输入全自动；来源链 flags>env>file>协议默认）**——下一步：轮动效 / 或 Mind 侧消费 /v1/health（看表接线）
+## 当前阶段：**WebUI 全资产化解耦达成（ADR-0015 + ADR-0016）**
+
+ADR-0015 完成 WebUI 水之波光化（令牌/组件/行为三层资产 + 驾驶舱 v2 + 会话域 `session.html` + 证轨 v3 骨架）；ADR-0016 收掉 `web/assets/` 的**最后一个红线违例**——`prove_track.html` 955 行按关注点拆为 5 个资产：
+
+- `prove_track.css`（样式层，~281 行）· `prove_track.html`（骨架层，~79 行）
+- `prove_track.data.js`（数据层，纯函数零状态）· `prove_track.view.js`（视图层，独占 `S`/`HAS`）· `prove_track.js`（控制层，事件绑定 + 对外接口）
+- 跨资产经 `window.CxProveTrack` 命名空间桥接（沿用 ADR-0015 D14 `window.CxSession` 先例）；加载序 data → view → ctrl → `script.html` 为硬约束；对外接口名 `__proveTrackLoad/Clear` 不变，调用点零改动
+- 同轮修复 `base.html` 首字节残留 `        r#"`（把 DOCTYPE 挤出首位 → quirks mode + 页面顶部渲染字面量 `r#"`），并补 `assert!(html.starts_with("<!DOCTYPE html>"))` 回归网
+
+**下一步候选**：会话管理深化（继续对话选择 + 状态栏耗时/token）／结晶闭环实施（Unmet≥2 → 判据候选 → Tuck hard 规则）／生态加固（项目生命周期管理、tuck 小白引导、WebUI 一键重启）／身份绑定（anaphase 1对1 JWT 绑定）
 
 **状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
 
@@ -83,4 +92,4 @@
 
 ---
 
-*《Cellrix 开发导航牌》v1.1（候选 G 完成：Anaphase 驾驶舱，2026-09-06）。*
+*《Cellrix 开发导航牌》v1.2（WebUI 全资产化解耦达成：ADR-0015 + ADR-0016，2026-09-14）。*

@@ -25,6 +25,28 @@
 | **P5** | Tentacle Integration (Tool Execution + Plugin Audit) | ✅ Complete |
 | **P6** | Production Ready (Config/Logging/Monitoring/Deploy) | ✅ Complete |
 
+> **Status 2026-09-14 (ADR-0016)**: `web/assets/` is now **fully under the
+> 400-line red line**. `prove_track.html` (955 lines) was split by concern
+> into five assets — `prove_track.css` (style), `prove_track.html`
+> (skeleton), `prove_track.data.js` (pure data layer, zero state),
+> `prove_track.view.js` (view layer, owns `S`/`HAS`) and `prove_track.js`
+> (control layer: bindings + public API). Cross-asset calls go through the
+> `window.CxProveTrack` namespace (same pattern as ADR-0015 D14's
+> `window.CxSession`); load order data → view → ctrl → `script.html` is a
+> hard constraint, and `__proveTrackLoad` / `__proveTrackClear` are
+> unchanged so `script.html` needed zero edits. The data layer was made
+> pure: `computeRepeats()` now takes `session` explicitly instead of
+> reading the closure's `S`.
+>
+> Same round fixed a **latent defect**: `base.html` line 1 carried a stray
+> `        r#"` prefix — the raw-string opener, dragged in when the asset was
+> extracted out of Rust source. It pushed DOCTYPE off byte 0, forcing the
+> browser into **quirks mode** and rendering a literal `r#"` at the top of
+> the page. The missing `</head>` was restored too. Existing tests only
+> used `contains` assertions and never checked the first byte, which is why
+> it survived this long; `assert!(html.starts_with("<!DOCTYPE html>"))`
+> now guards it. `cargo test --no-fail-fast` = **341 passed / 0 failed**.
+>
 > **Status 2026-09-09 (ADR-0015 D14)**: Session management deepened under
 > the **水之波光 · 触境** component language, **DSH skeleton** (dshbook ch.1:
 > session log = durable facts, click = resume progress). Chat sidebar now
