@@ -262,6 +262,61 @@ const EFX = global.window.CxEventFamily;
     after - before === 2, 'delta=' + (after - before));
 }
 
+// ---- a REAL period slice (the shape that was never in the net)
+//
+// Sliced from a real period file, two complete turns. Every fixture before this
+// was synthetic, and the synthetic ones numbered seq globally — which is
+// precisely how the multi-turn bug stayed invisible: the net agreed with a
+// shape the producer never emits.
+{
+  const real = [
+  {"type": "turn/start", "seq": 0, "time": "2026-09-08T21:11:53Z", "data": {}},
+  {"type": "user/message", "seq": 1, "time": "2026-09-08T21:11:53Z", "data": {"text": "现在北京天气怎么样？"}},
+  {"type": "context/inject", "seq": 2, "time": "2026-09-08T21:11:53Z", "data": {"chars": 800, "nodes": 0}},
+  {"type": "assistant/think", "seq": 3, "time": "2026-09-08T21:11:54Z", "data": {"text": "我们 need answer user. Need follow identity? User asks weather Beijing now. We have tools available: web_search. Need use tool before guessing. Need end reply with only JSON call? The instruction says when need tool end reply with ONLY {\"calls\":...} no prose. We need make tool call. Need determine query. We'll call web_search for \"北京天气 现在\". Need top-N. Expect ok. So final with JSON only."}},
+  {"type": "assistant/attempt", "seq": 4, "time": "2026-09-08T21:11:54Z", "data": {"empty": false, "text": "{\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"北京天气 现在 2026-09-09\"},\"expect\":\"ok\"}]}"}},
+  {"type": "tool/call", "seq": 5, "time": "2026-09-08T21:11:56Z", "data": {"expect": "ok", "index": 0, "tool": "web_search"}},
+  {"type": "tool/result", "seq": 6, "time": "2026-09-08T21:11:56Z", "data": {"duration_ms": 1407, "index": 0, "ok": true, "outcome": "{\"ok\":true,\"results\":[{\"title\":\"McAfee AI-Powered Antivirus, Scam, Identity, and Privacy ...\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=66584a8776c984b2fe473160dbc99c9b9964a4d584d3013ee6588b393c9c41b4JmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=149b6866-154f-6e9a-3b37-7fa814126f92&amp;u=a1aHR0cHM6Ly93d3cubWNhZmVlLmNvbS8_bXNvY2tpZD0xNDliNjg2NjE1NGY2ZTlhM2IzNzdmYTgxNDEyNmY5Mg&amp;ntb=1\"},{\"title\":\"Download and Install our Award Winning Products | McAfee\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=746abcfde5d64f1bb0f4211d5c4fc1e6fe8843911fa5164da706f0fa1a11eda8JmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=149b6866-154f-6e9a-3b37-7fa814126f92&amp;u=a1aHR0cHM6Ly93d3cubWNhZmVlLmNvbS9lbi11cy9hbnRpdmlydXMvZG93bmxvYWRzLmh0bWw_bXNvY2tpZD0xNDliNjg2NjE1NGY2ZTlhM2IzNzdmYTgxNDEyNmY5Mg&amp;ntb=1\"},{\"title\":\"Antivirus Software and Internet Security For Your PC ... - McAfee\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=a442970adf40bdd287cbce605f3ccfc4d485b5c890715805b7aa6fc2191506ffJmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=149b6866-154f-6e9a-3b37-7fa814126f92&amp;u=a1aHR0cHM6Ly9teWFjY291bnQubWNhZmVlLmNvbS92Mi8&amp;ntb=1\"},{\"title\":\"McAfee - Wikipedia\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=6393bf1d3454fa2046f1b782266d6e675d9ed82312fa2cdfe7c976610b5b4420JmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=149b6866-154f-6e9a-3b37-7fa814126f92&amp;u=a1aHR0cHM6Ly9lbi53aWtpcGVkaWEub3JnL3dpa2kvTWNBZmVl&amp;ntb=1\"},{\"title\":\"How to Get Rid of Fake McAfee Virus Pop-Ups - Cybernews\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=4d038a559e92d04d11c1f3e847600414dc8411c16b338de0017a14ffa6eb3c5bJmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=149b6866-154f-6e9a-3b37-7fa814126f92&amp;u=a1aHR0cHM6Ly9jeWJlcm5ld3MuY29tL21hbHdhcmUvcmVtb3ZlLW1jYWZlZS12aXJ1cy1wb3AtdXBzLw&amp;ntb=1\"}]}", "outcome_sha": "1b6b783c", "tool": "web_search"}},
+  {"type": "check/status", "seq": 7, "time": "2026-09-08T21:11:56Z", "data": {"actual": "ok=true", "check": "exec_ok", "check_id": "run-7efbf0f8aacf96d5#c0", "evidence_id": "run-7efbf0f8aacf96d5#0", "expect": "ok", "gate": "hard", "judge": "rule", "passed": true, "reason": "ok=true"}},
+  {"type": "check/status", "seq": 8, "time": "2026-09-08T21:11:56Z", "data": {"actual": "no business result in tool return", "check": "answer.delivered", "check_id": "run-7efbf0f8aacf96d5#c1", "evidence_id": "run-7efbf0f8aacf96d5#0", "expect": "ok", "gate": "hard", "judge": "rule", "passed": false, "reason": "no business result in tool return"}},
+  {"type": "verdict/status", "seq": 9, "time": "2026-09-08T21:11:56Z", "data": {"checks": 2, "job_id": "run-7efbf0f8aacf96d5", "reason": "failed: answer.delivered", "status": "Unmet"}},
+  {"type": "turn/end", "seq": 10, "time": "2026-09-08T21:11:56Z", "data": {"done": true, "impasse": false, "success": false, "verdict": "Unmet"}},
+  {"type": "turn/start", "seq": 0, "time": "2026-09-08T21:13:47Z", "data": {}},
+  {"type": "user/message", "seq": 1, "time": "2026-09-08T21:13:47Z", "data": {"text": "现在北京天气怎么样？"}},
+  {"type": "context/inject", "seq": 2, "time": "2026-09-08T21:13:47Z", "data": {"chars": 800, "choice": {"tiers": {"L1": 1, "L3": 1}, "top": [{"heat": 0.5, "id": "2dcd6a5f-9225-537f-966b-a0748e486767", "phase": "liquid", "tier": "L1"}, {"heat": 0.5, "id": "76b3755d-60b7-45db-b73d-fcf3a76e7d06", "phase": "liquid", "tier": "L3"}]}, "nodes": 2}},
+  {"type": "assistant/think", "seq": 3, "time": "2026-09-08T21:13:49Z", "data": {"text": "我们需要 understand identity/rules. Need answer in Chinese. Need decide about tools. User asks Beijing weather now. We have time anchor 2026-09-09 05:13:47 +0800. Need know weather. We have web_search tool. But before big LLM use tools. We should call web_search likely for Beijing weather. Need end with only JSON calls if tool needed. Need not include prose? So need first maybe think? Need make call. We can use web_search args query. Need ensure deterministic. Let's call web_search."}},
+  {"type": "assistant/attempt", "seq": 4, "time": "2026-09-08T21:13:49Z", "data": {"empty": false, "text": "{\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"北京 天气 2026-09-09\"},\"expect\":\"ok\"}]}"}},
+  {"type": "tool/call", "seq": 5, "time": "2026-09-08T21:13:50Z", "data": {"expect": "ok", "index": 0, "tool": "web_search"}},
+  {"type": "tool/result", "seq": 6, "time": "2026-09-08T21:13:50Z", "data": {"duration_ms": 1039, "index": 0, "ok": true, "outcome": "{\"ok\":true,\"results\":[{\"title\":\"北京市_百度百科\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=fbbb41d1091ed8937777119c608a593c0ba1e663dcf7be069c8674ad839c73c3JmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=227e699b-68ec-6011-0b24-7e5569ad6105&amp;u=a1aHR0cHM6Ly9iYWlrZS5iYWlkdS5jb20vaXRlbS8lZTUlOGMlOTclZTQlYmElYWMlZTUlYjglODIvMTI2MDY5&amp;ntb=1\"},{\"title\":\"北京市 - 维基百科，自由的百科全书\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=5931807433e9548f6cfc05398e7213fd2b70ef250cafc83c5cfc880db4938c22JmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=227e699b-68ec-6011-0b24-7e5569ad6105&amp;u=a1aHR0cHM6Ly96aC53aWtpcGVkaWEub3JnL3dpa2kvJUU1JThDJTk3JUU0JUJBJUFDJUU1JUI4JTgy&amp;ntb=1\"},{\"title\":\"Beijing - 北京市人民政府门户网站\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=99f533fdc25060c0a2bd6bfa726f3d03c4b45f8bd27c32d0e0f7a2bce2ff779cJmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=227e699b-68ec-6011-0b24-7e5569ad6105&amp;u=a1aHR0cHM6Ly93d3cuYmVpamluZy5nb3YuY24v&amp;ntb=1\"},{\"title\":\"北京市 - 维基百科，自由的百科全书\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=557bcdafd96233a6001bf9661c6a78ba226ce030c7615764f013516867b301a9JmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=227e699b-68ec-6011-0b24-7e5569ad6105&amp;u=a1aHR0cHM6Ly96aC53aWtpcGVkaWEub3JnL3poLWNuLyVFNSU4QyU5NyVFNCVCQSVBQyVFNSVCOCU4Mg&amp;ntb=1\"},{\"title\":\"北京市海淀区人民政府门户网站\",\"url\":\"https://www.bing.com/ck/a?!&amp;&amp;p=493407419f0fa9baa0937132039d48d01c8c0ae62c78fba7ab90ec425b21f1d9JmltdHM9MTc4ODgyNTYwMA&amp;ptn=3&amp;ver=2&amp;hsh=4&amp;fclid=227e699b-68ec-6011-0b24-7e5569ad6105&amp;u=a1aHR0cHM6Ly93d3cuYmpoZC5nb3YuY24v&amp;ntb=1\"}]}", "outcome_sha": "7146c9c7", "tool": "web_search"}},
+  {"type": "check/status", "seq": 7, "time": "2026-09-08T21:13:50Z", "data": {"actual": "ok=true", "check": "exec_ok", "check_id": "run-7efbf0f8aacf96d5#c0", "evidence_id": "run-7efbf0f8aacf96d5#0", "expect": "ok", "gate": "hard", "judge": "rule", "passed": true, "reason": "ok=true"}},
+  {"type": "check/status", "seq": 8, "time": "2026-09-08T21:13:50Z", "data": {"actual": "result produced, delivery confirmed at tool edge", "check": "answer.delivered", "check_id": "run-7efbf0f8aacf96d5#c1", "evidence_id": "run-7efbf0f8aacf96d5#0", "expect": "ok", "gate": "hard", "judge": "rule", "passed": true, "reason": "result produced, delivery confirmed at tool edge"}},
+  {"type": "verdict/status", "seq": 9, "time": "2026-09-08T21:13:50Z", "data": {"checks": 2, "job_id": "run-7efbf0f8aacf96d5", "reason": "all checks passed", "status": "Met"}},
+  {"type": "turn/end", "seq": 10, "time": "2026-09-08T21:13:50Z", "data": {"done": true, "impasse": false, "success": true, "verdict": "Met"}}
+  ];
+  const canon = NORM.normalize(real, { job_id: 'j-real' });
+  const a = ASM.create();
+  a.feed(canon.events);
+  const coords = a.coordinates({ job_id: 'j-real' });
+  check('REAL slice: zero refusals',
+    a.rejections().total === 0, JSON.stringify(a.rejections().counts));
+  check('REAL slice: every event reaches the tape',
+    a.events().length === real.length, a.events().length + ' of ' + real.length);
+  check('REAL slice: two turns derived',
+    new Set(coords.map(function (c) { return c.turn; })).size === 2,
+    JSON.stringify(Array.from(new Set(coords.map(function (c) { return c.turn; })))));
+  check('REAL slice: node ids are unique across turns',
+    new Set(coords.map(function (c) { return c.node; })).size === real.length,
+    new Set(coords.map(function (c) { return c.node; })).size + ' of ' + real.length);
+  /* gseqFallback is module-level, so earlier raw fixtures have already moved
+   * it. The delta is the fact; the absolute value is not. */
+  const fbBefore = ASM.create().diagnostics().gseqFallback;
+  const probe = ASM.create();
+  probe.feed(canon.events);
+  check('REAL slice: no fallback on the normalised path',
+    probe.diagnostics().gseqFallback === fbBefore,
+    fbBefore + ' -> ' + probe.diagnostics().gseqFallback);
+}
+
 // ---- the contract's alias table is complete against its own schema
 {
   const listed = Object.keys(EFX.TYPES).map(function (k) { return EFX.TYPES[k]; }).sort();
