@@ -34,9 +34,10 @@ console.log('event family contract (' + EF.VERSION + ')');
 const EXPECTED = [
   'turn/start', 'user/message', 'context/inject', 'assistant/think',
   'assistant/attempt', 'tool/call', 'tool/result', 'check/status',
-  'verdict/status', 'assistant/reply', 'turn/end'
+  'verdict/status', 'assistant/reply', 'turn/end',
+  'assistant/usage'
 ];
-check('vocabulary has 11 types', EF.KNOWN_TYPES.length === 11, 'got ' + EF.KNOWN_TYPES.length);
+check('vocabulary has 12 types', EF.KNOWN_TYPES.length === 12, 'got ' + EF.KNOWN_TYPES.length);
 EXPECTED.forEach(function (t) {
   check('vocabulary contains ' + t, EF.KNOWN_TYPES.indexOf(t) >= 0);
 });
@@ -51,12 +52,18 @@ check('turn/end with null model is valid (ADR-0036)',
 
 check('every type declaring a nullable field accepts null',
   EF.KNOWN_TYPES.every(function (t) {
-    var shape = EF.DATA_SCHEMA[t];
-    var fields = Object.keys(shape).filter(function (k) { return shape[k].indexOf('null') >= 0; });
-    if (!fields.length) return true;
+    var schema = EF.DATA_SCHEMA[t];
+    var req = schema.required || {}, opt = schema.optional || {};
+    function sample(k) {
+      var k0 = (req[k] || opt[k])[0];
+      return k0 === 'boolean' ? false : (k0 === 'number' ? 0 : (k0 === 'array' ? [] : (k0 === 'object' ? {} : 'x')));
+    }
     var data = {};
-    Object.keys(shape).forEach(function (k) { data[k] = shape[k][0] === 'boolean' ? false : (shape[k][0] === 'number' ? 0 : 'x'); });
-    fields.forEach(function (k) { data[k] = null; });
+    Object.keys(req).forEach(function (k) { data[k] = sample(k); });
+    Object.keys(opt).forEach(function (k) { data[k] = sample(k); });
+    // null out every optional field that declares nullability
+    Object.keys(opt).filter(function (k) { return opt[k].indexOf('null') >= 0; })
+      .forEach(function (k) { data[k] = null; });
     return EF.isValidEvent({ type: t, seq: 1, time: 'z', data: data });
   }));
 

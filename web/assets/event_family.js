@@ -34,22 +34,85 @@
     TURN_END: 'turn/end'
   };
 
-  /* data shape per type. A value is a LIST of accepted primitives — `model` is
-   * explicitly nullable (anaphase:ADR-0036: the upstream may not report one),
-   * and "nullable" is data here, not a special case in the validator. */
+  /* data shape per type, split into required and optional.
+   *
+   * A field the producer omits when the fact does not exist is OPTIONAL.
+   * Demanding it rejects real events — measured 2026-09-15 over 86 real
+   * periods: `context/inject.resume_from` appears in 34/103, `turn/end.reply`
+   * in 37/102, `assistant/reply.model` in 32/37. Required below means the
+   * field was present in EVERY event of that type in the measurement.
+   *
+   * A value is the list of accepted primitives; 'null' and 'array' are named
+   * explicitly because typeof alone cannot tell them apart from 'object'.
+   */
   var DATA_SCHEMA = {
-    'turn/start': {},
-    'user/message': { text: ['string'] },
-    'context/inject': { nodes: ['number'], chars: ['number'], resume_from: ['string', 'null'] },
-    'assistant/think': { text: ['string'] },
-    'assistant/attempt': { text: ['string'] },
-    'tool/call': { tool: ['string'], index: ['number'], expect: ['string'] },
-    'tool/result': { tool: ['string'], ok: ['boolean'], duration_ms: ['number'], data: ['string'] },
-    'check/status': { check_id: ['string'], check: ['string'], expect: ['string'], actual: ['string'], gate: ['string'] },
-    'verdict/status': { job_id: ['string'], status: ['string'] },
-    'assistant/reply': { text: ['string'], chars: ['number'], model: ['string', 'null'] },
-    'turn/end': { done: ['boolean'], success: ['boolean'], impasse: ['boolean'], reply: ['string'], model: ['string', 'null'] }
+    'turn/start': { required: {}, optional: {} },
+    'user/message': { required: { text: ['string'] }, optional: {} },
+    'context/inject': {
+      required: { chars: ['number'], nodes: ['number'] },
+      optional: { choice: ['object'], resume_from: ['string', 'null'] }
+    },
+    'assistant/think': { required: { text: ['string'] }, optional: {} },
+    'assistant/attempt': {
+      required: { text: ['string'] },
+      optional: { empty: ['boolean'] }
+    },
+    'assistant/usage': {
+      required: { prompt_tokens: ['number'], completion_tokens: ['number'] },
+      optional: {
+        cached_tokens: ['number'], reasoning_tokens: ['number'],
+        model: ['string', 'null']
+      }
+    },
+    'tool/call': {
+      required: { tool: ['string'], index: ['number'], expect: ['string'] },
+      optional: {}
+    },
+    'tool/result': {
+      required: { tool: ['string'], ok: ['boolean'], duration_ms: ['number'] },
+      optional: {
+        data: ['string', 'null'], index: ['number'],
+        outcome: ['string'], outcome_sha: ['string']
+      }
+    },
+    'check/status': {
+      required: {
+        check_id: ['string'], check: ['string'], expect: ['string'],
+        actual: ['string'], gate: ['string']
+      },
+      optional: {
+        evidence_id: ['string'], judge: ['string'],
+        passed: ['boolean'], reason: ['string']
+      }
+    },
+    'verdict/status': {
+      required: { job_id: ['string'], status: ['string'] },
+      optional: { checks: ['array', 'number'], reason: ['string'] }
+    },
+    'assistant/reply': {
+      required: { text: ['string'], chars: ['number'] },
+      optional: { model: ['string', 'null'] }
+    },
+    'turn/end': {
+      required: { done: ['boolean'], success: ['boolean'], impasse: ['boolean'] },
+      optional: {
+        reply: ['string', 'null'], model: ['string', 'null'],
+        verdict: ['string', 'null']
+      }
+    }
   };
+
+  /* Primitive name of a value. typeof reports 'object' for both null and
+   * arrays, which would make ['object'] accept null — so they are named. */
+  function kindOf(v) {
+    if (v === null) return 'null';
+    if (Array.isArray(v)) return 'array';
+    return typeof v;
+  }
+
+  function matches(v, allowed) {
+    return allowed.indexOf(kindOf(v)) >= 0;
+  }
 
   function isKnownType(t) {
     return Object.prototype.hasOwnProperty.call(DATA_SCHEMA, t);
@@ -74,10 +137,18 @@
     var d = e.data;
     if (!d || typeof d !== 'object') return false;
 
-    for (var k in shape) {
-      if (!Object.prototype.hasOwnProperty.call(shape, k)) continue;
-      var actual = d[k] === null ? 'null' : typeof d[k];
-      if (shape[k].indexOf(actual) < 0) return false;
+    /* Required: present AND typed. A missing required field is a malformed
+     * event, not an optional one. */
+    for (var k in shape.required) {
+      if (!Object.prototype.hasOwnProperty.call(shape.required, k)) continue;
+      if (!Object.prototype.hasOwnProperty.call(d, k)) return false;
+      if (!matches(d[k], shape.required[k])) return false;
+    }
+    /* Optional: absent is fine; present-but-wrong-typed is not. */
+    for (var k2 in shape.optional) {
+      if (!Object.prototype.hasOwnProperty.call(shape.optional, k2)) continue;
+      if (!Object.prototype.hasOwnProperty.call(d, k2)) continue;
+      if (!matches(d[k2], shape.optional[k2])) return false;
     }
     return true;
   }
