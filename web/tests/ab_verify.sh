@@ -79,17 +79,29 @@ if [ "$ready" != "1" ]; then
 fi
 
 echo "running all_views_test.js"
-"$NODE_BIN" "$CELLRIX/web/tests/all_views_test.js" 2>&1 | tail -6
-rc=${PIPESTATUS[0]}
+out="$("$NODE_BIN" "$CELLRIX/web/tests/all_views_test.js" 2>&1)"
+rc=$?
+printf '%s\n' "$out" | tail -6
+# Print the failures themselves rather than reciting a past run. A note that
+# says "4 failures are the known set" goes stale the moment the set changes,
+# and then sends the next reader after a problem that no longer exists.
+fails="$(printf '%s\n' "$out" | grep -c '^  FAIL' || true)"
+if [ "${fails:-0}" != "0" ]; then
+  echo ""
+  echo "actual failures ($fails):"
+  printf '%s\n' "$out" | grep '^  FAIL' | sed 's/^/  /'
+fi
 
 echo ""
 echo "stopping the stack"
 "$CELLRIX/web/tests/start-panel.sh" --stop > /dev/null 2>&1
 
-# Compare against a recorded baseline rather than demanding zero failures:
-# all_views_test carries known failures (K12), and a script that calls them a
-# regression would be crying wolf on every run.
+# No baseline recital: the failures above are the failures. K12 was fixed on
+# 2026-09-15 and this note outlived it by hours.
 echo ""
-echo "note: 4 failures are the known K12 set. Compare the RESULT line with the"
-echo "      previous run — an identical count is a pass, a larger one is not."
+if [ "$rc" = "0" ]; then
+  echo "all assertions passed"
+else
+  echo "non-zero exit — see the failures listed above"
+fi
 exit "$rc"

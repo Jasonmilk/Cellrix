@@ -117,7 +117,13 @@
     var out = [];
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
-      var turn = countsUpTo(events, i, EF.TYPES.TURN_START);
+      /* Prefer the turn derived at the read boundary. Counting turn/start here
+       * as well would be a second derivation of one fact — the shape this ADR
+       * exists to remove. The count stays only for a caller handing raw events
+       * straight in. */
+      var turn = (typeof e.turn === 'number')
+        ? e.turn
+        : countsUpTo(events, i, EF.TYPES.TURN_START);
       out.push({
         seq: e.seq,
         type: e.type,
