@@ -189,16 +189,18 @@ digest() = { lastSeq, eventCount, pendingCount, schemaVersion, fingerprint }
 
 ## 7. 实施追踪
 
+> **进度（2026-09-15）**：T0–T4 / T6 **已完成**；**T5 阻塞**（见下）；T7 待做。
+
 | 任务 | 状态 |
 |---|---|
-| T0 事件族 schema + 版本号落定（形状来自 `anaphase:ADR-0026`） | 待实施 |
-| T1 新增 `web/assets/assembly.js` + **`__ASSEMBLY__` 占位符与加载序**（排 data 之前） | 待实施 |
-| T2 共享 fold 原语 + `deriveCoordinates()` 具名纯函数落地 | 待实施 |
-| T3 证轨改为消费装配层（取数从 `prove_track.data.js` 上移） | 待实施 |
-| T4 经历侧栏改为消费装配层 | 待实施 |
+| T0 事件族 schema + 版本号落定（形状来自 `anaphase:ADR-0026`） | ✅ `d413d39` |
+| T1 新增 `web/assets/assembly.js` + **`__ASSEMBLY__` 占位符与加载序**（排 data 之前） | ✅ `d1def3b` |
+| T2 共享 fold 原语 + `deriveCoordinates()` 具名纯函数落地 | ✅ `8765622` |
+| T3 证轨改为消费装配层（取数从 `prove_track.data.js` 上移） | ✅ `dea7ced` |
+| T4 经历侧栏改为消费装配层 | ✅ `bd252ef` |
 | T5 对话（`chat.js`）的实时流接入同一 event family | **⛔ 阻塞 —— 实时流不是事件族（见下方说明）** |
-| T6 第 3 节 11 条写成回归网 + **node runner**（`web/tests/`） | 待实施 |
-| T7 A/B：旧二进制跑一遍**预期失败** → rebuild 跑第二遍 | 待实施 |
+| T6 第 3 节 11 条写成回归网 + **node runner**（`web/tests/`） | ✅ `269a086` |
+| T7 A/B：旧二进制跑一遍**预期失败** → rebuild 跑第二遍 | ⬜ 待实施 |
 
 > **T5 阻塞（2026-09-15 查明，实测）**
 >
