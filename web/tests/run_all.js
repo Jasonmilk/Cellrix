@@ -15,8 +15,7 @@ const path = require('path');
 const SELF_CONTAINED = [
   ['event_family_test.js', 'T0 — event family contract'],
   ['assembly_test.js', 'T2 — fold primitives and coordinates'],
-  ['acceptance_test.js', 'T6 — the 11 acceptance clauses'],
-  ['chain_size_test.js', 'session list — continuation count (B)']
+  ['acceptance_test.js', 'T6 — the 11 acceptance clauses']
 ];
 
 const NEEDS_INPUT = [

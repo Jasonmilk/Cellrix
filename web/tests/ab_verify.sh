@@ -80,25 +80,40 @@ fi
 
 # ------------------------------------------------- capability, not liveness
 # Readiness above only proves something is listening. Today six ports all
-# answered while the feature did not work, so the probe asks the chain to
-# actually do a thing: fetch a real period through the panel and get events
-# back. A port that answers is not a component that works.
+# answered while the feature did not work, so the probe asks the chain to do a
+# thing: fetch a period through the panel and check its shape.
+#
+# The sample is a real 5-turn period, not the newest file. The newest file is
+# typically 1 turn, and a 1-turn period passes even with the multi-turn bug
+# present — a probe that cannot fail on the bug it is meant to catch is not a
+# probe. (Measured: the newest was 8 lines / 1 turn, the easiest input there is.)
+#
+# Missing sample = FAILURE, not a skip: a skipped check reads as a pass.
+#
 # CELLRIX is the repo root; its parent is the workspace. Two levels up is the
 # workspace's parent, which is where I first pointed this — measured, not
 # assumed, because the probe silently skipped when the path did not exist.
 WS_ROOT="$(cd "$CELLRIX/.." && pwd)"
-CAP_JOB="$(ls -t "$WS_ROOT"/.helix/events/*.events.jsonl 2>/dev/null | head -1 | xargs -n1 basename 2>/dev/null | sed 's/\.events\.jsonl$//')"
-if [ -n "$CAP_JOB" ]; then
-  cap="$(curl -s --noproxy '*' -m 6 "http://127.0.0.1:$PORT/api/events?job_id=$CAP_JOB" | grep -o '"type"' | wc -l | tr -d ' ')"
-  if [ "${cap:-0}" -gt 0 ]; then
-    echo "capability — panel served $cap events for $CAP_JOB"
+CAP_JOB="run-7efbf0f8aacf96d5"
+CAP_FILE="$WS_ROOT/.helix/events/$CAP_JOB.events.jsonl"
+CAP_WANT_EVENTS=55
+CAP_WANT_TURNS=5
+
+if [ ! -f "$CAP_FILE" ]; then
+  echo "CAPABILITY FAILURE: sample period missing — $CAP_FILE"
+  echo "        (a missing sample must fail, not skip: a skipped check reads as a pass)"
+  rc=1
+else
+  cap_body="$(curl -s --noproxy '*' -m 6 "http://127.0.0.1:$PORT/api/events?job_id=$CAP_JOB")"
+  cap="$(printf '%s' "$cap_body" | grep -o '"type"' | wc -l | tr -d ' ')"
+  cap_turns="$(printf '%s' "$cap_body" | grep -o '"turn/start"' | wc -l | tr -d ' ')"
+  if [ "${cap:-0}" -ge "$CAP_WANT_EVENTS" ] && [ "${cap_turns:-0}" -eq "$CAP_WANT_TURNS" ]; then
+    echo "capability — $CAP_JOB served $cap events across $cap_turns turns"
   else
-    echo "CAPABILITY FAILURE: $CAP_JOB returned no events"
-    echo "        (the port answers, the chain does not work — that is the point of this check)"
+    echo "CAPABILITY FAILURE: $CAP_JOB served $cap events / $cap_turns turns"
+    echo "        (expected >= $CAP_WANT_EVENTS events and exactly $CAP_WANT_TURNS turns)"
     rc=1
   fi
-else
-  echo "capability — skipped: no period file found"
 fi
 
 echo "running all_views_test.js"

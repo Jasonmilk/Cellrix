@@ -43,69 +43,19 @@
   // `chatMode` drives the click behaviour: the chat sidebar loads the
   // period's history into the chat space (resume), the prove_track sidebar
   // opens its trajectory. One component, two intents [极致复用].
-  /* The ONE traversal of a continuation subtree.
-   *
-   * The count and the render order both come from here, so they cannot drift
-   * apart. Two implementations of one walk is how "one fact, two derivations"
-   * starts — the shape ADR-0018 exists to remove, and precisely what had to be
-   * fixed in deriveCoordinates an hour before this.
-   *
-   * Breadth-first: root, then its continuations, then theirs. Depth-first would
-   * put a deep chain's later questions below its own grandchildren, which reads
-   * as out of order — and out of order is indistinguishable from missing when
-   * someone is scanning a list for a question they asked.
-   *
-   * `seen` also makes a cycle terminate.
-   *
-   * Depth is bounded by the list: the sessions API returns at most `limit`
-   * periods, so a fully expanded tree cannot exceed that.
-   */
-  function walkChain(children, rootId) {
-    var out = [], queue = [rootId], seen = {};
-    while (queue.length) {
-      var id = queue.shift();
-      if (seen[id]) { continue; }
-      seen[id] = true;
-      out.push(id);
-      var kids = children[id] || [];
-      for (var i = 0; i < kids.length; i++) { queue.push(kids[i].job_id); }
-    }
-    return out;
-  }
-
-  /* Size of the subtree rooted at `job`, including itself. Pure: the children
-   * map is an argument, so a test can lift this without a DOM. The previous
-   * version reported DIRECT children, which on a linear chain is always 1 and
-   * on a ten-node chain said 2 — a visible number that was simply wrong. */
-  function chainSize(children, job) {
-    return walkChain(children, job).length;
-  }
-
   function renderSide(id, periods, empty, chatMode) {
     var box = document.getElementById(id);
     if (!periods.length) { box.innerHTML = empty; return; }
-    // 会话聚合（线程化）：period.parent 指向续接来源（context/inject
-    // resume_from）。根（parent 为 null 或不在列表）为会话主卡，续接轮
-    // 次缩进跟随 —— 连续对话不再被截断成互不相干的独立条目。
-    var byJob = {};
-    periods.forEach(function (p) { byJob[p.job_id] = p; });
-    var roots = [], children = {};
-    periods.forEach(function (p) {
-      var par = p.parent && byJob[p.parent] ? p.parent : null;
-      if (par) { (children[par] = children[par] || []).push(p); }
-      else { roots.push(p); }
-    });
-    // 根按列表序（时间倒序）在前，其续接线程紧随；孤儿（父不在列表）
-    // 已按根处理。连续对话 = 一个根 + 一串续接，不再被截断。
-    var byId = byJob;
-    var chain = [];
-    roots.forEach(function (r) {
-      walkChain(children, r.job_id).forEach(function (id) {
-        if (byId[id]) { chain.push(byId[id]); }
-      });
-    });
-    var rootCount = roots.length;
-    var head = '<div class="ses-head"><span>' + rootCount + ' 个对话 · ' + periods.length + ' 轮</span>' +
+    /* resume_from stays in the protocol layer: it is a causal link between
+     * periods, not a way to organise them on screen. Grouping by it produced a
+     * count to compute, a traversal to write, a depth to bound and a second
+     * half of the tree that never reached the DOM. The model was wrong, not
+     * the code. */
+    /* Flat, newest first — the order the API already returns. No grouping, no
+     * traversal: a period is a session, and clicking one continues it. */
+    var chain = periods.slice();
+    var rootCount = periods.length;
+    var head = '<div class="ses-head"><span>' + rootCount + ' 轮 · 最新在前</span>' +
       (chatMode ? '<button type="button" class="btn btn-sm btn-ghost" id="btn-newchat">+ 新对话</button>' : '') +
       '</div>';
     box.innerHTML = head;
@@ -118,7 +68,7 @@
     chain.forEach(function (p) {
       var div = document.createElement('div');
       var sel = (chatMode ? st.chatJobId : null) === p.job_id;
-      var isChild = !!p.parent;
+      var isChild = false;
       div.className = 'ses-item' + (sel ? ' sel' : '') + (isChild ? ' child' : '');
       div.setAttribute('data-ts', p.first_ts || '');
       var ts = String(p.first_ts || '');
@@ -129,14 +79,8 @@
       // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
       var reply = p.reply ? '<div class="p rp">' + esc(p.reply) + '</div>' : '';
       var mdl = p.model ? '<span class="mdl">' + esc(p.model) + '</span>' : '';
-      /* A root states how many continuations hang under it. Without this a
-       * root with six continuations looked identical to a root with none, so
-       * the six later questions appeared to have vanished — which is the
-       * symptom users reported, and it was never about lost data. */
-      var kids = isChild ? 0 : (chainSize(children, p.job_id) - 1);
-      var tag = isChild
-        ? '<span class="cont">↳ 续接</span>'
-        : (kids ? '<span class="cont">+' + kids + ' 续接</span>' : '');
+      /* No continuation marker: there is no continuation tier. */
+      var tag = '';
       div.innerHTML =
         '<div class="nm">' + tag + esc(nm) + '</div>' +
         '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' + mdl +
