@@ -28,7 +28,14 @@ function ev(type, seq, data) {
 }
 
 /* A small but complete window: two turns, the second one still open. */
-const WINDOW = [
+/* UNREAL: seq is globally unique here (1..6). Real periods restart seq at 0
+ * each turn — see the MULTI-TURN clause below, which feeds the real shape and
+ * currently fails.
+ *
+ * This fixture exercises single-sequence mechanics only. It must NOT be read
+ * as evidence that multi-turn works: the "second turn is t2" assertion below
+ * passes against it, and that pass means nothing about a real period. */
+const WINDOW_SINGLE_SEQ = [
   ev('turn/start', 1),
   ev('user/message', 2, { text: 'hi' }),
   ev('assistant/think', 3, { text: 'hmm' }),
@@ -51,22 +58,22 @@ console.log('assembly layer ' + ASM.VERSION + ' (T2)');
 // ---- acceptance 1: replaying the same window is idempotent
 {
   const a = ASM.create();
-  a.feed(WINDOW);
+  a.feed(WINDOW_SINGLE_SEQ);
   const first = a.digest();
-  a.feed(WINDOW);
+  a.feed(WINDOW_SINGLE_SEQ);
   check('replay of the same window is idempotent', a.digest() === first,
     first + ' vs ' + a.digest());
 }
 
 // ---- acceptance 9: split invariance — replay(k) + live(k..n) == replay(all)
 {
-  const all = ASM.create(); all.feed(WINDOW);
+  const all = ASM.create(); all.feed(WINDOW_SINGLE_SEQ);
   let ok = true;
   let detail = '';
-  for (let k = 0; k <= WINDOW.length; k++) {
+  for (let k = 0; k <= WINDOW_SINGLE_SEQ.length; k++) {
     const split = ASM.create();
-    split.feed(WINDOW.slice(0, k));
-    split.feed(WINDOW.slice(k));
+    split.feed(WINDOW_SINGLE_SEQ.slice(0, k));
+    split.feed(WINDOW_SINGLE_SEQ.slice(k));
     if (split.digest() !== all.digest()) { ok = false; detail = 'k=' + k; break; }
   }
   check('split invariance (acceptance 9)', ok, detail);
@@ -75,9 +82,9 @@ console.log('assembly layer ' + ASM.VERSION + ' (T2)');
 // ---- acceptance 4: an earlier page arriving late is an insert, not a rewind
 {
   const a = ASM.create();
-  a.feed(WINDOW.slice(2));
+  a.feed(WINDOW_SINGLE_SEQ.slice(2));
   const wmBefore = a.watermark();
-  a.feed(WINDOW.slice(0, 2));
+  a.feed(WINDOW_SINGLE_SEQ.slice(0, 2));
   check('late earlier page does not lower the watermark', a.watermark() === wmBefore,
     wmBefore + ' -> ' + a.watermark());
   const seqs = a.events().map(function (e) { return e.seq; });
@@ -85,17 +92,17 @@ console.log('assembly layer ' + ASM.VERSION + ' (T2)');
   check('late earlier page keeps the tape seq-ordered',
     JSON.stringify(seqs) === JSON.stringify(sorted), JSON.stringify(seqs));
   check('late earlier page is still counted',
-    a.events().length === WINDOW.length, String(a.events().length));
+    a.events().length === WINDOW_SINGLE_SEQ.length, String(a.events().length));
 }
 
 // ---- acceptance 10: chunk invariance
 {
-  const all = ASM.create(); all.feed(WINDOW);
+  const all = ASM.create(); all.feed(WINDOW_SINGLE_SEQ);
   let ok = true, detail = '';
-  [1, 3, 7, WINDOW.length].forEach(function (size) {
+  [1, 3, 7, WINDOW_SINGLE_SEQ.length].forEach(function (size) {
     const a = ASM.create();
-    for (let i = 0; i < WINDOW.length; i += size) {
-      a.feed(WINDOW.slice(i, i + size));
+    for (let i = 0; i < WINDOW_SINGLE_SEQ.length; i += size) {
+      a.feed(WINDOW_SINGLE_SEQ.slice(i, i + size));
     }
     if (a.digest() !== all.digest()) { ok = false; detail = 'chunk=' + size; }
   });
@@ -104,8 +111,8 @@ console.log('assembly layer ' + ASM.VERSION + ' (T2)');
 
 // ---- acceptance 8: purity — same tape twice, byte-identical result
 {
-  const coordsA = ASM.deriveCoordinates(WINDOW, { job_id: 'j1' });
-  const coordsB = ASM.deriveCoordinates(WINDOW, { job_id: 'j1' });
+  const coordsA = ASM.deriveCoordinates(WINDOW_SINGLE_SEQ, { job_id: 'j1' });
+  const coordsB = ASM.deriveCoordinates(WINDOW_SINGLE_SEQ, { job_id: 'j1' });
   check('deriveCoordinates is a pure function',
     JSON.stringify(coordsA) === JSON.stringify(coordsB));
 }
@@ -122,8 +129,8 @@ console.log('assembly layer ' + ASM.VERSION + ' (T2)');
 
 // ---- coordinates come from the tape, not from arrival order
 {
-  const forward = ASM.deriveCoordinates(WINDOW, { job_id: 'j1' });
-  const shuffled = WINDOW.slice().reverse();
+  const forward = ASM.deriveCoordinates(WINDOW_SINGLE_SEQ, { job_id: 'j1' });
+  const shuffled = WINDOW_SINGLE_SEQ.slice().reverse();
   const a = ASM.create();
   a.feed(shuffled);
   const viaTape = a.coordinates({ job_id: 'j1' });
