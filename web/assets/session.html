@@ -278,6 +278,12 @@
         }
       });
       box.scrollTop = box.scrollHeight;
+      // The trajectory is another projection of this same tape (L0): hand it
+      // the merged stream rather than letting it read one period, which would
+      // be a second source for the same facts and would break continuity.
+      if (window.Cx && window.Cx.selectPeriod) {
+        window.Cx.selectPeriod(jobId, events);
+      }
     }).catch(function (e) {
       if (seq !== st.histSeq) return;
       box.innerHTML = '<div class="empty">历史加载失败: ' + esc(e.message) + '</div>';

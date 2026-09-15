@@ -37,9 +37,12 @@
     esc: esc,
     showView: showView,
     // Explicit continuation (ADR-0026): chatJobId 置位时，下一句续接该经历。
-    selectPeriod: function (jobId) {
+    // `stream`, when given, is the merged chain (L0) — the trajectory then has
+    // no data source of its own. Without it the trajectory fetches one period,
+    // the legacy path, which still works.
+    selectPeriod: function (jobId, stream) {
       var meta = window.__proveTrackMeta || null;
-      if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, meta);
+      if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, meta, stream);
     },
     showToast: showToast,
     onEnter: function (name, fn) { (ENTER[name] = ENTER[name] || []).push(fn); }

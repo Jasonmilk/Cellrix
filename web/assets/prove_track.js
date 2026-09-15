@@ -114,13 +114,32 @@
     $('eStats').innerHTML = '';
     renderLanes();
   };
-  window.__proveTrackLoad = function (jobId, meta) {
+  /* Turn a flat event array into the trajectory's state and paint it. Split out
+   * because there are now two ways in: a stream handed to us (L0, the merged
+   * chain) or our own fetch (legacy, one period). */
+  function consume(events) {
+    S.session = buildSession(events, S.meta);
+    S.usage = derivePeriodUsage(events);
+    S.turnIds = [];
+    S.session.forEach(function (e) { if (e.kind === 'turn') { S.turnIds.push(e.id); S.turnIndex[e.id] = S.turnIds.length - 1; } });
+    S.turnIds.forEach(function (id) { S.openTurns[id] = true; });
+    S.sel = null; S.q = ''; $('eQ').value = '';
+    computeRepeats(S.session);
+    renderTable(); renderLanes(); syncTurnBtn(); renderStats(); applyModality();
+  }
+
+
+  window.__proveTrackLoad = function (jobId, meta, stream) {
     stopReplay();
     if (S.sel) closeInsp();
     S.meta = meta || null;
     $('eEmpty').style.display = 'none';
     $('eTraj').style.display = '';
     $('eTbody').innerHTML = '<tr class="e-turn-hd"><td colspan="5" style="color:var(--e-dim)">Loading ' + esc(jobId) + '…</td></tr>';
+    /* L0: `stream` is the merged chain, already normalised once upstream. The
+     * trajectory then has no data source of its own — it is another projection
+     * of the same tape, which is what gives it continuity across periods. */
+    if (stream && stream.length) { consume(stream); return; }
     fetch('/api/events?job_id=' + encodeURIComponent(jobId)).then(function (r) { return r.json(); }).then(function (j) {
       if (j.missing || !j.events || !j.events.length) {
         $('eTraj').style.display = 'none';
@@ -128,14 +147,7 @@
         $('eEmpty').textContent = 'no event stream for this period (' + jobId + ') — see the audit JSON chain below';
         return;
       }
-      S.session = buildSession(j.events, meta);
-      S.usage = derivePeriodUsage(j.events);
-      S.turnIds = [];
-      S.session.forEach(function (e) { if (e.kind === 'turn') { S.turnIds.push(e.id); S.turnIndex[e.id] = e.index; } });
-      S.turnIds.forEach(function (id) { S.openTurns[id] = true; });
-      S.sel = null; S.q = ''; $('eQ').value = '';
-      computeRepeats(S.session);
-      renderTable(); renderLanes(); syncTurnBtn(); renderStats(); applyModality();
+      consume(j.events);
     }).catch(function (e) {
       $('eTraj').style.display = 'none';
       $('eEmpty').style.display = '';
