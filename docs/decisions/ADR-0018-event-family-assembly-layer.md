@@ -200,7 +200,7 @@ digest() = { lastSeq, eventCount, pendingCount, schemaVersion, fingerprint }
 | T4 经历侧栏改为消费装配层 | ✅ `bd252ef` |
 | T5 对话（`chat.js`）的实时流接入同一 event family | **⛔ 阻塞 —— 实时流不是事件族（见下方说明）** |
 | T6 第 3 节 11 条写成回归网 + **node runner**（`web/tests/`） | ✅ `269a086` |
-| T7 A/B：旧二进制跑一遍**预期失败** → rebuild 跑第二遍 | ✅ `279a794`（2026-09-15 实测）——**Phase A**：临时移走 `event_family.js` / `assembly.js`（即事件族代码缺失的旧状态），`node run_all.js` = **3 suites RED**（event_family / assembly / acceptance 全 FAIL，exit 1）；**Phase B**：恢复资产重跑 = **3 suites GREEN**（`OK — 3 suites green`, exit 0）。验收网非空转实锤：装配层缺席即红、在场即绿 |
+| T7 A/B：旧二进制跑一遍**预期失败** → rebuild 跑第二遍 | ✅ `279a794`（2026-09-15 实测）——**Phase A**：临时移走 `event_family.js` / `assembly.js`（即事件族代码缺失的旧状态），`node run_all.js` = **3 suites RED**（event_family / assembly / acceptance 全 FAIL，exit 1）；**Phase B**：恢复资产重跑 = **3 suites GREEN**（`OK — 3 suites green`, exit 0）。验收网非空转实锤：装配层缺席即红、在场即绿 ／ **脚本化（`a2af69d`）**：`web/tests/ab_verify.sh` —— 陈旧二进制**拒绝**跑 e2e（`find -newer` 比对资产 mtime），起→探→停在单命令边界内完成 |
 
 > **T5 阻塞（2026-09-15 查明，实测）**
 >
