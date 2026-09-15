@@ -100,9 +100,48 @@
     }
   }
 
+  /* L0 — TEMPORARY. Retire when L1 lands (anaphase owns session identity).
+   *
+   * Merge several periods into ONE stream, in the given order (the caller
+   * passes job ids sorted by first_ts).
+   *
+   * The whole point is that normalisation happens exactly once, here, after the
+   * concatenation. Normalising each period separately would restart gseq at 0
+   * for every file, the keys would collide, and every period after the first
+   * would be refused as a duplicate — the same bug as chunked normalisation,
+   * one scale up. Doing it inside this function makes that unreachable rather
+   * than merely discouraged.
+   *
+   * Each event keeps a non-enumerable `sourceJob` so a renderer can say which
+   * period a row came from without the field appearing in the data.
+   *
+   * Returns the same shape as normalize(): { events, turnCount, diagnostics }.
+   */
+  function mergeChain(eventsByJob, orderedJobIds) {
+    var joined = [];
+    var sources = [];
+    var ids = orderedJobIds || [];
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var evs = (eventsByJob && eventsByJob[id]) || [];
+      for (var k = 0; k < evs.length; k++) {
+        joined.push(evs[k]);
+        sources.push(id);
+      }
+    }
+
+    var out = normalize(joined);
+    for (var j = 0; j < out.events.length; j++) {
+      mark(out.events[j], 'sourceJob', sources[j]);
+    }
+    out.jobCount = ids.length;
+    return out;
+  }
+
   window.CxNormalize = {
     VERSION: VERSION,
     normalize: normalize,
+    mergeChain: mergeChain,
     checkContiguous: checkContiguous
   };
 })();
