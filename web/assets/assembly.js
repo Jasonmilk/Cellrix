@@ -83,6 +83,8 @@
     var counts = {}; // type -> count, for digest()
     var watermark = null;
     var targets = {}; // name -> { name, active }
+    var subscribers = []; // functions fed on publication
+    var dirty = false;    // tape changed since the last flush
 
     /* Accept one event. Replay of an already-seen seq is dropped: replaying
      * the same window twice must be idempotent. */
@@ -101,7 +103,17 @@
       } else {
         tape.splice(lowerBound(tape, e.seq), 0, e);
       }
+      dirty = true;
       return true;
+    }
+
+    /* Canonical digest: keys sorted, so the same facts always stringify the
+     * same way. Clauses 9 and 10 compare these strings, and a digest that
+     * depends on insertion order would report a difference that is not there. */
+    function digestOf() {
+      var types = {};
+      Object.keys(counts).sort().forEach(function (k) { types[k] = counts[k]; });
+      return JSON.stringify({ v: VERSION, n: tape.length, wm: watermark, types: types });
     }
 
     return {
@@ -132,7 +144,7 @@
       /* D8: observable during production, and the thing the split/chunk
        * invariance tests (T6) assert on. */
       digest: function () {
-        return JSON.stringify({ v: VERSION, n: tape.length, wm: watermark, types: counts });
+        return digestOf();
       },
 
       /* D5: registering does no work. A target is driven only after it is
@@ -160,6 +172,42 @@
         return Object.keys(targets)
           .filter(function (k) { return targets[k].active; })
           .sort();
+      },
+
+      /* One snapshot per merged window. It carries only what a target may
+       * read: the watermark and the digest — never the tape itself (D5: a
+       * target must not scan the window). */
+      snapshot: function () {
+        return { version: VERSION, watermark: watermark, count: tape.length,
+                 digest: digestOf() };
+      },
+
+      /* Subscribe. The FIRST subscriber triggers one full replace, not an
+       * incremental build (D5) — but only if there is something to publish. */
+      subscribe: function (fn) {
+        var first = subscribers.length === 0;
+        subscribers.push(fn);
+        if (first && watermark !== null) fn(this.snapshot());
+        var self = this;
+        return function unsubscribe() {
+          subscribers = subscribers.filter(function (f) { return f !== fn; });
+          return self;
+        };
+      },
+
+      /* Publish the merged window. Returns how many subscribers were fed.
+       * Publishing twice without an intervening change feeds nobody — the
+       * window is merged, so a burst costs one publication, not one per event
+       * (acceptance 5). No subscriber means no work (acceptance 7). */
+      flush: function () {
+        if (!dirty || subscribers.length === 0) {
+          dirty = false;
+          return 0;
+        }
+        dirty = false;
+        var snap = this.snapshot();
+        subscribers.slice().forEach(function (fn) { fn(snap); });
+        return subscribers.length;
       },
 
       /* T2 primitives, bound to this tape. */
