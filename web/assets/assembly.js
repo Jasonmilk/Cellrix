@@ -21,6 +21,11 @@
 
   var VERSION = '1.0.0';
 
+  /* How many refused events to keep as specimens. The COUNTS are the durable
+   * fact; the sample exists so a diagnosis can name a culprit. Bounded so a
+   * malformed feed cannot grow the layer without limit. */
+  var REJECT_SAMPLE_MAX = 16;
+
   /* Position of `seq` in a seq-ordered array; the tape stays sorted so a
    * back-fill (an earlier page arriving late) needs no full re-sort. */
   function lowerBound(tape, seq) {
@@ -83,14 +88,27 @@
     var counts = {}; // type -> count, for digest()
     var watermark = null;
     var targets = {}; // name -> { name, active }
+    var rejectCounts = {}; // "reason:type" -> count, never silently dropped (D3)
+    var rejectSample = []; // bounded; the counts are the fact, this is the clue
     var subscribers = []; // functions fed on publication
     var dirty = false;    // tape changed since the last flush
 
     /* Accept one event. Replay of an already-seen seq is dropped: replaying
      * the same window twice must be idempotent. */
+    /* Record a refusal. A dropped event that leaves no trace is a silent
+     * failure: the stream looks empty rather than wrong (ADR-0018 D3). */
+    function refuse(e, reason) {
+      var type = (e && typeof e === 'object' && e.type) ? String(e.type) : '(untyped)';
+      var key = reason + ':' + type;
+      rejectCounts[key] = (rejectCounts[key] || 0) + 1;
+      if (rejectSample.length < REJECT_SAMPLE_MAX) {
+        rejectSample.push({ type: type, reason: reason });
+      }
+    }
+
     function accept(e) {
-      if (!EF.isValidEvent(e)) return false;
-      if (Object.prototype.hasOwnProperty.call(bySeq, e.seq)) return false;
+      if (!EF.isValidEvent(e)) { refuse(e, 'invalid'); return false; }
+      if (Object.prototype.hasOwnProperty.call(bySeq, e.seq)) { refuse(e, 'duplicate'); return false; }
 
       bySeq[e.seq] = e;
       counts[e.type] = (counts[e.type] || 0) + 1;
@@ -113,6 +131,9 @@
     function digestOf() {
       var types = {};
       Object.keys(counts).sort().forEach(function (k) { types[k] = counts[k]; });
+      // Refusal counts are deliberately NOT here: they depend on delivery
+      // history, and this string is what clauses 9 and 10 compare. A digest
+      // that changes when the same tape is fed twice is not a digest.
       return JSON.stringify({ v: VERSION, n: tape.length, wm: watermark, types: types });
     }
 
@@ -219,6 +240,16 @@
         var state = {};
         for (var i = 0; i < nodes.length; i++) upsert(state, nodes[i]);
         return state;
+      },
+
+      /* What was refused, and why. Counts first (the fact), specimens second. */
+      rejections: function () {
+        var counts = {};
+        Object.keys(rejectCounts).sort().forEach(function (k) { counts[k] = rejectCounts[k]; });
+        return { counts: counts, sample: rejectSample.slice(),
+                 total: Object.keys(rejectCounts).reduce(function (n, k) {
+                   return n + rejectCounts[k];
+                 }, 0) };
       },
 
       /* Read-only view, for targets and tests. */

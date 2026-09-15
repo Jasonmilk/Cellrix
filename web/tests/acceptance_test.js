@@ -141,6 +141,37 @@ console.log('ADR-0018 §3 acceptance net');
     snap.events === undefined && snap.tape === undefined);
 }
 
+// ---- 3 (D3): a refused event is counted, never silently dropped
+{
+  const a = ASM.create();
+  const junk = [
+    { type: 'not/a/type', seq: 1, time: 't', data: {} },
+    { type: 'user/message', seq: 2, time: 't', data: { text: 42 } }, // wrong field type
+    ev('user/message', 3, { text: 'ok' })
+  ];
+  a.feed(junk);
+  const rej = a.rejections();
+  check(3, 'refusals are counted, not silently dropped', rej.total === 2, String(rej.total));
+  check(3, 'the reason is recorded per type',
+    rej.counts['invalid:not/a/type'] === 1 && rej.counts['invalid:user/message'] === 1,
+    JSON.stringify(rej.counts));
+  check(3, 'the sample names a culprit', rej.sample.length === 2 && !!rej.sample[0].type);
+  // Distinguishable through rejections(), not through the digest — see the
+  // note in digestOf(): diagnostics must not enter an invariant.
+  check(3, 'a wholly-rejected window is distinguishable from an empty one',
+    a.rejections().total === 2 && JSON.parse(a.digest()).n === 1,
+    JSON.stringify(a.rejections()));
+}
+
+// ---- 3 (D3): duplicate seq is a refusal too, and is also counted
+{
+  const a = ASM.create();
+  a.feed([ev('user/message', 1, { text: 'x' }), ev('user/message', 1, { text: 'x' })]);
+  check(3, 'a duplicate is counted as a refusal',
+    a.rejections().counts['duplicate:user/message'] === 1,
+    JSON.stringify(a.rejections().counts));
+}
+
 // ---- 7: registration does no work; first subscribe replaces; unsub stops
 {
   const a = ASM.create();
