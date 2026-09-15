@@ -15,6 +15,10 @@ global.document = { getElementById: function () { return null; } };
 
 const dataPath = process.argv[2];
 const eventsPath = process.argv[3];
+// Same load order as the page: contract -> assembly -> data (ADR-0018).
+const assetsDir = require('path').dirname(dataPath);
+eval(fs.readFileSync(assetsDir + '/event_family.js', 'utf8'));
+eval(fs.readFileSync(assetsDir + '/assembly.js', 'utf8'));
 eval(fs.readFileSync(dataPath, 'utf8'));
 const PT = global.window.CxProveTrack;
 

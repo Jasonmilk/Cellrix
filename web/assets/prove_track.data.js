@@ -8,6 +8,14 @@
   'use strict';
   var PT = window.CxProveTrack = window.CxProveTrack || {};
 
+  // The assembly layer owns the tape and derives coordinates from it
+  // (ADR-0018). Without it there is no source of truth for node ids or turns,
+  // so failing loudly beats deriving them twice.
+  var ASM = window.CxAssembly;
+  if (!ASM) {
+    throw new Error('prove_track.data.js requires assembly.js to load first');
+  }
+
   /* ---------- Primitives ---------- */
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) {
@@ -198,17 +206,29 @@
   /* ---------- Build: Anaphase event stream -> SESSION ---------- */
   function buildSession(events, meta) {
     var out = [];
-    var id0 = (meta && meta.job_id) || 'run';
     var note = (meta && (meta.name || meta.preview)) || 'a session';
-    var t1 = { kind: 'turn', id: 't1', index: 1, note: short(note, 60) };
-    out.push(t1);
     // Keep only events that render: dur is the gap to the NEXT RENDERED event.
-    // Metering events (assistant/usage) do not render, so letting them into the
-    // gap baseline would collapse the existing durations.
+    // Metering events do not render, so letting them into the gap baseline
+    // would collapse the existing durations.
     var shown = (events || []).filter(function (e) { return !!TYPES[e.type]; });
+    // Node ids and turn numbers are the assembly's job (ADR-0018 D5), derived
+    // from the tape rather than counted as events arrive.
+    var coords = ASM.deriveCoordinates(shown, meta);
     var usage = derivePeriodUsage(events);
+    var seenTurn = {};
     shown.forEach(function (e, i) {
       var map = TYPES[e.type];
+      var coord = coords[i];
+      // A turn header per distinct turn, emitted where the turn first appears —
+      // a resumed session has more than one, and pinning them all to 't1'
+      // silently merged them.
+      if (!seenTurn[coord.turn]) {
+        seenTurn[coord.turn] = true;
+        out.push({
+          kind: 'turn', id: coord.turn,
+          index: Number(coord.turn.slice(1)), note: short(note, 60)
+        });
+      }
       var dur = 0;
       if (e.type === 'tool/result') dur = e.data.duration_ms || 0;
       else if (e.type === 'assistant/think' || e.type === 'assistant/attempt') {
@@ -216,7 +236,7 @@
         if (nxt) dur = Math.max(0, Date.parse(nxt.time) - Date.parse(e.time));
       }
       out.push({
-        kind: 'ev', id: id0 + '#' + e.seq, turn: 't1',
+        kind: 'ev', id: coord.node, turn: coord.turn,
         type: map.type, track: map.track,
         dur: dur,
         // The deliverable row carries this period's metering total (a derived
