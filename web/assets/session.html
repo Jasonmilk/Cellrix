@@ -197,6 +197,19 @@
         box.innerHTML = '<div class="empty">' + (j.missing ? '该经历的事件文件缺失' : '没有可回放的事件') + '</div>';
         return;
       }
+      // ADR-0018 T4: the window enters through the assembly layer, so this
+      // target and ProveTrack accept the same facts by the same rules —
+      // vocabulary-validated, deduped by seq, ordered by seq rather than by
+      // whatever order the response happened to carry. What follows is this
+      // target's own rendering: targets share the tape, not a display model.
+      var asm = window.CxAssembly ? window.CxAssembly.create() : null;
+      if (asm) asm.feed(j.events);
+      var events = asm ? asm.events() : j.events;
+      if (!events.length) {
+        box.innerHTML = '<div class="empty">事件全部被拒收（未知类型或格式不符）</div>';
+        return;
+      }
+
       box.innerHTML = '';
       var pendingTool = null;
       var sawReply = false; // assistant/reply is the deliverable; turn/end
@@ -205,7 +218,7 @@
       d.className = 'period-head';
       d.textContent = '—— 经历 ' + jobId + ' 的历史 ——';
       box.appendChild(d);
-      j.events.forEach(function (e) {
+      events.forEach(function (e) {
         if (e.type === 'user/message') { Cx.addMsg('user', e.data.text || '', false); }
         else if (e.type === 'assistant/think') { Cx.foldRow('思考', e.data.text || ''); }
         else if (e.type === 'assistant/attempt') { Cx.foldRow('计划', e.data.text || ''); }
