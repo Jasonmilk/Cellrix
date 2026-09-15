@@ -48,7 +48,7 @@
     'check/status': { check_id: ['string'], check: ['string'], expect: ['string'], actual: ['string'], gate: ['string'] },
     'verdict/status': { job_id: ['string'], status: ['string'] },
     'assistant/reply': { text: ['string'], chars: ['number'], model: ['string', 'null'] },
-    'turn/end': { done: ['boolean'], success: ['boolean'], impasse: ['boolean'], reply: ['string'], model: ['string'] }
+    'turn/end': { done: ['boolean'], success: ['boolean'], impasse: ['boolean'], reply: ['string'], model: ['string', 'null'] }
   };
 
   function isKnownType(t) {

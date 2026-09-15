@@ -33,6 +33,50 @@
     return lo;
   }
 
+  /* ---------- T2: shared fold primitives ---------- */
+
+  /* Idempotent upsert keyed by (kind, id) — the merge rule from ADR-0018 D3.
+   * An existing key is REPLACED, never appended, so replaying the same window
+   * twice deep-equals (acceptance 1). The separator is a NUL so that a kind or
+   * id containing the delimiter cannot collide with a real key. */
+  function upsert(state, node) {
+    state[node.kind + '\u0000' + node.id] = node;
+    return state;
+  }
+
+  /* Turn coordinates: for every event in tape order, which turn it belongs to
+   * and the node id it folds to.
+   *
+   * Derived from the TAPE, never from arrival order — arrival order is a
+   * network fact, not an event fact (D4). Two clients fed the same events in
+   * different orders must get the same coordinates. */
+  function deriveCoordinates(events, meta) {
+    var jobId = (meta && meta.job_id) || 'run';
+    var out = [];
+    for (var i = 0; i < events.length; i++) {
+      var e = events[i];
+      var turn = countsUpTo(events, i, EF.TYPES.TURN_START);
+      out.push({
+        seq: e.seq,
+        type: e.type,
+        turn: 't' + turn,
+        node: jobId + '#' + e.seq
+      });
+    }
+    return out;
+  }
+
+  /* How many events of `type` occur in events[0..upto] inclusive. Turn numbers
+   * are ordinal, so they come from the tape, not from a counter that depends on
+   * which events happened to arrive first. */
+  function countsUpTo(events, upto, type) {
+    var n = 0;
+    for (var i = 0; i <= upto; i++) {
+      if (events[i].type === type) n++;
+    }
+    return n || 1;
+  }
+
   function create() {
     var tape = [];   // accepted events, ordered by seq
     var bySeq = {};  // seq -> event, so dedupe is O(1) not O(n)
@@ -118,6 +162,17 @@
           .sort();
       },
 
+      /* T2 primitives, bound to this tape. */
+      coordinates: function (meta) {
+        return deriveCoordinates(tape, meta);
+      },
+      /* Fold a list of nodes into one map, idempotently. */
+      foldNodes: function (nodes) {
+        var state = {};
+        for (var i = 0; i < nodes.length; i++) upsert(state, nodes[i]);
+        return state;
+      },
+
       /* Read-only view, for targets and tests. */
       events: function () {
         return tape.slice();
@@ -125,5 +180,11 @@
     };
   }
 
-  window.CxAssembly = { VERSION: VERSION, create: create };
+  window.CxAssembly = {
+    VERSION: VERSION,
+    create: create,
+    /* Exposed for targets that already hold their own tape. */
+    upsert: upsert,
+    deriveCoordinates: deriveCoordinates
+  };
 })();

@@ -1,0 +1,164 @@
+/* Assembly layer tests (Cellrix:ADR-0018 T2).
+ *
+ * Pure-logic harness: the assets are browser IIFEs that only touch `window`,
+ * so they load under node with a one-line shim. No browser, no mocks.
+ *
+ * Usage: node assembly_test.js
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+global.window = {};
+const A = path.join(__dirname, '..', 'assets');
+eval(fs.readFileSync(path.join(A, 'event_family.js'), 'utf8'));
+eval(fs.readFileSync(path.join(A, 'assembly.js'), 'utf8'));
+const ASM = global.window.CxAssembly;
+
+let failures = 0;
+function check(name, cond, detail) {
+  if (cond) { console.log('  PASS  ' + name); }
+  else { failures++; console.log('  FAIL  ' + name + (detail ? '  -> ' + detail : '')); }
+}
+
+/* Build one event. seq is explicit because the whole point is that the tape —
+ * not arrival order — decides the result. */
+function ev(type, seq, data) {
+  return { type: type, seq: seq, time: '2026-09-15T00:00:00Z', data: data || {} };
+}
+
+/* A small but complete window: two turns, the second one still open. */
+const WINDOW = [
+  ev('turn/start', 1),
+  ev('user/message', 2, { text: 'hi' }),
+  ev('assistant/think', 3, { text: 'hmm' }),
+  ev('turn/end', 4, { done: true, success: true, impasse: false, reply: 'ok', model: null }),
+  ev('turn/start', 5),
+  ev('user/message', 6, { text: 'again' })
+];
+
+console.log('assembly layer ' + ASM.VERSION + ' (T2)');
+
+// ---- D4: pending until a turn/start exists
+{
+  const a = ASM.create();
+  a.feed([ev('user/message', 1, { text: 'x' })]);
+  check('pending without a turn/start', a.status() === 'pending', a.status());
+  a.feed([ev('turn/start', 2)]);
+  check('ready once a turn/start arrives', a.status() === 'ready', a.status());
+}
+
+// ---- acceptance 1: replaying the same window is idempotent
+{
+  const a = ASM.create();
+  a.feed(WINDOW);
+  const first = a.digest();
+  a.feed(WINDOW);
+  check('replay of the same window is idempotent', a.digest() === first,
+    first + ' vs ' + a.digest());
+}
+
+// ---- acceptance 9: split invariance — replay(k) + live(k..n) == replay(all)
+{
+  const all = ASM.create(); all.feed(WINDOW);
+  let ok = true;
+  let detail = '';
+  for (let k = 0; k <= WINDOW.length; k++) {
+    const split = ASM.create();
+    split.feed(WINDOW.slice(0, k));
+    split.feed(WINDOW.slice(k));
+    if (split.digest() !== all.digest()) { ok = false; detail = 'k=' + k; break; }
+  }
+  check('split invariance (acceptance 9)', ok, detail);
+}
+
+// ---- acceptance 4: an earlier page arriving late is an insert, not a rewind
+{
+  const a = ASM.create();
+  a.feed(WINDOW.slice(2));
+  const wmBefore = a.watermark();
+  a.feed(WINDOW.slice(0, 2));
+  check('late earlier page does not lower the watermark', a.watermark() === wmBefore,
+    wmBefore + ' -> ' + a.watermark());
+  const seqs = a.events().map(function (e) { return e.seq; });
+  const sorted = seqs.slice().sort(function (x, y) { return x - y; });
+  check('late earlier page keeps the tape seq-ordered',
+    JSON.stringify(seqs) === JSON.stringify(sorted), JSON.stringify(seqs));
+  check('late earlier page is still counted',
+    a.events().length === WINDOW.length, String(a.events().length));
+}
+
+// ---- acceptance 10: chunk invariance
+{
+  const all = ASM.create(); all.feed(WINDOW);
+  let ok = true, detail = '';
+  [1, 3, 7, WINDOW.length].forEach(function (size) {
+    const a = ASM.create();
+    for (let i = 0; i < WINDOW.length; i += size) {
+      a.feed(WINDOW.slice(i, i + size));
+    }
+    if (a.digest() !== all.digest()) { ok = false; detail = 'chunk=' + size; }
+  });
+  check('chunk invariance (acceptance 10)', ok, detail);
+}
+
+// ---- acceptance 8: purity — same tape twice, byte-identical result
+{
+  const coordsA = ASM.deriveCoordinates(WINDOW, { job_id: 'j1' });
+  const coordsB = ASM.deriveCoordinates(WINDOW, { job_id: 'j1' });
+  check('deriveCoordinates is a pure function',
+    JSON.stringify(coordsA) === JSON.stringify(coordsB));
+}
+
+// ---- D3: idempotent upsert on (kind, id)
+{
+  const state = {};
+  ASM.upsert(state, { kind: 'turn', id: 't1', note: 'first' });
+  ASM.upsert(state, { kind: 'turn', id: 't1', note: 'second' });
+  check('upsert replaces rather than appends',
+    Object.keys(state).length === 1 && state['turn\u0000t1'].note === 'second',
+    JSON.stringify(state));
+}
+
+// ---- coordinates come from the tape, not from arrival order
+{
+  const forward = ASM.deriveCoordinates(WINDOW, { job_id: 'j1' });
+  const shuffled = WINDOW.slice().reverse();
+  const a = ASM.create();
+  a.feed(shuffled);
+  const viaTape = a.coordinates({ job_id: 'j1' });
+  check('coordinates ignore arrival order',
+    JSON.stringify(viaTape) === JSON.stringify(forward),
+    JSON.stringify(viaTape.map(function (c) { return c.seq; })));
+  check('turn numbers are ordinal (second turn is t2)',
+    viaTape[5].turn === 't2', viaTape[5].turn);
+  check('node ids are job-scoped',
+    viaTape[0].node === 'j1#1', viaTape[0].node);
+}
+
+// ---- unknown / malformed events never enter the tape
+{
+  const a = ASM.create();
+  a.feed([{ type: 'nope/nope', seq: 1, time: 't', data: {} },
+          { type: 'turn/start', seq: 2, time: 't', data: {} },
+          null]);
+  check('malformed events are rejected, not counted',
+    a.events().length === 1, String(a.events().length));
+  check('unknown type does not become a turn',
+    a.coordinates()[0].turn === 't1', a.coordinates()[0].turn);
+}
+
+// ---- the target registry does no work at registration (D5)
+{
+  const a = ASM.create();
+  a.register('prove_track');
+  check('registered target is not active', a.activeTargets().length === 0);
+  a.activate('prove_track');
+  check('activated target is active',
+    JSON.stringify(a.activeTargets()) === '["prove_track"]');
+  a.deactivate('prove_track');
+  check('deactivation stops the driving', a.activeTargets().length === 0);
+}
+
+console.log(failures === 0 ? '\nOK — all passed' : '\nFAILED: ' + failures);
+process.exit(failures === 0 ? 0 : 1);

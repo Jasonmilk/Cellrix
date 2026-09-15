@@ -46,6 +46,20 @@ check('turn/start with empty data is valid', EF.isValidEvent(ev('turn/start', {}
 check('user/message with text is valid', EF.isValidEvent(ev('user/message', { text: 'hi' })));
 check('assistant/reply with null model is valid (ADR-0036)',
   EF.isValidEvent(ev('assistant/reply', { text: 'a', chars: 1, model: null })));
+check('turn/end with null model is valid (ADR-0036)',
+  EF.isValidEvent(ev('turn/end', { done: true, success: true, impasse: false, reply: 'ok', model: null })));
+
+check('every type declaring a nullable field accepts null',
+  EF.KNOWN_TYPES.every(function (t) {
+    var shape = EF.DATA_SCHEMA[t];
+    var fields = Object.keys(shape).filter(function (k) { return shape[k].indexOf('null') >= 0; });
+    if (!fields.length) return true;
+    var data = {};
+    Object.keys(shape).forEach(function (k) { data[k] = shape[k][0] === 'boolean' ? false : (shape[k][0] === 'number' ? 0 : 'x'); });
+    fields.forEach(function (k) { data[k] = null; });
+    return EF.isValidEvent({ type: t, seq: 1, time: 'z', data: data });
+  }));
+
 check('assistant/reply with string model is valid',
   EF.isValidEvent(ev('assistant/reply', { text: 'a', chars: 1, model: 'x' })));
 
