@@ -19,7 +19,10 @@
     throw new Error('assembly.js requires event_family.js to load first');
   }
 
-  var VERSION = '1.0.0';
+  /* The assembly layer's own version — distinct from the contract's.
+   * They were both '1.0.0' once, which hid the fact that the digest
+   * was citing the wrong one. */
+  var LAYER_VERSION = '1.0.0';
 
   /* How many refused events to keep as specimens. The COUNTS are the durable
    * fact; the sample exists so a diagnosis can name a culprit. Bounded so a
@@ -74,12 +77,17 @@
   /* How many events of `type` occur in events[0..upto] inclusive. Turn numbers
    * are ordinal, so they come from the tape, not from a counter that depends on
    * which events happened to arrive first. */
+  /* Events before the first turn/start belong to the opening turn, which is
+   * turn 1 — the count is 0 there, and 0 must not become 0. Named so the
+   * intent is readable rather than inferred from `|| 1`. */
+  var OPENING_TURN = 1;
+
   function countsUpTo(events, upto, type) {
     var n = 0;
     for (var i = 0; i <= upto; i++) {
       if (events[i].type === type) n++;
     }
-    return n || 1;
+    return n === 0 ? OPENING_TURN : n;
   }
 
   function create() {
@@ -134,11 +142,13 @@
       // Refusal counts are deliberately NOT here: they depend on delivery
       // history, and this string is what clauses 9 and 10 compare. A digest
       // that changes when the same tape is fed twice is not a digest.
-      return JSON.stringify({ v: VERSION, n: tape.length, wm: watermark, types: types });
+      // `v` is the CONTRACT version: it answers "which interpretation
+      // produced this", which is the question a digest has to answer.
+      return JSON.stringify({ v: EF.VERSION, n: tape.length, wm: watermark, types: types });
     }
 
     return {
-      version: VERSION,
+      version: LAYER_VERSION,
 
       /* Feed a window. Returns how many events were newly accepted. */
       feed: function (events) {
@@ -199,7 +209,7 @@
        * read: the watermark and the digest — never the tape itself (D5: a
        * target must not scan the window). */
       snapshot: function () {
-        return { version: VERSION, watermark: watermark, count: tape.length,
+        return { version: LAYER_VERSION, watermark: watermark, count: tape.length,
                  digest: digestOf() };
       },
 
@@ -208,7 +218,13 @@
       subscribe: function (fn) {
         var first = subscribers.length === 0;
         subscribers.push(fn);
-        if (first && watermark !== null) fn(this.snapshot());
+        if (first && watermark !== null) {
+          /* The replace just published this window, so it is no longer pending
+           * a flush. Leaving it dirty would publish the same window twice on
+           * the next flush (acceptance 5: one publication per merged window). */
+          dirty = false;
+          fn(this.snapshot());
+        }
         var self = this;
         return function unsubscribe() {
           subscribers = subscribers.filter(function (f) { return f !== fn; });
@@ -260,7 +276,7 @@
   }
 
   window.CxAssembly = {
-    VERSION: VERSION,
+    VERSION: LAYER_VERSION,
     create: create,
     /* Exposed for targets that already hold their own tape. */
     upsert: upsert,

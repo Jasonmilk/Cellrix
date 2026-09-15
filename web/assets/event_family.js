@@ -16,7 +16,16 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  /* Contract version. Bumped whenever the interpretation of an event changes,
+   * not just when a field is added: the required/optional split and the
+   * addition of assistant/usage both changed what a given tape means, and a
+   * digest that keeps saying 1.0.0 cannot tell the two apart.
+   *
+   *   1.0.0  2026-09-15  initial vocabulary (11 types, all fields required)
+   *   1.1.0  2026-09-15  + assistant/usage; required/optional split; fields
+   *                      measured optional are no longer demanded
+   */
+  var VERSION = '1.1.0';
 
   /* Protocol values. Consumers match these exactly; never derive a type name
    * from display text. */

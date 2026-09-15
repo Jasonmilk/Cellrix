@@ -231,13 +231,49 @@ console.log('ADR-0018 §3 acceptance net');
   check(10, 'chunk invariance across 1/2/3/7/full/oversized', bad === '', bad);
 }
 
+// ---- D3 (immunity): a REAL period is accepted with zero refusals
+//
+// The vocabulary once rejected 17% of real events — every period lost its
+// assistant/usage, and periods whose context/inject omitted the optional
+// resume_from lost that too. Nothing in this file noticed, because every
+// sample was synthetic. This clause is anchored on the shape the producer
+// actually emits, measured over 86 real periods:
+//   * assistant/usage is a real type and must be known
+//   * context/inject may omit resume_from
+//   * turn/end may omit reply and model
+//   * assistant/reply may omit model
+{
+  const a = ASM.create();
+  const real = [
+    ev('turn/start', 0),
+    ev('user/message', 1, { text: 'go' }),
+    ev('context/inject', 2, { chars: 800, nodes: 12 }),          // no resume_from
+    ev('assistant/usage', 3, { prompt_tokens: 100, completion_tokens: 20,
+                               cached_tokens: 0, reasoning_tokens: 0, model: 'm' }),
+    ev('assistant/think', 4, { text: 't' }),
+    ev('assistant/attempt', 5, { text: 'a', empty: false }),
+    ev('tool/call', 6, { tool: 'read', index: 0, expect: 'ok' }),
+    ev('tool/result', 7, { tool: 'read', ok: true, duration_ms: 3 }),  // no data/outcome
+    ev('assistant/reply', 8, { text: 'done', chars: 4 }),              // no model
+    ev('turn/end', 9, { done: true, success: true, impasse: false })   // no reply/model
+  ];
+  a.feed(real);
+  check(3, 'a real period is accepted with zero refusals',
+    a.rejections().total === 0, JSON.stringify(a.rejections().counts));
+  check(3, 'and every event reached the tape',
+    a.events().length === real.length,
+    a.events().length + ' of ' + real.length);
+  check(3, 'assistant/usage is a known type',
+    EF.isKnownType('assistant/usage'));
+}
+
 // ---- 11: the digest is observable, and it is what proves 9 and 10
 {
   const a = ASM.create(); a.feed(FULL);
   const d = a.digest();
   check(11, 'digest is readable during production', typeof d === 'string' && d.length > 0);
   const parts = JSON.parse(d);
-  check(11, 'digest carries a contract version', parts.v === ASM.VERSION, String(parts.v));
+  check(11, 'digest carries the CONTRACT version', parts.v === EF.VERSION, String(parts.v));
   check(11, 'digest carries the watermark', parts.wm === 9, String(parts.wm));
   check(11, 'digest carries the event count', parts.n === FULL.length, String(parts.n));
   // Self-证: the very values 9 and 10 compare are the ones digest exposes.
