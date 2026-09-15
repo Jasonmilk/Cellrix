@@ -202,9 +202,21 @@
       // vocabulary-validated, deduped by seq, ordered by seq rather than by
       // whatever order the response happened to carry. What follows is this
       // target's own rendering: targets share the tape, not a display model.
+      /* Read boundary (ADR-0019 I1/I2): assign gseq ONCE, here, before
+       * anything filters. gseq is the row's position in this response, which is
+       * what makes the key, the ordering and the node id stable no matter how
+       * the caller later chunks or back-fills. turn is derived here too but
+       * stays out of the node id. */
+      var NORM = window.CxNormalize;
+      var norm = NORM ? NORM.normalize(j.events, { job_id: jobId }) : null;
+      if (norm && !norm.diagnostics.ok) {
+        box.innerHTML = '<div class="empty">事件流读取异常（' +
+          esc(norm.diagnostics.reason) + '）—— 不猜测，请重试</div>';
+        return;
+      }
       var asm = window.CxAssembly ? window.CxAssembly.create() : null;
-      if (asm) asm.feed(j.events);
-      var events = asm ? asm.events() : j.events;
+      if (asm) asm.feed(norm ? norm.events : j.events);
+      var events = asm ? asm.events() : (norm ? norm.events : j.events);
       if (!events.length) {
         box.innerHTML = '<div class="empty">事件全部被拒收（未知类型或格式不符）</div>';
         return;

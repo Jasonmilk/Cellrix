@@ -59,8 +59,28 @@
    *
    * The fast path calls through here rather than comparing seq itself, so that
    * "one comparison" is a fact rather than an intention. */
+  /* Position of an event on the tape.
+   *
+   * `gseq` is assigned once at the read boundary (period_normalize.js) and
+   * never recomputed, so re-feeding, chunking and back-filling all hand back
+   * the same value. Falls back to `seq` for a caller handing raw events in —
+   * and COUNTS the fallback, because a silent fallback is the same defect as a
+   * silent drop: a caller that forgets to normalise would quietly get the old
+   * buggy key and the regression net would stay green. Production callers must
+   * show zero.
+   */
+  var gseqFallback = 0;
+
+  /* Pure. Called several times per event — dedupe key, watermark, both sides of
+   * every ordering comparison, and again inside the binary search — so counting
+   * here would report a multiple of the truth (measured: 8 for 2 events). The
+   * count belongs at intake; see accept(). */
+  function posOf(e) {
+    return (typeof e.gseq === 'number') ? e.gseq : e.seq;
+  }
+
   function comparePosition(a, b) {
-    return a.seq - b.seq;
+    return posOf(a) - posOf(b);
   }
 
   /* Index where `event` belongs in a tape-ordered array; the tape stays sorted
@@ -102,7 +122,16 @@
         seq: e.seq,
         type: e.type,
         turn: 't' + turn,
-        node: jobId + '#' + e.seq
+        /* jobId#gseq. `gseq` is stable across chunking and back-fill, so
+         * this id does not move when an earlier page arrives.
+         *
+         * CAVEAT (a period can be rewritten in place): re-sending the same
+         * input derives the same job id and TRUNCATES the period file, so
+         * `jobId#3` can come to mean a different event. A keyed renderer
+         * would then reuse the old node and show stale content. Therefore a
+         * node id is only valid WITHIN one digest — when the digest changes,
+         * rebuild the whole segment rather than patching by id. */
+        node: jobId + '#' + posOf(e)
       });
     }
     return out;
@@ -162,9 +191,11 @@
 
     function accept(e) {
       if (!EF.isValidEvent(e)) { refuse(e, 'invalid'); return false; }
-      if (Object.prototype.hasOwnProperty.call(bySeq, e.seq)) { refuse(e, 'duplicate'); return false; }
+      /* Intake is the one place an event is counted exactly once. */
+      if (typeof e.gseq !== 'number') gseqFallback++;
+      if (Object.prototype.hasOwnProperty.call(bySeq, posOf(e))) { refuse(e, 'duplicate'); return false; }
 
-      bySeq[e.seq] = e;
+      bySeq[posOf(e)] = e;
       counts[e.type] = (counts[e.type] || 0) + 1;
 
       /* Fast path — the common case is a monotonic append, which needs no
@@ -172,7 +203,7 @@
       if (lastEvent === null || comparePosition(e, lastEvent) > 0) {
         tape.push(e);
         lastEvent = e;
-        watermark = e.seq;
+        watermark = posOf(e);
       } else {
         tape.splice(lowerBound(tape, e), 0, e);
       }
@@ -316,6 +347,13 @@
        * tracing needs type + seq + reason. Printing user text into a console or
        * a log because it happened to be in a rejected event is the leak this
        * avoids. Pass { withData: true } when the content is genuinely needed. */
+      /* Normalisation diagnostics. `gseqFallback > 0` on a production path
+       * means a caller skipped period_normalize.js and is silently on the old
+       * key — the bug, not a warning. */
+      diagnostics: function () {
+        return { gseqFallback: gseqFallback, layerVersion: LAYER_VERSION };
+      },
+
       rejections: function (opts) {
         var counts = {};
         Object.keys(rejectCounts).sort().forEach(function (k) { counts[k] = rejectCounts[k]; });

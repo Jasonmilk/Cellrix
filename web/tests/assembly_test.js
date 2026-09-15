@@ -12,8 +12,10 @@ const path = require('path');
 global.window = {};
 const A = path.join(__dirname, '..', 'assets');
 eval(fs.readFileSync(path.join(A, 'event_family.js'), 'utf8'));
+eval(fs.readFileSync(path.join(A, 'period_normalize.js'), 'utf8'));
 eval(fs.readFileSync(path.join(A, 'assembly.js'), 'utf8'));
 const ASM = global.window.CxAssembly;
+const NORM = global.window.CxNormalize;
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -196,7 +198,10 @@ const EFX = global.window.CxEventFamily;
     ev('assistant/reply', 2, { text: 'a2', chars: 2 }),
     ev('turn/end', 3, { done: true, success: true, impasse: false })
   ];
-  a.feed(twoTurns);
+  /* Through the REAL read boundary. The spike hand-assigned gseq, which was
+   * fairly criticised: that tests the consumer with an input no caller
+   * produces. */
+  a.feed(NORM.normalize(twoTurns, { job_id: 'j1' }).events);
   const rej = a.rejections();
   check('MULTI-TURN: a second turn is not refused as duplicate (RED = fix pending)',
     rej.total === 0, JSON.stringify(rej.counts));
@@ -207,6 +212,54 @@ const EFX = global.window.CxEventFamily;
   check('MULTI-TURN: node ids are unique across turns (RED = fix pending)',
     new Set(nodes).size === twoTurns.length,
     new Set(nodes).size + ' unique of ' + nodes.length);
+}
+
+// ---- gseq + back-fill: the invariant gseq exists for
+//
+// Until now the back-fill assertions ran only on the single-sequence fixture,
+// i.e. through the fallback path. The invariant gseq is meant to protect was
+// never exercised in the mode that uses it.
+{
+  const rows = [
+    ev('turn/start', 0), ev('user/message', 1, { text: 'q1' }),
+    ev('turn/start', 0), ev('user/message', 1, { text: 'q2' })
+  ];
+  /* Normalised ONCE on the complete stream; the chunks fed below are slices of
+   * that normalised array, not separately normalised. Doing it per chunk
+   * restarts gseq at 0 and collides — measured while writing this. */
+  const norm = NORM.normalize(rows, { job_id: 'j1' }).events;
+  const whole = ASM.create();
+  whole.feed(norm);
+  const back = ASM.create();
+  back.feed(norm.slice(2));       // later half first
+  back.feed(norm.slice(0, 2));    // then the earlier half
+  check('gseq: back-fill converges to the same tape',
+    back.digest() === whole.digest(), back.digest() + ' vs ' + whole.digest());
+  const nw = whole.coordinates({ job_id: 'j1' }).map(function (c) { return c.node; }).sort();
+  const nb = back.coordinates({ job_id: 'j1' }).map(function (c) { return c.node; }).sort();
+  check('gseq: existing node ids survive back-fill unchanged',
+    JSON.stringify(nw) === JSON.stringify(nb), JSON.stringify(nb));
+  /* gseqFallback is module-level, so other fixtures in this file have already
+   * contributed to it. The delta is the fact; the absolute value is not. */
+  const fbBefore = ASM.create().diagnostics().gseqFallback;
+  const probe = ASM.create();
+  probe.feed(norm);
+  check('gseq: a normalised feed adds no fallback',
+    probe.diagnostics().gseqFallback === fbBefore,
+    fbBefore + ' -> ' + probe.diagnostics().gseqFallback);
+}
+
+// ---- the fallback counter has its own negative test
+//
+// A guard whose counter has never been seen to move is indistinguishable from
+// one that cannot move.
+{
+  const a = ASM.create();
+  const before = a.diagnostics().gseqFallback;
+  a.feed([ev('turn/start', 0), ev('user/message', 1, { text: 'raw' })]);
+  const after = a.diagnostics().gseqFallback;
+  check('gseq: raw events raise the fallback counter (guard is testable)',
+    after - before === 2, 'delta=' + (after - before));
 }
 
 // ---- the contract's alias table is complete against its own schema
