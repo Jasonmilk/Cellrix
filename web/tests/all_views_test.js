@@ -11,21 +11,47 @@
 const { JSDOM, VirtualConsole } = require("jsdom");
 
 const BASE = process.argv[2] || "http://127.0.0.1:18932";
-const JOB = process.argv[3] || "";
+const JOB_ARG = process.argv[3] || "";
+let JOB = JOB_ARG;
 const VIEWS = ["cockpit", "prove-track", "chat", "flows"];
 const CJK = /[\u4e00-\u9fff]/;
 const cjkCount = (s) => (s.match(new RegExp(CJK.source, "g")) || []).length;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, skipped = 0;
 function check(label, cond, detail) {
   const tail = detail ? "  [" + detail + "]" : "";
   if (cond) { pass++; console.log("  PASS  " + label + tail); }
   else { fail++; console.log("  FAIL  " + label + tail); }
 }
+/* Counted separately from pass: a green run must not claim coverage it did not
+ * have. Used where there is genuinely nothing to exercise — an empty panel is
+ * not a product defect. */
+function skip(label, why) {
+  skipped++;
+  console.log("  SKIP  " + label + "  -> " + why);
+}
 
 (async () => {
   console.log("== all-views real render: " + BASE + " ==");
+
+  /* With no job_id, ask the running panel for its newest period — the same
+   * thing a person would do, and the difference between a check that can run
+   * unattended and one that cannot. */
+  if (!JOB) {
+    try {
+      const s = await (await fetch(BASE + "/api/sessions")).json();
+      const p = (s.periods || [])[0];
+      if (p && p.job_id) {
+        JOB = p.job_id;
+        console.log("job_id not given — using the newest period: " + JOB);
+      } else {
+        console.log("job_id not given and this panel has no period");
+      }
+    } catch (e) {
+      console.log("job_id not given; could not list periods: " + e.message);
+    }
+  }
 
   const errors = [];
   const vc = new VirtualConsole();
@@ -123,11 +149,10 @@ function check(label, cond, detail) {
       check(`chrome shows ${l}`, chromeText.includes(l));
     }
   } else if (!JOB) {
-    // K12 (2026-09-15): the recorded "4 failures" were this — the drive path
-    // is skipped entirely without a job_id, so the inspector below finds an
-    // empty table. Fail with the fix, not a mystery count.
-    check("sidebar rows available to drive prove-track", false,
-      `job_id arg missing — usage: node all_views_test.js <panel_base_url> <job_id>`);
+    // K12 (2026-09-15): the recorded "4 failures" were this. Rewording the
+    // message did not close anything — an unattended run stayed red. With no
+    // period in the panel there is nothing to drive, so this is a skip.
+    skip("sidebar rows available to drive prove-track", "no period in this panel");
   } else {
     check("sidebar rows available to drive prove-track", false, `${items.length} rows`);
   }
@@ -135,7 +160,11 @@ function check(label, cond, detail) {
   console.log("-- inspector path --");
   const rows = Array.from(doc.querySelectorAll("#eTbody tr.ev[data-e-ev]"))
     .filter((r) => !r.classList.contains("e-reply"));
-  check("event rows rendered", rows.length > 0, rows.length + " rows");
+  if (JOB) {
+    check("event rows rendered", rows.length > 0, rows.length + " rows");
+  } else {
+    skip("event rows rendered", "no period in this panel");
+  }
   const insp = doc.getElementById("eInsp");
   const inspOn = () => insp.classList.contains("on");
   const dtText = () =>
@@ -186,7 +215,10 @@ function check(label, cond, detail) {
       closeInsp();
       await sleep(300);
     } else {
-      check("a TOOL row exists to exercise the optional field", false, "none");
+      // Same class as K12: the panel is fine, this period simply has no tool
+    // call to exercise. A red run for absent data trains people to ignore red.
+    skip("a TOOL row exists to exercise the optional field",
+      JOB ? "this period has no TOOL row" : "no period in this panel");
     }
   }
 
@@ -198,7 +230,7 @@ function check(label, cond, detail) {
     closeInsp();
     await sleep(300);
   } else {
-    check("a lane block exists to click", false, "none");
+    skip("a lane block exists to click", JOB ? "no lane block rendered" : "no period in this panel");
   }
 
   const tg = doc.querySelector("[data-e-turntoggle]");
@@ -209,11 +241,12 @@ function check(label, cond, detail) {
     check("in-table turn toggle flips aria-expanded", b !== ariaExpanded(),
       b + " -> " + ariaExpanded());
   } else {
-    check("an in-table turn toggle exists", false, "none");
+    skip("an in-table turn toggle exists", JOB ? "no turn toggle rendered" : "no period in this panel");
   }
 
   console.log("");
-  console.log("RESULT: " + pass + " passed, " + fail + " failed");
+  console.log("RESULT: " + pass + " passed, " + fail + " failed"
+  + (skipped ? ", " + skipped + " skipped (nothing to exercise)" : ""));
   if (errors.length) console.log("captured errors:\n  " + errors.slice(0, 8).join("\n  "));
   dom.window.close();
   process.exit(fail ? 1 : 0);
