@@ -16,7 +16,7 @@ const html = fs.readFileSync(SRC, 'utf8');
 
 /* Lift the function by name. It is self-contained, so eval works and no shim
  * for window/document is needed. */
-const m = html.match(/function chainSize\(children, job, seen\) \{[\s\S]*?\n  \}/);
+const m = html.match(/function walkChain\(children, rootId\) \{[\s\S]*?\n  \}/);
 if (!m) {
   console.log('  FAIL  chainSize not found in session.html');
   process.exit(1);
@@ -24,7 +24,8 @@ if (!m) {
 /* As an expression: under 'use strict' a function DECLARATION inside eval
  * does not leak into the surrounding scope, so eval(m[0]) alone leaves
  * chainSize undefined. */
-const chainSize = eval('(' + m[0] + ')');
+const walkChain = eval('(' + m[0] + ')');
+const chainSize = function (children, job) { return walkChain(children, job).length; };
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -68,6 +69,22 @@ check('a cycle terminates', chainSize(cyclic, 'a') === 2,
 /* The negative test: if the counter stops counting, the assertions above must
  * be the thing that fails. Here it is mutated inline and shown to disagree. */
 function chainSizeZeroed() { return 1; }
+/* Order is part of the contract: breadth-first, so the list reads in time
+ * order. Depth-first would put a deep chain's later questions below its own
+ * grandchildren, and out-of-order reads as missing. */
+{
+  const deep = {
+    r: [{ job_id: 'a' }],
+    a: [{ job_id: 'b' }, { job_id: 'c' }],
+    b: [{ job_id: 'd' }]
+  };
+  const order = walkChain(deep, 'r');
+  check('order is breadth-first: root, then its children, then theirs',
+    JSON.stringify(order) === JSON.stringify(['r', 'a', 'b', 'c', 'd']),
+    JSON.stringify(order));
+  check('the count agrees with the walk', chainSize(deep, 'r') === order.length);
+}
+
 check('MUTATION: a zeroed counter disagrees with the assertions',
   chainSizeZeroed(linear, 'root') !== 4);
 

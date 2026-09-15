@@ -43,23 +43,42 @@
   // `chatMode` drives the click behaviour: the chat sidebar loads the
   // period's history into the chat space (resume), the prove_track sidebar
   // opens its trajectory. One component, two intents [极致复用].
-  /* Size of the continuation subtree rooted at `job`, including itself.
+  /* The ONE traversal of a continuation subtree.
    *
-   * Pure: it takes the children map rather than closing over it, so a test can
-   * lift this function on its own. The previous version reported DIRECT
-   * children, which on a linear chain is always 1 and on a ten-node chain said
-   * 2 — a visible number that was simply wrong.
+   * The count and the render order both come from here, so they cannot drift
+   * apart. Two implementations of one walk is how "one fact, two derivations"
+   * starts — the shape ADR-0018 exists to remove, and precisely what had to be
+   * fixed in deriveCoordinates an hour before this.
+   *
+   * Breadth-first: root, then its continuations, then theirs. Depth-first would
+   * put a deep chain's later questions below its own grandchildren, which reads
+   * as out of order — and out of order is indistinguishable from missing when
+   * someone is scanning a list for a question they asked.
+   *
+   * `seen` also makes a cycle terminate.
+   *
+   * Depth is bounded by the list: the sessions API returns at most `limit`
+   * periods, so a fully expanded tree cannot exceed that.
    */
-  function chainSize(children, job, seen) {
-    seen = seen || {};
-    if (seen[job]) { return 0; }
-    seen[job] = true;
-    var kids = children[job] || [];
-    var n = 1;
-    for (var i = 0; i < kids.length; i++) {
-      n += chainSize(children, kids[i].job_id, seen);
+  function walkChain(children, rootId) {
+    var out = [], queue = [rootId], seen = {};
+    while (queue.length) {
+      var id = queue.shift();
+      if (seen[id]) { continue; }
+      seen[id] = true;
+      out.push(id);
+      var kids = children[id] || [];
+      for (var i = 0; i < kids.length; i++) { queue.push(kids[i].job_id); }
     }
-    return n;
+    return out;
+  }
+
+  /* Size of the subtree rooted at `job`, including itself. Pure: the children
+   * map is an argument, so a test can lift this without a DOM. The previous
+   * version reported DIRECT children, which on a linear chain is always 1 and
+   * on a ten-node chain said 2 — a visible number that was simply wrong. */
+  function chainSize(children, job) {
+    return walkChain(children, job).length;
   }
 
   function renderSide(id, periods, empty, chatMode) {
@@ -78,10 +97,12 @@
     });
     // 根按列表序（时间倒序）在前，其续接线程紧随；孤儿（父不在列表）
     // 已按根处理。连续对话 = 一个根 + 一串续接，不再被截断。
+    var byId = byJob;
     var chain = [];
     roots.forEach(function (r) {
-      chain.push(r);
-      (children[r.job_id] || []).forEach(function (c) { chain.push(c); });
+      walkChain(children, r.job_id).forEach(function (id) {
+        if (byId[id]) { chain.push(byId[id]); }
+      });
     });
     var rootCount = roots.length;
     var head = '<div class="ses-head"><span>' + rootCount + ' 个对话 · ' + periods.length + ' 轮</span>' +
