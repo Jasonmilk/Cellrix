@@ -29,13 +29,24 @@
    * malformed feed cannot grow the layer without limit. */
   var REJECT_SAMPLE_MAX = 16;
 
-  /* Position of `seq` in a seq-ordered array; the tape stays sorted so a
-   * back-fill (an earlier page arriving late) needs no full re-sort. */
-  function lowerBound(tape, seq) {
+  /* Order of two events on the tape.
+   *
+   * Named, and deliberately alone in its own function: it currently compares
+   * `seq`, which silently assumes one sequence spans the whole tape. A period
+   * file holds several turns and each restarts at 0, so this is the line that
+   * has to learn about turn — and when it does, it is the only line that
+   * changes. */
+  function comparePosition(a, b) {
+    return a.seq - b.seq;
+  }
+
+  /* Index where `event` belongs in a tape-ordered array; the tape stays sorted
+   * so a back-fill (an earlier page arriving late) needs no full re-sort. */
+  function lowerBound(tape, event) {
     var lo = 0, hi = tape.length;
     while (lo < hi) {
       var mid = (lo + hi) >> 1;
-      if (tape[mid].seq < seq) lo = mid + 1;
+      if (comparePosition(tape[mid], event) < 0) lo = mid + 1;
       else hi = mid;
     }
     return lo;
@@ -110,7 +121,15 @@
       var key = reason + ':' + type;
       rejectCounts[key] = (rejectCounts[key] || 0) + 1;
       if (rejectSample.length < REJECT_SAMPLE_MAX) {
-        rejectSample.push({ type: type, reason: reason });
+        /* The whole event, not just its name: a specimen that cannot be
+         * replayed or traced back to a line names nothing. `seq` locates it,
+         * `data` shows what was actually wrong. */
+        rejectSample.push({
+          type: type,
+          reason: reason,
+          seq: (e && typeof e === 'object') ? e.seq : undefined,
+          data: (e && typeof e === 'object') ? e.data : undefined
+        });
       }
     }
 
@@ -127,7 +146,7 @@
         tape.push(e);
         watermark = e.seq;
       } else {
-        tape.splice(lowerBound(tape, e.seq), 0, e);
+        tape.splice(lowerBound(tape, e), 0, e);
       }
       dirty = true;
       return true;
