@@ -78,6 +78,29 @@ if [ "$ready" != "1" ]; then
   exit 4
 fi
 
+# ------------------------------------------------- capability, not liveness
+# Readiness above only proves something is listening. Today six ports all
+# answered while the feature did not work, so the probe asks the chain to
+# actually do a thing: fetch a real period through the panel and get events
+# back. A port that answers is not a component that works.
+# CELLRIX is the repo root; its parent is the workspace. Two levels up is the
+# workspace's parent, which is where I first pointed this — measured, not
+# assumed, because the probe silently skipped when the path did not exist.
+WS_ROOT="$(cd "$CELLRIX/.." && pwd)"
+CAP_JOB="$(ls -t "$WS_ROOT"/.helix/events/*.events.jsonl 2>/dev/null | head -1 | xargs -n1 basename 2>/dev/null | sed 's/\.events\.jsonl$//')"
+if [ -n "$CAP_JOB" ]; then
+  cap="$(curl -s --noproxy '*' -m 6 "http://127.0.0.1:$PORT/api/events?job_id=$CAP_JOB" | grep -o '"type"' | wc -l | tr -d ' ')"
+  if [ "${cap:-0}" -gt 0 ]; then
+    echo "capability — panel served $cap events for $CAP_JOB"
+  else
+    echo "CAPABILITY FAILURE: $CAP_JOB returned no events"
+    echo "        (the port answers, the chain does not work — that is the point of this check)"
+    rc=1
+  fi
+else
+  echo "capability — skipped: no period file found"
+fi
+
 echo "running all_views_test.js"
 out="$("$NODE_BIN" "$CELLRIX/web/tests/all_views_test.js" 2>&1)"
 rc=$?
