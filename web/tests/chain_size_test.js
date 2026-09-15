@@ -85,6 +85,24 @@ function chainSizeZeroed() { return 1; }
   check('the count agrees with the walk', chainSize(deep, 'r') === order.length);
 }
 
+/* The count is a LOWER BOUND once the list is truncated.
+ *
+ * /api/sessions returns at most \ periods (50) while disk holds more
+ * (measured: 91), so a chain crossing that boundary is counted only over the
+ * members that arrived. That is K14, a known limitation rather than a fault in
+ * walkChain — but it has to be visible HERE, because in a few weeks it will
+ * read as "the count went wrong again".
+ */
+{
+  const full = { r: [{ job_id: 'a' }], a: [{ job_id: 'b' }], b: [{ job_id: 'c' }] };
+  const truncated = { r: [{ job_id: 'a' }] };   // b and c fell outside the window
+  check('a truncated window yields a lower bound, not the true size',
+    chainSize(truncated, 'r') < chainSize(full, 'r'),
+    chainSize(truncated, 'r') + ' < ' + chainSize(full, 'r'));
+  check('the true size is 4, the truncated window reports 2',
+    chainSize(full, 'r') === 4 && chainSize(truncated, 'r') === 2);
+}
+
 check('MUTATION: a zeroed counter disagrees with the assertions',
   chainSizeZeroed(linear, 'root') !== 4);
 
