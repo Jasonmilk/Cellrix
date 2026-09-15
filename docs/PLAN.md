@@ -18,12 +18,18 @@ ADR-0015 完成 WebUI 水之波光化（令牌/组件/行为三层资产 + 驾�
 
 **下一步候选**：
 
-- **事件族装配层（`ADR-0018`，Accepted 2026-09-15，T0 未做）** —— 同一持久事件族 →
-  target-neutral 装配层 → 多 target（证轨 / 会话）；装配层**只发布不 fold**，坐标由共享纯函数
-  `deriveCoordinates(eventWindow)` 派生（移给证轨会违反 D2 互不导入）。契约含服务端 seq、
-  幂等 upsert on `(kind,id)`、丢弃 `seq ≤ lastSeq`、缺口回拉、`watermark = {lastSeq, gaps}`、
-  `digest()`。加载序 `__ASSEMBLY__` → data → view → ctrl → `__SCRIPT__` 为硬约束。
-  pending 有界（上限 + TTL + 可见 + **按 seq 排序释放**）；**变更驱动**，非时钟驱动。
+- **事件族装配层（`ADR-0018`，Accepted 2026-09-15）** —— 同一持久事件族 →
+  target-neutral 装配层 → 多 target（证轨 / 会话）。
+  **进度（2026-09-15）**：**T0 契约 / T1 骨架与加载序 / T2 共享原语 + `deriveCoordinates()` /
+  T3 证轨 target 接入 / T6 11 条验收网 + runner 已完成**；T4（经历侧栏）/ T5（对话实时流）/
+  T7（A/B 脚本化）待做。三个提交：`d413d39` / `d1def3b` / `8765622` / `dea7ced` / `269a086`。
+  装配层**不做 target 专属 fold**（`buildSession` 仍在证轨侧，D2 互不导入），
+  只提供**通用原语**：`upsert`（幂等合并 on `(kind,id)`，替换而非追加）+
+  `deriveCoordinates()`（turn 序号数 tape，不数到达顺序）。
+  契约含服务端 seq、丢弃已见 seq、缺口回拉、`digest()`（**键排序**，与插入顺序无关）。
+  加载序 `__EVENT_FAMILY__` → `__ASSEMBLY__` → data 为硬约束。
+  **变更驱动**（`feed()` 只标脏、`flush()` 才发布）；`turn/start` 未到恒 pending。
+  实测：`node web/tests/run_all.js` → 3 套绿 + 2 套需输入。
 - 会话管理深化（继续对话选择 + 状态栏耗时/token）／结晶闭环实施（Unmet≥2 → 判据候选 →
   Tuck hard 规则）／生态加固（项目生命周期管理、tuck 小白引导、WebUI 一键重启）／身份绑定
   （anaphase 1对1 JWT 绑定）
