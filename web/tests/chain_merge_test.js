@@ -101,6 +101,56 @@ check('48 unique node ids',
     'accepted=' + n + ' refused=' + b.rejections().total);
 }
 
+// ------------------------------------------------------------ chain direction
+//
+// resume_from points backwards, so collecting from the newest yields
+// newest-first. Without the explicit sort the conversation renders in reverse,
+// with every assertion above still green — the point of these two.
+{
+  // A chain of four, in the shape the producer emits: each period names its
+  // predecessor, and the newest was created last.
+  const chainPeriods = [
+    { job_id: 'p4', parent: 'p3', first_ts: '2026-09-16T04:00:00Z' },
+    { job_id: 'p3', parent: 'p2', first_ts: '2026-09-16T03:00:00Z' },
+    { job_id: 'p2', parent: 'p1', first_ts: '2026-09-16T02:00:00Z' },
+    { job_id: 'p1', parent: null, first_ts: '2026-09-16T01:00:00Z' }
+  ];
+  const ordered = NORM.chainJobIds(chainPeriods, 'p4');
+  check('chainJobIds returns the whole chain', ordered.length === 4, JSON.stringify(ordered));
+  check('chainJobIds is OLDEST FIRST (the root leads)',
+    ordered[0] === 'p1', JSON.stringify(ordered));
+  check('chainJobIds ends at the period we asked from',
+    ordered[ordered.length - 1] === 'p4', JSON.stringify(ordered));
+
+  // Asking from the middle must give the same chain, same order.
+  const fromMiddle = NORM.chainJobIds(chainPeriods, 'p2');
+  check('asking from the middle yields the same order',
+    JSON.stringify(fromMiddle) === JSON.stringify(ordered), JSON.stringify(fromMiddle));
+
+  // MUTATION: newest-first, the naive walk. Must disagree with the assertions.
+  const naive = ['p4', 'p3', 'p2', 'p1'];
+  check('MUTATION: newest-first disagrees with the direction assertions',
+    naive[0] !== 'p1' && JSON.stringify(naive) !== JSON.stringify(ordered));
+}
+
+// ------------------------------------------------- single period (the common case)
+//
+// 91 periods, 63 roots: most have no chain at all. This path must not be
+// special-cased into behaving differently.
+{
+  const solo = { s1: period(9, 'alone') };
+  const m = NORM.mergeChain(solo, ['s1']);
+  const direct = NORM.normalize(solo.s1, { job_id: 's1' });
+  check('a single period merges to the same length as normalize',
+    m.events.length === direct.events.length,
+    m.events.length + ' vs ' + direct.events.length);
+  check('a single period keeps the same order',
+    JSON.stringify(m.events.map(function (e) { return e.seq; })) ===
+    JSON.stringify(direct.events.map(function (e) { return e.seq; })));
+  check('a single period differs from normalize only by sourceJob',
+    m.events[0].sourceJob === 's1' && direct.events[0].sourceJob === undefined);
+}
+
 console.log('');
 console.log(failures === 0 ? 'OK — all passed' : 'FAILED: ' + failures);
 process.exit(failures === 0 ? 0 : 1);

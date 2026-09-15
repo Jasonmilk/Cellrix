@@ -138,10 +138,67 @@
     return out;
   }
 
+  /* L0 — TEMPORARY, same as mergeChain: retire when L1 lands.
+   *
+   * Ordered job ids for the chain containing `startId`, OLDEST FIRST.
+   *
+   * resume_from points backwards (the newest period names its predecessor), so
+   * a naive walk from the clicked period yields newest-first and the merged
+   * conversation renders in reverse. That failure is silent: everything is
+   * accepted, no counter moves, the text is simply backwards.
+   *
+   * `seen` terminates on a cycle. Ordering is by first_ts with a job-id
+   * tiebreak, so the same data always yields the same order.
+   */
+  function chainJobIds(periods, startId) {
+    var byId = {}, children = {}, list = periods || [];
+    for (var i = 0; i < list.length; i++) { byId[list[i].job_id] = list[i]; }
+    for (var j = 0; j < list.length; j++) {
+      var p = list[j];
+      if (p.parent && byId[p.parent]) {
+        (children[p.parent] = children[p.parent] || []).push(p.job_id);
+      }
+    }
+
+    /* Backwards to the root: the oldest period is the one nothing points from. */
+    var root = startId, guard = {};
+    while (byId[root] && byId[root].parent && byId[byId[root].parent] && !guard[root]) {
+      guard[root] = true;
+      root = byId[root].parent;
+    }
+
+    /* Forwards from the root, breadth-first so a branch does not bury a sibling. */
+    var out = [], queue = [root], seen = {};
+    while (queue.length) {
+      var id = queue.shift();
+      if (seen[id] || !byId[id]) { continue; }
+      seen[id] = true;
+      out.push(id);
+      var kids = children[id] || [];
+      for (var k = 0; k < kids.length; k++) { queue.push(kids[k]); }
+    }
+
+    /* NO global timestamp sort. Measured on a real 10-node chain: the period
+     * that resumes from the root can carry an EARLIER first_ts than the root
+     * itself, so sorting by time moves it in front of the period it continues
+     * from — the chain comes out in an order that contradicts resume_from.
+     *
+     * The walk order is already correct: it starts at the root and visits
+     * children after their parent. Siblings are ordered by the API's own
+     * ordering, which is newest-first, so reverse each sibling group to read
+     * oldest-first within a branch. */
+    for (var s = 0; s < out.length; s++) {
+      var kids2 = children[out[s]];
+      if (kids2 && kids2.length > 1) { kids2.reverse(); }
+    }
+    return out;
+  }
+
   window.CxNormalize = {
     VERSION: VERSION,
     normalize: normalize,
     mergeChain: mergeChain,
+    chainJobIds: chainJobIds,
     checkContiguous: checkContiguous
   };
 })();
