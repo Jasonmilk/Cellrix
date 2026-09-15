@@ -6,6 +6,7 @@
 //! must be split — assets live in `web/assets/`, logic in `server.rs`/`config.rs`.
 
 mod config;
+mod routes;
 mod server;
 
 use std::net::TcpListener;
