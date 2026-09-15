@@ -196,9 +196,24 @@ digest() = { lastSeq, eventCount, pendingCount, schemaVersion, fingerprint }
 | T2 共享 fold 原语 + `deriveCoordinates()` 具名纯函数落地 | 待实施 |
 | T3 证轨改为消费装配层（取数从 `prove_track.data.js` 上移） | 待实施 |
 | T4 经历侧栏改为消费装配层 | 待实施 |
-| T5 对话（`chat.js`）的实时流接入同一 event family | 待实施 |
+| T5 对话（`chat.js`）的实时流接入同一 event family | **⛔ 阻塞 —— 实时流不是事件族（见下方说明）** |
 | T6 第 3 节 11 条写成回归网 + **node runner**（`web/tests/`） | 待实施 |
 | T7 A/B：旧二进制跑一遍**预期失败** → rebuild 跑第二遍 | 待实施 |
+
+> **T5 阻塞（2026-09-15 查明，实测）**
+>
+> `anaphase` 的 `/v1/chat` SSE 推的是：`data: {"delta": …, "think": …}`（LLM token 增量）与
+> `data: {"done": true, "reply": …, "model": …}`（终局）。**它不含 `type` / `seq` / `time`，
+> 即不是事件族** —— 事件族（D3）是后端写盘的**离散事件**（`turn/start`、`assistant/reply` …）。
+>
+> 把 token 增量塞进事件族属于**层次混淆**：token 是**显示通道**的粒（渐进渲染），
+> 事件是**记录通道**的粒（权威、可回放）。而且 D3 明确「seq 的持有者是服务端，
+> **客户端自增序号永远对不上**」—— **前端无法自行补 seq**，因此 T5 不能在前端实现。
+>
+> 只有两条路，**待用户裁决**：
+> ① **关闭 T5**：实时流只做显示，权威数据走事件流；**历史回放已由 T4 覆盖**。
+> ② **升级为跨仓协议扩展**：`anaphase` 在 SSE 中带上事件形状，
+> 需 `anaphase:ADR-0026` 与本文同步修订。
 
 > **没有 runner 的回归网是装饰品**。测试期依赖 node（受管 workspace + `NODE_PATH`）≠ 运行期依赖；
 > D6 禁止的是运行期构建依赖，不禁止测试期 runner。
