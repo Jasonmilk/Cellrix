@@ -235,6 +235,13 @@
           Cx.foldRow(label, text);
         }
         else if (e.type === 'assistant/reply') { sawReply = true; Cx.addReplyMsg(e.data.text || '', e.data.model || ''); }
+        else if (e.type === 'assistant/usage') {
+          // Metering, not conversation. Token counts belong to the prove-track
+          // status bar, never to a message row (ADR-0026 D4). Named explicitly
+          // so a reader can tell "deliberately not rendered" from "forgotten" —
+          // this type only started reaching the sidebar on 2026-09-15, when the
+          // vocabulary stopped rejecting it.
+        }
         else if (e.type === 'turn/end') {
           // Legacy fallback only: periods written before assistant/reply
           // carried the answer on turn/end alone. Never duplicate.
