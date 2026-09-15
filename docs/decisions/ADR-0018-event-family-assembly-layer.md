@@ -189,7 +189,7 @@ digest() = { lastSeq, eventCount, pendingCount, schemaVersion, fingerprint }
 
 ## 7. 实施追踪
 
-> **进度（2026-09-15）**：T0–T4 / T6 **已完成**；**T5 阻塞**（见下）；T7 待做。
+> **进度（2026-09-15）**：T0–T4 / T6 / **T7 已完成**；**T5 阻塞**（见下）。
 
 | 任务 | 状态 |
 |---|---|
@@ -200,7 +200,7 @@ digest() = { lastSeq, eventCount, pendingCount, schemaVersion, fingerprint }
 | T4 经历侧栏改为消费装配层 | ✅ `bd252ef` |
 | T5 对话（`chat.js`）的实时流接入同一 event family | **⛔ 阻塞 —— 实时流不是事件族（见下方说明）** |
 | T6 第 3 节 11 条写成回归网 + **node runner**（`web/tests/`） | ✅ `269a086` |
-| T7 A/B：旧二进制跑一遍**预期失败** → rebuild 跑第二遍 | ⬜ 待实施 |
+| T7 A/B：旧二进制跑一遍**预期失败** → rebuild 跑第二遍 | ✅ `25dc7a1`（2026-09-15 实测）——**Phase A**：临时移走 `event_family.js` / `assembly.js`（即事件族代码缺失的旧状态），`node run_all.js` = **3 suites RED**（event_family / assembly / acceptance 全 FAIL，exit 1）；**Phase B**：恢复资产重跑 = **3 suites GREEN**（`OK — 3 suites green`, exit 0）。验收网非空转实锤：装配层缺席即红、在场即绿 |
 
 > **T5 阻塞（2026-09-15 查明，实测）**
 >

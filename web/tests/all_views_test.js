@@ -122,6 +122,12 @@ function check(label, cond, detail) {
     for (const l of ["TOKENS", "CACHE HIT", "INPUT TOK", "LLM TIME", "TOOL TIME"]) {
       check(`chrome shows ${l}`, chromeText.includes(l));
     }
+  } else if (!JOB) {
+    // K12 (2026-09-15): the recorded "4 failures" were this — the drive path
+    // is skipped entirely without a job_id, so the inspector below finds an
+    // empty table. Fail with the fix, not a mystery count.
+    check("sidebar rows available to drive prove-track", false,
+      `job_id arg missing — usage: node all_views_test.js <panel_base_url> <job_id>`);
   } else {
     check("sidebar rows available to drive prove-track", false, `${items.length} rows`);
   }
