@@ -16,7 +16,8 @@ const SELF_CONTAINED = [
   ['event_family_test.js', 'T0 — event family contract'],
   ['assembly_test.js', 'T2 — fold primitives and coordinates'],
   ['acceptance_test.js', 'T6 — the 11 acceptance clauses'],
-  ['chain_merge_test.js', 'L0 — merging periods into one stream']
+  ['chain_merge_test.js', 'L0 — merging periods into one stream'],
+  ['dom_contract_test.js', 'DOM contract — inventory matches the sources']
 ];
 
 const NEEDS_INPUT = [

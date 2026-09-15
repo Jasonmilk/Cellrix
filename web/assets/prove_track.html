@@ -3,82 +3,82 @@
   Data: /api/sessions + /api/events (the real Anaphase event stream)
   Styles in prove_track.css · logic in prove_track.data.js / prove_track.view.js / prove_track.js
   ============================================================ -->
-<div class="e-wrap" id="eWrap">
-  <div class="e-empty" id="eEmpty">Pick a session on the left; the trajectory unfolds here as an auditable trace.</div>
+<div class="e-wrap" id="eWrap" data-page-node-id="A9mF4emJLJneDwdKITrdx1">
+  <div class="e-empty" id="eEmpty" data-page-node-id="6E4clXBouKHalAc9Xrs6wl">Pick a session on the left; the trajectory unfolds here as an auditable trace.</div>
 
-  <div class="e-traj" id="eTraj" style="display:none">
-    <div class="e-tools">
-      <button type="button" class="e-btn e-btn-sm" id="eDurBtn" data-e-ripple aria-pressed="false">
-        <span id="eDurLbl">Equal width</span>
+  <div class="e-traj" id="eTraj" style="display:none" data-page-node-id="8tFLvL0Yq5GN5R5hdmlX4I">
+    <div class="e-tools" data-page-node-id="TXdsERU34R611KXaPikmHB">
+      <button type="button" class="e-btn e-btn-sm" id="eDurBtn" data-e-ripple aria-pressed="false" data-page-node-id="VLcyHwdhBBjSskpWkia2uT">
+        <span id="eDurLbl" data-page-node-id="Yg7Ga7kvOh8Db7ngwMonPb">Equal width</span>
       </button>
-      <button type="button" class="e-btn e-btn-sm" id="eTurnBtn" data-e-ripple aria-pressed="true">Collapse all turns</button>
-      <button type="button" class="e-btn e-btn-sm" id="eCallBtn" data-e-ripple aria-pressed="true">Expand all calls</button>
-      <button type="button" class="e-btn e-btn-sm e-btn-primary" id="eReplayBtn" data-e-ripple>Replay</button>
-      <div class="sp"></div>
-      <div class="e-search">
-        <span class="ico" aria-hidden="true">⌕</span>
-        <input id="eQ" placeholder="Search the trajectory…" aria-label="Search trajectory">
-        <button type="button" class="clr" id="eQClr" aria-label="Clear search">✕</button>
+      <button type="button" class="e-btn e-btn-sm" id="eTurnBtn" data-e-ripple aria-pressed="true" data-page-node-id="R8zMsBRGj5inb5sI0u65Ct">Collapse all turns</button>
+      <button type="button" class="e-btn e-btn-sm" id="eCallBtn" data-e-ripple aria-pressed="true" data-page-node-id="RatDbhugNqkRyJe3XRn5jC">Expand all calls</button>
+      <button type="button" class="e-btn e-btn-sm e-btn-primary" id="eReplayBtn" data-e-ripple data-page-node-id="3CmfjeQCFDjEnKWnNHVdLx">Replay</button>
+      <div class="sp" data-page-node-id="mvXAX87CqgBsmtKJKn4Ydg"></div>
+      <div class="e-search" data-page-node-id="gielH0J8kGvDvVAArBbKB0">
+        <span class="ico" aria-hidden="true" data-page-node-id="dQeytUKvSGP1dutKb22imU">⌕</span>
+        <input id="eQ" placeholder="Search the trajectory…" aria-label="Search trajectory" data-page-node-id="GhbcGo1OwXQ3Rj46eIlB7c">
+        <button type="button" class="clr" id="eQClr" aria-label="Clear search" data-page-node-id="k42jrjZ7oTctwrN1Ui5O8O">✕</button>
       </div>
     </div>
 
-    <div class="e-ov">
-      <div class="e-ov-hd">
-        <span class="e-ov-t">OVERVIEW · time projection</span>
-        <span class="e-mini" id="eOvNote" style="margin:0">Equal width: see what happened</span>
+    <div class="e-ov" data-page-node-id="CjLEEiUh752QghNUGdRHWt">
+      <div class="e-ov-hd" data-page-node-id="jch27BIfD3G6eq1MSGoCqB">
+        <span class="e-ov-t" data-page-node-id="3ClAN1UqdMMp4Omv0ovTcR">OVERVIEW · time projection</span>
+        <span class="e-mini" id="eOvNote" style="margin:0" data-page-node-id="dH8TWPxIfCVstgHo2WP5aA">Equal width: see what happened</span>
       </div>
-      <div class="e-trk"><span class="e-trk-nm">Input</span><div class="e-lane" id="eLaneInput"></div></div>
-      <div class="e-trk"><span class="e-trk-nm">Model</span><div class="e-lane" id="eLaneModel"></div></div>
-      <div class="e-trk"><span class="e-trk-nm">Tools</span><div class="e-lane" id="eLaneTool"></div></div>
-      <div class="e-legend">
-        <span><i class="input"></i>user input / context injection</span>
-        <span><i class="model"></i>model reasoning</span>
-        <span><i class="tool"></i>tool execution / criterion</span>
-        <span style="color:var(--e-risk)">▮ outline = failure</span>
-        <span style="color:var(--e-warn)">▮ pulse = awaiting response</span>
+      <div class="e-trk" data-page-node-id="izmCyMWAG8Vv66pRUXXlyh"><span class="e-trk-nm" data-page-node-id="k58MQR3PxEXwfwSX65KBHi">Input</span><div class="e-lane" id="eLaneInput" data-page-node-id="1IMLqgtVgNjjwrDzAqnROF"></div></div>
+      <div class="e-trk" data-page-node-id="HxtWUzumoNiDEi3mxpsWCy"><span class="e-trk-nm" data-page-node-id="tVnMNgPspCQY8JO7VVPfCb">Model</span><div class="e-lane" id="eLaneModel" data-page-node-id="73UbM2LlzNAoDbsEVoQsj7"></div></div>
+      <div class="e-trk" data-page-node-id="n2YGNbLOt1uQXWkcd4MkeL"><span class="e-trk-nm" data-page-node-id="H00PJyQqyOaQ2FxhwXrhfx">Tools</span><div class="e-lane" id="eLaneTool" data-page-node-id="bvYAOgs7zC6uQPeTcqCTI3"></div></div>
+      <div class="e-legend" data-page-node-id="tpp4bFrMAcR6VDBOhAWYwr">
+        <span data-page-node-id="IV1JO2mgl1BA0KeoQX69sU"><i class="input" data-page-node-id="WaOGxThwlQsyfdQdZEgHdG"></i>user input / context injection</span>
+        <span data-page-node-id="Fwh7oBJnjxlYALF6ecVgsR"><i class="model" data-page-node-id="ixULGJZGwQHHGfCP59tkU2"></i>model reasoning</span>
+        <span data-page-node-id="yrG9DOds6QpHgGDI6tCsTm"><i class="tool" data-page-node-id="eNTsX90HhussZaG12pgw44"></i>tool execution / criterion</span>
+        <span style="color:var(--e-risk)" data-page-node-id="zTtAzA7iH9O2HydNTDalud">▮ outline = failure</span>
+        <span style="color:var(--e-warn)" data-page-node-id="A5wBQ64JrdTu3gyBxd4dkU">▮ pulse = awaiting response</span>
       </div>
-      <p class="e-mini" style="margin:8px 0 0">
+      <p class="e-mini" style="margin:8px 0 0" data-page-node-id="QJmhRfeqm3XyCf9F0vynWy">
         The three lanes share one horizontal ruler: each column is the same step on all three. A blank is not "unpainted";
-        it is <b>that lane being genuinely idle at that step</b> — while a tool ran for 8 seconds the model lane was empty, and that is now legible.
+        it is <b data-page-node-id="GX37F46y9WOsmN3bFpEZbM">that lane being genuinely idle at that step</b> — while a tool ran for 8 seconds the model lane was empty, and that is now legible.
       </p>
     </div>
 
-    <div class="e-vp" id="eTblVp">
-      <div class="e-scroll" id="eTblScroll" tabindex="0" role="region" aria-label="trajectory event table">
-        <table>
-          <caption class="e-sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Trajectory event table, organized by turn</caption>
-          <thead><tr>
-            <th scope="col" class="e-c-ty">Type</th>
-            <th scope="col">Summary</th>
-            <th scope="col" class="e-c-st">Status</th>
-            <th scope="col" class="e-c-dur">Duration</th>
-            <th scope="col" class="e-c-tok">Tokens</th>
+    <div class="e-vp" id="eTblVp" data-page-node-id="xmdE9oJyEd17DZb4MjAgo0">
+      <div class="e-scroll" id="eTblScroll" tabindex="0" role="region" aria-label="trajectory event table" data-page-node-id="QKgp1VvloyCt0YRPfpsHzw">
+        <table data-page-node-id="hkENT2R9z7uqRrXlHlYiaC">
+          <caption class="e-sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)" data-page-node-id="rrZ42VA5Bv9SyUOKFJ36yd">Trajectory event table, organized by turn</caption>
+          <thead data-page-node-id="ZcLr57vherxYpYw5OzvGdc"><tr data-page-node-id="BWg7bNHzukxbTmnbqypruK">
+            <th scope="col" class="e-c-ty" data-page-node-id="JODiFPHV6lu4DCA7FTErFC">Type</th>
+            <th scope="col" data-page-node-id="lPG7Kek1sOLguoJp5kHFOn">Summary</th>
+            <th scope="col" class="e-c-st" data-page-node-id="yKVrPirehmKP19zJOHZt6f">Status</th>
+            <th scope="col" class="e-c-dur" data-page-node-id="Gml86nqxsliWaSnwWhwh1d">Duration</th>
+            <th scope="col" class="e-c-tok" data-page-node-id="YqgG7y8NPKg8nTi2AgFJxI">Tokens</th>
           </tr></thead>
-          <tbody id="eTbody"></tbody>
+          <tbody id="eTbody" data-page-node-id="lUILVpNu4zwdCLJCSB0u8G"></tbody>
         </table>
       </div>
-      <i class="e-eg t" aria-hidden="true"></i><i class="e-eg b" aria-hidden="true"></i>
-      <i class="e-eg l" aria-hidden="true"></i><i class="e-eg r" aria-hidden="true"></i>
+      <i class="e-eg t" aria-hidden="true" data-page-node-id="wFPRQMs4wLHW8lk3bHoBhG"></i><i class="e-eg b" aria-hidden="true" data-page-node-id="8Lgl8oe6o1Z8qvEg7IqrgD"></i>
+      <i class="e-eg l" aria-hidden="true" data-page-node-id="6AGeTQm8nAVMCE95glWmYq"></i><i class="e-eg r" aria-hidden="true" data-page-node-id="aOWvLEL9dREUqHyckGyysj"></i>
     </div>
 
-    <div class="e-stats" id="eStats"></div>
+    <div class="e-stats" id="eStats" data-page-node-id="mT5MLqCHMC1Ghw8nMM2DzP"></div>
   </div>
 
-  <p class="e-mini" style="margin-top:12px" id="eHint" style="display:none">
-    Click any row → the inspector on the right unfolds that event's <b>Summary / Payload / Result / Schema / Timing</b>.
+  <p class="e-mini" style="margin-top:12px" id="eHint" style="display:none" data-page-node-id="54kmiEE1E3w0xsd8wBbuop">
+    Click any row → the inspector on the right unfolds that event's <b data-page-node-id="2JQjhAnYwcHHos4mnakIx0">Summary / Payload / Result / Schema / Timing</b>.
     The whole trajectory is one closed-loop object. The table scrolls vertically only; a covered bottom edge lifts into a very narrow hint.
   </p>
 </div>
 
-<div class="e-scrim" id="eScrim"></div>
-<aside class="e-insp" id="eInsp" role="dialog" aria-labelledby="eInspT">
-  <div class="e-insp-hd">
-    <div><h3 id="eInspT">Event</h3><div class="sb" id="eInspS"></div></div>
-    <button type="button" class="e-btn e-btn-sm" id="eInspX" data-e-ripple aria-label="Close inspector">✕</button>
+<div class="e-scrim" id="eScrim" data-page-node-id="5sk5CBEyGPCR6h5OYB1cB9"></div>
+<aside class="e-insp" id="eInsp" role="dialog" aria-labelledby="eInspT" data-page-node-id="ygJ2nhuc8oz4Da34Bgs4ZW">
+  <div class="e-insp-hd" data-page-node-id="i9Ts93vi9xyXncRtKfZTw0">
+    <div data-page-node-id="NuJZJoQOVtEN5snleDCrR9"><h3 id="eInspT" data-page-node-id="7DzhqdmSv4aXwDxFOAnYlX">Event</h3><div class="sb" id="eInspS" data-page-node-id="Kh6RQNccfvAFTmzbhLiuYM"></div></div>
+    <button type="button" class="e-btn e-btn-sm" id="eInspX" data-e-ripple aria-label="Close inspector" data-page-node-id="HNBGxReTF8GPFxHeR2R0Hy">✕</button>
   </div>
-  <div class="e-vp" style="flex:1 1 auto;min-height:0">
-    <div class="e-insp-bd" id="eInspB"></div>
-    <i class="e-eg t" aria-hidden="true"></i><i class="e-eg b" aria-hidden="true"></i>
-    <i class="e-eg l" aria-hidden="true"></i><i class="e-eg r" aria-hidden="true"></i>
+  <div class="e-vp" style="flex:1 1 auto;min-height:0" data-page-node-id="sYFGgdj2YZBz6H6Ouna2yE">
+    <div class="e-insp-bd" id="eInspB" data-page-node-id="aT4fmnoxLdtIQH1bS6YdI0"></div>
+    <i class="e-eg t" aria-hidden="true" data-page-node-id="lGUwtns8mjbR2E1KUAEShI"></i><i class="e-eg b" aria-hidden="true" data-page-node-id="gxFJho2rjplPXFkrMbEpSk"></i>
+    <i class="e-eg l" aria-hidden="true" data-page-node-id="OybmY028KzqAiS1bWl91yY"></i><i class="e-eg r" aria-hidden="true" data-page-node-id="zbm5bx3615KksjRS3Xc6ao"></i>
   </div>
 </aside>
