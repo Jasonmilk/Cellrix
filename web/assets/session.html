@@ -89,7 +89,14 @@
       // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
       var reply = p.reply ? '<div class="p rp">' + esc(p.reply) + '</div>' : '';
       var mdl = p.model ? '<span class="mdl">' + esc(p.model) + '</span>' : '';
-      var tag = isChild ? '<span class="cont">↳ 续接</span>' : '';
+      /* A root states how many continuations hang under it. Without this a
+       * root with six continuations looked identical to a root with none, so
+       * the six later questions appeared to have vanished — which is the
+       * symptom users reported, and it was never about lost data. */
+      var kids = isChild ? 0 : (children[p.job_id] || []).length;
+      var tag = isChild
+        ? '<span class="cont">↳ 续接</span>'
+        : (kids ? '<span class="cont">+' + kids + ' 续接</span>' : '');
       div.innerHTML =
         '<div class="nm">' + tag + esc(nm) + '</div>' +
         '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' + mdl +
