@@ -29,13 +29,36 @@
    * malformed feed cannot grow the layer without limit. */
   var REJECT_SAMPLE_MAX = 16;
 
+  /* How much of a refused event's `data` to retain. Enough to recognise the
+   * shape, not enough to reproduce a conversation. */
+  var REJECT_DATA_MAX_CHARS = 200;
+
+  /* Serialised length cap: the specimen keeps its shape, not its content. */
+  function truncateData(data) {
+    if (data === undefined) return undefined;
+    var s;
+    try { s = JSON.stringify(data); } catch (err) { return '(unserialisable)'; }
+    if (typeof s !== 'string') return undefined;
+    return s.length <= REJECT_DATA_MAX_CHARS
+      ? data
+      : { truncated: s.slice(0, REJECT_DATA_MAX_CHARS), chars: s.length };
+  }
+
   /* Order of two events on the tape.
    *
-   * Named, and deliberately alone in its own function: it currently compares
-   * `seq`, which silently assumes one sequence spans the whole tape. A period
-   * file holds several turns and each restarts at 0, so this is the line that
-   * has to learn about turn — and when it does, it is the only line that
-   * changes. */
+   * It compares `seq`, which silently assumes one sequence spans the whole
+   * tape — and a period file holds several turns, each restarting at 0.
+   *
+   * When this learns about turn, CHECK EVERYTHING THAT COMPARES OR STORES seq
+   * AS A GLOBAL SCALAR, not just this function: the dedupe key, the fast-path
+   * test, the watermark assignment, the watermark getter, digestOf's `wm`,
+   * deriveCoordinates' node id, countsUpTo's turn ordinal. The fast path and
+   * this function in particular must move together — if only this one does,
+   * the next turn's events take the fast path and get pushed to the tail, so
+   * nothing is missing and nothing is in order.
+   *
+   * The fast path calls through here rather than comparing seq itself, so that
+   * "one comparison" is a fact rather than an intention. */
   function comparePosition(a, b) {
     return a.seq - b.seq;
   }
@@ -105,7 +128,8 @@
     var tape = [];   // accepted events, ordered by seq
     var bySeq = {};  // seq -> event, so dedupe is O(1) not O(n)
     var counts = {}; // type -> count, for digest()
-    var watermark = null;
+    var watermark = null;  // the published position value
+    var lastEvent = null;  // the tape's tail, for the fast path
     var targets = {}; // name -> { name, active }
     var rejectCounts = {}; // "reason:type" -> count, never silently dropped (D3)
     var rejectSample = []; // bounded; the counts are the fact, this is the clue
@@ -128,7 +152,10 @@
           type: type,
           reason: reason,
           seq: (e && typeof e === 'object') ? e.seq : undefined,
-          data: (e && typeof e === 'object') ? e.data : undefined
+          /* `data` is kept but truncated: it can be a long string, and for
+           * user/message it is the user's own text. It is not returned by
+           * default — see rejections(). */
+          data: truncateData((e && typeof e === 'object') ? e.data : undefined)
         });
       }
     }
@@ -142,8 +169,9 @@
 
       /* Fast path — the common case is a monotonic append, which needs no
        * search. Only a back-fill pays for the insert (D5). */
-      if (watermark === null || e.seq > watermark) {
+      if (lastEvent === null || comparePosition(e, lastEvent) > 0) {
         tape.push(e);
+        lastEvent = e;
         watermark = e.seq;
       } else {
         tape.splice(lowerBound(tape, e), 0, e);
@@ -163,7 +191,10 @@
       // that changes when the same tape is fed twice is not a digest.
       // `v` is the CONTRACT version: it answers "which interpretation
       // produced this", which is the question a digest has to answer.
-      return JSON.stringify({ v: EF.VERSION, n: tape.length, wm: watermark, types: types });
+      // `contractVersion`: the interpretation, not the implementation. Never
+      // compare it with the layer's — they answer different questions.
+      return JSON.stringify({ contractVersion: EF.VERSION, n: tape.length,
+                              wm: watermark, types: types });
     }
 
     return {
@@ -228,7 +259,9 @@
        * read: the watermark and the digest — never the tape itself (D5: a
        * target must not scan the window). */
       snapshot: function () {
-        return { version: LAYER_VERSION, watermark: watermark, count: tape.length,
+        // layerVersion, not version: this is the layer's number, and it is
+        // NOT comparable with the digest's contractVersion.
+        return { layerVersion: LAYER_VERSION, watermark: watermark, count: tape.length,
                  digest: digestOf() };
       },
 
@@ -277,11 +310,20 @@
         return state;
       },
 
-      /* What was refused, and why. Counts first (the fact), specimens second. */
-      rejections: function () {
+      /* What was refused, and why. Counts first (the fact), specimens second.
+       *
+       * `data` is withheld unless asked for: a specimen is for tracing, and
+       * tracing needs type + seq + reason. Printing user text into a console or
+       * a log because it happened to be in a rejected event is the leak this
+       * avoids. Pass { withData: true } when the content is genuinely needed. */
+      rejections: function (opts) {
         var counts = {};
         Object.keys(rejectCounts).sort().forEach(function (k) { counts[k] = rejectCounts[k]; });
-        return { counts: counts, sample: rejectSample.slice(),
+        var withData = !!(opts && opts.withData);
+        var sample = rejectSample.map(function (s) {
+          return withData ? s : { type: s.type, reason: s.reason, seq: s.seq };
+        });
+        return { counts: counts, sample: sample,
                  total: Object.keys(rejectCounts).reduce(function (n, k) {
                    return n + rejectCounts[k];
                  }, 0) };

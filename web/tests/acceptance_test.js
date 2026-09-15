@@ -273,7 +273,7 @@ console.log('ADR-0018 §3 acceptance net');
   const d = a.digest();
   check(11, 'digest is readable during production', typeof d === 'string' && d.length > 0);
   const parts = JSON.parse(d);
-  check(11, 'digest carries the CONTRACT version', parts.v === EF.VERSION, String(parts.v));
+  check(11, 'digest carries the CONTRACT version', parts.contractVersion === EF.VERSION, String(parts.v));
   check(11, 'digest carries the watermark', parts.wm === 9, String(parts.wm));
   check(11, 'digest carries the event count', parts.n === FULL.length, String(parts.n));
   // Self-证: the very values 9 and 10 compare are the ones digest exposes.

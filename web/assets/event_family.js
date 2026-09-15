@@ -40,6 +40,7 @@
     CHECK_STATUS: 'check/status',
     VERDICT_STATUS: 'verdict/status',
     ASSISTANT_REPLY: 'assistant/reply',
+    ASSISTANT_USAGE: 'assistant/usage',
     TURN_END: 'turn/end'
   };
 

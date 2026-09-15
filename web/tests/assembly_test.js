@@ -165,6 +165,53 @@ console.log('assembly layer ' + ASM.VERSION + ' (T2)');
     JSON.stringify(unknown));
 }
 
+const EFX = global.window.CxEventFamily;
+
+// ---- MULTI-TURN (RED until the seq work lands)
+//
+// The fixture above numbers its events 1..6, one global sequence, so "second
+// turn is t2" passed while real periods were rejected wholesale — a green
+// assertion proving a false conclusion.
+//
+// A real period restarts seq at 0 each turn (measured: run-7efbf0f8 has
+// 0..10 five times). This clause feeds that shape and is EXPECTED TO FAIL
+// until `comparePosition`, the dedupe key and the watermark all learn about
+// turn together. Red here means "the fix is not in yet" — not "the test is
+// wrong". It is the only thing standing between us and believing multi-turn
+// already works.
+{
+  const a = ASM.create();
+  const twoTurns = [
+    ev('turn/start', 0), ev('user/message', 1, { text: 'q1' }),
+    ev('assistant/reply', 2, { text: 'a1', chars: 2 }),
+    ev('turn/end', 3, { done: true, success: true, impasse: false }),
+    ev('turn/start', 0), ev('user/message', 1, { text: 'q2' }),
+    ev('assistant/reply', 2, { text: 'a2', chars: 2 }),
+    ev('turn/end', 3, { done: true, success: true, impasse: false })
+  ];
+  a.feed(twoTurns);
+  const rej = a.rejections();
+  check('MULTI-TURN: a second turn is not refused as duplicate (RED = fix pending)',
+    rej.total === 0, JSON.stringify(rej.counts));
+  check('MULTI-TURN: every event of both turns reaches the tape (RED = fix pending)',
+    a.events().length === twoTurns.length,
+    a.events().length + ' of ' + twoTurns.length);
+  const nodes = a.coordinates({ job_id: 'j1' }).map(function (c) { return c.node; });
+  check('MULTI-TURN: node ids are unique across turns (RED = fix pending)',
+    new Set(nodes).size === twoTurns.length,
+    new Set(nodes).size + ' unique of ' + nodes.length);
+}
+
+// ---- the contract's alias table is complete against its own schema
+{
+  const listed = Object.keys(EFX.TYPES).map(function (k) { return EFX.TYPES[k]; }).sort();
+  const known = EFX.KNOWN_TYPES.slice().sort();
+  check('contract TYPES is complete against DATA_SCHEMA',
+    JSON.stringify(listed) === JSON.stringify(known),
+    'TYPES=' + listed.length + ' KNOWN=' + known.length +
+    ' missing=' + JSON.stringify(known.filter(function (t) { return listed.indexOf(t) < 0; })));
+}
+
 // ---- the target registry does no work at registration (D5)
 {
   const a = ASM.create();
