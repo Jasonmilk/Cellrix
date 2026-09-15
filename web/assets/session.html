@@ -43,6 +43,25 @@
   // `chatMode` drives the click behaviour: the chat sidebar loads the
   // period's history into the chat space (resume), the prove_track sidebar
   // opens its trajectory. One component, two intents [极致复用].
+  /* Size of the continuation subtree rooted at `job`, including itself.
+   *
+   * Pure: it takes the children map rather than closing over it, so a test can
+   * lift this function on its own. The previous version reported DIRECT
+   * children, which on a linear chain is always 1 and on a ten-node chain said
+   * 2 — a visible number that was simply wrong.
+   */
+  function chainSize(children, job, seen) {
+    seen = seen || {};
+    if (seen[job]) { return 0; }
+    seen[job] = true;
+    var kids = children[job] || [];
+    var n = 1;
+    for (var i = 0; i < kids.length; i++) {
+      n += chainSize(children, kids[i].job_id, seen);
+    }
+    return n;
+  }
+
   function renderSide(id, periods, empty, chatMode) {
     var box = document.getElementById(id);
     if (!periods.length) { box.innerHTML = empty; return; }
@@ -93,7 +112,7 @@
        * root with six continuations looked identical to a root with none, so
        * the six later questions appeared to have vanished — which is the
        * symptom users reported, and it was never about lost data. */
-      var kids = isChild ? 0 : (children[p.job_id] || []).length;
+      var kids = isChild ? 0 : (chainSize(children, p.job_id) - 1);
       var tag = isChild
         ? '<span class="cont">↳ 续接</span>'
         : (kids ? '<span class="cont">+' + kids + ' 续接</span>' : '');
