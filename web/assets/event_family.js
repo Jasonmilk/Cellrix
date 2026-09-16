@@ -107,20 +107,23 @@
     'turn/start': { start: ['?turn/start', 'lit:true'] },
     'turn/end': {
       end: ['?turn/end', 'lit:true'], done: ['done'], success: ['success'],
-      impasse: ['impasse'], model: ['model', 'maybe']
+      impasse: ['impasse'], model: ['model', 'maybe'], verdict: ['verdict', 'maybe']
     },
     'user/message': { text: ['text'] },
     'context/inject': {
-      chars: ['chars'], nodes: ['nodes'], resumeFrom: ['resume_from', 'snake', 'maybe']
+      chars: ['chars'], nodes: ['nodes'], choice: ['choice', 'maybe'],
+      resumeFrom: ['resume_from', 'snake', 'maybe']
     },
     'assistant/think': { text: ['text'] },
-    'assistant/attempt': { text: ['text'] },
+    'assistant/attempt': { text: ['text'], empty: ['empty', 'maybe'] },
     'tool/call': {
       stage: ['?tool/call', 'lit:call'], tool: ['tool'], index: ['index'], expect: ['expect']
     },
     'tool/result': {
       stage: ['?tool/result', 'lit:result'], tool: ['tool'], ok: ['ok'],
-      durationMs: ['duration_ms', 'snake'], outcome: ['outcome', 'maybe']
+      durationMs: ['duration_ms', 'snake'], outcome: ['outcome', 'maybe'],
+      outcomeSha: ['outcome_sha', 'snake', 'maybe'], index: ['index', 'maybe'],
+      data: ['data', 'maybe']
     },
     'check/status': {
       checkId: ['check_id', 'snake'], check: ['check'], expect: ['expect'],
@@ -133,7 +136,10 @@
     },
     'assistant/reply': { text: ['text'], chars: ['chars'], model: ['model', 'maybe'] },
     'assistant/usage': {
-      promptTokens: ['prompt_tokens', 'snake'], completionTokens: ['completion_tokens', 'snake']
+      promptTokens: ['prompt_tokens', 'snake'], completionTokens: ['completion_tokens', 'snake'],
+      cachedTokens: ['cached_tokens', 'snake', 'maybe'],
+      reasoningTokens: ['reasoning_tokens', 'snake', 'maybe'],
+      model: ['model', 'maybe']
     }
   };
 
