@@ -138,7 +138,6 @@
     var targets = {}; // name -> { name, active }
     var rejectCounts = {}; // "reason:type" -> count, never silently dropped (D3)
     var rejectSample = []; // bounded; the counts are the fact, this is the clue
-    var subscribers = []; // functions fed on publication
     var dirty = false;    // tape changed since the last flush
 
     /* Accept one event. Replay of an already-seen seq is dropped: replaying
@@ -204,6 +203,17 @@
                               wm: watermark, types: types });
     }
 
+    function snapshotOf() {
+      return { layerVersion: LAYER_VERSION, watermark: watermark, count: tape.length,
+               digest: digestOf(), nodes: SHAPE.deriveCoordinates(tape, null) };
+    }
+
+    function activeTargetNames() {
+      return Object.keys(targets)
+        .filter(function (k) { return targets[k].active; })
+        .sort();
+    }
+
     return {
       version: LAYER_VERSION,
 
@@ -263,6 +273,17 @@
           t.instance = t.factory();
         }
         t.active = true;
+        /* The first-frame push, moved here from subscribe(). A target that
+         * activates into an existing window receives it once, immediately,
+         * rather than waiting for the next change. */
+        if (t.instance && typeof t.instance.onSnapshot === 'function' && watermark !== null) {
+          t.instance.onSnapshot(snapshotOf());
+          /* The frame we just delivered IS the publication of this window, so
+           * the window is no longer pending a flush. Without this, the next
+           * flush() delivers the same window a second time — measured: the
+           * acceptance test reported one extra call before this line existed. */
+          dirty = false;
+        }
         return t.instance;
       },
 
@@ -276,14 +297,14 @@
         }
       },
       activeTargets: function () {
-        return Object.keys(targets)
-          .filter(function (k) { return targets[k].active; })
-          .sort();
+        return activeTargetNames();
       },
 
       /* One snapshot per merged window. It carries only what a target may
        * read: the watermark and the digest — never the tape itself (D5: a
        * target must not scan the window). */
+      /* Plain functions, not methods: activate() and flush() both need them,
+       * and a method would drag `this` into both. */
       snapshot: function () {
         // layerVersion, not version: this is the layer's number, and it is
         // NOT comparable with the digest's contractVersion.
@@ -293,42 +314,31 @@
         // protocol name to branch on and no raw fields to re-interpret — the
         // type lock, satisfied by what the snapshot carries rather than by a
         // rule saying what a target may do.
-        return { layerVersion: LAYER_VERSION, watermark: watermark, count: tape.length,
-                 digest: digestOf(), nodes: SHAPE.deriveCoordinates(tape, null) };
+        return snapshotOf();
       },
 
-      /* Subscribe. The FIRST subscriber triggers one full replace, not an
-       * incremental build (D5) — but only if there is something to publish. */
-      subscribe: function (fn) {
-        var first = subscribers.length === 0;
-        subscribers.push(fn);
-        if (first && watermark !== null) {
-          /* The replace just published this window, so it is no longer pending
-           * a flush. Leaving it dirty would publish the same window twice on
-           * the next flush (acceptance 5: one publication per merged window). */
-          dirty = false;
-          fn(this.snapshot());
-        }
-        var self = this;
-        return function unsubscribe() {
-          subscribers = subscribers.filter(function (f) { return f !== fn; });
-          return self;
-        };
-      },
+      /* subscribe() retired in batch 3. It answered the same question as
+       * targets — "who should be notified" — with a second mechanism, and
+       * flush() drove that one while activeTargets() was called by nobody.
+       * The first-frame push it carried now lives in activate(). */
 
-      /* Publish the merged window. Returns how many subscribers were fed.
-       * Publishing twice without an intervening change feeds nobody — the
-       * window is merged, so a burst costs one publication, not one per event
-       * (acceptance 5). No subscriber means no work (acceptance 7). */
       flush: function () {
-        if (!dirty || subscribers.length === 0) {
+        var names = activeTargetNames();
+        if (!dirty || names.length === 0) {
           dirty = false;
           return 0;
         }
         dirty = false;
-        var snap = this.snapshot();
-        subscribers.slice().forEach(function (fn) { fn(snap); });
-        return subscribers.length;
+        var snap = snapshotOf();
+        var n = 0;
+        for (var i = 0; i < names.length; i++) {
+          var inst = targets[names[i]] && targets[names[i]].instance;
+          if (inst && typeof inst.onSnapshot === 'function') {
+            inst.onSnapshot(snap);
+            n++;
+          }
+        }
+        return n;
       },
 
       /* T2 primitives, bound to this tape. */

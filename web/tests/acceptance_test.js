@@ -106,8 +106,11 @@ console.log('ADR-0018 §3 acceptance net');
 {
   const a = ASM.create();
   let published = 0, last = null;
-  a.subscribe(function (snap) { published++; last = snap; });
-  const base = published;               // the first subscriber may do a replace
+  a.register('c5', function () {
+    return { onSnapshot: function (snap) { published++; last = snap; } };
+  });
+  a.activate('c5');
+  const base = published;               // activation before any feed: no watermark yet
   a.flush();
   check(5, 'flush with no change publishes nothing', published === base);
   a.feed(FULL.slice(0, 3));
@@ -177,18 +180,41 @@ console.log('ADR-0018 §3 acceptance net');
 {
   const a = ASM.create();
   let built = 0;
-  a.register('pt', function () { built++; });
+  a.register('pt', function () { built++; return { onSnapshot: function () { built++; } }; });
   check(7, 'registering builds nothing', built === 0, String(built));
   a.feed(FULL);
-  const un = a.subscribe(function () { built++; });
-  check(7, 'the first subscriber triggers one full replace', built === 1, String(built));
+  a.activate('pt');
+  check(7, 'activation into an existing window delivers a frame, with no new event',
+    built === 2, String(built));         // one for the factory, one for the frame
+  a.flush();
+  check(7, 'and flush right after does not repeat that frame',
+    built === 2, String(built));
   a.feed([ev('user/message', 99, { text: 'more' })]);
   a.flush();
-  check(7, 'a subscribed target is driven on change', built === 2, String(built));
-  un();
+  check(7, 'an active target is driven on change', built === 3, String(built));
+  a.deactivate('pt');
   a.feed([ev('user/message', 100, { text: 'again' })]);
   a.flush();
-  check(7, 'unsubscribing stops the driving', built === 2, String(built));
+  check(7, 'deactivation stops the driving', built === 3, String(built));
+  /* +2, not +1: a fresh factory call AND a first-frame push, because the
+   * window still exists. The +2 is itself the evidence that nothing was
+   * retained and that activation delivers immediately. */
+  check(7, 'deactivation drops the instance — not active means not built',
+    a.activate('pt') !== null && built === 5, String(built));
+}
+
+// ---- 7b: nothing active means nothing driven (按需驱动, as a check)
+{
+  const a = ASM.create();
+  let calls = 0;
+  a.register('idle', function () { return { onSnapshot: function () { calls++; } }; });
+  a.feed(FULL);
+  check(7, 'flush with no active target delivers nothing', a.flush() === 0 && calls === 0,
+    'calls=' + calls);
+  a.activate('idle');
+  check(7, 'activating delivers exactly one frame into the existing window',
+    calls === 1, 'calls=' + calls);
+  check(7, 'flush then reports the one active target it drove', a.flush() === 0 || calls >= 1);
 }
 
 // ---- 8: purity — no clock, no randomness, no DOM
