@@ -13,10 +13,31 @@
 
   // auto name: 经历 + 首事件时间。标题行恒定 = 人名 > 自动名（永不裸挂
   // "无用户输入"）；preview 恒在正文行（行结构铁轨，P-022 空间记忆）。
+  /* `first_ts` is an INSTANT, written by the producer in UTC (…Z). Slicing the
+   * string showed UTC beside a reader whose clock is local — measured: a card
+   * read 08:30 while its file was written at 16:30, eight hours out, and the
+   * same field also names the card. An instant has no reader; the READER's clock
+   * is the frame it is shown in. (The cockpit already shows a local clock, so
+   * this is also the panel's existing convention.) If the string cannot be
+   * parsed the raw text is shown — a wrong instant is worse than an unformatted
+   * one, and inventing a local time here would be exactly that. */
+  function stamp(iso) {
+    var s = String(iso || '');
+    var d = new Date(s);
+    if (!s || isNaN(d.getTime())) {
+      return { date: s.slice(5, 10), time: s.slice(11, 16) };
+    }
+    var two = function (n) { return (n < 10 ? '0' : '') + n; };
+    return {
+      date: two(d.getMonth() + 1) + '-' + two(d.getDate()),
+      time: two(d.getHours()) + ':' + two(d.getMinutes())
+    };
+  }
+
   function autoName(p) {
     if (p.name) return p.name;
-    var ts = String(p.first_ts || '');
-    return '经历 ' + ts.slice(5, 10) + ' ' + ts.slice(11, 16);
+    var st = stamp(p.first_ts);
+    return '经历 ' + st.date + ' ' + st.time;
   }
 
   function loadSessions() {
@@ -71,8 +92,8 @@
       var isChild = false;
       div.className = 'ses-item' + (sel ? ' sel' : '') + (isChild ? ' child' : '');
       div.setAttribute('data-ts', p.first_ts || '');
-      var ts = String(p.first_ts || '');
-      var disp = ts.slice(5, 10) + ' ' + ts.slice(11, 16);
+      var st = stamp(p.first_ts);
+      var disp = st.date + ' ' + st.time;
       // 行结构恒定（铁轨）：标题 .nm + 时间 .t + 正文 .p，重命名只换标题文本
       var nm = autoName(p);
       var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
