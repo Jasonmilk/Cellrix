@@ -15,6 +15,7 @@ const A = path.join(__dirname, '..', 'assets');
 global.window = {};
 eval(fs.readFileSync(path.join(A, 'event_family.js'), 'utf8'));
 eval(fs.readFileSync(path.join(A, 'period_normalize.js'), 'utf8'));
+eval(fs.readFileSync(path.join(A, 'node_shape.js'), 'utf8'));
 eval(fs.readFileSync(path.join(A, 'assembly.js'), 'utf8'));
 
 const NORM = global.window.CxNormalize;
@@ -158,6 +159,28 @@ check('48 unique node ids',
     JSON.stringify(direct.events.map(function (e) { return e.seq; })));
   check('a single period differs from normalize only by sourceJob',
     m.events[0].sourceJob === 's1' && direct.events[0].sourceJob === undefined);
+}
+
+// ---- 1e: the snapshot is what a target projects from
+//
+// Batch 1's own criterion, applied to the real chain rather than to "matches
+// the current implementation" — the current trajectory is the broken one.
+{
+  const a = ASM.create();
+  a.feed(merged.events);
+  const snap = a.snapshot();
+  check('the snapshot carries the explained stream',
+    Array.isArray(snap.nodes) && snap.nodes.length === 48,
+    snap.nodes ? String(snap.nodes.length) : 'missing');
+  check('a snapshot node has no protocol type and no raw data',
+    snap.nodes.every(function (n) { return n.type === undefined && n.data === undefined; }));
+  check('a snapshot node has a kind, a payload, an identity and an ord',
+    snap.nodes.every(function (n) {
+      return typeof n.kind === 'string' && n.payload && typeof n.node === 'string' &&
+        typeof n.ord === 'number';
+    }));
+  check('snapshot identities are unique',
+    new Set(snap.nodes.map(function (n) { return n.node; })).size === snap.nodes.length);
 }
 
 console.log('');

@@ -5,7 +5,7 @@
  * same window cannot yield two different pictures depending on who read it.
  *
  * T1 scope is the skeleton: intake, watermark, pending, target registry,
- * digest. Fold primitives and deriveCoordinates() are T2; the three targets
+ * digest. Fold primitives and SHAPE.deriveCoordinates() are T2; the three targets
  * attach in T3–T5.
  *
  * Depends on CxEventFamily (T0) for the vocabulary — it must load first.
@@ -13,6 +13,14 @@
  */
 (function () {
   'use strict';
+
+  /* Node construction lives in node_shape.js; assembly.js holds the tape state
+   * machine and reaches it through this namespace (load order in base.html:
+   * event_family -> normalize -> node_shape -> assembly). */
+  var SHAPE = window.CxNodeShape;
+  if (!SHAPE) {
+    throw new Error('assembly.js requires node_shape.js to load first');
+  }
 
   var EF = window.CxEventFamily;
   if (!EF) {
@@ -52,7 +60,7 @@
    * When this learns about turn, CHECK EVERYTHING THAT COMPARES OR STORES seq
    * AS A GLOBAL SCALAR, not just this function: the dedupe key, the fast-path
    * test, the watermark assignment, the watermark getter, digestOf's `wm`,
-   * deriveCoordinates' node id, countsUpTo's turn ordinal. The fast path and
+   * SHAPE.deriveCoordinates' node id, SHAPE.countsUpTo's turn ordinal. The fast path and
    * this function in particular must move together — if only this one does,
    * the next turn's events take the fast path and get pushed to the tail, so
    * nothing is missing and nothing is in order.
@@ -112,40 +120,6 @@
    * Derived from the TAPE, never from arrival order — arrival order is a
    * network fact, not an event fact (D4). Two clients fed the same events in
    * different orders must get the same coordinates. */
-  function deriveCoordinates(events, meta) {
-    var jobId = (meta && meta.job_id) || 'run';
-    var out = [];
-    for (var i = 0; i < events.length; i++) {
-      var e = events[i];
-      /* turn is display grouping, derived at the read boundary when present. */
-      var turn = (typeof e.turn === 'number')
-        ? e.turn
-        : countsUpTo(events, i, EF.TYPES.TURN_START);
-      var interp = EF.interpret(e.type, e.data);
-
-      /* Identity anchors INSIDE the source file; `ord` is the position in this
-       * stream. Welding them together (jobId#gseq) made one event read
-       * differently depending on where the read began — the determinism
-       * violation. `sourceJob`/`lineNo` survive the merge; gseq does not.
-       *
-       * CAVEAT (a period can be rewritten in place): re-sending the same input
-       * derives the same job id and TRUNCATES the file, so `B#3` can come to
-       * mean a different event. Identity is therefore valid WITHIN one read of
-       * one digest — when the digest changes, rebuild rather than patch by id. */
-      var src = e.sourceJob || jobId;
-      var line = (typeof e.lineNo === 'number') ? e.lineNo : e.seq;
-      out.push({
-        kind: interp ? interp.kind : null,
-        payload: interp ? interp.payload : null,
-        node: src + '#' + line,
-        ord: i,
-        lineNo: line,
-        turn: 't' + turn,
-        ts: e.time || null
-      });
-    }
-    return out;
-  }
 
   /* How many events of `type` occur in events[0..upto] inclusive. Turn numbers
    * are ordinal, so they come from the tape, not from a counter that depends on
@@ -153,15 +127,7 @@
   /* Events before the first turn/start belong to the opening turn, which is
    * turn 1 — the count is 0 there, and 0 must not become 0. Named so the
    * intent is readable rather than inferred from `|| 1`. */
-  var OPENING_TURN = 1;
 
-  function countsUpTo(events, upto, type) {
-    var n = 0;
-    for (var i = 0; i <= upto; i++) {
-      if (events[i].type === type) n++;
-    }
-    return n === 0 ? OPENING_TURN : n;
-  }
 
   function create() {
     var tape = [];   // accepted events, ordered by seq
@@ -302,8 +268,14 @@
       snapshot: function () {
         // layerVersion, not version: this is the layer's number, and it is
         // NOT comparable with the digest's contractVersion.
+        //
+        // `nodes` is the explained stream a target projects from. It is built
+        // here rather than handed to targets as raw events, so a target has no
+        // protocol name to branch on and no raw fields to re-interpret — the
+        // type lock, satisfied by what the snapshot carries rather than by a
+        // rule saying what a target may do.
         return { layerVersion: LAYER_VERSION, watermark: watermark, count: tape.length,
-                 digest: digestOf() };
+                 digest: digestOf(), nodes: SHAPE.deriveCoordinates(tape, null) };
       },
 
       /* Subscribe. The FIRST subscriber triggers one full replace, not an
@@ -342,7 +314,7 @@
 
       /* T2 primitives, bound to this tape. */
       coordinates: function (meta) {
-        return deriveCoordinates(tape, meta);
+        return SHAPE.deriveCoordinates(tape, meta);
       },
       /* Fold a list of nodes into one map, idempotently. */
       foldNodes: function (nodes) {
@@ -389,6 +361,6 @@
     create: create,
     /* Exposed for targets that already hold their own tape. */
     upsert: upsert,
-    deriveCoordinates: deriveCoordinates
+    deriveCoordinates: SHAPE.deriveCoordinates
   };
 })();

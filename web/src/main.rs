@@ -118,6 +118,7 @@ fn index_html(_cfg: &PanelConfig) -> String {
 // the data layer — the data layer consumes what the assembly produces.
 const EVENT_FAMILY: &str = include_str!("../assets/event_family.js");
 const NORMALIZE: &str = include_str!("../assets/period_normalize.js");
+const NODE_SHAPE: &str = include_str!("../assets/node_shape.js");
 const ASSEMBLY: &str = include_str!("../assets/assembly.js");
 const PROVE_TRACK_DATA: &str = include_str!("../assets/prove_track.data.js");
     const PROVE_TRACK_VIEW: &str = include_str!("../assets/prove_track.view.js");
@@ -142,6 +143,7 @@ const PROVE_TRACK_DATA: &str = include_str!("../assets/prove_track.data.js");
         .replace("__PROVE_TRACK_CSS__", PROVE_TRACK_CSS)
         .replace("__EVENT_FAMILY__", EVENT_FAMILY)
         .replace("__NORMALIZE__", NORMALIZE)
+        .replace("__NODE_SHAPE__", NODE_SHAPE)
         .replace("__ASSEMBLY__", ASSEMBLY)
         .replace("__PROVE_TRACK_DATA__", PROVE_TRACK_DATA)
         .replace("__PROVE_TRACK_VIEW__", PROVE_TRACK_VIEW)
@@ -291,7 +293,7 @@ mod tests {
             i = start + 2;
         }
         // The scan must have found them — otherwise it would pass vacuously.
-        assert!(checked >= 19, "placeholder scan found only {checked} tokens");
+        assert!(checked >= 20, "placeholder scan found only {checked} tokens");
         // ADR-0016: all four split assets must land in the page.
         assert!(html.contains("--e-trk-tl")); // prove_track.css (tokens)
         assert!(html.contains("function buildSession")); // prove_track.data.js

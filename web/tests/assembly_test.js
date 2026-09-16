@@ -13,6 +13,7 @@ global.window = {};
 const A = path.join(__dirname, '..', 'assets');
 eval(fs.readFileSync(path.join(A, 'event_family.js'), 'utf8'));
 eval(fs.readFileSync(path.join(A, 'period_normalize.js'), 'utf8'));
+eval(fs.readFileSync(path.join(A, 'node_shape.js'), 'utf8'));
 eval(fs.readFileSync(path.join(A, 'assembly.js'), 'utf8'));
 const ASM = global.window.CxAssembly;
 const NORM = global.window.CxNormalize;
