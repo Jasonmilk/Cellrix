@@ -48,7 +48,6 @@
 | `resume-list` | chat.html, session.html |
 | `s-side` | base.html, session.html |
 | `.ses-edit` | session.html |
-| `state` | base.html, script.html |
 | `sub` | base.html, flows.html, script.html |
 | `.tbl-scroll` | cockpit.html, gleam.html |
 | `.tbl-shell` | cockpit.html, gleam.html |
@@ -225,6 +224,7 @@
 | `.small` | cockpit.html |
 | `.sp` | prove_track.html |
 | `.stat` | cockpit.html |
+| `state` | base.html, script.html |
 | `.stats-bar` | cockpit.html |
 | `.t` | prove_track.html, session.html |
 | `.tag` | base.html |
