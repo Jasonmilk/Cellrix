@@ -105,6 +105,22 @@ if (NODE_SIDE) {
 
 /* ---- P0-2: the switch, asserted rather than noted ---------------------
  *
+ * ⚠️ THESE TWO ARE RED ON PURPOSE. DO NOT MAKE THEM GREEN BY EDITING THEM.
+ *
+ * The only correct way to turn them green is to finish the migration:
+ *   1. prove_track.js takes its consumption functions from PT.node instead of
+ *      PT.buildSession
+ *   2. buildSession switches to PT.node internally
+ *   3. the consumption half of prove_track.data.js is DELETED
+ *
+ * Editing or relaxing this assertion would hide a real regression: the
+ * trajectory view would keep running the event-based layer while a green run
+ * claimed otherwise. That is the "55 from the server" mistake — a number that
+ * could not change being read as proof that something else had been fixed.
+ *
+ * If you are here because the suite is red: the suite is right. Fix the caller,
+ * not the assertion.
+ *
  * "Temporary: does not last a round" is a comment, and comments have not
  * stopped anything today. This asserts the end state: the trajectory view must
  * be driving the Node layer, not the event-based one. It is red until 3b-2 and
