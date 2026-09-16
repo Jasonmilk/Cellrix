@@ -33,6 +33,7 @@ global.window = {};
 const NORM = global.window.CxNormalize;
 const ASM = global.window.CxAssembly;
 const PT = global.window.CxProveTrack;
+const EF = global.window.CxEventFamily;
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -100,6 +101,52 @@ if (NODE_SIDE) {
     })[0]);
   });
   check('every kind has a lane and a status', kinds2.length === 0, JSON.stringify(kinds2));
+}
+
+/* ---- P0-2: the switch, asserted rather than noted ---------------------
+ *
+ * "Temporary: does not last a round" is a comment, and comments have not
+ * stopped anything today. This asserts the end state: the trajectory view must
+ * be driving the Node layer, not the event-based one. It is red until 3b-2 and
+ * 3b-3 land, and while it is red, "the trajectory is fixed" is not a claim
+ * anyone can make. */
+{
+  const view = fs.readFileSync(path.join(A, 'prove_track.js'), 'utf8');
+  check('the trajectory view drives the Node layer',
+    /PT\.node|\.node\./ .test(view) || /PT\.node/.test(view),
+    'prove_track.js still takes its consumption from the legacy path');
+  const legacy = /buildSession\s*=\s*PT\.buildSession/.test(view);
+  check('the naive legacy wiring is gone',
+    !legacy, 'buildSession is still bound from PT.buildSession');
+}
+
+/* ---- P0-3: the lane table and the class table cover the same kinds ----- */
+if (NODE_SIDE) {
+  const kinds = Object.keys(NODE_SIDE.LANE_OF).sort();
+  const contractKinds = Object.keys(EF.KINDS)
+    .map(function (k) { return EF.KINDS[k]; }).sort();
+  check('LANE_OF keys equal the contract KINDS value set',
+    JSON.stringify(kinds) === JSON.stringify(contractKinds),
+    JSON.stringify(kinds) + ' vs ' + JSON.stringify(contractKinds));
+
+  // many-to-one is deliberate: ten semantic classes collapse to three lanes.
+  const lanes = new Set(Object.keys(NODE_SIDE.LANE_OF).map(function (k) {
+    return NODE_SIDE.LANE_OF[k];
+  }));
+  check('lanes are a coarser partition than classes (many-to-one)',
+    lanes.size < kinds.length, String(lanes.size) + ' lanes for ' + kinds.length + ' kinds');
+
+  /* ---- P1-3: `when` is a function, never a string to evaluate ---- */
+  const stringWhen = [];
+  Object.keys(NODE_SIDE.SUMMARY).forEach(function (k) {
+    const spec = NODE_SIDE.SUMMARY[k];
+    const variants = Object.prototype.toString.call(spec) === '[object Array]' ? spec : [spec];
+    variants.forEach(function (v) {
+      if (v.when !== undefined && typeof v.when !== 'function') { stringWhen.push(k); }
+    });
+  });
+  check('every SUMMARY when is a function, not a string to evaluate',
+    stringWhen.length === 0, JSON.stringify(stringWhen));
 }
 
 console.log('');
