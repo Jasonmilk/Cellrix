@@ -116,7 +116,16 @@
     },
     reasoning: {
       tpl: 'think: {text}', gap: true,
-      fmt: { text: function (p) { return firstLine(p.text, 100); } }
+      fmt: {
+        text: function (p) {
+          /* An empty string is a fact: the model reasoned and produced nothing
+           * to show. An absent field is a different fact. Both used to render as
+           * the same blank, which is the em-dash problem wearing no glyph. */
+          if (p.text == null) { return ABSENT; }
+          var line = firstLine(p.text, 100);
+          return line === '' ? '(no reasoning text recorded)' : line;
+        }
+      }
     },
     plan: {
       tpl: '{text}', gap: true,
@@ -158,6 +167,11 @@
        * to click. The affordance belongs to the view that has the pointer. */
       tpl: 'reply: {prefix}{text}',
       body: 'text',
+      /* The reply can be the OUTPUT of a call with no row of its own: when the
+       * model's second call is not dispatched, the reply IS that call's result.
+       * Without this its latency is attributed to nothing — measured: 3.4s of an
+       * 8.0s window belonged to no row. */
+      gap: true,
       fmt: {
         prefix: function (p) { return hasModel(p) ? '[' + p.model + '] ' : ''; },
         text: function (p) { return firstLine(p.text, 140); }
