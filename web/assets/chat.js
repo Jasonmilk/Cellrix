@@ -177,16 +177,19 @@
                 var who = bodyEl.parentElement && bodyEl.parentElement.querySelector('.who');
                 if (who) who.innerHTML = helixWho(j.model);
               }
-              // Continuation anchor (ADR-0026): only an EXPLICIT continuation
-              // keeps chaining. Adopting the reply's job_id unconditionally is
-              // what made a fresh conversation silently become a child of the
-              // previous period — a new experience appearing inside the old one
-              // it happened to resume from. The resume banner promises that the
-              // NEXT message continues a period (session.html); it does not
-              // promise that a conversation the human started fresh quietly
-              // becomes one. `job` is the anchor captured when the message was
-              // sent, so a null anchor stays null: one question, one experience.
-              if (job && j.job_id) Cx.state.chatJobId = j.job_id;
+              // Continuation anchor (ADR-0026): this period's job becomes the
+              // next resume_from, so consecutive messages stay ONE conversation
+              // (threaded in the ProveTrack session list), never fragments.
+              //
+              // Briefly gated on `job` (2026-09-17) while the chain window was
+              // still walking the whole subtree: back then a follow-up really
+              // did surface inside the older period it continued. Cellrix:ADR-0021
+              // fixed the window itself — it is now the LINEAGE PATH, ancestors
+              // only — so chaining is safe again, and gating it was actively
+              // harmful: every message became a separate experience and the live
+              // store showed it (the newest periods all had resume_from absent).
+              // Continuity is the original intent, so it is restored.
+              if (j.job_id) Cx.state.chatJobId = j.job_id;
               finish(); return;
             }
           }
