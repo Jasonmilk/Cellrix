@@ -139,7 +139,11 @@
       /* The figure is a CALL's total (prompt + completion) — on a row whose
        * call re-sent a large context, most of it is prompt. Calling the column
        * 'tokens' invited reading it as the answer's size. */
-      out.push('| # | ref | class | status | wait | call tok | summary |');
+      /* The figure is the TURN's metering total over its calls — measured: 2049 +
+       * 2394 + 1501 = 5944 on one reply whose own answer was short. It was called
+       * `call tok` for a round, which promised per-call and delivered per-turn:
+       * a value standing where a different quantity was announced. */
+      out.push('| # | ref | class | status | wait | turn tok | summary |');
       out.push('|---|-----|-------|--------|------|----------|---------|');
       g.rows.forEach(function (r) {
         n++;
