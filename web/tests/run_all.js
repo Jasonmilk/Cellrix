@@ -11,6 +11,7 @@
 'use strict';
 const { execFileSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 /* ── 铁律：校验器不得把 [ENG] 阈值写成硬断言 ────────────────────────────────
  *
@@ -25,10 +26,12 @@ const path = require('path');
  *   ✓ 允许 —— console.log('views =', n)           报告当前值
  *   ✓ 允许 —— assert(n === EXPECTED_FROM_CONFIG)  值来自配置/单一来源
  *
- * 缺口（诚实登记）：本文件目前**只承载规则文本，尚无自动检查器**。因为今天网里并不
- * 存在这类硬断言，此时写检查器必然空转——而空转的测试比没有测试更糟（它读起来像覆盖
- * 率）。待出现真实对象，或先做**变异注入**（临时植入一条 `=== 4` 断言，证明检查器会红）
- * 再落地，见 ADR-0022 §4 验收第 2 条。
+ * 检查器（N1b，已落地）：`checkEngAssertions()` 扫全部测试文件，只抓**导航形态计数**
+ * 与字面量的比较（`views` / `navItems` / `navEntries` / `tiers` / `panes`）。做窄是有意的
+ * ——N-001/N-002 被判陶土**正因为没有数字可论证**，所以这类断言必然在断言一个**编造的
+ * 阈值**；而宽扫描器会误报，**没人信的检查比没有检查更糟**。
+ * 非空转已由**变异注入**证明：临时植入 `assert(views.length === 4)` ⇒ 检查器变红；
+ * 移除 ⇒ 转绿（见提交信息与 ADR-0022 §4 验收第 2 条）。
  * ────────────────────────────────────────────────────────────────────── */
 
 const SELF_CONTAINED = [
@@ -74,8 +77,31 @@ if (PANEL_UP) {
   SELF_CONTAINED.push(['all_views_test.js', 'all views against the live panel — ' + PANEL]);
 }
 
+/* The concrete instance ADR-0022 §2.5 guards: the panel's own navigation shape.
+ * Narrow by design — see the header note above. */
+const ENG_FORBIDDEN = /\b(views?|navItems?|navEntries|tiers?|panes?)\b[^\n]*?[=!]==\s*\d+/;
+function checkEngAssertions() {
+  const bad = [];
+  for (const f of fs.readdirSync(__dirname)) {
+    if (!/_(test)\.js$/.test(f) && f !== 'pt_replay.js') continue;
+    fs.readFileSync(path.join(__dirname, f), 'utf8').split('\n').forEach((line, i) => {
+      const t = line.trim();
+      if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+      if (ENG_FORBIDDEN.test(line)) bad.push(f + ':' + (i + 1) + '  ' + t);
+    });
+  }
+  return bad;
+}
+
 let failed = 0;
 const results = [];
+
+const engBad = checkEngAssertions();
+if (engBad.length) {
+  failed++;
+  console.log('  FAIL  eng-assertion check        ADR-0022 §2.5 — hard-asserted [ENG] value');
+  engBad.forEach(function (b) { console.log('        ' + b); });
+}
 
 for (const [file, what] of SELF_CONTAINED) {
   const target = path.join(__dirname, file);
