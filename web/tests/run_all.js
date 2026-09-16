@@ -23,10 +23,36 @@ const SELF_CONTAINED = [
   ['pt_replay.js', 'trajectory — metering and panes against real files']
 ];
 
+/* The panel test is RUN when the panel is reachable and SKIPPED only when it is
+ * not — never silently skipped while it is up. The base used to be hardcoded to
+ * :18932 while the panel actually serves :8080, so this test sat idle for as long
+ * as that mismatch existed: a passing test that never ran, which is worse than no
+ * test because it looks like coverage. Override with CELLRIX_PANEL. */
+const PANEL = process.env.CELLRIX_PANEL || 'http://127.0.0.1:8080';
+
+function panelReachable() {
+  let host = '127.0.0.1', port = 80;
+  try { const u = new URL(PANEL); host = u.hostname; port = u.port || 80; } catch { return false; }
+  try {
+    execFileSync(process.execPath, ['-e',
+      'const s=require("net").connect(' + Number(port) + ',' + JSON.stringify(host) + ');' +
+      's.on("connect",()=>{s.end();process.exit(0)});' +
+      's.on("error",()=>process.exit(1));' +
+      'setTimeout(()=>process.exit(1),1500);'
+    ], { stdio: 'ignore' });
+    return true;
+  } catch { return false; }
+}
+
+const PANEL_UP = panelReachable();
+
 const NEEDS_INPUT = [
-  ['all_views_test.js', 'needs the panel live on :18932 (see start-panel.sh)'],
-  ['layout_test.js', 'needs the panel live + Chrome on :9222: node layout_test.js (see README)']
+  ['layout_test.js', 'needs Chrome on :9222: node layout_test.js (see README)']
 ];
+
+if (PANEL_UP) {
+  SELF_CONTAINED.push(['all_views_test.js', 'all views against the live panel — ' + PANEL]);
+}
 
 let failed = 0;
 const results = [];
@@ -34,7 +60,8 @@ const results = [];
 for (const [file, what] of SELF_CONTAINED) {
   const target = path.join(__dirname, file);
   try {
-    execFileSync(process.execPath, [target], { stdio: 'pipe' });
+    const extra = file === 'all_views_test.js' ? [PANEL] : [];
+    execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' });
     results.push(['PASS', file, what]);
   } catch (e) {
     failed++;
