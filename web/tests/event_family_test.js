@@ -92,8 +92,38 @@ check('validation is a pure function', JSON.stringify(verdicts) === JSON.stringi
 // `turn/start` is the only type whose data shape is empty, so it is the only
 // one that accepts an empty payload. Every other type must reject it.
 check('empty data validates only for turn/start',
+
+
   verdicts.filter(function (v) { return v; }).length === 1,
   'got ' + verdicts.filter(function (v) { return v; }).length + ' accepted');
+
+// ---- the semantic layer selects over the same facts; it is not a second
+// vocabulary. KIND_OF's key set must equal TYPES' value set, or the lists drift
+// and the kind names become a third copy of the type facts.
+{
+  const typeNames = Object.keys(EF.TYPES).map(function (k) { return EF.TYPES[k]; }).sort();
+  const kindKeys = Object.keys(EF.KIND_OF).sort();
+  check('KIND_OF covers every protocol type and nothing else',
+    JSON.stringify(kindKeys) === JSON.stringify(typeNames),
+    JSON.stringify(kindKeys) + ' vs ' + JSON.stringify(typeNames));
+
+  const kinds = Object.keys(EF.KINDS).map(function (k) { return EF.KINDS[k]; });
+  const used = kindKeys.map(function (k) { return EF.KIND_OF[k]; });
+  check('every declared kind is reachable from a protocol type',
+    kinds.filter(function (k) { return used.indexOf(k) === -1; }).length === 0);
+
+  const bad = typeNames.filter(function (n) {
+    const r = EF.interpret(n, {});
+    return !r || !r.kind || !r.payload || typeof r.payload !== 'object';
+  });
+  check('interpret() answers for every protocol type', bad.length === 0, JSON.stringify(bad));
+  check('interpret() refuses an unknown type instead of inventing meaning',
+    EF.interpret('nonsense/type', {}) === null);
+  const call = EF.interpret(EF.TYPES.TOOL_CALL, { tool: 'x', index: 0, expect: 's' });
+  const res = EF.interpret(EF.TYPES.TOOL_RESULT, { tool: 'x', ok: true, duration_ms: 3 });
+  check('tool call and result share the kind, differ by stage',
+    call.kind === res.kind && call.payload.stage === 'call' && res.payload.stage === 'result');
+}
 
 console.log(failures === 0 ? '\nOK — all passed' : '\nFAILED: ' + failures);
 process.exit(failures === 0 ? 0 : 1);

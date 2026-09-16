@@ -44,6 +44,83 @@
     TURN_END: 'turn/end'
   };
 
+  /* Semantic kinds — what a fact IS, after interpretation.
+   *
+   * A target selects over these. It cannot re-interpret them: there is no
+   * protocol name on a Node, and no branch table to switch on. tool/call and
+   * tool/result share one kind and are separated by payload.stage, so pairing
+   * them is a selection, not a re-reading of the protocol.
+   *
+   * KIND_OF's key set must equal TYPES' value set — asserted, so the two cannot
+   * drift, and so this cannot quietly become a second vocabulary.
+   */
+  var KINDS = {
+    TURN: 'turn',
+    MESSAGE: 'message',
+    CONTEXT: 'context',
+    REASONING: 'reasoning',
+    PLAN: 'plan',
+    TOOL: 'tool',
+    CHECK: 'check',
+    VERDICT: 'verdict',
+    REPLY: 'reply',
+    METERING: 'metering'
+  };
+
+  var KIND_OF = {
+    'turn/start': KINDS.TURN,
+    'turn/end': KINDS.TURN,
+    'user/message': KINDS.MESSAGE,
+    'context/inject': KINDS.CONTEXT,
+    'assistant/think': KINDS.REASONING,
+    'assistant/attempt': KINDS.PLAN,
+    'tool/call': KINDS.TOOL,
+    'tool/result': KINDS.TOOL,
+    'check/status': KINDS.CHECK,
+    'verdict/status': KINDS.VERDICT,
+    'assistant/reply': KINDS.REPLY,
+    'assistant/usage': KINDS.METERING
+  };
+
+  /* Protocol name + data -> { kind, payload }. The ONE place a protocol name is
+   * turned into meaning. fold calls this and never sees the name.
+   *
+   * payload carries only what a view needs; absent fields stay absent rather
+   * than becoming empty strings, so a consumer can tell "not present" from
+   * "present and empty". */
+  var INTERPRETERS = {
+    'turn/start': function () { return { start: true }; },
+    'turn/end': function (d) {
+      return { end: true, done: d.done, success: d.success, impasse: d.impasse, model: d.model || null };
+    },
+    'user/message': function (d) { return { text: d.text }; },
+    'context/inject': function (d) {
+      return { chars: d.chars, nodes: d.nodes, resumeFrom: d.resume_from || null };
+    },
+    'assistant/think': function (d) { return { text: d.text }; },
+    'assistant/attempt': function (d) { return { text: d.text }; },
+    'tool/call': function (d) {
+      return { stage: 'call', tool: d.tool, index: d.index, expect: d.expect, args: d.args };
+    },
+    'tool/result': function (d) {
+      return { stage: 'result', tool: d.tool, ok: d.ok, durationMs: d.duration_ms, outcome: d.outcome };
+    },
+    'check/status': function (d) { return { name: d.name, state: d.state, detail: d.detail }; },
+    'verdict/status': function (d) { return { name: d.name, state: d.state, detail: d.detail }; },
+    'assistant/reply': function (d) { return { text: d.text, chars: d.chars, model: d.model || null }; },
+    'assistant/usage': function (d) {
+      return { promptTokens: d.prompt_tokens, completionTokens: d.completion_tokens };
+    }
+  };
+
+  /* Unknown protocol name: no interpretation, no guess. The caller decides
+   * whether that is a refusal — this layer never invents meaning. */
+  function interpret(typeName, data) {
+    var fn = INTERPRETERS[typeName];
+    if (!fn) { return null; }
+    return { kind: KIND_OF[typeName], payload: fn(data || {}) };
+  }
+
   /* data shape per type, split into required and optional.
    *
    * A field the producer omits when the fact does not exist is OPTIONAL.
@@ -166,6 +243,9 @@
   window.CxEventFamily = {
     VERSION: VERSION,
     TYPES: TYPES,
+    KINDS: KINDS,
+    KIND_OF: KIND_OF,
+    interpret: interpret,
     DATA_SCHEMA: DATA_SCHEMA,
     KNOWN_TYPES: Object.keys(DATA_SCHEMA),
     isKnownType: isKnownType,
