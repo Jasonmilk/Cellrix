@@ -82,43 +82,78 @@
     'assistant/usage': KINDS.METERING
   };
 
-  /* Protocol name + data -> { kind, payload }. The ONE place a protocol name is
-   * turned into meaning. fold calls this and never sees the name.
+  /* Which source field feeds which payload field, per protocol type.
    *
-   * payload carries only what a view needs; absent fields stay absent rather
-   * than becoming empty strings, so a consumer can tell "not present" from
-   * "present and empty". */
-  var INTERPRETERS = {
-    'turn/start': function () { return { start: true }; },
-    'turn/end': function (d) {
-      return { end: true, done: d.done, success: d.success, impasse: d.impasse, model: d.model || null };
+   * A DECLARATION, not code. interpret() walks this table, so it contains no
+   * per-type branch: adding a type is a data edit, not a code edit. Twelve
+   * per-type functions would also have been "type knowledge in one place", but
+   * it would have been twelve pieces of hardcoding in the contract layer's coat.
+   *
+   * Entry forms:
+   *   ['field']                    copy data.field as-is
+   *   ['field', 'snake']           copy, camelCasing the payload name
+   *   ['field', 'maybe']           copy only when the producer sent it
+   *   ['?literal', 'lit:value']    a constant; the '?' marks it as not a field
+   */
+  var PAYLOAD_MAP = {
+    'turn/start': { start: ['?turn/start', 'lit:true'] },
+    'turn/end': {
+      end: ['?turn/end', 'lit:true'], done: ['done'], success: ['success'],
+      impasse: ['impasse'], model: ['model', 'maybe']
     },
-    'user/message': function (d) { return { text: d.text }; },
-    'context/inject': function (d) {
-      return { chars: d.chars, nodes: d.nodes, resumeFrom: d.resume_from || null };
+    'user/message': { text: ['text'] },
+    'context/inject': {
+      chars: ['chars'], nodes: ['nodes'], resumeFrom: ['resume_from', 'snake', 'maybe']
     },
-    'assistant/think': function (d) { return { text: d.text }; },
-    'assistant/attempt': function (d) { return { text: d.text }; },
-    'tool/call': function (d) {
-      return { stage: 'call', tool: d.tool, index: d.index, expect: d.expect, args: d.args };
+    'assistant/think': { text: ['text'] },
+    'assistant/attempt': { text: ['text'] },
+    'tool/call': {
+      stage: ['?tool/call', 'lit:call'], tool: ['tool'], index: ['index'],
+      expect: ['expect'], args: ['args', 'maybe']
     },
-    'tool/result': function (d) {
-      return { stage: 'result', tool: d.tool, ok: d.ok, durationMs: d.duration_ms, outcome: d.outcome };
+    'tool/result': {
+      stage: ['?tool/result', 'lit:result'], tool: ['tool'], ok: ['ok'],
+      durationMs: ['duration_ms', 'snake'], outcome: ['outcome', 'maybe']
     },
-    'check/status': function (d) { return { name: d.name, state: d.state, detail: d.detail }; },
-    'verdict/status': function (d) { return { name: d.name, state: d.state, detail: d.detail }; },
-    'assistant/reply': function (d) { return { text: d.text, chars: d.chars, model: d.model || null }; },
-    'assistant/usage': function (d) {
-      return { promptTokens: d.prompt_tokens, completionTokens: d.completion_tokens };
+    'check/status': { name: ['name'], state: ['state'], detail: ['detail', 'maybe'] },
+    'verdict/status': { name: ['name'], state: ['state'], detail: ['detail', 'maybe'] },
+    'assistant/reply': { text: ['text'], chars: ['chars'], model: ['model', 'maybe'] },
+    'assistant/usage': {
+      promptTokens: ['prompt_tokens', 'snake'], completionTokens: ['completion_tokens', 'snake']
     }
   };
 
-  /* Unknown protocol name: no interpretation, no guess. The caller decides
-   * whether that is a refusal — this layer never invents meaning. */
+  /* Protocol name + data -> { kind, payload }, by table lookup.
+   *
+   * The one place a protocol name becomes meaning. fold calls this and never
+   * learns a name. Absent optional fields stay absent rather than becoming
+   * empty strings, so a consumer can tell "not sent" from "sent and empty".
+   *
+   * Unknown name: no interpretation, no guess. Refusing is the caller's call;
+   * this layer never invents meaning.
+   */
   function interpret(typeName, data) {
-    var fn = INTERPRETERS[typeName];
-    if (!fn) { return null; }
-    return { kind: KIND_OF[typeName], payload: fn(data || {}) };
+    var kind = KIND_OF[typeName];
+    var map = PAYLOAD_MAP[typeName];
+    if (!kind || !map) { return null; }
+    var src = data || {};
+    var payload = {};
+    for (var key in map) {
+      if (!Object.prototype.hasOwnProperty.call(map, key)) { continue; }
+      var spec = map[key];
+      var from = spec[0];
+      if (from.charAt(0) === '?') {
+        payload[key] = spec[1].slice(4) === 'true' ? true : spec[1].slice(4);
+        continue;
+      }
+      var has = Object.prototype.hasOwnProperty.call(src, from) && src[from] !== undefined;
+      if (!has) {
+        if (spec.indexOf('maybe') === -1) { payload[key] = null; }
+        continue;
+      }
+      payload[key] = src[from];
+    }
+    return { kind: kind, payload: payload };
   }
 
   /* data shape per type, split into required and optional.
@@ -246,6 +281,7 @@
     KINDS: KINDS,
     KIND_OF: KIND_OF,
     interpret: interpret,
+    PAYLOAD_MAP: PAYLOAD_MAP,
     DATA_SCHEMA: DATA_SCHEMA,
     KNOWN_TYPES: Object.keys(DATA_SCHEMA),
     isKnownType: isKnownType,

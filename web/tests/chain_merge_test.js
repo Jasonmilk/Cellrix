@@ -75,6 +75,15 @@ check('turn is contiguous across files (six turns, not six restarts)',
 check('every event carries a non-enumerable sourceJob',
   merged.events.every(function (e, i) { return e.sourceJob === jobs[Math.floor(i / 8)]; }),
   merged.events[0].sourceJob + ' ... ' + merged.events[47].sourceJob);
+check('every event knows its line inside its own file',
+  merged.events.every(function (e, i) { return e.lineNo === (i % 8); }),
+  merged.events[0].lineNo + ' ... ' + merged.events[47].lineNo);
+check('lineNo is not the merged position (they are different quantities)',
+  merged.events[8].lineNo === 0 && merged.events[8].gseq === 8,
+  'lineNo=' + merged.events[8].lineNo + ' gseq=' + merged.events[8].gseq);
+check('lineNo does not appear in the serialised shape',
+  JSON.stringify(merged.events[0]).indexOf('lineNo') === -1);
+
 check('sourceJob does not appear in the serialised shape',
   JSON.stringify(merged.events[0]).indexOf('sourceJob') === -1);
 

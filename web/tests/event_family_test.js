@@ -121,6 +121,15 @@ check('empty data validates only for turn/start',
     EF.interpret('nonsense/type', {}) === null);
   const call = EF.interpret(EF.TYPES.TOOL_CALL, { tool: 'x', index: 0, expect: 's' });
   const res = EF.interpret(EF.TYPES.TOOL_RESULT, { tool: 'x', ok: true, duration_ms: 3 });
+  // interpret() must be a lookup, not twelve branches. If PAYLOAD_MAP does not
+  // cover the types, the code is dispatching per type again — hardcoding that
+  // merely moved into the contract layer.
+  check('PAYLOAD_MAP covers every protocol type',
+    JSON.stringify(Object.keys(EF.PAYLOAD_MAP).sort()) === JSON.stringify(typeNames),
+    JSON.stringify(Object.keys(EF.PAYLOAD_MAP).sort()));
+  check('the contract exposes no per-type interpreter functions',
+    typeof EF.INTERPRETERS === 'undefined');
+
   check('tool call and result share the kind, differ by stage',
     call.kind === res.kind && call.payload.stage === 'call' && res.payload.stage === 'result');
 }

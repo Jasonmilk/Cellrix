@@ -120,6 +120,7 @@
   function mergeChain(eventsByJob, orderedJobIds) {
     var joined = [];
     var sources = [];
+    var lineNos = [];
     var ids = orderedJobIds || [];
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i];
@@ -127,12 +128,19 @@
       for (var k = 0; k < evs.length; k++) {
         joined.push(evs[k]);
         sources.push(id);
+        /* The row's position INSIDE its own file. Recorded here because after
+         * concatenation it is gone: gseq is the position in the merged stream,
+         * which is a different quantity and changes with the starting point.
+         * Identity needs the one that does not change, so it has to be captured
+         * before the merge. */
+        lineNos.push(k);
       }
     }
 
     var out = normalize(joined);
     for (var j = 0; j < out.events.length; j++) {
       mark(out.events[j], 'sourceJob', sources[j]);
+      mark(out.events[j], 'lineNo', lineNos[j]);
     }
     out.jobCount = ids.length;
     return out;
