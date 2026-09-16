@@ -1,11 +1,5 @@
 /* Node-side consumption for the trajectory (Cellrix:ADR-0018 batch 4).
  *
- * A SEPARATE FILE, not new names in the old one. `summarizeNode` would have to
- * be renamed back to `summarize` after the switch — a second edit and a second
- * risk. Here the functions keep their final names, and switching is a change of
- * call sites (`PT.data.x` -> `PT.node.x`), with zero changes to the functions.
- * That is the same rule as splitting by responsibility rather than by name.
- *
  * Everything here takes a NODE, not an event:
  *
  *   kind      semantic, from the contract
@@ -16,13 +10,9 @@
  * protocol would have no name to branch on and no raw fields to read. The type
  * lock is satisfied by what this file does not have.
  *
- * The contract layer supplies `classOf(node)` (what a kind IS). This file
- * supplies `laneOf(kind)` (where a row is DRAWN) — a rendering concept, which
- * ADR-0019 §4 keeps out of the contract.
- *
- * TEMPORARY, like L0: this file replaces prove_track.data.js's consumption half.
- * Until that file is reduced to nothing, both exist, which is two derivations of
- * one fact for as long as it lasts. It does not last a round.
+ * What a row LOOKS like comes from prove_track.render.js (the tables). This
+ * file turns one node into that row's content (the panes) and a node stream
+ * into the session the view walks.
  */
 (function () {
   'use strict';
@@ -32,191 +22,20 @@
   if (!EF) {
     throw new Error('prove_track.node.js requires event_family.js to load first');
   }
-
-  /* Text helpers, local to this file. They format strings; they are not type
-   * knowledge. Kept here rather than shared, because this file replaces the old
-   * one and must not depend on anything inside it. */
-  function esc(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
+  var R = PT.render;
+  if (!R) {
+    throw new Error('prove_track.node.js requires prove_track.render.js to load first');
   }
-  function jsonOf(d) {
-    try { return JSON.stringify(d, null, 2); } catch (e) { return String(d); }
+  var D = PT.data;
+  if (!D) {
+    throw new Error('prove_track.node.js requires prove_track.data.js to load first');
   }
-  function short(s, n) {
-    s = String(s || '');
-    return s.length > n ? s.slice(0, n) + '…' : s;
-  }
-  function firstLine(s, n) {
-    s = String(s || '').split('\n')[0];
-    return short(s, n || 100);
-  }
+  var jsonOf = D.jsonOf, short = D.short;
 
-  /* Which lane a row is drawn in. A rendering concept: the contract says what a
-   * kind IS, this says where the picture puts it. */
-  var LANE_OF = {
-    turn: 'model', message: 'input', context: 'input',
-    reasoning: 'model', plan: 'model', tool: 'tool',
-    check: 'tool', verdict: 'tool', reply: 'model', metering: 'model'
-  };
+  function hasOutcome(p) { return p.outcome != null; }
+  function hasNodes(p) { return ((p.choice && p.choice.top) || []).length > 0; }
 
-  function laneOf(kind) { return LANE_OF[kind] || null; }
-
-  /* ---- named predicates -------------------------------------------------
-   *
-   * Branches on a payload VALUE, not on a kind. These are business judgements —
-   * "what counts as passing", "what counts as an empty reply" — and they stay
-   * as code: readable, unit-testable, and changeable without touching a table.
-   * Collapsing them into data would move the rules into a place where nobody
-   * can read them and nothing can test them.
-   */
-  function isToolOk(p) { return !!p.ok; }
-  function isCheckPassed(p) { return !!p.passed; }
-  function isVerdictMet(p) { return p.status === 'Met'; }
-  function isEmptyReply(p) { return !!p.empty; }
-  function hasModel(p) { return !!p.model; }
-  function hasReason(p) { return !!p.reason; }
-  function hasSha(p) { return !!p.outcomeSha; }
-  function hasChars(p) { return p.chars != null; }
-  function hasDuration(p) { return p.durationMs != null; }
-  function hasTiers(p) { return !!p.choice; }
-  function hasCached(p) { return p.cachedTokens != null; }
-  function hasReasoning(p) { return p.reasoningTokens != null; }
-
-  /* ---- how each kind summarises itself ---------------------------------
-   *
-   * A DECLARATION, not branches: eleven if(k === ...) would be the same shape as
-   * the eleven if(t === ...) it replaces, with different strings. A kind names a
-   * template; the template names payload fields; a named formatter covers what
-   * a template language cannot express.
-   *
-   * A turn has two ends, so it lists two variants and `when` picks. That is the
-   * same distinction the contract's classOf reads from payload.end.
-   */
-  var SUMMARY = {
-    turn: [
-      { when: function (p) { return !p.end; }, tpl: 'cognitive cycle started' },
-      {
-        when: function (p) { return !!p.end; },
-        tpl: 'done={done} · success={success}{verdict}{impasse}',
-        opt: {
-          verdict: function (p) { return hasReason(p) ? ' · verdict=' + p.verdict : ''; },
-          impasse: function (p) { return p.impasse ? ' · impasse' : ''; }
-        }
-      }
-    ],
-    message: { tpl: '{text}', fmt: { text: function (p) { return short(p.text, 140); } } },
-    context: {
-      tpl: 'context inject · SA-Core selection{tiers} · nodes={nodes} chars={chars}{resume}',
-      opt: {
-        tiers: function (p) {
-          if (!hasTiers(p)) { return ''; }
-          var tiers = (p.choice && p.choice.tiers) || {};
-          var ks = Object.keys(tiers);
-          return ks.length ? ' ' + ks.map(function (k) { return k + '×' + tiers[k]; }).join(' ') : '';
-        },
-        resume: function (p) { return p.resumeFrom ? ' · resume ' + short(p.resumeFrom, 24) : ''; }
-      }
-    },
-    reasoning: { tpl: 'think: {text}', fmt: { text: function (p) { return firstLine(p.text, 100); } } },
-    plan: {
-      tpl: '{text}',
-      fmt: {
-        text: function (p) {
-          if (isEmptyReply(p)) { return '(empty reply — honest marker, nothing invented)'; }
-          var txt = String(p.text || '');
-          var calls = null;
-          try { var o = JSON.parse(txt); if (o && o.calls) { calls = o.calls; } } catch (err) {}
-          if (calls) {
-            return 'planned calls: ' + calls.map(function (c) { return c.tool; }).join(', ');
-          }
-          return 'reply: ' + firstLine(txt, 100);
-        }
-      }
-    },
-    tool: [
-      {
-        when: function (p) { return p.stage === 'call'; },
-        tpl: '{tool} · #{index} · expect={expect}'
-      },
-      {
-        when: function (p) { return p.stage === 'result'; },
-        tpl: '{tool} · {ok} · {durationMs}{sha}',
-        fmt: {
-          ok: function (p) { return isToolOk(p) ? 'ok' : 'fail'; },
-          durationMs: function (p) { return hasDuration(p) ? p.durationMs + 'ms' : '—'; }
-        },
-        opt: { sha: function (p) { return hasSha(p) ? ' · sha ' + p.outcomeSha : ''; } }
-      }
-    ],
-    check: {
-      tpl: 'gate · {check} · {passed} · expect={expect}',
-      fmt: { passed: function (p) { return isCheckPassed(p) ? 'PASS' : 'FAIL'; } }
-    },
-    verdict: {
-      tpl: '{status}{reason}',
-      opt: { reason: function (p) { return hasReason(p) ? ' · ' + p.reason : ''; } }
-    },
-    reply: {
-      tpl: 'reply: {prefix}{text} (click to expand)',
-      fmt: {
-        prefix: function (p) { return hasModel(p) ? '[' + p.model + '] ' : ''; },
-        text: function (p) { return firstLine(p.text, 140); }
-      }
-    },
-    metering: {
-      tpl: 'tokens · prompt {promptTokens} completion {completionTokens}{cached}{reasoning}',
-      opt: {
-        cached: function (p) { return hasCached(p) ? ' cached ' + p.cachedTokens : ''; },
-        reasoning: function (p) { return hasReasoning(p) ? ' reasoning ' + p.reasoningTokens : ''; }
-      }
-    }
-  };
-
-  /* Filling is substitution, not dispatch: a named formatter wins, otherwise the
-   * payload value is written in. No branch on kind. */
-  function fill(tpl, payload, fmt, opt) {
-    var out = tpl.replace(/\{(\w+)\}/g, function (_, name) {
-      if (fmt && fmt[name]) { return fmt[name](payload); }
-      var v = payload[name];
-      return v === undefined || v === null ? '—' : String(v);
-    });
-    if (opt) {
-      out += Object.keys(opt).map(function (k) { return opt[k](payload); }).join('');
-    }
-    return out;
-  }
-
-  function summarize(node) {
-    var spec = SUMMARY[node.kind];
-    if (!spec) { return node.kind; }
-    var variants = Object.prototype.toString.call(spec) === '[object Array]' ? spec : [spec];
-    for (var i = 0; i < variants.length; i++) {
-      var v = variants[i];
-      if (!v.when || v.when(node.payload)) {
-        return fill(v.tpl, node.payload, v.fmt, v.opt);
-      }
-    }
-    return node.kind;
-  }
-
-  /* ---- status ----------------------------------------------------------- */
-  var STATUS = {
-    tool: function (p) {
-      if (p.stage === 'call') { return 'pending'; }
-      return isToolOk(p) ? 'ok' : 'fail';
-    },
-    check: function (p) { return isCheckPassed(p) ? 'ok' : 'fail'; },
-    verdict: function (p) { return isVerdictMet(p) ? 'ok' : 'fail'; }
-  };
-
-  function statusOf(node) {
-    var fn = STATUS[node.kind];
-    return fn ? fn(node.payload) : 'done';
-  }
-
-  /* ---- tool name and the payload/detail panes --------------------------- */
+  /* ---- tool name and the panes ------------------------------------------ */
   function toolNameOf(node) {
     if (node.kind !== 'tool') { return null; }
     return node.payload.tool || 'tool';
@@ -233,31 +52,42 @@
         return jsonOf({ role: 'assistant', stage: 'reply', text: p.text,
                         chars: p.chars, model: p.model });
       case 'plan':
-        return jsonOf(isEmptyReply(p) ? { empty: true, text: '' } : { text: p.text });
-      case 'context':
-        return jsonOf(p);
+        return jsonOf(p.empty ? { empty: true, text: '' } : { text: p.text });
       default:
         return jsonOf(p);
     }
   }
 
+  /* The Result pane. This is the pane a reviewer reads, so it shows the
+   * BUSINESS artifact rather than a summary of it: a tool's outcome verbatim
+   * (pretty-printed when it is JSON), the node hits a context injection chose,
+   * and the reason behind a criterion. A digest once stood here in place of the
+   * outcome — a digest proves it is the same artifact, it does not show what
+   * the artifact said.
+   */
+  function prettyJson(text) {
+    try { return JSON.stringify(JSON.parse(text), null, 2); } catch (err) { return text; }
+  }
+
   function detailOf(node) {
     var p = node.payload;
     switch (node.kind) {
+      case 'context':
+        if (!hasNodes(p)) { return '(no node hit)'; }
+        return (p.choice.top || []).map(function (n) {
+          return n.tier + '·' + n.heat + ' ' + short(n.id || '', 12) + ' ' + (n.phase || '');
+        }).join('\n');
       case 'tool':
         if (p.stage === 'call') { return 'awaiting tool response…'; }
-        return hasSha(p) ? 'sha ' + p.outcomeSha : (p.outcome || '—');
+        return hasOutcome(p) ? prettyJson(String(p.outcome)) : '—';
       case 'check':
-        return 'actual=' + (p.actual || '—') + (hasReason(p) ? '\n' + p.reason : '');
+        return 'actual=' + (p.actual || '—') + (p.reason ? '\n' + p.reason : '');
       case 'verdict':
         return p.reason || '—';
-      case 'message':
-      case 'turn':
-        return '—';
       case 'reasoning':
         return '(full thinking in Payload)';
       case 'reply':
-        return hasChars(p) ? p.chars + ' chars' : '(full reply in Payload)';
+        return p.chars != null ? p.chars + ' chars' : '(full reply in Payload)';
       case 'plan':
         return '(intent and calls in Payload)';
       default:
@@ -265,32 +95,28 @@
     }
   }
 
-  PT.node = {
-    laneOf: laneOf,
-    summarize: summarize,
-    statusOf: statusOf,
-    toolNameOf: toolNameOf,
-    payloadOf: payloadOf,
-    detailOf: detailOf,
-    /* exported for tests and for the guard that checks no branch sits on kind */
-    LANE_OF: LANE_OF,
-    SUMMARY: SUMMARY,
-    STATUS: STATUS
-  };
+  /* An outcome that is a fragment of terminal output is rendered as one. The
+   * rule reads a payload VALUE, not a protocol name — the same judgement the
+   * event-based layer made, which could never fire there because it was handed
+   * a session row and asked for an event. */
+  function resultIsTerm(node) {
+    if (node.kind !== 'tool' || node.payload.stage !== 'result') { return false; }
+    return /^[#$>]/.test(String(node.payload.outcome || ''));
+  }
 
-
-  /* ---- moved from the event-based layer, now node-based ----------------- */
-
+  /* ---- period metering --------------------------------------------------
+   * Metering is a kind, not a protocol name. No metering node means the
+   * upstream reported nothing means the fact does not exist — no
+   * approximation, and an overflow withholds the whole aggregate rather than
+   * publishing a wrapped sum. Three rules, unchanged from ADR-0038:
+   *   1. DISJOINT counts: input = prompt - cached.
+   *   2. OPTIONAL BUCKETS ARE ALL-OR-NOTHING.
+   *   3. ABSENT MEANS OMITTED.
+   */
   function safeCount(n) {
     return typeof n === 'number' && isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER;
   }
-  function fmtDur(ms) { return ms === 0 ? '—' : (ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's'); }
-  function fmtTok(n) { return (n == null) ? '—' : Number(n).toLocaleString('en-US'); }
 
-  /* Metering is a kind, not a protocol name. No metering event means the
-   * upstream reported nothing means the fact does not exist — no approximation,
-   * and an overflow withholds the whole aggregate rather than publishing a
-   * wrapped sum. */
   function derivePeriodUsage(nodes) {
     var calls = 0, prompt = 0, completion = 0;
     var cachedSum = 0, cachedAll = true, reasoningSum = 0, reasoningAll = true;
@@ -311,66 +137,99 @@
     return {
       calls: calls, prompt: prompt, completion: completion,
       cached: cached, reasoning: reasoning,
-      /* Disjoint input: unknowable when cached is absent (prompt - 0 would be
-       * guessing a cache miss). */
       input: (cached == null) ? null : prompt - cached,
       total: prompt + completion
     };
   }
 
-  /* The tool row's own payload, for the inspector. `stage` separates the call
-   * from the result — the same field classOf reads, not a protocol name. */
-  function resultOf(node) {
-    var p = node.payload || {};
-    if (node.kind !== 'tool' || p.stage !== 'result') { return null; }
-    return {
-      tool: p.tool, ok: p.ok, durationMs: p.durationMs,
-      outcome: p.outcome, outcomeSha: p.outcomeSha
-    };
-  }
-
-  /* ---- build: node stream -> SESSION ----------------------------------- */
+  /* ---- build: node stream -> SESSION -----------------------------------
+   *
+   * An item carries every fact a row needs and nothing else: what it is drawn
+   * as (cls/lane), how it reads (summary), what it measures (dur/tok), how it
+   * can be traced back (id/ord/ts), and what it unfolds to (payload/detail/
+   * term/full/schema).
+   */
   function buildSession(nodes) {
+    /* The filter IS the render table: no SUMMARY entry means no row. */
+    var shown = (nodes || []).filter(function (n) { return !!R.SUMMARY[n.kind]; });
+    /* Over the WHOLE stream, not the drawn subset: metering is precisely the
+     * kind that is not drawn, so deriving from `shown` would find no call to
+     * total and the reply row would carry nothing. Measured: it did. */
+    var usage = derivePeriodUsage(nodes);
     var out = [];
-    var note = 'a session';
-    var shown = nodes || [];
     var seenTurn = {};
-    shown.forEach(function (n) {
-      var cls = EF.classOf(n);
-      var lane = laneOf(n.kind);
+
+    shown.forEach(function (n, i) {
+      var spec = R.specFor(n) || {};
       /* A turn header per distinct turn, emitted where the turn first appears —
        * a resumed session has more than one, and pinning them all to 't1'
-       * silently merged them. The ordinal now arrives on the node. */
+       * silently merged them. The ordinal arrives on the node. */
       if (n.turn && !seenTurn[n.turn]) {
         seenTurn[n.turn] = true;
         out.push({
           kind: 'turn', id: n.turn,
-          index: Number(String(n.turn).slice(1)), note: short(note, 60)
+          index: Number(String(n.turn).slice(1)),
+          /* Which period this turn came from. A merged chain is exactly where a
+           * reader needs it: without it every header over ten periods says the
+           * same nothing. */
+          note: short(n.source || 'a session', 24)
         });
       }
-      if (!cls) { return; }
       var dur = 0;
-      if (n.kind === 'tool' && n.payload && n.payload.stage === 'result') {
-        dur = n.payload.durationMs || 0;
+      if (spec.dur) {
+        dur = n.payload[spec.dur] || 0;
+      } else if (spec.gap) {
+        /* A duration is the gap to the next DRAWN row: the sequence is the
+         * clock. Wall-clock between arbitrary events would measure the read,
+         * not the work. */
+        var nxt = shown[i + 1];
+        var a = nxt ? Date.parse(nxt.ts) : NaN, b = Date.parse(n.ts);
+        dur = (isFinite(a) && isFinite(b)) ? Math.max(0, a - b) : 0;
       }
       out.push({
-        kind: 'ev', id: n.node, turn: n.turn, cls: cls, lane: lane,
-        ord: n.ord, ts: n.ts, dur: dur,
-        status: statusOf(n), summary: summarize(n),
-        payload: payloadOf(n), detail: detailOf(n)
+        kind: 'ev', id: n.node, turn: n.turn, ord: n.ord, ts: n.ts,
+        cls: EF.classOf(n), lane: R.laneOf(n.kind),
+        dur: dur,
+        status: R.statusOf(n), summary: R.summarize(n),
+        tool: toolNameOf(n),
+        /* The Schema pane: what this kind is, and the fields the contract
+         * declares for it. The second half is derived, so the pane cannot drift
+         * from the contract the row was interpreted through. */
+        kindNote: R.KIND_NOTE[n.kind] || '', fields: R.fieldsOf(n.kind),
+        payload: payloadOf(n), detail: detailOf(n), term: resultIsTerm(n),
+        /* The deliverable row is kept verbatim so expanding it shows the whole
+         * answer rather than the truncated summary (no fake expand). */
+        full: R.bodyOf(n),
+        /* The period's metering total rides on the row that delivered it. */
+        tok: (n.kind === 'reply' && usage) ? usage.total : null
       });
     });
-    /* The array shape is the contract with the caller: prove_track.js assigns
-     * it to S.session and iterates it. usage is derived separately by the same
-     * caller, exactly as before — changing the return shape here would be a
-     * silent break at the switch. */
     return out;
   }
 
-  PT.node.derivePeriodUsage = derivePeriodUsage;
-  PT.node.resultOf = resultOf;
-  PT.node.buildSession = buildSession;
-  PT.node.safeCount = safeCount;
-  PT.node.fmtDur = fmtDur;
-  PT.node.fmtTok = fmtTok;
+  /* ---- stuck detection: run-length state machine, marks once at the tail --- */
+  function computeRepeats(session) {
+    var TOOL = EF.KIND_CLASS.tool;
+    session.forEach(function (e) { if (e.kind === 'ev') { delete e.repeat; } });
+    var tool = null, streak = [];
+    function flush() {
+      if (streak.length >= 3) { streak[streak.length - 1].repeat = streak.length; }
+      streak = [];
+    }
+    session.forEach(function (e) {
+      if (e.kind !== 'ev') { return; }
+      if (e.cls === TOOL && e.status === 'fail') {
+        if (e.tool !== tool) { flush(); tool = e.tool; }
+        streak.push(e);
+      } else { flush(); tool = null; }
+    });
+    flush();
+  }
+
+  PT.node = {
+    toolNameOf: toolNameOf, payloadOf: payloadOf, detailOf: detailOf,
+    resultIsTerm: resultIsTerm,
+    derivePeriodUsage: derivePeriodUsage,
+    buildSession: buildSession, computeRepeats: computeRepeats
+  };
 })();

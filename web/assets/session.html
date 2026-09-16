@@ -96,8 +96,11 @@
           document.getElementById('chat-text').focus();
         } else {
           window.__proveTrackMeta = { job_id: p.job_id, name: p.name, preview: p.preview };
-          Cx.showView('prove-track');
+          /* Choose the period first: the trajectory's enter hook reads the
+           * chosen job and asks the shell for exactly that window. Showing the
+           * view first would load the newest experience instead. */
           Cx.selectPeriod(p.job_id);
+          Cx.showView('prove-track');
         }
       };
       var rn = div.querySelector('[data-ren]');
@@ -182,57 +185,18 @@
     var seq = ++st.histSeq;
     var box = document.getElementById('chat-msgs');
     box.innerHTML = '<div class="period-head">—— 正在加载 ' + esc(jobId.slice(0, 12)) + ' 的历史 ——</div>';
-    /* L0 — TEMPORARY. Retire when anaphase provides session_id.
+    /* ONE read, two projections (ADR-0018 T4). The shell merges the chain
+     * through the assembly and hands ONE window to the tape; this view renders
+     * the events off that window, and the trajectory reads the same window as
+     * nodes. Building the window here as well — and handing it on — is what
+     * made the shell a second place that decided what a session was.
      *
-     * A session is a container the runtime owns. Until it exists, the view
-     * reconstructs one from resume_from: read the list, collect the chain
-     * (oldest first), fetch each period, and merge them into a single stream.
-     *
-     * mergeChain normalises ONCE, after concatenation. Normalising per period
-     * would restart gseq at 0 in every file, collide, and refuse all but the
-     * first — the bug fixed today, one scale up.
-     *
-     * sourceJob is not rendered anywhere: it belongs to diagnostics and export.
-     * Showing "this row came from another file" would put the protocol back on
-     * screen, which is exactly what cancelling the fold removed.
+     * L0 (temporary, retired when anaphase provides session_id) lives with the
+     * read, in script.html's loadWindow.
      */
-    var NORM = window.CxNormalize;
-    fetch('/api/sessions?limit=500').then(function (r) { return r.json(); }).then(function (d) {
-      var ids = NORM ? NORM.chainJobIds(d.periods || [], jobId) : [jobId];
-      if (!ids.length) { ids = [jobId]; }
-      return Promise.all(ids.map(function (id) {
-        return fetch('/api/events?job_id=' + encodeURIComponent(id))
-          .then(function (r) { return r.json(); })
-          .then(function (j) { return { id: id, events: (j && j.events) || [] }; });
-      }));
-    }).then(function (parts) {
+    Cx.loadWindow(jobId).then(function (win) {
       if (seq !== st.histSeq) return;
-      var byJob = {}, ordered = [];
-      parts.forEach(function (p) {
-        byJob[p.id] = p.events;
-        ordered.push(p.id);
-      });
-      if (!ordered.length) {
-        box.innerHTML = '<div class="empty">没有可回放的事件</div>';
-        return;
-      }
-      // ADR-0018 T4: the window enters through the assembly layer, so this
-      // target and ProveTrack accept the same facts by the same rules —
-      // vocabulary-validated, deduped by key, ordered by position rather than
-      // by whatever order the response happened to carry. What follows is this
-      // target's own rendering: targets share the tape, not a display model.
-      var merged = NORM
-        ? NORM.mergeChain(byJob, ordered)
-        : { events: ordered.reduce(function (a, id) { return a.concat(byJob[id]); }, []),
-            diagnostics: { ok: true } };
-      if (!merged.diagnostics.ok) {
-        box.innerHTML = '<div class="empty">事件流读取异常（' +
-          esc(merged.diagnostics.reason || 'unknown') + '）—— 不猜测，请重试</div>';
-        return;
-      }
-      var asm = window.CxAssembly ? window.CxAssembly.create() : null;
-      if (asm) asm.feed(merged.events);
-      var events = asm ? asm.events() : merged.events;
+      var events = win.events;
       if (!events.length) {
         box.innerHTML = '<div class="empty">事件全部被拒收（未知类型或格式不符）</div>';
         return;
@@ -245,7 +209,7 @@
       var d = document.createElement('div');
       d.className = 'period-head';
       d.textContent = '—— 经历 ' + jobId + ' 的历史 ——'
-        + (ordered.length > 1 ? '（含 ' + ordered.length + ' 段）' : '');
+        + (win.jobs.length > 1 ? '（含 ' + win.jobs.length + ' 段）' : '');
       box.appendChild(d);
       events.forEach(function (e) {
         if (e.type === 'user/message') { Cx.addMsg('user', e.data.text || '', false); }
@@ -278,12 +242,10 @@
         }
       });
       box.scrollTop = box.scrollHeight;
-      // The trajectory is another projection of this same tape (L0): hand it
-      // the merged stream rather than letting it read one period, which would
-      // be a second source for the same facts and would break continuity.
-      if (window.Cx && window.Cx.selectPeriod) {
-        window.Cx.selectPeriod(jobId, events);
-      }
+      /* The trajectory is another projection of this same tape: it is told
+       * WHICH period was chosen, not handed the events. Passing the stream
+       * along as well is the second way in that let the two drift apart. */
+      if (Cx.selectPeriod) { Cx.selectPeriod(jobId); }
     }).catch(function (e) {
       if (seq !== st.histSeq) return;
       box.innerHTML = '<div class="empty">历史加载失败: ' + esc(e.message) + '</div>';

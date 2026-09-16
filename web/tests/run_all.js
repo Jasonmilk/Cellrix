@@ -18,11 +18,11 @@ const SELF_CONTAINED = [
   ['acceptance_test.js', 'T6 — the 11 acceptance clauses'],
   ['chain_merge_test.js', 'L0 — merging periods into one stream'],
   ['dom_contract_test.js', 'DOM contract — inventory matches the sources'],
-  ['prove_track_nodes_test.js', 'trajectory — real chain through the Node layer']
+  ['prove_track_nodes_test.js', 'trajectory — real chain through the Node layer'],
+  ['pt_replay.js', 'trajectory — metering and panes against real files']
 ];
 
 const NEEDS_INPUT = [
-  ['pt_replay.js', 'needs an events file: node pt_replay.js <data.js> <events.jsonl>'],
   ['all_views_test.js', 'needs the panel live on :18932 (see start-panel.sh)']
 ];
 

@@ -51,7 +51,14 @@
       out.push({
         kind: interp ? interp.kind : null,
         payload: interp ? interp.payload : null,
+        /* `node` is the key a consumer compares and puts in an attribute; it is
+         * a pure function of the two parts below, which are kept apart because
+         * a GROUPING and an EXPORT need the part, not the key. Without `source`
+         * a turn header in a merged chain could not say which period it came
+         * from, and an exported row could not cite the file it came from —
+         * both would have to split the key back apart on `#`. */
         node: src + '#' + line,
+        source: src,
         ord: i,
         lineNo: line,
         turn: 't' + turn,

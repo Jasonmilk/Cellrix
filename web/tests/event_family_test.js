@@ -183,52 +183,58 @@ check('empty data validates only for turn/start',
   check('classOf refuses an unknown kind instead of guessing',
     EF.classOf({ kind: 'nonsense', payload: {} }) === null);
 
-  // ---- reverse interlock: what a view reads must be what the table supplies
+  // ---- reverse interlock: what a consumer reads must be what the contract
+  //      supplies
   //
   // The seven field gaps found in 3a were found by a throwaway script. This is
-  // that script as an assertion, and it replaces a grep that was used as grounds
-  // to DELETE a field — a negative conclusion with no positive control, exactly
-  // the shape that nearly deleted register/activate once. The control is built
-  // in: `d.nonexistent_field` below must be reported.
+  // that script as an assertion, and it replaces a grep that was used as
+  // grounds to DELETE a field — a negative conclusion with no positive control,
+  // exactly the shape that nearly deleted register/activate once.
+  //
+  // It follows the consumption to where it now lives. The event-based layer
+  // read raw snake_case off `data`; the Node layer reads the payload's own
+  // names. The declared set is derived from the contract either way: the keys
+  // of PAYLOAD_MAP ARE the payload field names.
   {
     const fs2 = require('fs');
     const path2 = require('path');
-    const src = fs2.readFileSync(path2.join(__dirname, '..', 'assets',
-      'prove_track.data.js'), 'utf8');
+    const SRC = ['prove_track.node.js', 'prove_track.render.js']
+      .map(function (f) {
+        return fs2.readFileSync(path2.join(__dirname, '..', 'assets', f), 'utf8');
+      }).join('\n');
 
-    // payload field names the contract supplies, per type
-    const supplied = new Set();
+    const declared = new Set();
     Object.keys(EF.PAYLOAD_MAP).forEach(function (typeName) {
-      Object.keys(EF.PAYLOAD_MAP[typeName]).forEach(function (p) {
-        supplied.add(EF.PAYLOAD_MAP[typeName][p][0]);
+      Object.keys(EF.PAYLOAD_MAP[typeName]).forEach(function (field) {
+        declared.add(field);
       });
     });
-    // the raw name each payload field came from: snake_case in the contract,
-    // camelCase in the payload, so compare on the source name
-    const rawNames = new Set();
-    Object.keys(EF.DATA_SCHEMA).forEach(function (typeName) {
-      const decl = EF.DATA_SCHEMA[typeName] || {};
-      Object.keys(decl.required || {}).forEach(function (k) { rawNames.add(k); });
-      Object.keys(decl.optional || {}).forEach(function (k) { rawNames.add(k); });
-    });
 
-    const read = new Set();
-    let m;
-    const reAccess = /\bd\.([a-z_][a-z0-9_]*)/g;
-    while ((m = reAccess.exec(src)) !== null) { read.add(m[1]); }
-    const reBracket = /\bd\[['"]([a-z_][a-z0-9_]*)['"]\]/g;
-    while ((m = reBracket.exec(src)) !== null) { read.add(m[1]); }
+    /* A read is `p.<name>` or `payload.<name>`. A bracket read is dynamic and
+     * deliberately invisible — `payload[name]` is the template machinery, not a
+     * field anyone named. */
+    function scanReads(src) {
+      const out = new Set();
+      let m;
+      const re = /\b(?:p|payload)\.([A-Za-z_][A-Za-z0-9_]*)/g;
+      while ((m = re.exec(src)) !== null) { out.add(m[1]); }
+      return out;
+    }
 
+    const read = scanReads(SRC);
     const orphans = Array.from(read).filter(function (name) {
-      return !rawNames.has(name);
+      return !declared.has(name);
     });
-    check('every data field the trajectory reads is declared in DATA_SCHEMA',
+    check('every payload field the Node layer reads is declared in the contract',
       orphans.length === 0, JSON.stringify(orphans));
 
-    // positive control: the scan must report a name that does not exist
-    const control = 'nonexistent_field';
+    // positive control: the scan must report a name that does not exist, run
+    // through the same function the assertion above used
+    const control = scanReads('var v = p.nonexistent_field || payload.also_fake;');
     check('the scan reports an undeclared field (positive control)',
-      !rawNames.has(control) && !supplied.has(control));
+      control.has('nonexistent_field') && control.has('also_fake') &&
+        !declared.has('nonexistent_field') && !declared.has('also_fake'),
+      JSON.stringify(Array.from(control)));
   }
 
   check('tool call and result share the kind, differ by stage',

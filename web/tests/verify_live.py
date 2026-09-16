@@ -14,7 +14,9 @@ page = Path(page_path).read_text(encoding="utf-8")
 ASSETS = [
     ("prove_track.css", "Cellrix \u00b7 ProveTrack \u2014 style layer (ADR-0016 D1)"),
     ("prove_track.html", "Cellrix \u00b7 ProveTrack \u2014 skeleton layer (ADR-0016 D1)"),
-    ("prove_track.data.js", "Cellrix prove-track data layer (ADR-0016 D1/D6)"),
+    ("prove_track.data.js", "Cellrix prove-track primitives (ADR-0016 D1/D6)"),
+    ("prove_track.render.js", "The trajectory's render tables (Cellrix:ADR-0018 batch 4)"),
+    ("prove_track.node.js", "Node-side consumption for the trajectory (Cellrix:ADR-0018 batch 4)"),
     ("prove_track.view.js", "Cellrix ProveTrack view layer (ADR-0016 D1)"),
     ("prove_track.js", "Cellrix ProveTrack control layer (ADR-0016 D1/D3)"),
 ]
@@ -33,13 +35,24 @@ def check(label, cond, detail=""):
 
 
 print(f"== served page: {page_path} ({len(page)} bytes) ==")
+# A frozen snapshot is a post-JS DOM, so an element whose inline style the app
+# set no longer matches its asset and the burn-in check below reads that as a
+# broken build. That produced two permanent false failures, which is worse than
+# no check: people learn to ignore them. Refuse, and say which file is wanted.
+if "OFFLINE SNAPSHOT" in page:
+    print("ERROR: this is a frozen post-JS snapshot, not the served page.")
+    print("       Burn-in is about what the SERVER returns; the DOM has been")
+    print("       mutated since. Use the .raw.html that snapshot.js writes,")
+    print("       or: curl -s http://127.0.0.1:18932/ -o page.html")
+    raise SystemExit(3)
 check("first bytes are <!DOCTYPE html>", page.startswith("<!DOCTYPE html>"),
       page[:15].replace("\n", "\\n"))
 
 print("-- placeholder residue must be zero --")
 for ph in ["__TOKENS__", "__COMPONENTS__", "__COCKPIT__", "__CHAT__",
            "__PROVE_TRACK__", "__PROVE_TRACK_CSS__", "__PROVE_TRACK_DATA__",
-           "__PROVE_TRACK_VIEW__", "__PROVE_TRACK_CTRL__", "__SCRIPT__",
+           "__PROVE_TRACK_RENDER__", "__PROVE_TRACK_NODE__", "__PROVE_TRACK_VIEW__",
+           "__PROVE_TRACK_CTRL__", "__SCRIPT__",
            "__SESSION__", "__GLEAM__", "__FLOWS__", "__REFRESH__",
            "__TUCK_CONFIGURED__"]:
     check(f"residue {ph} == 0", page.count(ph) == 0, f"count={page.count(ph)}")
@@ -51,6 +64,8 @@ BOUND = {
     "prove_track.css": ("<style>", "</style>"),
     "prove_track.html": ('<div id="s-main">', "</aside>"),
     "prove_track.data.js": ("<script>", "</script>"),
+    "prove_track.render.js": ("<script>", "</script>"),
+    "prove_track.node.js": ("<script>", "</script>"),
     "prove_track.view.js": ("<script>", "</script>"),
     "prove_track.js": ("<script>", "</script>"),
 }

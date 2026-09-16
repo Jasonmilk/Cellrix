@@ -158,22 +158,18 @@ console.log('assembly layer ' + ASM.VERSION + ' (T2)');
     a.coordinates()[0].turn === 't1', a.coordinates()[0].turn);
 }
 
-// ---- the renderer's type table is a subset of the contract's vocabulary
+// ---- the renderer's vocabulary vs the contract's
 //
-// Not derived: a renderer needs `track` and a validator does not, so one table
-// cannot serve both without letting UI concerns dictate the contract. What
-// must hold is that the renderer never names a type the contract does not
-// know — otherwise a render row exists for an event the tape will refuse.
-{
-  // the renderer table lives in prove_track.data.js; it needs CxAssembly, which
-  // is already loaded above
-  eval(fs.readFileSync(path.join(A, 'prove_track.data.js'), 'utf8'));
-  const PT = global.window.CxProveTrack;
-  const EFX = global.window.CxEventFamily;
-  const unknown = Object.keys(PT.TYPES).filter(function (k) { return !EFX.isKnownType(k); });
-  check('renderer types are all known to the contract', unknown.length === 0,
-    JSON.stringify(unknown));
-}
+// This block used to read `PT.TYPES` — a fourth type table, keyed by protocol
+// name, living in prove_track.data.js — and assert it was a subset of the
+// contract's. That table is gone (it was the duplication the type lock exists
+// to end), and with it the thing this assertion was about.
+//
+// The fact it protected has not gone anywhere, and it is asserted in one place:
+// prove_track_nodes_test.js requires the render tables to partition the
+// contract's kinds exactly — drawn plus not-drawn, no kind in both and none in
+// neither. Restating it here would be a second source for one fact, which is
+// how the two come to disagree.
 
 const EFX = global.window.CxEventFamily;
 

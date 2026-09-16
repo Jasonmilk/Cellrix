@@ -18,8 +18,81 @@
   function navButtons() { return document.querySelectorAll('.nav [data-view]'); }
 
   /* Enter hooks are declared by the view assets themselves (Cx.onEnter), so
-   * the shell never names a view it does not own. */
-  var ENTER = {};
+   * the shell never names a view it does not own. Leaving is the mirror of
+   * entering, declared the same way. */
+  var ENTER = {}, LEAVE = {};
+
+  /* ---- the tape ---------------------------------------------------------
+   * ONE tape for the panel (ADR-0018: one tape, many targets). Every view that
+   * shows the same read feeds and reads this one, so two projections cannot
+   * disagree about what happened. The shell owns its lifecycle; a view owns its
+   * rendering.
+   */
+  var TAPE = null, TAPE_JOB = null, TAPE_REGISTERED = false;
+  function tape() {
+    if (!TAPE) { TAPE = window.CxAssembly.create(); }
+    return TAPE;
+  }
+  /* Registration does no work (ADR-0018 D5): the factory is stored, never
+   * called, and the target is built only when its view activates it. */
+  function registerTargets(t) {
+    if (TAPE_REGISTERED) { return; }
+    TAPE_REGISTERED = true;
+    if (window.CxProveTrack && window.CxProveTrack.target) {
+      t.register('prove-track', window.CxProveTrack.target);
+    }
+  }
+
+  /* Merge the chain containing `jobId` — or the newest experience when no
+   * period was chosen — and hand ONE window to the tape. Returns the events,
+   * which are the conversation's projection; the trajectory reads the same
+   * window as nodes.
+   *
+   * L0 — TEMPORARY, same as mergeChain: retire when anaphase provides
+   * session_id. A session is a container the runtime owns; until it exists the
+   * shell reconstructs one from resume_from. `mergeChain` normalises ONCE,
+   * after concatenation: normalising per period would restart gseq at 0 in
+   * every file and refuse all but the first.
+   *
+   * This is the ONLY read of the chain. A second one would be a second source
+   * for the same facts, which is how a trajectory and a conversation come to
+   * tell different stories.
+   */
+  function loadWindow(jobId) {
+    var NORM = window.CxNormalize;
+    return fetch('/api/sessions?limit=500').then(function (r) { return r.json(); })
+      .then(function (d) {
+        var list = (d && d.periods) || [];
+        var start = jobId || (list[0] && list[0].job_id) || null;
+        if (!start) { throw new Error('没有可用的经历'); }
+        var ids = NORM ? NORM.chainJobIds(list, start) : [start];
+        if (!ids.length) { ids = [start]; }
+        return Promise.all(ids.map(function (id) {
+          return fetch('/api/events?job_id=' + encodeURIComponent(id))
+            .then(function (r) { return r.json(); })
+            .then(function (j) { return { id: id, events: (j && j.events) || [] }; });
+        })).then(function (parts) { return { parts: parts, start: start, ordered: ids }; });
+      })
+      .then(function (w) {
+        var byJob = {};
+        w.parts.forEach(function (p) { byJob[p.id] = p.events; });
+        var merged = NORM
+          ? NORM.mergeChain(byJob, w.ordered)
+          : { events: w.ordered.reduce(function (a, id) { return a.concat(byJob[id]); }, []),
+              diagnostics: { ok: true } };
+        if (!merged.diagnostics.ok) {
+          throw new Error('事件流读取异常（' + (merged.diagnostics.reason || 'unknown') + '）—— 不猜测');
+        }
+        var t = tape();
+        t.feed(merged.events);
+        registerTargets(t);
+        TAPE_JOB = w.start;
+        var evs = t.events();
+        t.flush();
+        return { events: evs, jobs: w.ordered };
+      });
+  }
+
   function showView(v) {
     var bs = navButtons(), i, n;
     for (i = 0; i < bs.length; i++) {
@@ -27,6 +100,13 @@
       var el = document.getElementById('view-' + n);
       if (el) el.style.display = (n === v) ? '' : 'none';
       bs[i].className = 'btn' + (n === v ? ' on' : '');
+    }
+    /* A view that is no longer on screen stops being driven — and, for a
+     * target, stops being built at all (ADR-0018 D5). The shell iterates the
+     * hooks it was given, so it still names no view it does not own. */
+    for (var k in LEAVE) {
+      if (!Object.prototype.hasOwnProperty.call(LEAVE, k) || k === v) { continue; }
+      for (i = 0; i < LEAVE[k].length; i++) LEAVE[k][i]();
     }
     var hooks = ENTER[v] || [];
     for (i = 0; i < hooks.length; i++) hooks[i]();
@@ -37,15 +117,20 @@
     esc: esc,
     showView: showView,
     // Explicit continuation (ADR-0026): chatJobId 置位时，下一句续接该经历。
-    // `stream`, when given, is the merged chain (L0) — the trajectory then has
-    // no data source of its own. Without it the trajectory fetches one period,
-    // the legacy path, which still works.
-    selectPeriod: function (jobId, stream) {
-      var meta = window.__proveTrackMeta || null;
-      if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, meta, stream);
+    // No stream parameter: the trajectory reads the tape, and the tape is fed
+    // once by loadWindow. Handing a stream in as well was the second way in —
+    // the reason the two projections could drift apart.
+    selectPeriod: function (jobId) {
+      state.chatJobId = jobId || null;
+      if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, window.__proveTrackMeta || null);
     },
     showToast: showToast,
-    onEnter: function (name, fn) { (ENTER[name] = ENTER[name] || []).push(fn); }
+    onEnter: function (name, fn) { (ENTER[name] = ENTER[name] || []).push(fn); },
+    onLeave: function (name, fn) { (LEAVE[name] = LEAVE[name] || []).push(fn); },
+    /* The tape and its read, for a view that projects from it. */
+    tape: tape,
+    tapeJob: function () { return TAPE_JOB; },
+    loadWindow: loadWindow
   };
 
   // One centered toast for system-level errors — never a Helix speech bubble

@@ -136,6 +136,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const withStub = serialised.replace(/<head([^>]*)>/i, (m, attrs) => "<head" + attrs + ">\n" + stub)
     + banner + boot;
   fs.writeFileSync(OUT, withStub, "utf8");
+  /* Also keep the page EXACTLY as served, before any script ran. The frozen
+   * file above is a post-JS DOM (serialised after a period was driven), so it
+   * is not the artifact to check burn-in against — an element whose inline
+   * style the app set differs from the asset, and verify_live reads that as a
+   * broken burn-in. Two outputs, two questions, no ambiguity about which is
+   * which. */
+  fs.writeFileSync(OUT.replace(/\.html$/, '') + ".raw.html", html, "utf8");
   console.log("  captured keys: " + Object.keys(captured).join(", "));
   console.log("  wrote " + OUT + " (" + withStub.length + " chars)");
   if (errors.length) console.log("  captured errors: " + errors.slice(0, 3).join(" | "));

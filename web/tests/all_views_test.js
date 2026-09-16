@@ -123,6 +123,86 @@ function skip(label, why) {
       errors.slice(before, before + 2).join(" | "));
   }
 
+  /* ---- the trajectory opened ON ITS OWN ---------------------------------
+   *
+   * The criterion: opening the trajectory without going through the
+   * conversation shows the WHOLE chain, not one period. The expected number is
+   * recomputed by this test from the API — the app's own count would agree with
+   * itself, which is the shape of every false green this project has found.
+   */
+  console.log("-- prove-track: opened on its own, with no period chosen --");
+  {
+    /* The chain logic, run here rather than asked for: the same public
+     * functions the panel uses, on the same API, in this process. */
+    let expect = null;
+    try {
+      const prevWindow = global.window;
+      global.window = {};
+      for (const f of ["event_family.js", "period_normalize.js", "node_shape.js",
+                       "assembly.js", "prove_track.data.js", "prove_track.render.js",
+                       "prove_track.node.js"]) {
+        const src = require("fs").readFileSync(require("path").join(__dirname, "..", "assets", f), "utf8");
+        (0, eval)(src);
+      }
+      const EFX = global.window.CxEventFamily, NORMX = global.window.CxNormalize;
+      const RX = global.window.CxProveTrack.render;
+      const list = ((await (await fetch(BASE + "/api/sessions?limit=500")).json()).periods) || [];
+      const start = list[0] && list[0].job_id;
+      const ids = start ? NORMX.chainJobIds(list, start) : [];
+      const byJob = {};
+      for (const id of ids) {
+        const j = await (await fetch(BASE + "/api/events?job_id=" + encodeURIComponent(id))).json();
+        byJob[id] = (j && j.events) || [];
+      }
+      const merged = NORMX.mergeChain(byJob, ids);
+      const drawn = merged.events.filter((e) => {
+        const k = EFX.KIND_OF[e.type];
+        return !!k && !!RX.SUMMARY[k];
+      }).length;
+      expect = { periods: ids.length, drawn: drawn, rows: drawn + ids.length,
+                 metering: merged.events.filter((e) => EFX.KIND_OF[e.type] === "metering").length };
+      global.window = prevWindow;
+    } catch (e) {
+      check("the expected chain could be recomputed independently", false, e.message);
+    }
+
+    /* The rows arrive when the tape publishes; wait rather than assume. */
+    const rowsNow = () => doc.querySelectorAll("#eTbody tr.ev[data-e-ev]").length;
+    const headsNow = () => doc.querySelectorAll("#eTbody [data-e-turntoggle]").length;
+    for (let i = 0; i < 20 && !rowsNow(); i++) { await sleep(250); }
+
+    if (!expect || !expect.periods) {
+      skip("the trajectory opened on its own", "this panel has no period to chain");
+    } else {
+      console.log("     expected: " + expect.rows + " rows (" + expect.drawn +
+        " drawn + " + expect.periods + " turn headers), " + expect.metering + " metering events not drawn");
+      check("opening the trajectory alone shows the whole chain",
+        rowsNow() + headsNow() === expect.rows,
+        rowsNow() + " rows + " + headsNow() + " headers vs " + expect.rows);
+      check("every period of the chain has a turn header",
+        headsNow() === expect.periods,
+        headsNow() + " vs " + expect.periods);
+
+      const headText = Array.from(doc.querySelectorAll("#eTbody [data-e-turntoggle]"))
+        .map((b) => b.textContent).join(" | ");
+      check("a turn header names the period it came from",
+        headText.includes(expect.periods > 1 ? expect.periods.toString() : "") &&
+          /run-[0-9a-f]{8,}/.test(headText),
+        headText.slice(0, 100));
+
+      const chips = Array.from(doc.querySelectorAll("#eTbody span.e-ty")).map((s) => s.textContent);
+      check("metering is not drawn as a row", !chips.includes("USAGE"),
+        JSON.stringify(Array.from(new Set(chips))));
+
+      /* 导出的可追溯性: every row can be traced back to a line of a file. */
+      const ids2 = Array.from(doc.querySelectorAll("#eTbody tr.ev[data-e-ev]"))
+        .map((r) => r.getAttribute("data-e-ev"));
+      check("every row is traceable to a source file and line",
+        ids2.length > 0 && ids2.every((v) => /^run-[0-9a-f]+#\d+$/.test(v)),
+        JSON.stringify(ids2.slice(0, 2)));
+    }
+  }
+
   console.log("-- prove-track: drive the real period-row path --");
   const items = Array.from(doc.querySelectorAll("#s-side .ses-item"));
   if (items.length && JOB) {

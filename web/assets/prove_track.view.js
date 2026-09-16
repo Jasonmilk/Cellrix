@@ -6,8 +6,29 @@
 (function () {
   'use strict';
   var PT = window.CxProveTrack = window.CxProveTrack || {};
-  var $ = PT.$, esc = PT.esc, STATUS = PT.STATUS,
-      fmtDur = PT.fmtDur, fmtTok = PT.fmtTok, resultIsTerm = PT.resultIsTerm;
+  var D = PT.data, R = PT.render, EF = window.CxEventFamily,
+      $ = D.$, esc = D.esc, STATUS = D.STATUS, fmtDur = D.fmtDur, fmtTok = D.fmtTok;
+  if (!EF || !R) { throw new Error('prove_track.view.js requires event_family.js + prove_track.render.js'); }
+
+  /* The classes this layer draws differently, taken from the contract's kind
+   * table: a class name is a type fact and has exactly one source. */
+  var TOOL_CLS = EF.KIND_CLASS.tool, REPLY_CLS = EF.KIND_CLASS.reply,
+      THINK_CLS = EF.KIND_CLASS.reasoning, ATTEMPT_CLS = EF.KIND_CLASS.plan;
+
+  /* The lanes this view draws, read off the render table rather than retyped.
+   * Each lane's element id is derived from its name; a lane with no element is
+   * skipped here and caught by the DOM contract test instead of by a crash. */
+  var LANES = (function () {
+    var seen = {}, out = [];
+    Object.keys(R.LANE_OF).forEach(function (k) {
+      var l = R.LANE_OF[k];
+      if (!seen[l]) { seen[l] = true; out.push(l); }
+    });
+    return out;
+  })();
+  function laneEl(lane) {
+    return $('eLane' + lane.charAt(0).toUpperCase() + lane.slice(1));
+  }
 
   /* ---------- State ---------- */
   var S = {
@@ -44,9 +65,9 @@
   function renderStats() {
     var evs = S.session.filter(function (e) { return e.kind === 'ev'; });
     var turns = S.session.filter(function (e) { return e.kind === 'turn'; }).length;
-    var calls = evs.filter(function (e) { return e.type === 'TOOL' && e.status === 'pending'; }).length;
-    var llm = evs.reduce(function (a, e) { return a + ((e.type === 'THINK' || e.type === 'ATTEMPT') ? e.dur : 0); }, 0);
-    var toolT = evs.reduce(function (a, e) { return a + (e.type === 'TOOL' ? e.dur : 0); }, 0);
+    var calls = evs.filter(function (e) { return e.cls === TOOL_CLS && e.status === 'pending'; }).length;
+    var llm = evs.reduce(function (a, e) { return a + ((e.cls === THINK_CLS || e.cls === ATTEMPT_CLS) ? e.dur : 0); }, 0);
+    var toolT = evs.reduce(function (a, e) { return a + (e.cls === TOOL_CLS ? e.dur : 0); }, 0);
     // The metering cells read the derived result of derivePeriodUsage
     // (computed by the control layer at load time). No data means em dash —
     // never an estimate (ADR-0038 D11).
@@ -80,18 +101,18 @@
         continue;
       }
       if (!S.openTurns[it.turn]) continue;
-      if (it.type === 'TOOL' && !S.callsOpen) continue;
+      if (it.cls === TOOL_CLS && !S.callsOpen) continue;
 
       var st = STATUS[it.status] || STATUS.done;
       var isSel = (S.sel === it.id);
       var isRunning = (S.replayIdx >= 0 && i === S.replayIdx);
-      var cls = 'ev' + (isRunning ? ' e-running' : '') + (it.type === 'REPLY' ? ' e-reply' : '');
-      var isHit = S.q && (it.summary + ' ' + (it.tool || '') + ' ' + it.type).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
-      h += '<tr class="' + cls + (isHit ? ' e-row-hit' : '') + '" data-e-ev="' + it.id + '" tabindex="0"' +
+      var rowCls = 'ev' + (isRunning ? ' e-running' : '') + (it.cls === REPLY_CLS ? ' e-reply' : '');
+      var isHit = S.q && (it.summary + ' ' + (it.tool || '') + ' ' + it.cls).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
+      h += '<tr class="' + rowCls + (isHit ? ' e-row-hit' : '') + '" data-e-ev="' + it.id + '" tabindex="0"' +
         (isSel ? ' aria-current="true"' : '') + '>' +
-        '<td><span class="e-ty ' + it.type + '">' + it.type + '</span></td>' +
-        '<td class="e-summ"' + (it.type === 'REPLY' && it.payload ? ' title="' + esc(String(it.payload).slice(0, 300)) + '"' : '') + '>' +
-        (it.type === 'REPLY' && it.full
+        '<td><span class="e-ty ' + it.cls + '">' + it.cls + '</span></td>' +
+        '<td class="e-summ"' + (it.cls === REPLY_CLS && it.payload ? ' title="' + esc(String(it.payload).slice(0, 300)) + '"' : '') + '>' +
+        (it.cls === REPLY_CLS && it.full
           ? '<span class="e-short">' + hl(it.summary) + '</span><span class="e-full">' + esc(it.full) + '</span>'
           : hl(it.summary)) +
         (it.repeat ? '<span class="e-rep">stuck ×' + it.repeat + '</span>' : '') + '</td>' +
@@ -105,7 +126,8 @@
 
   /* ---------- Three lanes: one shared ruler ---------- */
   function renderLanes() {
-    var lanes = { input: [], model: [], tool: [] }, evs = [];
+    var lanes = {}, evs = [];
+    LANES.forEach(function (k) { lanes[k] = []; });
     S.session.forEach(function (e) { if (e.kind === 'ev') evs.push(e); });
     var maxDur = 0, maxTok = 0;
     evs.forEach(function (e) { if (e.dur > maxDur) maxDur = e.dur; if (e.tok > maxTok) maxTok = e.tok; });
@@ -131,22 +153,23 @@
       var wPct = (raw[idx] / sum * 100).toFixed(4) + '%';
       var hit = S.q && (e.summary + ' ' + (e.tool || '')).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
       var isSel = (S.sel === e.id);
-      ['input', 'model', 'tool'].forEach(function (k) {
-        if (e.track === k) {
-          var cls = 'e-blk ' + e.track + (e.status === 'fail' ? ' fail' : '') +
+      LANES.forEach(function (k) {
+        if (e.lane === k) {
+          var blkCls = 'e-blk ' + e.lane + (e.status === 'fail' ? ' fail' : '') +
             (e.status === 'pending' ? ' wait' : '') + (isSel ? ' sel' : '') +
             (S.q && !hit ? ' dim' : '');
-          lanes[k].push('<div class="' + cls + '" data-e-ev="' + e.id + '" aria-hidden="true" ' +
-            'title="step ' + (idx + 1) + ' · ' + esc(e.type + ' · ' + e.summary) + '" ' +
+          lanes[k].push('<div class="' + blkCls + '" data-e-ev="' + e.id + '" aria-hidden="true" ' +
+            'title="step ' + (idx + 1) + ' · ' + esc(e.cls + ' · ' + e.summary) + '" ' +
             'style="flex:0 0 ' + wPct + '"></div>');
         } else {
           lanes[k].push('<div class="e-blk e-blk-empty" aria-hidden="true" style="flex:0 0 ' + wPct + '"></div>');
         }
       });
     });
-    $('eLaneInput').innerHTML = lanes.input.join('');
-    $('eLaneModel').innerHTML = lanes.model.join('');
-    $('eLaneTool').innerHTML = lanes.tool.join('');
+    LANES.forEach(function (k) {
+      var el = laneEl(k);
+      if (el) { el.innerHTML = lanes[k].join(''); }
+    });
     $('eOvNote').textContent = S.durMode === 'actual'
       ? 'actual time: see which is slowest (widest = longest)' : 'equal width: see what happened (duration ignored)';
   }
@@ -210,27 +233,33 @@
     var pct = total ? ((ev.dur / total) * 100).toFixed(1) : '0';
     var turnIdx = S.turnIndex[ev.turn] || '?';
 
-    $('eInspT').textContent = (ev.tool ? ev.tool + ' · ' : '') + ev.type;
+    $('eInspT').textContent = (ev.tool ? ev.tool + ' · ' : '') + ev.cls;
     $('eInspS').innerHTML = hl(ev.summary);
-    var resultHtml = resultIsTerm(ev)
-      ? '<div class="e-tpre"><pre class="e-term">' + esc(ev.result) + '</pre>' +
+    var resultHtml = ev.term
+      ? '<div class="e-tpre"><pre class="e-term">' + esc(ev.detail) + '</pre>' +
         '<i class="e-eg l" aria-hidden="true"></i><i class="e-eg r" aria-hidden="true"></i></div>'
-      : '<pre>' + esc(ev.result) + '</pre>';
+      : '<pre>' + esc(ev.detail) + '</pre>';
     $('eInspB').innerHTML =
       '<div class="e-sec"><h4>Summary</h4><dl class="e-kv">' +
-      '<dt>Type</dt><dd>' + ev.type + '</dd>' +
+      '<dt>Type</dt><dd>' + ev.cls + '</dd>' +
       (ev.tool ? '<dt>Tool</dt><dd><code>' + esc(ev.tool) + '</code></dd>' : '') +
       '<dt>Status</dt><dd><span class="e-st ' + st.c + '"><span class="d"></span>' + st.t + '</span></dd>' +
       '<dt>Turn</dt><dd>' + turnIdx + '</dd>' +
+      '<dt>Reference</dt><dd><code>' + esc(ev.id) + '</code></dd>' +
       (ev.repeat ? '<dt>Stuck streak</dt><dd style="color:var(--e-warn);font-weight:700">' + ev.repeat + ' consecutive identical calls</dd>' : '') +
       '</dl></div>' +
       '<div class="e-sec"><h4>Payload</h4><pre>' + esc(ev.payload || '—') + '</pre></div>' +
       '<div class="e-sec"><h4>Result</h4>' + resultHtml + '</div>' +
-      '<div class="e-sec"><h4>Schema</h4><pre>' + esc(ev.schema || '—') + '</pre></div>' +
+      '<div class="e-sec"><h4>Schema</h4><dl class="e-kv">' +
+      '<dt>Kind</dt><dd>' + esc(ev.kindNote || '—') + '</dd>' +
+      '<dt>Fields</dt><dd><code>' + esc((ev.fields || []).join(', ') || '—') + '</code></dd>' +
+      '</dl></div>' +
       '<div class="e-sec"><h4>Timing</h4><dl class="e-kv">' +
       '<dt>Duration</dt><dd>' + fmtDur(ev.dur) + '</dd>' +
       '<dt>Share</dt><dd>' + pct + '%</dd>' +
       '<dt>Tokens</dt><dd>' + fmtTok(ev.tok) + '</dd>' +
+      '<dt>Position</dt><dd>' + ev.ord + '</dd>' +
+      '<dt>Time</dt><dd>' + esc(ev.ts || '—') + '</dd>' +
       '</dl></div>';
     applyModality();
     $('eInsp').classList.add('on');

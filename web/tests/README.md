@@ -15,13 +15,13 @@ the assembled page served by a running panel.
 
 | Script | Proves | Needs the stack |
 |---|---|---|
-| `verify_live.py <snapshot> <assets-dir>` | The served page is the current assets, byte for byte: first byte is `<!DOCTYPE html>`, zero placeholder residue, tags balanced, anchor counts, load order strictly increasing, and each asset appears **verbatim** inside its section | no |
+| `verify_live.py <served page> <assets-dir>` | The served page is the current assets, byte for byte: first byte is `<!DOCTYPE html>`, zero placeholder residue, tags balanced, anchor counts, load order strictly increasing, and each asset appears **verbatim** inside its section. **Takes the raw page, not the frozen snapshot** — a frozen file is a post-JS DOM, and an inline style the app set reads as a broken build. It refuses one rather than reporting two permanent failures | no |
 | `coupling_audit.py <snapshot> <assets-dir>` | Derived coupling invariants: every `dataset.X` **read** is supplied by some `data-*` attribute or a runtime assignment; placeholder scan is non-vacuous (`checked >= 16`) | no |
 | `all_views_test.js <base_url> <job_id>` | Real render through a real user path (click a session → switch view → pick a period), then asserts the inspector opens, the turn collapses, and inspector field names are ASCII-only | yes |
 | `chat_model_test.js <base_url>` | The live chat names the LLM that served the turn. The SSE transport is stubbed, so this asserts **our** contract, not a vendor's availability. Tests both directions: value present → shown, absent → honestly omitted | yes |
 | `render_test.js <base_url>` | Full-view render smoke test | yes |
-| `pt_replay.js` | ProveTrack `data.js` pure-function replay (no DOM, no state) | no |
-| `snapshot.js <base_url>` | Freezes a live page plus its API responses into one self-contained HTML file | yes |
+| `pt_replay.js [events.jsonl]` | The trajectory's Node layer against real event files: the metering aggregate cross-checked against the raw file's own fields, malformed rows refused, and the panes (tool outcome, criterion verdict, gate label) rendered. Picks its fixture by what each block needs | no |
+| `snapshot.js <base_url> [job] [out.html]` | Freezes a live page plus its API responses into one self-contained HTML file, **and** writes `<out>.raw.html` — the page exactly as served, which is what `verify_live.py` wants | yes |
 | `snapshot_selftest.js <file>` | The snapshot is actually self-contained | no |
 | `probe_bug.js` | Minimal reproduction of a reported defect | no |
 | `start-panel.sh [port]` / `--stop` | Brings the six-component stack up in dependency order and stops it by PID | — |
@@ -31,7 +31,7 @@ the assembled page served by a running panel.
 
 ```bash
 # Non-live checks — no services needed.
-python3 web/tests/verify_live.py <snapshot.html> web/assets
+python3 web/tests/verify_live.py <served page> web/assets   # e.g. snapshot.html.raw.html
 
 # Live checks — bring the stack up first, then point at it.
 ./web/tests/start-panel.sh          # tuck -> tentacle -> mind -> flowmodus -> anaphase -> panel

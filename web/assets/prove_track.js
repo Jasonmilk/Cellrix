@@ -1,18 +1,28 @@
 /* ============================================================
   Cellrix ProveTrack control layer (ADR-0016 D1/D3) — entry point
   Event binding / ripple feedback / public interface __proveTrackLoad|Clear
-  Hard load-order constraint: this file must come after data / view and before script.html (D3).
-  The public interface names are unchanged, so the call sites in script.html and main.rs need no edit.
+  Hard load-order constraint: this file must come after data / render / node /
+  view and before script.html (D3).
+  The public interface names are unchanged, so the call sites in script.html and
+  main.rs need no edit.
+
+  The trajectory has NO data source of its own. It is a target of the tape: the
+  shell feeds one window (ADR-0018: one tape, many targets) and this file reads
+  `nodes` off the snapshot. A second way in — fetching a period here — was the
+  thing that made the trajectory a different story from the conversation.
   ============================================================ */
 (function () {
   'use strict';
   var PT = window.CxProveTrack || {};
-  var $ = PT.$, esc = PT.esc, S = PT.S, HAS = PT.HAS,
-      buildSession = PT.buildSession, computeRepeats = PT.computeRepeats,
-      derivePeriodUsage = PT.derivePeriodUsage,
+  var D = PT.data, N = PT.node,
+      $ = D.$, esc = D.esc, S = PT.S, HAS = PT.HAS,
+      buildSession = N.buildSession, computeRepeats = N.computeRepeats,
+      derivePeriodUsage = N.derivePeriodUsage,
       renderStats = PT.renderStats, renderTable = PT.renderTable, renderLanes = PT.renderLanes,
       openInsp = PT.openInsp, closeInsp = PT.closeInsp, isModal = PT.isModal,
       applyModality = PT.applyModality, stopReplay = PT.stopReplay, startReplay = PT.startReplay;
+
+  var TARGET = 'prove-track';
 
   /* ---------- Event binding ---------- */
   /* dataset key mapping: data-e-ev -> eEv, data-e-turntoggle -> eTurntoggle
@@ -102,6 +112,34 @@
     s.addEventListener('animationend', function () { s.remove(); });
   });
 
+  /* ---------- Consumption: the snapshot's nodes -> SESSION ---------- */
+  function consume(nodes) {
+    S.session = buildSession(nodes);
+    S.usage = derivePeriodUsage(nodes);
+    S.turnIds = [];
+    S.turnIndex = {};
+    S.session.forEach(function (e) {
+      if (e.kind === 'turn') { S.turnIds.push(e.id); S.turnIndex[e.id] = S.turnIds.length - 1; }
+    });
+    S.turnIds.forEach(function (id) { S.openTurns[id] = true; });
+    /* A re-render invalidates the selection; it does NOT clear the search box.
+     * A target is re-pushed whenever its view reopens, and silently discarding
+     * what the user typed would be the tape's business reaching into theirs. */
+    S.sel = null;
+    computeRepeats(S.session);
+    renderTable(); renderLanes(); syncTurnBtn(); renderStats(); applyModality();
+  }
+
+  function onSnapshot(snap) {
+    if (!snap || !snap.nodes) { return; }
+    consume(snap.nodes);
+  }
+
+  /* The factory the shell registers. Registering does no work; the instance is
+   * built on activation and dropped on deactivation, so a closed trajectory
+   * costs nothing (ADR-0018 D5). */
+  PT.target = function () { return { name: TARGET, onSnapshot: onSnapshot }; };
+
   /* ---------- Public interface (called by main.rs selectPeriod) ---------- */
   window.__proveTrackClear = function () {
     stopReplay();
@@ -114,46 +152,74 @@
     $('eStats').innerHTML = '';
     renderLanes();
   };
-  /* Turn a flat event array into the trajectory's state and paint it. Split out
-   * because there are now two ways in: a stream handed to us (L0, the merged
-   * chain) or our own fetch (legacy, one period). */
-  function consume(events) {
-    S.session = buildSession(events, S.meta);
-    S.usage = derivePeriodUsage(events);
-    S.turnIds = [];
-    S.session.forEach(function (e) { if (e.kind === 'turn') { S.turnIds.push(e.id); S.turnIndex[e.id] = S.turnIds.length - 1; } });
-    S.turnIds.forEach(function (id) { S.openTurns[id] = true; });
-    S.sel = null; S.q = ''; $('eQ').value = '';
-    computeRepeats(S.session);
-    renderTable(); renderLanes(); syncTurnBtn(); renderStats(); applyModality();
-  }
-
-
-  window.__proveTrackLoad = function (jobId, meta, stream) {
+  /* Prepare the trajectory for a period. The data arrives through the tape —
+   * the shell owns it — so this only clears state and states honestly that a
+   * window is being fetched. Without the tape there is no trajectory to show,
+   * and saying so beats showing an empty one. */
+  window.__proveTrackLoad = function (jobId, meta) {
     stopReplay();
     if (S.sel) closeInsp();
     S.meta = meta || null;
+    /* A new window is a new view: the filter and the selection from the last one
+     * do not belong to it. */
+    S.q = ''; $('eQ').value = ''; S.sel = null;
+    if (!jobId) return;
     $('eEmpty').style.display = 'none';
     $('eTraj').style.display = '';
-    $('eTbody').innerHTML = '<tr class="e-turn-hd"><td colspan="5" style="color:var(--e-dim)">Loading ' + esc(jobId) + '…</td></tr>';
-    /* L0: `stream` is the merged chain, already normalised once upstream. The
-     * trajectory then has no data source of its own — it is another projection
-     * of the same tape, which is what gives it continuity across periods. */
-    if (stream && stream.length) { consume(stream); return; }
-    fetch('/api/events?job_id=' + encodeURIComponent(jobId)).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.missing || !j.events || !j.events.length) {
-        $('eTraj').style.display = 'none';
-        $('eEmpty').style.display = '';
-        $('eEmpty').textContent = 'no event stream for this period (' + jobId + ') — see the audit JSON chain below';
-        return;
-      }
-      consume(j.events);
+    $('eTbody').innerHTML = '<tr class="e-turn-hd"><td colspan="5" style="color:var(--e-dim)">Loading ' +
+      esc(jobId) + '…</td></tr>';
+  };
+
+  /* ---------- The view's own lifecycle hook -------------------------------
+   * The shell never names a view it does not own, so this view declares when it
+   * wants to be driven. Registered on DOMContentLoaded because this asset loads
+   * BEFORE the shell that provides Cx.onEnter.
+   *
+   * Opening the trajectory by itself has to produce a window too. "Independent
+   * open" must not be a second, empty code path: the enter hook asks the shell
+   * for the same read every other projection gets.
+   */
+  function shell() { return window.Cx && window.Cx.tape && window.Cx.loadWindow; }
+
+  function onEnter() {
+    if (!shell()) { return; }
+    var Cx = window.Cx;
+    var want = Cx.state.chatJobId || null;
+    var t = Cx.tape();
+    /* The window on the tape is reused when it is the one we were asked for;
+     * otherwise a read is needed. An empty tape is never "reused" — that is how
+     * an empty trajectory would look identical to a loaded one. */
+    var holds = t.watermark() !== null && (want === null || Cx.tapeJob() === want);
+    if (holds) { t.activate(TARGET); t.flush(); return; }
+    window.__proveTrackLoad(want, window.__proveTrackMeta || null);
+    Cx.loadWindow(want).then(function () {
+      t.activate(TARGET);
+      t.flush();
     }).catch(function (e) {
       $('eTraj').style.display = 'none';
       $('eEmpty').style.display = '';
       $('eEmpty').textContent = 'Load failed: ' + e.message;
     });
-  };
+  }
+
+  function onLeave() {
+    if (!shell() || !window.CxAssembly) { return; }
+    /* Not active means not built (ADR-0018 D5): a closed trajectory costs
+     * nothing, and cannot be a hidden element that quietly keeps rendering. */
+    window.Cx.tape().deactivate(TARGET);
+  }
+
+  function bindLifecycle() {
+    window.Cx.onEnter(TARGET, onEnter);
+    window.Cx.onLeave(TARGET, onLeave);
+  }
+  if (!window.CxAssembly) {
+    /* Nothing to project from: leave the view in its honest empty state. */
+  } else if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindLifecycle);
+  } else {
+    bindLifecycle();
+  }
 
   PT.syncTurnBtn = syncTurnBtn;
 })();
