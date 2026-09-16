@@ -78,6 +78,12 @@
         if (Object.prototype.hasOwnProperty.call(r, k)) e[k] = r[k];
       }
       mark(e, 'gseq', i);
+      /* lineNo is the position inside the stream this call received. Called on
+       * one period that IS the file line number; mergeChain overwrites it with
+       * the real one after concatenation. Identity needs it: gseq is the merged
+       * position and changes with the starting point, while seq restarts every
+       * turn, so neither can serve as identity on its own. */
+      mark(e, 'lineNo', i);
       mark(e, 'turn', turn || 1);
       out.push(e);
     }

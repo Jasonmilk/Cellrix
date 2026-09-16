@@ -117,27 +117,31 @@
     var out = [];
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
-      /* Prefer the turn derived at the read boundary. Counting turn/start here
-       * as well would be a second derivation of one fact — the shape this ADR
-       * exists to remove. The count stays only for a caller handing raw events
-       * straight in. */
+      /* turn is display grouping, derived at the read boundary when present. */
       var turn = (typeof e.turn === 'number')
         ? e.turn
         : countsUpTo(events, i, EF.TYPES.TURN_START);
+      var interp = EF.interpret(e.type, e.data);
+
+      /* Identity anchors INSIDE the source file; `ord` is the position in this
+       * stream. Welding them together (jobId#gseq) made one event read
+       * differently depending on where the read began — the determinism
+       * violation. `sourceJob`/`lineNo` survive the merge; gseq does not.
+       *
+       * CAVEAT (a period can be rewritten in place): re-sending the same input
+       * derives the same job id and TRUNCATES the file, so `B#3` can come to
+       * mean a different event. Identity is therefore valid WITHIN one read of
+       * one digest — when the digest changes, rebuild rather than patch by id. */
+      var src = e.sourceJob || jobId;
+      var line = (typeof e.lineNo === 'number') ? e.lineNo : e.seq;
       out.push({
-        seq: e.seq,
-        type: e.type,
+        kind: interp ? interp.kind : null,
+        payload: interp ? interp.payload : null,
+        node: src + '#' + line,
+        ord: i,
+        lineNo: line,
         turn: 't' + turn,
-        /* jobId#gseq. `gseq` is stable across chunking and back-fill, so
-         * this id does not move when an earlier page arrives.
-         *
-         * CAVEAT (a period can be rewritten in place): re-sending the same
-         * input derives the same job id and TRUNCATES the period file, so
-         * `jobId#3` can come to mean a different event. A keyed renderer
-         * would then reuse the old node and show stale content. Therefore a
-         * node id is only valid WITHIN one digest — when the digest changes,
-         * rebuild the whole segment rather than patching by id. */
-        node: jobId + '#' + posOf(e)
+        ts: e.time || null
       });
     }
     return out;

@@ -339,5 +339,67 @@ const EFX = global.window.CxEventFamily;
   check('deactivation stops the driving', a.activeTargets().length === 0);
 }
 
+// ---- the type lock, as an assertion rather than a sentence
+//
+// Re-reading the protocol needs two things: a name to branch on, and raw fields
+// to interpret. Remove both and re-interpretation is not forbidden, it has no
+// material. Every one-sentence rule today was broken anyway, so it is checked.
+{
+  const a = ASM.create();
+  const norm = NORM.normalize([
+    { type: 'turn/start', seq: 0, time: 't', data: {} },
+    { type: 'user/message', seq: 1, time: 't', data: { text: 'hi' } },
+    { type: 'tool/call', seq: 2, time: 't', data: { tool: 'x', index: 0, expect: 's' } }
+  ], { job_id: 'j1' });
+  a.feed(norm.events);
+  const nodes = a.coordinates({ job_id: 'j1' });
+  check('a node carries no protocol type', nodes.every(function (n) { return n.type === undefined; }));
+  check('a node carries no raw data', nodes.every(function (n) { return n.data === undefined; }));
+  check('a node carries a semantic kind',
+    nodes.every(function (n) { return typeof n.kind === 'string' && n.kind.length > 0; }),
+    JSON.stringify(nodes.map(function (n) { return n.kind; })));
+  check('a node carries an interpreted payload',
+    nodes.every(function (n) { return n.payload && typeof n.payload === 'object'; }));
+  check('identity and stream position are separate fields',
+    nodes.length === 3 && nodes[2].ord === 2 && nodes[2].node !== String(nodes[2].ord));
+}
+
+// ---- identity survives a different starting point
+//
+// The promise identity/ord separation makes: the same event gets the same id no
+// matter where the read began. Before, node = jobId#gseq, so one row read B#10
+// from the root and B#0 from a middle slice.
+//
+// The realistic middle read is mergeChain with a shorter chain, not
+// normalize() on a slice: normalize receives ONE stream and its lineNo is that
+// stream's index, while mergeChain knows each row's position inside its own
+// file. Only the latter is the scenario that occurs.
+{
+  const p1 = [
+    { type: 'turn/start', seq: 0, time: 't1', data: {} },
+    { type: 'user/message', seq: 1, time: 't1', data: { text: 'a' } }
+  ];
+  const p2 = [
+    { type: 'turn/start', seq: 0, time: 't2', data: {} },
+    { type: 'user/message', seq: 1, time: 't2', data: { text: 'b' } }
+  ];
+  const byJob = { j1: p1, j2: p2 };
+
+  const both = ASM.create(); both.feed(NORM.mergeChain(byJob, ['j1', 'j2']).events);
+  const bothIds = both.coordinates({ job_id: 'j1' }).map(function (n) { return n.node; });
+
+  const later = ASM.create(); later.feed(NORM.mergeChain(byJob, ['j2']).events);
+  const laterIds = later.coordinates({ job_id: 'j1' }).map(function (n) { return n.node; });
+
+  check('the same event yields the same id from a different starting point',
+    JSON.stringify(laterIds) === JSON.stringify(bothIds.slice(2)),
+    JSON.stringify(laterIds) + ' vs ' + JSON.stringify(bothIds.slice(2)));
+  check('identity names its source file, not the merged position',
+    bothIds[2] === 'j2#0' && bothIds[0] === 'j1#0', JSON.stringify(bothIds));
+  check('and ord still differs, because it is a stream position',
+    later.coordinates({ job_id: 'j1' })[0].ord === 0 &&
+    both.coordinates({ job_id: 'j1' })[2].ord === 2);
+}
+
 console.log(failures === 0 ? '\nOK — all passed' : '\nFAILED: ' + failures);
 process.exit(failures === 0 ? 0 : 1);
