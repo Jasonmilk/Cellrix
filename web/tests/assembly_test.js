@@ -331,13 +331,22 @@ const EFX = global.window.CxEventFamily;
 // ---- the target registry does no work at registration (D5)
 {
   const a = ASM.create();
-  a.register('prove_track');
+  var built = 0;
+  a.register('prove_track', function () { built++; return { name: 'prove_track' }; });
   check('registered target is not active', a.activeTargets().length === 0);
+  check('registration does not build the target', built === 0, String(built));
   a.activate('prove_track');
+  check('activation is the construction point', built === 1, String(built));
   check('activated target is active',
     JSON.stringify(a.activeTargets()) === '["prove_track"]');
   a.deactivate('prove_track');
   check('deactivation stops the driving', a.activeTargets().length === 0);
+  /* The lock, stated as an assertion: an inactive target is not built. A second
+   * activation builds a fresh instance, which is the only way to get one. */
+  var second = a.activate('prove_track');
+  check('re-activation builds a fresh instance (nothing was retained)',
+    built === 2 && second && second.name === 'prove_track', String(built));
+  a.deactivate('prove_track');
 }
 
 // ---- the type lock, as an assertion rather than a sentence

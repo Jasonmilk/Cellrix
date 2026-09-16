@@ -238,22 +238,41 @@
       /* D5: registering does no work. A target is driven only after it is
        * activated, and stops being driven when deactivated — creating a
        * source must not cost anything. */
-      register: function (name) {
-        if (!Object.prototype.hasOwnProperty.call(targets, name)) {
-          targets[name] = { name: name, active: false };
-        }
-        return targets[name];
+      /* Register a target by name and factory. This does NO work: the factory
+       * is stored, never called (按需加载). */
+      register: function (name, factory) {
+        targets[name] = { name: name, factory: factory || null, active: false, instance: null };
+        /* The instance is deliberately not returned. Handing it out here would
+         * be a second way to hold a target, and a second way is how the one
+         * fact becomes N. */
+        return { name: name, active: false };
       },
+
+      /* The ONE construction point (按需驱动).
+       *
+       * A target exists only after it is activated. There is no other call that
+       * invokes the factory, so a target cannot acquire a life of its own
+       * outside the tape's control — which is what makes the deactivation in
+       * batch 7 a real lock rather than a curtain. */
       activate: function (name) {
-        if (!Object.prototype.hasOwnProperty.call(targets, name)) {
+        var t = targets[name];
+        if (!t) {
           throw new Error('unknown target: ' + name);
         }
-        targets[name].active = true;
-        return targets[name];
+        if (!t.instance && typeof t.factory === 'function') {
+          t.instance = t.factory();
+        }
+        t.active = true;
+        return t.instance;
       },
+
+      /* Not active means not built. Dropping the instance is the difference
+       * between a lock and a hidden element. */
       deactivate: function (name) {
-        if (Object.prototype.hasOwnProperty.call(targets, name)) {
-          targets[name].active = false;
+        var t = targets[name];
+        if (t) {
+          t.active = false;
+          t.instance = null;
         }
       },
       activeTargets: function () {
