@@ -12,6 +12,25 @@
 const { execFileSync } = require('child_process');
 const path = require('path');
 
+/* ── 铁律：校验器不得把 [ENG] 阈值写成硬断言 ────────────────────────────────
+ *
+ * 来源：`Cellrix:ADR-0022` §2.5（工具纪律）。硬度分级见该 ADR §2.4。
+ *
+ * 理由：**机器把陶土固化成钻石，比手写冒充更隐蔽。** 一条断言「视图数 = 4」「列表 ≤ N
+ * 条」的测试，会把一个工程约定变成**看起来有测试保护的事实**，后来者不敢改它。
+ *
+ * 判据：
+ *   ✗ 禁止 —— assert(views.length === 4)          工程约定被当成事实
+ *   ✓ 允许 —— assert(views.length > 0)            结构性不变量
+ *   ✓ 允许 —— console.log('views =', n)           报告当前值
+ *   ✓ 允许 —— assert(n === EXPECTED_FROM_CONFIG)  值来自配置/单一来源
+ *
+ * 缺口（诚实登记）：本文件目前**只承载规则文本，尚无自动检查器**。因为今天网里并不
+ * 存在这类硬断言，此时写检查器必然空转——而空转的测试比没有测试更糟（它读起来像覆盖
+ * 率）。待出现真实对象，或先做**变异注入**（临时植入一条 `=== 4` 断言，证明检查器会红）
+ * 再落地，见 ADR-0022 §4 验收第 2 条。
+ * ────────────────────────────────────────────────────────────────────── */
+
 const SELF_CONTAINED = [
   ['event_family_test.js', 'T0 — event family contract'],
   ['assembly_test.js', 'T2 — fold primitives and coordinates'],
@@ -82,6 +101,6 @@ for (const [file, why] of NEEDS_INPUT) {
 }
 console.log('');
 console.log(failed === 0
-  ? 'OK — ' + SELF_CONTAINED.length + ' suites green, ' + NEEDS_INPUT.length + ' need input'
+  ? 'OK — ' + results.filter(function (r) { return r[0] === 'PASS'; }).length + ' suites green, ' + NEEDS_INPUT.length + ' need input'
   : 'FAILED — ' + failed + ' suite(s) red');
 process.exit(failed === 0 ? 0 : 1);
