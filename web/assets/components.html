@@ -131,13 +131,18 @@
 
   /* ---------- 对话 ----------
      消息流 + 思考折叠 + 续接列表（内联样式清零） */
-  .chat-grid { display:grid; grid-template-columns:240px 1fr; gap:12px; padding:12px; }
+  /* ONE derivation for the window of both panes in this grid. Two panes on one
+     row must be bounded by the same thing, and that thing is the device — a
+     constant per pane is how 420px and 480px came to crop 581px and 6254px of
+     content respectively. `.chat-msgs` and `.ses-side` both read this. */
+  .chat-grid { --pane-h:min(70vh,720px);
+    display:grid; grid-template-columns:240px 1fr; gap:12px; padding:12px; }
   .chat-col { min-width:0; display:flex; flex-direction:column; }
   /* A transcript is unbounded, so its window has to be bounded by something.
      That something is the viewport, not a number: the old 420px was a constant,
      and the content it cropped (measured: 581px of transcript in a 420px window)
      was the content the box was supposed to show. */
-  .chat-msgs { max-height:min(70vh,720px); overflow-y:auto; padding:12px; display:flex;
+  .chat-msgs { max-height:var(--pane-h); overflow-y:auto; padding:12px; display:flex;
     flex-direction:column; gap:8px; }
   /* A scroller's items must not be compressed BY the scroller.
      `display:flex` here makes every child a flex item, and a flex item SHRINKS by
@@ -205,7 +210,7 @@
     max-height:160px; overflow:auto; font-size:11px; color:var(--text); }
   /* ---------- 会话列表组件（DSH 骨架 + 水之波光血统） ----------
      持久事实可回放 [DSH 理念]：左侧会话列表 = 经历的索引，点击即恢复进度。 */
-  .ses-side { border-right:1px solid var(--line); padding-right:12px; max-height:480px;
+  .ses-side { border-right:1px solid var(--line); padding-right:12px; max-height:var(--pane-h);
     overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
   .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
   .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
@@ -224,8 +229,13 @@
     display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical;
     overflow:hidden;
     margin-bottom:2px; }
+  /* The meta line is ONE line, always. It carries metadata (time / event count /
+     id), so it is the thing that may be shortened — and it must never wrap,
+     because a wrap here changes the card's height. */
   .ses-item .t { color:var(--text-dim); font-size:11px; display:flex; align-items:center;
-    gap:6px; flex-wrap:wrap; }
+    gap:6px; flex-wrap:nowrap; }
+  .ses-item .t > :not(.act) { min-width:0; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
   /* iOS swipe 风格操作区：绝对定位右缘浮出（滑入），不占文档流 → 内容零挤压。
      渐变遮罩 = 涟漪消散：按钮盖住文本尾部时平滑过渡，不穿帮 */
   /* The card's actions live ON THE META LINE and RESERVE their room. They used
@@ -241,8 +251,11 @@
     transition:opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
   .ses-item:hover .t .act, .ses-item.sel .t .act,
   .ses-item.editing .t .act { opacity:1; transform:translateY(-50%); pointer-events:auto; }
-  .ses-item:hover .t, .ses-item.sel .t, .ses-item.editing .t {
-    padding-right:calc(34px * 2 + 20px); }
+  /* The room is reserved PERMANENTLY. Reserving it only on :hover moved the meta
+     line's content onto a second line and pulled the whole card taller — a hover
+     that changes the geometry is worse than no hover state at all. The state
+     only decides whether the actions are VISIBLE; the box is the same either way. */
+  .ses-item .t { padding-right:calc(34px * 2 + 20px); }
   /* A 2-line clamp with `white-space:nowrap` is not a style, it is a
      contradiction: the box promises two lines and `nowrap` renders one, so the
      preview was squeezed to half of what it was designed to show. Measured:
