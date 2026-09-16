@@ -121,7 +121,14 @@
     // once by loadWindow. Handing a stream in as well was the second way in —
     // the reason the two projections could drift apart.
     selectPeriod: function (jobId) {
-      state.chatJobId = jobId || null;
+      /* `state` is a KEY of this object literal, not a local: writing
+       * `state.x` here silently created a property on the DOM element with
+       * id="state" instead (a named-access global), so Cx.state was never set
+       * and every reader of chatJobId saw null. Measured: the guard dropped
+       * from 55 passed to 46 passed / 1 failed, and the panel reported
+       * "经历列表拉取失败: Cannot read properties of undefined (reading
+       * 'chatJobId')". Name the owner. */
+      window.Cx.state.chatJobId = jobId || null;
       if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, window.__proveTrackMeta || null);
     },
     showToast: showToast,

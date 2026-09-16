@@ -36,8 +36,8 @@
 
   function autoName(p) {
     if (p.name) return p.name;
-    var st = stamp(p.first_ts);
-    return '经历 ' + st.date + ' ' + st.time;
+    var when = stamp(p.first_ts);
+    return '经历 ' + when.date + ' ' + when.time;
   }
 
   function loadSessions() {
@@ -92,8 +92,12 @@
       var isChild = false;
       div.className = 'ses-item' + (sel ? ' sel' : '') + (isChild ? ' child' : '');
       div.setAttribute('data-ts', p.first_ts || '');
-      var st = stamp(p.first_ts);
-      var disp = st.date + ' ' + st.time;
+      /* `st` is this asset's module state object (st.chatJobId / st.sesSeq) —
+       * shadowing it here with a timestamp broke every later read in this
+       * function. Measured: the sidebar rendered zero rows and the panel
+       * reported "经历列表拉取失败". Name the local after what it is. */
+      var when = stamp(p.first_ts);
+      var disp = when.date + ' ' + when.time;
       // 行结构恒定（铁轨）：标题 .nm + 时间 .t + 正文 .p，重命名只换标题文本
       var nm = autoName(p);
       var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
