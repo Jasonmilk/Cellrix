@@ -164,6 +164,51 @@
    * `seen` terminates on a cycle. Ordering is by first_ts with a job-id
    * tiebreak, so the same data always yields the same order.
    */
+  /* The URL hash is a SERIALISATION OF ONE SELECTION STATE, not a route.
+   *
+   * Key=value rather than path-style (`#/prove-track/run-x`): the panel is a single
+   * document with client-side view switching, so a path would imply a hierarchy and
+   * a router that do not exist. Key=value is also order-independent and tolerates
+   * missing keys — the common case being a view with no period chosen yet — which is
+   * the same tolerant-degradation reading the rest of this ecosystem uses.
+   *
+   * Both functions are pure and TOTAL. An unknown key is ignored and a malformed
+   * hash yields an empty state rather than throwing: the panel must still render
+   * when the address bar contains something it did not write.
+   */
+  function parseHash(hash) {
+    var out = { view: null, period: null };
+    var raw = String(hash == null ? '' : hash);
+    if (raw.charAt(0) === '#') raw = raw.slice(1);
+    if (!raw) return out;
+    var parts = raw.split('&');
+    for (var i = 0; i < parts.length; i++) {
+      var eq = parts[i].indexOf('=');
+      if (eq < 0) continue;
+      var k, v;
+      try {
+        k = decodeURIComponent(parts[i].slice(0, eq));
+        v = decodeURIComponent(parts[i].slice(eq + 1));
+      } catch (e) {
+        continue; /* malformed percent-encoding: skip the pair, keep the rest */
+      }
+      if (k === 'view' && v) out.view = v;
+      else if (k === 'period' && v) out.period = v;
+    }
+    return out;
+  }
+
+  /* Empty fields are omitted, so a view with no period produces `#view=chat`
+   * rather than `#view=chat&period=`. A fully empty state returns '' — absent,
+   * not a bare '#'. */
+  function buildHash(state) {
+    var st = state || {};
+    var parts = [];
+    if (st.view) parts.push('view=' + encodeURIComponent(st.view));
+    if (st.period) parts.push('period=' + encodeURIComponent(st.period));
+    return parts.length ? '#' + parts.join('&') : '';
+  }
+
   function chainJobIds(periods, startId) {
     var byId = {};
     var list = periods || [];
@@ -205,6 +250,8 @@
     normalize: normalize,
     mergeChain: mergeChain,
     chainJobIds: chainJobIds,
+    parseHash: parseHash,
+    buildHash: buildHash,
     checkContiguous: checkContiguous
   };
 })();

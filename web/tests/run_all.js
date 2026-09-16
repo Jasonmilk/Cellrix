@@ -20,7 +20,8 @@ const SELF_CONTAINED = [
   ['dom_contract_test.js', 'DOM contract — inventory matches the sources'],
   ['naming_test.js', 'two naming accidents, made structurally impossible'],
   ['prove_track_nodes_test.js', 'trajectory — real chain through the Node layer'],
-  ['pt_replay.js', 'trajectory — metering and panes against real files']
+  ['pt_replay.js', 'trajectory — metering and panes against real files'],
+  ['hash_state_test.js', 'URL hash — the addressable selection state']
 ];
 
 /* The panel test is RUN when the panel is reachable and SKIPPED only when it is
