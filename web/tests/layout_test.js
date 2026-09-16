@@ -123,12 +123,72 @@ const GEOM = `(function () {
            metaLines: t ? t.getClientRects().length : null };
 })()`;
 
+
+/* ---- 4a: the geometry the contract demands -------------------------------
+ * Written BEFORE the layout work, so they must be RED now. Each is derived from
+ * the contract (docs/panel-geometry-contract.md), not from the implementation:
+ *   A  the inspector is a COLUMN: opening it must take width from the main area
+ *   B  the input is always inside the viewport, however long the transcript is
+ *   C  the transcript's height is the space the layout gives it, not a fraction
+ *      of the viewport
+ */
+const PROBE_4A = `(async function () {
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  function R(e) { if (!e) { return null; } var r = e.getBoundingClientRect();
+    return { x: Math.round(r.x), w: Math.round(r.width), bottom: Math.round(r.bottom),
+             right: Math.round(r.right), h: Math.round(r.height) }; }
+  var out = {};
+
+  /* --- chat view: B and C --- */
+  var nav = document.getElementById('v-chat'); if (nav) { nav.click(); }
+  await sleep(400);
+  var item = document.querySelector('#chat-side .ses-item');
+  if (item) { item.click(); await sleep(2500); }
+  var col = document.querySelector('.chat-col'), msgs = document.querySelector('#chat-msgs');
+  var inp = document.querySelector('.chat-input'), ban = document.getElementById('cont-banner');
+  if (col && msgs && inp) {
+    var bannerH = (ban && getComputedStyle(ban).display !== 'none') ? ban.offsetHeight : 0;
+    var available = col.clientHeight - inp.offsetHeight - bannerH;
+    out.transcript = { box: msgs.clientHeight, available: Math.round(available),
+                       gap: Math.round(available - msgs.clientHeight),
+                       colH: col.clientHeight, inputH: inp.offsetHeight,
+                       viewport: innerHeight };
+    out.input = { bottom: R(inp).bottom, viewport: innerHeight, inside: R(inp).bottom <= innerHeight + 1 };
+    out.pageScrolls = document.documentElement.scrollHeight > innerHeight + 1;
+  }
+
+  /* --- prove-track view: A --- */
+  var pnav = document.getElementById('v-prove-track'); if (pnav) { pnav.click(); }
+  await sleep(1600);
+  var main = document.querySelector('#view-prove-track .e-wrap') ||
+             document.querySelector('#view-prove-track .e-traj') ||
+             document.querySelector('#s-main');
+  var wid = function () { return main ? Math.round(main.getBoundingClientRect().width) : null; };
+  out.mainClosed = wid();
+  var rows = document.querySelectorAll('#eTbody tr.ev[data-e-ev]');
+  if (rows.length) { rows[0].click(); await sleep(500); }
+  var insp = document.getElementById('eInsp');
+  out.inspectorOpen = !!(insp && insp.classList.contains('on'));
+  out.mainOpen = wid();
+  out.inspector = R(insp);
+  out.mainShrankBy = (out.mainClosed != null && out.mainOpen != null) ? out.mainClosed - out.mainOpen : null;
+  return out;
+})()`;
+
 (async function main() {
   console.log('== transcript + sidebar layout, measured in a real browser ==');
-  let list;
-  try { list = await (await fetch(CDP + '/json/list')).json(); }
-  catch (e) {
-    console.log('  FAIL  a browser is reachable at ' + CDP + '  [' + e.message + ']');
+  /* Node's fetch resolves `localhost` to ::1 first and does not fall back the
+   * way curl does, so a browser listening on 127.0.0.1 can read as unreachable.
+   * Measured twice: the same Chrome answered curl and not node. Try both hosts
+   * before calling it unreachable. */
+  const HOSTS = [CDP, 'http://127.0.0.1:9222', 'http://localhost:9222'];
+  let list = null;
+  for (const h of HOSTS) {
+    try { list = await (await fetch(h + '/json/list')).json(); break; }
+    catch (e) { /* next */ }
+  }
+  if (!list) {
+    console.log('  FAIL  a browser is reachable at ' + HOSTS.join(' or '));
     console.log('\nRESULT: could not measure (needs the panel + Chrome)');
     process.exit(1);
   }
@@ -221,6 +281,35 @@ const GEOM = `(function () {
       !!over && over.metaLines === 1, over ? over.metaLines + ' line(s)' : 'not measured');
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'none' });
     await new Promise(function (r) { setTimeout(r, 200); });
+  }
+
+
+  /* --- 4a: three geometry assertions, RED before the layout work --------- */
+  console.log('-- 4a geometry: what the contract demands (expected RED before the work) --');
+  {
+    const g = await evalIn(PROBE_4A);
+    console.log('  measured: ' + JSON.stringify(g));
+    if (!g || !g.transcript) {
+      check('the chat panes are measurable', false, JSON.stringify(g));
+    } else {
+      /* C: the transcript's height is what the layout gives it. A viewport
+       * fraction (70vh) is not the space available; the difference is the whole
+       * point of the height chain. */
+      check('the transcript height comes from the layout, not from the viewport',
+        Math.abs(g.transcript.gap) <= 2,
+        'box ' + g.transcript.box + ' vs available ' + g.transcript.available +
+        ' (gap ' + g.transcript.gap + ')');
+      /* B: the input stays reachable however long the transcript is. */
+      check('the chat input stays inside the viewport',
+        g.input.inside, 'input bottom ' + g.input.bottom + ' vs viewport ' + g.input.viewport);
+      check('the page itself does not scroll (panes do)',
+        !g.pageScrolls, 'documentElement.scrollHeight > innerHeight');
+    }
+    /* A: the inspector is a column — opening it takes width from the main area. */
+    check('opening the inspector takes width from the main area (a column, not an overlay)',
+      g && g.inspectorOpen && g.mainShrankBy != null && g.mainShrankBy > 0,
+      'main ' + (g && g.mainClosed) + ' -> ' + (g && g.mainOpen) +
+      ' (shrank by ' + (g && g.mainShrankBy) + ')');
   }
 
   console.log('');
