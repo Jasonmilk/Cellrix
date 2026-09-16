@@ -164,15 +164,18 @@ check('empty data validates only for turn/start',
   const kinds2 = Object.keys(EF.KINDS).map(function (k) { return EF.KINDS[k]; });
   const missing = kinds2.filter(function (k) { return !EF.KIND_CLASS[k]; });
   check('KIND_CLASS covers every declared kind', missing.length === 0, JSON.stringify(missing));
-  check('every KIND_CLASS entry names a class and a track',
-    kinds2.every(function (k) { return EF.KIND_CLASS[k].cls && EF.KIND_CLASS[k].track; }));
+  check('KIND_CLASS is one neutral axis, not a render table',
+    kinds2.every(function (k) { return typeof EF.KIND_CLASS[k] === 'string'; }));
+  check('the contract does not carry the lane/track concept',
+    kinds2.every(function (k) { return EF.KIND_CLASS[k] !== undefined &&
+      String(EF.KIND_CLASS[k]).indexOf('model') === -1; }));
 
   // turn/start and turn/end share a kind; only the payload tells them apart
   const startN = { kind: EF.KINDS.TURN, payload: { start: true } };
   const endN = { kind: EF.KINDS.TURN, payload: { end: true } };
   check('classOf separates the two ends of a turn without the protocol name',
-    EF.classOf(startN).cls === 'SYSTEM' && EF.classOf(endN).cls === 'END',
-    EF.classOf(startN).cls + '/' + EF.classOf(endN).cls);
+    EF.classOf(startN) === 'SYSTEM' && EF.classOf(endN) === 'END',
+    EF.classOf(startN) + '/' + EF.classOf(endN));
   check('classOf refuses an unknown kind instead of guessing',
     EF.classOf({ kind: 'nonsense', payload: {} }) === null);
 

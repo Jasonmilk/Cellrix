@@ -237,3 +237,30 @@ digest() = { lastSeq, eventCount, pendingCount, schemaVersion, fingerprint }
 ---
 
 *ADR 是记忆不可篡改在工程层的投射。*
+
+## 附：批次 1 落地（2026-09-16）
+
+**资产分层**（加载序即硬约束：`event_family` → `normalize` → `node_shape` → `assembly`）：
+
+| 资产 | 职责 | 红线内 |
+|---|---|---|
+| `event_family.js` | **契约**：`TYPES` / `DATA_SCHEMA` / `KINDS` / `KIND_OF` / `PAYLOAD_MAP` / `interpret` / `KIND_CLASS` / `classOf` | ✅ |
+| `period_normalize.js` | **读取边界**：`normalize` / `mergeChain` / `chainJobIds` | ✅ |
+| **`node_shape.js`** | **Node 构造**：`kind` / `payload` / `identity` / `ord` / `lineNo` / `turn` / `ts` | ✅ |
+| `assembly.js` | **tape 状态机**：`feed` / `watermark` / `flush` / `targets` | ✅ |
+
+**拆分按职责，不按函数类型**：上轮把「模块级纯函数」移出，`create()` 到处引用被移走的
+（`upsert` 是 tape 内部的事，**根本不该被移走**）⇒ `upsert is not defined` 是必然。
+本轮移出 **Node 构造**（数组进、数组出），状态机只经命名空间触它 ⇒ **悬空引用结构上不可能**。
+
+**类型锁**（可执行断言，非一句话）：`Node 上不存在 type` ＋ `Node 上不存在 raw data`。
+`tool/call` 与 `tool/result` **同 kind `tool`**，靠 `payload.stage` 分开 ⇒ **配对是 select，不是重读协议**。
+
+**`snapshot()` 现携带 `nodes`**（改，不是加 —— 不留第二个出口）。
+
+**⚠️ `KIND_CLASS` 只有中性 `cls`**，**`track` 不进契约层** ——
+ADR-0019 §4 已定「渲染表是子集，**含 track ⇒ 不派生，否则校验契约被 UI 需求绑架**」。
+把 UI 语义塞进契约 = 另一个方向的同一种污染。
+
+**`PAYLOAD_MAP` 与 `DATA_SCHEMA` 互锁**：表里引用的每个字段名必须在
+`DATA_SCHEMA` 声明（literal 除外），**断言之**；否则字段名分裂而无人发现。

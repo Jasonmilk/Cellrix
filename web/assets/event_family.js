@@ -122,8 +122,7 @@
     'tool/result': {
       stage: ['?tool/result', 'lit:result'], tool: ['tool'], ok: ['ok'],
       durationMs: ['duration_ms', 'snake'], outcome: ['outcome', 'maybe'],
-      outcomeSha: ['outcome_sha', 'snake', 'maybe'], index: ['index', 'maybe'],
-      data: ['data', 'maybe']
+      outcomeSha: ['outcome_sha', 'snake', 'maybe'], index: ['index', 'maybe']
     },
     'check/status': {
       checkId: ['check_id', 'snake'], check: ['check'], expect: ['expect'],
@@ -186,25 +185,30 @@
     return { kind: kind, payload: payload };
   }
 
-  /* Which track each semantic kind belongs to, and how it is drawn.
+  /* What each semantic kind IS, in the system's own vocabulary.
    *
-   * A type fact, not a view fact: it says what a kind IS in the system, and the
-   * view merely renders that. It lives here for the same reason KIND_OF does —
-   * otherwise the trajectory carries its own vocabulary, which is exactly the
-   * duplication this layer exists to end. A view with no type knowledge cannot
-   * re-interpret the protocol; one with a table of its own always can.
+   * One axis only: a neutral class. A type fact, not a view fact, so it lives
+   * here for the same reason KIND_OF does — otherwise the trajectory carries
+   * its own vocabulary, which is the duplication this layer exists to end.
+   *
+   * `track` deliberately does NOT live here. It says which lane a row is drawn
+   * in, which is a rendering concept; ADR-0019 §4 already ruled that a render
+   * table may be a subset of the vocabulary but must not drag UI needs into the
+   * contract. Adding it here would have been the same pollution in the other
+   * direction — a fifth vocabulary avoided by pushing UI semantics into the
+   * contract instead. The lane table belongs to the view.
    */
   var KIND_CLASS = {
-    turn: { cls: 'SYSTEM', track: 'model' },
-    message: { cls: 'USER', track: 'input' },
-    context: { cls: 'CONTEXT', track: 'input' },
-    reasoning: { cls: 'THINK', track: 'model' },
-    plan: { cls: 'ATTEMPT', track: 'model' },
-    tool: { cls: 'TOOL', track: 'tool' },
-    check: { cls: 'CHECK', track: 'tool' },
-    verdict: { cls: 'VERDICT', track: 'tool' },
-    reply: { cls: 'REPLY', track: 'model' },
-    metering: { cls: 'USAGE', track: 'model' }
+    turn: 'SYSTEM',
+    message: 'USER',
+    context: 'CONTEXT',
+    reasoning: 'THINK',
+    plan: 'ATTEMPT',
+    tool: 'TOOL',
+    check: 'CHECK',
+    verdict: 'VERDICT',
+    reply: 'REPLY',
+    metering: 'USAGE'
   };
 
   /* A turn has two ends and they are not drawn the same. Which end a row is
@@ -214,8 +218,11 @@
   function classOf(node) {
     var base = KIND_CLASS[node && node.kind];
     if (!base) { return null; }
+    /* A turn has two ends and they are not the same class. Which end a row is
+     * comes from payload.end — a fact about the payload this layer produces, so
+     * reading it belongs here rather than being guessed by every consumer. */
     if (node.kind === KINDS.TURN && node.payload && node.payload.end) {
-      return { cls: 'END', track: base.track };
+      return 'END';
     }
     return base;
   }
