@@ -80,7 +80,7 @@
         var head = (p.nodes != null && p.nodes > top.length)
           ? 'top ' + top.length + ' of ' + p.nodes + '\n' : '';
         return head + top.map(function (n) {
-          return n.tier + '·' + n.heat + ' ' + short(n.id || '', 12) + ' ' + (n.phase || '');
+          return n.tier + '·' + n.activation + ' ' + short(n.id || '', 12) + ' ' + (n.phase || '');
         }).join('\n');
       case 'tool':
         if (p.stage === 'call') { return 'awaiting tool response…'; }
