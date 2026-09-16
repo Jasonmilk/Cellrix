@@ -67,3 +67,6 @@ Thumbs.db
 **/*.rs.bk
 **/*.swp
 .DS_Store
+
+# JS test deps (installed --no-save, never committed)
+node_modules/

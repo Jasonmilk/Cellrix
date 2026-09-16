@@ -160,11 +160,17 @@ const PROBE_4A = `(async function () {
   /* --- prove-track view: A --- */
   var pnav = document.getElementById('v-prove-track'); if (pnav) { pnav.click(); }
   await sleep(1600);
-  var main = document.querySelector('#view-prove-track .e-wrap') ||
-             document.querySelector('#view-prove-track .e-traj') ||
+  /* Pick a session first: the trajectory (and thus the third column) exists
+     only when a session is selected. The measure is the MAIN CONTENT width —
+     the trajectory itself — which the inspector column takes from (4a Q1). */
+  var sItem = document.querySelector('#s-side .ses-item');
+  if (sItem) { sItem.click(); await sleep(1200); }
+  var main = document.querySelector('#view-prove-track .e-traj') ||
+             document.querySelector('#view-prove-track .e-wrap') ||
              document.querySelector('#s-main');
   var wid = function () { return main ? Math.round(main.getBoundingClientRect().width) : null; };
   out.mainClosed = wid();
+  out.mainX = main ? Math.round(main.getBoundingClientRect().x) : null;
   var rows = document.querySelectorAll('#eTbody tr.ev[data-e-ev]');
   if (rows.length) { rows[0].click(); await sleep(500); }
   var insp = document.getElementById('eInsp');
@@ -172,6 +178,15 @@ const PROBE_4A = `(async function () {
   out.mainOpen = wid();
   out.inspector = R(insp);
   out.mainShrankBy = (out.mainClosed != null && out.mainOpen != null) ? out.mainClosed - out.mainOpen : null;
+  out.viewport = innerWidth;
+  out.inspectorModal = !!(insp && insp.getAttribute('aria-modal') === 'true');
+  /* Drawer criterion: while the drawer is open, how much of the main area is
+     still visible (its right edge stops where the drawer begins). */
+  out.mainVisibleAfterOpen = (insp && main && insp.classList.contains('on') &&
+      main.getBoundingClientRect().width > 0) ?
+    Math.max(0, Math.round(
+      Math.min(main.getBoundingClientRect().right, insp.getBoundingClientRect().left) -
+      main.getBoundingClientRect().left)) : null;
   return out;
 })()`;
 
@@ -305,11 +320,16 @@ const PROBE_4A = `(async function () {
       check('the page itself does not scroll (panes do)',
         !g.pageScrolls, 'documentElement.scrollHeight > innerHeight');
     }
-    /* A: the inspector is a column — opening it takes width from the main area. */
-    check('opening the inspector takes width from the main area (a column, not an overlay)',
-      g && g.inspectorOpen && g.mainShrankBy != null && g.mainShrankBy > 0,
-      'main ' + (g && g.mainClosed) + ' -> ' + (g && g.mainOpen) +
-      ' (shrank by ' + (g && g.mainShrankBy) + ')');
+    /* A: the inspector is a POPUP DRAWER (user decision 2026-09-16: two
+       columns only, no resident third column). Opening it must leave part of
+       the main area visible — the drawer is width-limited, never full-screen;
+       the scrim (blank area) or ✕ hides it again. Criterion: the main area's
+       visible width while the drawer is open stays ≥ 200px. */
+    check('the inspector opens as a drawer that leaves part of the main area visible',
+      g && g.mainVisibleAfterOpen != null && g.mainVisibleAfterOpen >= 200,
+      'drawer w=' + (g && g.inspector && g.inspector.w) +
+      ' at x=' + (g && g.inspector && g.inspector.x) +
+      ' — main area still visible ' + (g && g.mainVisibleAfterOpen) + 'px');
   }
 
   console.log('');

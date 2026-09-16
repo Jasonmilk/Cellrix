@@ -131,18 +131,29 @@
 
   /* ---------- 对话 ----------
      消息流 + 思考折叠 + 续接列表（内联样式清零） */
-  /* ONE derivation for the window of both panes in this grid. Two panes on one
-     row must be bounded by the same thing, and that thing is the device — a
-     constant per pane is how 420px and 480px came to crop 581px and 6254px of
-     content respectively. `.chat-msgs` and `.ses-side` both read this. */
-  .chat-grid { --pane-h:min(70vh,720px);
-    display:grid; grid-template-columns:240px 1fr; gap:12px; padding:12px; }
-  .chat-col { min-width:0; display:flex; flex-direction:column; }
+  /* 4a geometry (panel-geometry-contract Q4): the view shell owns the
+     viewport height; panes scroll INSIDE it, the page never scrolls as a
+     whole. Q2: the sidebar width is a device-derived clamp, not a constant.
+     Q3: each pane has exactly one scroll context — `.chat-msgs` fills the
+     height the layout gives it (`flex:1 1 auto; min-height:0`) instead of
+     being capped by a max-height constant. */
+  html, body { height:100%; }
+  body { overflow:hidden; display:flex; flex-direction:column; }
+  #view-cockpit, #view-prove-track, #view-chat, #view-flows { flex:1 1 auto; min-height:0;
+    overflow:hidden; display:flex; flex-direction:column; }
+  #view-chat > .panel.chat-panel { flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column; }
+  /* A flex ROW (not grid): a grid row is sized by content, which severs the
+     height chain — measured col 62px with the input alone at 65px. A flex
+     row stretches both children to the chain the layout gives them. */
+  .chat-grid { display:flex; gap:12px; padding:12px; flex:1 1 auto; min-height:0; }
+  .chat-grid > .ses-side { width:clamp(200px,18vw,320px); flex-shrink:0; }
+  .chat-col { min-width:0; display:flex; flex-direction:column; min-height:0; flex:1 1 auto; }
   /* A transcript is unbounded, so its window has to be bounded by something.
-     That something is the viewport, not a number: the old 420px was a constant,
-     and the content it cropped (measured: 581px of transcript in a 420px window)
-     was the content the box was supposed to show. */
-  .chat-msgs { max-height:var(--pane-h); overflow-y:auto; padding:12px; display:flex;
+     That something is the layout's height chain (Q4), not a number: the old
+     420px/`--pane-h` constants cropped content (measured: 581px of transcript
+     in a 420px window). */
+  .chat-msgs { flex:1 1 auto; min-height:0; overflow-y:auto; padding:12px; display:flex;
     flex-direction:column; gap:8px; }
   /* A scroller's items must not be compressed BY the scroller.
      `display:flex` here makes every child a flex item, and a flex item SHRINKS by
@@ -194,6 +205,10 @@
   .think-row.open .think-body { flex:1 1 100%; max-width:100%;
     white-space:pre-wrap; word-break:break-word; }
   .think-row.fold .think-head { color:var(--text-dim); } /* 过程行（计划/工具）次级强调，思考行保持 accent */
+  /* check/verdict rows (timeline): PASS green, FAIL red — the verdict is the
+     row's headline, the reason is the expandable body. */
+  .think-row.chk-pass .think-head { color:#3E9B5F; }
+  .think-row.chk-fail .think-head { color:#D64545; }
   .msg .mdl { color:var(--accent); font-weight:500; font-size:10px; }
   /* `.fold` is a STATE (open/closed), not a layout. It used to declare
      `display:inline-block` for an inline fold widget — and process rows carry
@@ -210,7 +225,7 @@
     max-height:160px; overflow:auto; font-size:11px; color:var(--text); }
   /* ---------- 会话列表组件（DSH 骨架 + 水之波光血统） ----------
      持久事实可回放 [DSH 理念]：左侧会话列表 = 经历的索引，点击即恢复进度。 */
-  .ses-side { border-right:1px solid var(--line); padding-right:12px; max-height:var(--pane-h);
+  .ses-side { border-right:1px solid var(--line); padding-right:12px; min-height:0;
     overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
   .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
   .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
@@ -310,7 +325,19 @@
   .rename-btn:hover { border-color:var(--accent); color:var(--accent); }
 
   /* 证轨比例 2D 网格（概览 / 明细）—— 具体列比由视图内联 style 裁决 */
-  .prove-track-main { display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:16px; }
+  /* 4a geometry: prove-track main grid fills the shell (Q4); at ≥1180px the
+     inspector becomes the third column (Q1, see prove_track.css media rule). */
+  .prove-track-main { display:grid; grid-template-columns:280px minmax(0,1fr); gap:12px;
+    margin-bottom:16px; flex:1 1 auto; min-height:0; }
+  #view-prove-track #s-side, #view-prove-track #s-main { min-height:0; }
+  #view-prove-track #s-side { overflow-y:auto; }
+  #view-prove-track #s-main { overflow:hidden; display:flex; flex-direction:column; }
+  #view-prove-track #s-main .e-wrap { flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column; }
+  /* 4a geometry: cockpit ledger fills the shell; the table scrolls inside. */
+  #view-cockpit > .panel.ledger { flex:1 1 auto; min-height:0; display:flex;
+    flex-direction:column; }
+  #view-cockpit .tbl-shell { flex:1 1 auto; min-height:0; }
   .timeline { max-height:420px; overflow-y:auto; }
 
   /* ---------- 事件行与证轨共享行（驾驶舱详情 / 会话） ---------- */
@@ -414,7 +441,8 @@
   @media (max-width:800px){
     .prove-track-main { grid-template-columns:1fr; }
     .ses-side { border-right:0; padding-right:0; max-height:220px; }
-    .chat-grid { grid-template-columns:1fr; }
+    .chat-grid { flex-direction:column; }
+    .chat-grid > .ses-side { width:auto; flex-shrink:1; max-height:120px; }
     body { padding:12px; }
   }
 </style>

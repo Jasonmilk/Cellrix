@@ -74,10 +74,11 @@
   // Unified collapsible row (水之波光：一种能力，全场景复用 — 过程折叠)：
   // process rows (思考/计划/工具) are one component; click to expand/collapse.
   // label = short tag, text = full payload (truncated to one line when closed).
-  function foldRow(label, text) {
+  // cls = optional extra class for the row (e.g. a PASS/FAIL tint on check rows).
+  function foldRow(label, text, cls) {
     var b = box();
     var d = document.createElement('div');
-    d.className = 'think-row fold';
+    d.className = 'think-row fold' + (cls ? ' ' + cls : '');
     d.innerHTML = '<span class="think-head">' + Cx.esc(label) +
       '</span><span class="think-body"></span>';
     d.querySelector('.think-body').textContent = text || '';
@@ -85,6 +86,27 @@
     b.appendChild(d);
     b.scrollTop = b.scrollHeight;
     return d;
+  }
+
+  // A tool plan (assistant/attempt) carries raw JSON like
+  // {"calls":[{"tool":"weather","args":{"city":"New York"}}]} — the deliverable
+  // of that row is the READABLE plan ("weather · city=New York"), with the raw
+  // JSON kept for the expanded state. Returns { label, raw }.
+  function parsePlan(text) {
+    var raw = text || '';
+    var calls = [];
+    try {
+      var obj = JSON.parse(raw.replace(/^[\s\S]*?(\{.*\})[\s\S]*?$/, '$1'));
+      if (obj && Array.isArray(obj.calls)) calls = obj.calls;
+    } catch (e) { /* not JSON — keep the original text as the label */ }
+    if (!calls.length) return { label: raw, raw: raw };
+    var parts = calls.map(function (c) {
+      var t = c.tool || '?';
+      var a = c.args || {};
+      var kv = Object.keys(a).map(function (k) { return k + '=' + String(a[k]); }).join(' ');
+      return t + (kv ? ' · ' + kv : '');
+    });
+    return { label: '调用 ' + parts.join(' ｜ '), raw: raw };
   }
 
   // The deliverable is the protagonist: the reply is the message body, process
@@ -217,6 +239,7 @@
   Cx.addMsg = addMsg;
   Cx.addReplyMsg = addReplyMsg;
   Cx.foldRow = foldRow;
+  Cx.parsePlan = parsePlan;
   Cx.addThinkRow = addThinkRow;
 
   /* Entering the view focuses its input — the shell does not know this view
