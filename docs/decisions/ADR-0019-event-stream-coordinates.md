@@ -357,6 +357,7 @@ CI-144 四项协议**已冻结**，不得改动；事件流（`anaphase:ADR-0026
 | **`node`** | **identity = `sourceJob#lineNo`** | ✅ **就是 id** |
 | **`ord`** | **流内位置** | ❌ |
 | **`lineNo`** | **所属文件内的行号** | 供导出 |
+| **`source`** | **identity 的文件部件**（`sourceJob`，与 `lineNo` 并列） | 供分组与导出（2026-09-16 增订） |
 
 **前置**：`lineNo` 必须在**合并之前**记下 —— 拼接会毁掉它
 （`gseq` 是合并后的位置，随起点变化）。`normalize` 赋 `lineNo` = 本次流的行号；

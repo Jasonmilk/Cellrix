@@ -246,12 +246,18 @@ digest() = { lastSeq, eventCount, pendingCount, schemaVersion, fingerprint }
 |---|---|---|
 | `event_family.js` | **契约**：`TYPES` / `DATA_SCHEMA` / `KINDS` / `KIND_OF` / `PAYLOAD_MAP` / `interpret` / `KIND_CLASS` / `classOf` | ✅ |
 | `period_normalize.js` | **读取边界**：`normalize` / `mergeChain` / `chainJobIds` | ✅ |
-| **`node_shape.js`** | **Node 构造**：`kind` / `payload` / `identity` / `ord` / `lineNo` / `turn` / `ts` | ✅ |
+| **`node_shape.js`** | **Node 构造**：`kind` / `payload` / `node` / **`source`** / `ord` / `lineNo` / `turn` / `ts` | ✅ |
 | `assembly.js` | **tape 状态机**：`feed` / `watermark` / `flush` / `targets` | ✅ |
 
 **拆分按职责，不按函数类型**：上轮把「模块级纯函数」移出，`create()` 到处引用被移走的
 （`upsert` 是 tape 内部的事，**根本不该被移走**）⇒ `upsert is not defined` 是必然。
 本轮移出 **Node 构造**（数组进、数组出），状态机只经命名空间触它 ⇒ **悬空引用结构上不可能**。
+
+**2026-09-16 增订**：Node 新增 **`source`**（`sourceJob` 原样，与 `lineNo` 并列）。
+`node` 仍是 `source + '#' + lineNo` 的**键**（比较用、进 `data-e-ev` 属性用），
+`source` 与 `lineNo` 是它的**两个部件** —— 一个**分组**（合并链里 turn 表头要说出「这一轮来自哪一段」）
+与一次**导出**（要能引用到具体文件）需要的是部件，不是键；否则得把键在 `#` 上拆回去。
+不变量是断言：**`node === source + '#' + lineNo`**（`assembly_test.js`）。
 
 **类型锁**（可执行断言，非一句话）：`Node 上不存在 type` ＋ `Node 上不存在 raw data`。
 `tool/call` 与 `tool/result` **同 kind `tool`**，靠 `payload.stage` 分开 ⇒ **配对是 select，不是重读协议**。

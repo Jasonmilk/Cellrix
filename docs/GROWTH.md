@@ -56,26 +56,49 @@
 「半截实现」比没实现更难查：同一事实 3/4 条路径已有，
 查这类缺陷要**按路径列表盘**，不能只看有没有实现。
 
-## [2026-09-14] 消除上帝文件 —— 四视图共用逻辑按域拆分（阶段 1）
+---
 
-**变异类型**：膨胀控制 —— `script.html`（323 行，四视图共用的上帝文件）按域拆分。
-本轮只做「消除上帝文件」，不动视图划分与视觉。
+## [2026-09-16] 证轨成为 tape 的 target —— 表即行集，一类缺陷变成不可能状态（ADR-0018 批次 4 · 3b-3+4b）
 
-- **视图清单数据驱动**：`showView` 遍历 `.nav [data-view]`，删掉硬编码的视图清单
-- **进入钩子自注册**：`Cx.onEnter(name, fn)`，视图资产不再被 `script.html` 反向依赖
-- **按需驱动**：`tick` 只更新状态行，渲染交给 `Cx.Cockpit.render`
-- 新增资产 `chat.js`（对话域，从 `script.html` 逐字搬出）、`cockpit.js`（态势域）；
-  `base.html` 去 inline onclick 改 `data-view`，script 序接入两新资产；
-  `main.rs` 补两个 `include_str!` 与 replace
-- **拼装测试升级为派生式占位符扫描**：从 `base.html` 扫 `__NAME__` 逐个断言未残留，
-  并断言 `checked >= 16` **防空转**
+**变异类型**：取数口收口 —— 最后一个自带数据源的视图改为投影同一笔 tape
 
-**规模**：`script.html` 323 → 145 行。
+- **壳层拥有唯一一笔 tape**（`script.html`）：`loadWindow` 把链合并**一次**并喂入；
+  对话渲染 `events()`，证轨读 `snapshot().nodes`。证轨的 `stream` 形参与自带的
+  `/api/events` 取数**删除** —— 「第二个入口」正是两个投影讲出两套故事的原因。
+- **按需驱动落到 target 上**：`onEnter` 激活 / `onLeave` 取消激活；取消即**销毁实例**
+  （ADR-0018 D5：不是隐藏元素）。壳层新增 `onLeave`，且仍不点名任何视图（[GENE] 0 硬编码）。
+- **表即行集**：`prove_track.node.js` 撞 400 行红线 ⇒ 按**声明/执行**拆出
+  `prove_track.render.js`（`LANE_OF` / `SUMMARY` / `KIND_NOTE` / `STATUS_OF` / 校验器）。
+  没有 `SUMMARY` 条目 = **不成行**；`NOT_DRAWN` 显式声明例外（metering：被测量，不是一步）。
+- **装载期校验把一类缺陷变成不可能状态**：`{slot}` 必须解析（fmt 或契约声明字段），
+  且不得与 `opt` 同名 ⇒ 模块**拒绝加载**。守卫带**阳性对照**（给校验器喂坏表必须抛）。
+- **切换前对拍**（新旧两层在同一真链上逐字段比对，脚本不入仓）查出 6 类缺陷，全部已修：
+  四个模板的游离 `—`（`opt` 键被写成 `{slot}` ⇒ 先填 em dash 再追加真值）、
+  check 标签是字面量、tool/result 显示 digest 而非 outcome、context 丢节点命中、
+  reply 丢周期总量与可展开正文 / reasoning 丢 gap 时长（`LLM TIME` 恒 `—`）、
+  metering 变成行并重定义所有时长。
+- `prove_track.data.js` 收敛为**原语**（45 行）：无事件知识、无协议名。
+- 「Schema」页签从此是真的：显示该 kind 的**契约声明字段** + 一句话说明；字段集与装载期
+  校验**共用同一份推导**，页签无法与契约漂移。
 
-### 验收（A/B 全绿，与拆分前逐项一致）
+**规模**：`prove_track.node.js` 376 → 224；新增 `prove_track.render.js` 302；
+`prove_track.data.js` 283 → 45。
 
-- `cargo test` 108 passed / 0 failed
-- `all_views_test.js` 50 passed ／ `verify_live.py` 50 passed
-- `coupling_audit.py` 0 unresolved coupling
+### 验收（A/B：单条命令内起栈 → 探 → 停）
 
-**边界**：标为「阶段 1」，后续阶段未做。
+- 独立打开证轨（不选经历）显示**整条链**；期望值由 e2e **自己从 API 重算**，不向应用要数：
+  `all_views_test.js` **55 passed / 0 failed**
+- 服务端页面逐字等于资产：`verify_live.py` **56 passed / 0 failed**
+- 回归网 **7 套件全绿**（`pt_replay.js` 由 SKIP 转为运行）；`coupling_audit.py` 0 unresolved
+
+### 顺带修正的防线
+
+`verify_live.py` 一直被指向**冻结快照**（JS 跑完后的 DOM）⇒「应用自己设过的 inline style」
+被读成「烧入坏了」= **两条永久假红**，而永久假红会训练人忽略检查。现在它**拒收冻结快照
+并说明该喂哪个文件**；`snapshot.js` 同时写出 `.raw.html`（服务端原页）；并补上它此前
+从未覆盖的 `prove_track.node.js`。
+
+### 边界
+
+用户侧还剩 4 项诉求 —— **导出证轨 / 三分布局 / 密码解锁 / Tentacle 搜索**。
+架构杠杆已接通（View → tape target 的迁移已完成），这四项**未动**。

@@ -25,9 +25,21 @@
 |---|---|---|---|
 | `web/assets/prove_track.css` | 样式层（`e-` 令牌 / 双主题 / 降级阶梯） | 7–289 | ~281 |
 | `web/assets/prove_track.html` | 骨架层（`e-wrap` / `e-traj` / `e-insp` / `e-scrim`） | 291–369 | ~79 |
-| `web/assets/prove_track.data.js` | 数据层（词表 / 事件→呈现映射 / 格式化 / `buildSession` / `computeRepeats`） | 374–581 | ~208 |
+| `web/assets/prove_track.data.js` | 数据层（**原语**：格式化 / `fmtDur` / `fmtTok` / `STATUS`） | 374–581 | ~208 |
 | `web/assets/prove_track.view.js` | 视图层（状态 `S`/`HAS` + 渲染 + 遮挡自证 + 检查器 + 重放） | 583–827 | ~245 |
 | `web/assets/prove_track.js` | 控制层（事件绑定 + 涟漪 + 对外接口） | 829–953 | ~125 |
+
+**2026-09-16 增订（批次 4 落地后）**：资产由 5 个变 6 个，两个角色已被拆走。
+
+| 资产 | 角色 |
+|---|---|
+| `web/assets/prove_track.render.js` | **渲染表**（kind → lane / status / 摘要模板 / 一句话），**外加装载期校验器**；`SUMMARY` 即行集 |
+| `web/assets/prove_track.node.js` | **Node 侧消费**：一个 node → 该行的面板内容；node 流 → SESSION |
+| `web/assets/prove_track.data.js` | 只剩**原语**（45 行）：无事件知识、无协议名 |
+
+拆出 `render.js` 的直接触发是 **`node.js` 撞 400 行红线**，切法沿用本仓既有范式
+（**声明/执行**：与 `event_family`(契约词汇) → `node_shape`(构造) 同形），
+**不是**按行数均分。加载序：`data` → `render` → `node` → `view` → `ctrl`（D3 的硬约束不变）。
 
 切分依据是**关注点**，不是行数。DNA 铁律 2 的表述是「HTML/CSS/JS 视图内容落入独立资产」——样式与骨架天然属于两个不同关注点，故不合并。
 
