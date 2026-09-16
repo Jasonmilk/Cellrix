@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "stage": "T1a",
+  "template": "base.html",
+  "note": [
+    "起搏图（Cellrix:ADR-0021 T1a）。这是装配的唯一事实源。",
+    "pieces 的数组顺序 = 装配顺序，是语义硬约束，不是偏好。",
+    "derived 在所有 pieces 展开之后、对整体结果应用一次 —— 复刻链式替换语义：",
+    "script.html 内含 __REFRESH__，只有在其被插入后才替换才能命中（见 boot.rs 测试）。",
+    "T1b 将补 lands/opens/dependsOn 并把 base.html 的洞收敛为单一 __SEAT_BOOT__。"
+  ],
+  "pieces": [
+    { "id": "tokens",              "placeholder": "__TOKENS__",            "asset": "tokens.html" },
+    { "id": "components",          "placeholder": "__COMPONENTS__",        "asset": "components.html" },
+    { "id": "cockpit",             "placeholder": "__COCKPIT__",           "asset": "cockpit.html" },
+    { "id": "chat",                "placeholder": "__CHAT__",              "asset": "chat.html" },
+    { "id": "prove_track",         "placeholder": "__PROVE_TRACK__",       "asset": "prove_track.html" },
+    { "id": "prove_track_css",     "placeholder": "__PROVE_TRACK_CSS__",   "asset": "prove_track.css" },
+    { "id": "event_family",        "placeholder": "__EVENT_FAMILY__",      "asset": "event_family.js" },
+    { "id": "period_normalize",    "placeholder": "__NORMALIZE__",         "asset": "period_normalize.js" },
+    { "id": "node_shape",          "placeholder": "__NODE_SHAPE__",        "asset": "node_shape.js" },
+    { "id": "assembly",            "placeholder": "__ASSEMBLY__",          "asset": "assembly.js" },
+    { "id": "prove_track_data",    "placeholder": "__PROVE_TRACK_DATA__",  "asset": "prove_track.data.js" },
+    { "id": "prove_track_render",  "placeholder": "__PROVE_TRACK_RENDER__","asset": "prove_track.render.js" },
+    { "id": "prove_track_node",    "placeholder": "__PROVE_TRACK_NODE__",  "asset": "prove_track.node.js" },
+    { "id": "prove_track_export",  "placeholder": "__PROVE_TRACK_EXPORT__","asset": "prove_track.export.js" },
+    { "id": "prove_track_view",    "placeholder": "__PROVE_TRACK_VIEW__",  "asset": "prove_track.view.js" },
+    { "id": "prove_track_ctrl",    "placeholder": "__PROVE_TRACK_CTRL__",  "asset": "prove_track.js" },
+    { "id": "script",              "placeholder": "__SCRIPT__",            "asset": "script.html" },
+    { "id": "chat_js",             "placeholder": "__CHAT_JS__",           "asset": "chat.js" },
+    { "id": "cockpit_js",          "placeholder": "__COCKPIT_JS__",        "asset": "cockpit.js" },
+    { "id": "session",             "placeholder": "__SESSION__",           "asset": "session.html" },
+    { "id": "gleam",               "placeholder": "__GLEAM__",             "asset": "gleam.html" },
+    { "id": "flows",               "placeholder": "__FLOWS__",             "asset": "flows.html" }
+  ],
+  "derived": [
+    { "placeholder": "__REFRESH__", "source": "refresh_secs" }
+  ]
+}

@@ -10,6 +10,11 @@ description = "Anaphase cockpit web panel — browser-visible white-box (G2, ADR
 [dependencies]
 hmac = "0.12"
 sha2 = "0.10"
+# Boot graph (ADR-0021 T1a): the assembly is data, so the host parses it.
+# Both were already vendored in the workspace lock (protocol/layout/transport);
+# no new download, but this crate now carries them too.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [lib]
 name = "cellrix_web"

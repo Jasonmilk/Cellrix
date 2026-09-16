@@ -1,74 +1,68 @@
 # Cellrix 开发导航牌（PLAN）
 
-> **版本**：v1.2
-> **日期**：2026-09-14
+> **版本**：v1.3
+> **日期**：2026-09-17
 > **所属方法论**：phyt-DNA v1.0
 > **性质**：本文件是 Cellrix 的当前生长阶段导航牌。只含当前阶段 + 下一阶段预览 + 阶段总览。已完成的详细内容移入 GROWTH.md。
+> **引用约定**：不带仓名的 `ADR-XXXX` 一律指 `Cellrix:ADR-XXXX`（编号与他仓撞车，跨仓引用必带仓名）。
 
 ---
 
-## 当前阶段：**WebUI 全资产化解耦达成（ADR-0015 + ADR-0016）**
+## 当前阶段：**Web 面板的协议投影（ADR-0021）**
 
-ADR-0015 完成 WebUI 水之波光化（令牌/组件/行为三层资产 + 驾驶舱 v2 + 会话域 `session.html` + 证轨 v3 骨架）；ADR-0016 收掉 `web/assets/` 的**最后一个红线违例**——`prove_track.html` 955 行按关注点拆为 5 个资产：
+**根因（可证，非推测）**：Cellrix 协议早已定义 `GridDefinition` / `GridSlot`
+（`protocol/src/manifest.rs:36-59`）、`SemanticNode.slot_binding`（`snapshot.rs:38`）、
+`NodeType::Unknown`（`snapshot.rs:45-54`）。使用者实测为 `protocol`（定义）/ `layout`（纯数学引擎）/
+`mock-agent`（夹具），而 **`web/src` 零使用**。
 
-- `prove_track.css`（样式层，~281 行）· `prove_track.html`（骨架层，~79 行）
-- `prove_track.data.js`（数据层，纯函数零状态）· `prove_track.view.js`（视图层，独占 `S`/`HAS`）· `prove_track.js`（控制层，事件绑定 + 对外接口）
-- 跨资产经 `window.CxProveTrack` 命名空间桥接（沿用 ADR-0015 D14 `window.CxSession` 先例）；加载序 data → view → ctrl → `script.html` 为硬约束；对外接口名 `__proveTrackLoad/Clear` 不变，调用点零改动
-- 同轮修复 `base.html` 首字节残留 `        r#"`（把 DOCTYPE 挤出首位 → quirks mode + 页面顶部渲染字面量 `r#"`），并补 `assert!(html.starts_with("<!DOCTYPE html>"))` 回归网
+TUI 走「协议网格 → 布局引擎 → `ui`」即**碳硅同构**（DNA 原则 3：人类看到的视觉布局 =
+AI 看到的语义拓扑图，不允许"人类可见但 AI 不可寻址"的元素）；**`cellrix-web` 整体绕开协议模型**。
+**这才是"界面凭凑式"的根因**——不是"缺一套 slot 系统"。
 
-**下一步候选**：
-
-- **事件族装配层（`ADR-0018`，Accepted 2026-09-15）** —— 同一持久事件族 →
-  target-neutral 装配层 → 多 target（证轨 / 会话）。
-  **进度（2026-09-15）**：**T0 契约 / T1 骨架与加载序 / T2 共享原语 + `deriveCoordinates()` /
-  T3 证轨 target 接入 / T6 11 条验收网 + runner 已完成**；T4（经历侧栏）/ T5（对话实时流）/
-  T7（A/B 脚本化）待做。三个提交：`d413d39` / `d1def3b` / `8765622` / `dea7ced` / `269a086`。
-  装配层**不做 target 专属 fold**（`buildSession` 仍在证轨侧，D2 互不导入），
-  只提供**通用原语**：`upsert`（幂等合并 on `(kind,id)`，替换而非追加）+
-  `deriveCoordinates()`（turn 序号数 tape，不数到达顺序）。
-  契约含服务端 seq、丢弃已见 seq、缺口回拉、`digest()`（**键排序**，与插入顺序无关）。
-  加载序 `__EVENT_FAMILY__` → `__ASSEMBLY__` → data 为硬约束。
-  **变更驱动**（`feed()` 只标脏、`flush()` 才发布）；`turn/start` 未到恒 pending。
-  实测：`node web/tests/run_all.js` → 3 套绿 + 2 套需输入。
-- 会话管理深化（继续对话选择 + 状态栏耗时/token）／结晶闭环实施（Unmet≥2 → 判据候选 →
-  Tuck hard 规则）／生态加固（项目生命周期管理、tuck 小白引导、WebUI 一键重启）／身份绑定
-  （anaphase 1对1 JWT 绑定）
-
-**状态**：P0-P6 完成 + 候选 G 完成（G-T3 消费层 / G-T4 渲染 / G-T5 live 验证）
-
-**Cellrix 项目已完成所有规划阶段**，包括：
-- P0: 方法论初始化 + 现有代码审查
-- P1: CI-144 v2.0 对齐（PFP+SAP）
-- P2: Tuck 对接（审计日志 + 安全事件展示）
-- P3: Helix-Mind 联调（语义快照 + 认知工艺展示）
-- P4: Anaphase 联调（编排状态展示 + HITL 交互）
-- P5: Tentacle 联调（工具执行状态 + 插件审计展示）
-- P6: 生产就绪（配置/日志/监控/部署）
-
-**测试覆盖率**：325 个测试（`--all-features` 实测 2026-09-07，0 failed；protocol 137 / transport 95 / ui 90 + integration）
-
----
-
-## 候选 G：Anaphase 驾驶舱（ADR-0009）
-
-**目标**：Cellrix = Anaphase 意识层的白盒驾驶舱（正名：监控意识层，Helix-Mind 灵魂本体不驾驶）。
-
-| 任务 | 内容 | 状态 |
+| 期 | 目标 | 状态 |
 |---|---|---|
-| G-T3 | protocol 快照结构 + AnaphaseClient get_snapshot（一次拉全）+ HttpAnaphaseClient | ✅ |
-| G-T4 | CockpitWidget（模式栏+经历+ledger 审查）+ AppState.cockpit + renderer strip + attach_cockpit + cli --anaphase-endpoint | ✅ |
-| G-T5 | live 联调（真实 Anaphase 50061 ↔ HttpAnaphaseClient）+ serde 契约修正（snake_case） | ✅ |
-| G-T6 | ADR-0009 + PLAN + GROWTH + README | ✅ |
-| G-3 | transport 帧契约对齐（mock-agent 双通道字节序/编码/UDS 裸 Manifest，ADR-0010） | ✅ |
+| **T0** | 槽位契约（`docs/spec/grids.md` v2） | ✅ 已交付 |
+| **T1a** | 装配数据化：23 次 `replace` → `web/assets/boot.json` 起搏图 + `web/src/boot.rs`；**不碰 `base.html`** | ✅ **已完成并三重验证** |
+| **T1b** | 23 洞收敛为单一洞；**投影协议槽位**（`GridSlot.id` ↔ `slot_binding`） | ⬜ 待人类几何工作落地 |
+| **T2** | 皮片自注册 + 装配期校验 V1–V9 | ⬜ |
+| **T3** | 静照单向流（承接 `ADR-0018` D5） | ⬜ |
+| **T4** | 独立失败边界（一槽崩溃只黑一槽） | ⬜ |
+| **T5** | 依赖图分层门（防"凭凑"复发，CI 门禁） | ⬜ |
 
-**双端策略**：snapshot HTTP JSON 是唯一数据协议（TUI/Web 共享）；TUI 先行，Web 面板（G2）后续低摩擦接入。
+**T1a 判据（三重，全部通过）**
 
-**运行方式**：`cellrix-cli run --mode stdio --exec <agent> --anaphase-endpoint http://127.0.0.1:50061`（--mode 为传输模式 stdio/uds，非认知模式；Anaphase 需 cap_http_enabled）
+1. 差分测试 `boot_output_is_byte_identical_to_the_legacy_mechanism`（旧序列即预言机，
+   非冻结金标——金标会把测试绑到资产**内容**而非装配**机制**）
+2. HTTP 层：新二进制页面 vs 改动前**逐字节相同**（244858 B）
+3. `verify_live.py` 59/0 · `coupling_audit.py` 0 unresolved · JS 回归网 8/8
 
-**✅ G-3 已修复（2026-09-06，ADR-0010）**：mock-agent 帧契约对齐双通道字节序
-（stdio=LE / uds=BE + map-form rmp + UDS 裸 Manifest）——驾驶舱 TUI 双通道实测渲染通过
-（模式栏/经历/真实 MET ledger 投影），316 测试全绿无回归。
-**遗留**：transport 两套字节序未统一（物理事实保留，重构项）；transport 真实集成测试未自动化（手动 pty 实测覆盖）。
+红线：`main.rs` 279 行 / `boot.rs` 338 行（均 ≤400）。
+
+**已捕获的陷阱**：`script.html` 内含 `__REFRESH__` ⇒ 派生值必须在宿主皮片展开**之后**
+对整体应用一次（链式替换语义承重）；单遍模板替换会把字面量留在页面上。已由
+`boot::tests::derived_applies_after_its_host_piece` 守卫。
+
+**诚实约束**：`include_str!` 需字符串字面量 ⇒ 嵌入清单必然留在 `boot.rs`（Rust）。
+**图管装配顺序与映射，清单管嵌入内容**；新增资产 = 1 行清单 + 1 条图项。
+
+---
+
+## 下一阶段预览
+
+- **T1b 前置**：`web/tests/layout_test.js:127-129` 的 4a 几何断言（原文
+  "Written BEFORE the layout work, so they must be **RED** now"）须先转绿——
+  人类几何改动目前在飞（`base.html` / `prove_track.css` 未提交）。
+- **T1b 待裁决**：投影深度——只做槽位名对应，还是同时接通 `view_hash.slot_bindings`，
+  使 Web 面板与 TUI 共享 `CAPABILITY-13` PC-2 的共识锚点（"所见即所签"）。
+- **T5 之外**：E 区缺口（`session-query` 检索 / 崩溃修复 / 子 agent / 沙箱）是否另立 ADR。
+
+**历史候选（均已完成，明细见 GROWTH 与 `docs/archive/growth/`）**：
+`ADR-0015` 水之波光 WebUI · `ADR-0016` 证轨资产解耦（400 行红线清零）·
+`ADR-0018` 事件族装配层（T0/T1/T2/T3/T4/T6/T7 完成；**T5 阻塞待裁决**——
+实时 SSE 是 token 增量非事件族）· 候选 G Anaphase 驾驶舱（`ADR-0009`/`ADR-0010`）。
+
+**候选 G 遗留（活项，非历史）**：transport 两套字节序未统一（物理事实保留，重构项）；
+transport 真实集成测试未自动化（手动 pty 实测覆盖）。
 
 ---
 
@@ -83,7 +77,13 @@ ADR-0015 完成 WebUI 水之波光化（令牌/组件/行为三层资产 + 驾�
 | **P4** | Anaphase 联调（编排状态展示 + HITL 交互） | ✅ 已完成 |
 | **P5** | Tentacle 联调（工具执行状态 + 插件审计展示） | ✅ 已完成 |
 | **P6** | 生产就绪（配置/日志/监控/部署） | ✅ 已完成 |
-| **候选 G** | Anaphase 驾驶舱（协议/渲染/live） | ✅ ADR-0009 |
+| **候选 G** | Anaphase 驾驶舱（协议/渲染/live，`ADR-0009`/`ADR-0010`） | ✅ 已完成 |
+| **WebUI 资产化** | `ADR-0015` + `ADR-0016`（`web/assets/` 全部 ≤400 行） | ✅ 已完成 |
+| **事件族装配层** | `ADR-0018`（T5 待裁决 / T7 已完成） | 🔶 部分 |
+| **协议投影** | **`ADR-0021`（本阶段：T0 ✅ / T1a ✅ / T1b–T5 ⬜）** | 🚧 进行中 |
+
+**测试数**：341（2026-09-14 全量实测）；全生态 1563（口径见 `ECOSYSTEM.md` §1）。
+**口径陷阱**：`cargo test` 默认 fail-fast，不带 `--no-fail-fast` 不是真实总数。
 
 ---
 
@@ -100,6 +100,7 @@ ADR-0015 完成 WebUI 水之波光化（令牌/组件/行为三层资产 + 驾�
 | spec/contract.md | ✅ | `docs/spec/contract.md` |
 | spec/safety.md | ✅ | `docs/spec/safety.md` |
 | spec/positioning.md | ✅ | `docs/spec/positioning.md` |
+| **spec/grids.md** | ✅ **新增（ADR-0021 T0）** | `docs/spec/grids.md` |
 | PLAN.md | ✅ | `docs/PLAN.md` |
 | GROWTH.md | ✅ | `docs/GROWTH.md` |
 | DEPRECATE.md | ✅ | `docs/DEPRECATE.md` |
@@ -108,4 +109,4 @@ ADR-0015 完成 WebUI 水之波光化（令牌/组件/行为三层资产 + 驾�
 
 ---
 
-*《Cellrix 开发导航牌》v1.2（WebUI 全资产化解耦达成：ADR-0015 + ADR-0016，2026-09-14）。*
+*《Cellrix 开发导航牌》v1.3（Web 面板的协议投影：`ADR-0021` T0 + T1a 达成，2026-09-17）。*

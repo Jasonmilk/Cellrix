@@ -5,6 +5,7 @@
 //! 400-line decoupling red line (DNA v1.1), any file growing past 400 lines
 //! must be split — assets live in `web/assets/`, logic in `server.rs`/`config.rs`.
 
+mod boot;
 mod config;
 mod routes;
 mod server;
@@ -31,6 +32,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &cfg.tuck_endpoint {
         Some(ep) => println!("             prove_track chain @ {ep} (limit {})", cfg.tuck_limit),
         None => println!("             prove_track: off (pass --tuck-endpoint + --tuck-key to enable)"),
+    }
+    // White-box self-report (ADR-0021 T1a): name the live assembly graph rather
+    // than leave the operator to infer it from the binary's age.
+    match boot::graph() {
+        Ok(g) => println!("             {}", boot::describe(&g)),
+        Err(e) => eprintln!("cellrix-web: 起搏图损坏: {e}"),
     }
     health_check(&cfg);
 
@@ -94,73 +101,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// and renders the two projections of the same truth the TUI shows.
 /// No frameworks, no build step. View switch mirrors the TUI's Ctrl+E.
 ///
-/// 资产化拼装（ADR-0015 D8 / 解耦）：视图 HTML/CSS/JS 全部独立为
-/// web/assets/*.html，宿主只做 replace 拼装——零 format! 转义，
-/// Assets may write `{}` freely. The only dynamic value is __REFRESH__, which
-/// comes from a constant rather than from the config.
+/// 起搏图装配（ADR-0021 T1a）：面板由什么构成是**数据**——顺序与映射住在
+/// `web/assets/boot.json`，不再散落为本文件里的 23 次 `replace`。机制在
+/// `boot.rs`；本函数只取结果，并把装配失败变成**响亮的诚实状态**。
+///
+/// 资产仍是编译期 `include_str!` 嵌入（零构建步骤，ADR-0016 D7），所以
+/// "哪些字节被嵌入"必然留在 `boot.rs` 的清单里——那是嵌入清单，不是装配逻辑。
 ///
 /// Nothing from `PanelConfig` is injected today, so the parameter is unused —
 /// it stays so callers don't churn when the first dynamic value lands (e.g.
 /// injecting the flowmodus endpoint for the Flows view).
 fn index_html(_cfg: &PanelConfig) -> String {
-    const BASE: &str = include_str!("../assets/base.html");
-    const TOKENS: &str = include_str!("../assets/tokens.html");
-    const COMPONENTS: &str = include_str!("../assets/components.html");
-    const COCKPIT: &str = include_str!("../assets/cockpit.html");
-    const CHAT: &str = include_str!("../assets/chat.html");
-    const PROVE_TRACK: &str = include_str!("../assets/prove_track.html");
-    // ADR-0016: ProveTrack split by concern — bare CSS/JS assets are wrapped by
-    // base.html (`<style>` in head, `<script>` before __SCRIPT__). Load order
-    // data → view → ctrl is a hard constraint (ctrl defines __proveTrackLoad,
-    // which script.html's selectPeriod calls).
-    const PROVE_TRACK_CSS: &str = include_str!("../assets/prove_track.css");
-    // ADR-0018: the event family contract and the assembly layer load BEFORE
-// the data layer — the data layer consumes what the assembly produces.
-const EVENT_FAMILY: &str = include_str!("../assets/event_family.js");
-const NORMALIZE: &str = include_str!("../assets/period_normalize.js");
-const NODE_SHAPE: &str = include_str!("../assets/node_shape.js");
-const ASSEMBLY: &str = include_str!("../assets/assembly.js");
-const PROVE_TRACK_DATA: &str = include_str!("../assets/prove_track.data.js");
-const PROVE_TRACK_RENDER: &str = include_str!("../assets/prove_track.render.js");
-const PROVE_TRACK_NODE: &str = include_str!("../assets/prove_track.node.js");
-    const PROVE_TRACK_EXPORT: &str = include_str!("../assets/prove_track.export.js");
-const PROVE_TRACK_VIEW: &str = include_str!("../assets/prove_track.view.js");
-    const PROVE_TRACK_CTRL: &str = include_str!("../assets/prove_track.js");
-    const SCRIPT: &str = include_str!("../assets/script.html");
-    // View-owned assets (ADR-0015 D8 follow-through): the shell keeps the
-    // frame, each view owns its own rendering. Load order is a hard
-    // constraint — the shell defines `window.Cx`, and every view asset reads
-    // it at IIFE time, so __SCRIPT__ must come first in base.html.
-    const CHAT_JS: &str = include_str!("../assets/chat.js");
-    const COCKPIT_JS: &str = include_str!("../assets/cockpit.js");
-    const SESSION: &str = include_str!("../assets/session.html");
-    const GLEAM: &str = include_str!("../assets/gleam.html");
-    const FLOWS: &str = include_str!("../assets/flows.html");
-
-    BASE
-        .replace("__TOKENS__", TOKENS)
-        .replace("__COMPONENTS__", COMPONENTS)
-        .replace("__COCKPIT__", COCKPIT)
-        .replace("__CHAT__", CHAT)
-        .replace("__PROVE_TRACK__", PROVE_TRACK)
-        .replace("__PROVE_TRACK_CSS__", PROVE_TRACK_CSS)
-        .replace("__EVENT_FAMILY__", EVENT_FAMILY)
-        .replace("__NORMALIZE__", NORMALIZE)
-        .replace("__NODE_SHAPE__", NODE_SHAPE)
-        .replace("__ASSEMBLY__", ASSEMBLY)
-        .replace("__PROVE_TRACK_DATA__", PROVE_TRACK_DATA)
-        .replace("__PROVE_TRACK_RENDER__", PROVE_TRACK_RENDER)
-        .replace("__PROVE_TRACK_NODE__", PROVE_TRACK_NODE)
-        .replace("__PROVE_TRACK_EXPORT__", PROVE_TRACK_EXPORT)
-        .replace("__PROVE_TRACK_VIEW__", PROVE_TRACK_VIEW)
-        .replace("__PROVE_TRACK_CTRL__", PROVE_TRACK_CTRL)
-        .replace("__SCRIPT__", SCRIPT)
-        .replace("__CHAT_JS__", CHAT_JS)
-        .replace("__COCKPIT_JS__", COCKPIT_JS)
-        .replace("__SESSION__", SESSION)
-        .replace("__GLEAM__", GLEAM)
-        .replace("__FLOWS__", FLOWS)
-        .replace("__REFRESH__", &config::REFRESH_SECS.to_string())
+    match boot::render_index() {
+        Ok(page) => page,
+        // Loud, honest failure: a broken graph is a build mistake, and naming it
+        // in the browser beats a blank panel (fail-loud, never silent).
+        Err(e) => {
+            eprintln!("cellrix-web: 起搏图损坏: {e}");
+            boot::failure_page(&e)
+        }
+    }
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@
 [![Protocol](https://img.shields.io/badge/Protocol-CI--144%20v2.0-blue.svg)]()
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
-[![Tests](https://img.shields.io/badge/tests-341-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-349-green.svg)]()
 [![Phases](https://img.shields.io/badge/phases-P0--P6%20complete-5B5FC7.svg)]()
 
 ---
@@ -45,7 +45,7 @@
 > the page. The missing `</head>` was restored too. Existing tests only
 > used `contains` assertions and never checked the first byte, which is why
 > it survived this long; `assert!(html.starts_with("<!DOCTYPE html>"))`
-> now guards it. `cargo test --no-fail-fast` = **341 passed / 0 failed**.
+> now guards it. `cargo test --no-fail-fast` = **349 passed / 0 failed / 4 ignored**（2026-09-17 实测）。
 >
 > **Status 2026-09-09 (ADR-0015 D14)**: Session management deepened under
 > the **水之波光 · 触境** component language, on a **durable-session-log skeleton**
@@ -615,13 +615,37 @@ Cellrix follows the **phyt-DNA** (Plant DNA) self-growth methodology, ensuring k
 
 ### Architecture Decision Records (ADR)
 
+> 本表由 ADR 文件头部的 `状态` 字段机械提取（共 18 份）。
+> **缺号 0011–0013**（未创建；编号不回收，见 `ECOSYSTEM.md` 惯例）。
+
 | ADR | Title | Status |
 |---|---|---|
-| ADR-0001 | Methodology Initialization | ✅ Adopted |
-| ADR-0002 | CI-144 v2.0 Alignment (PFP+SAP) | ✅ Adopted |
-| ADR-0003 | Tuck Integration Architecture | ✅ Adopted |
-| ADR-0004 | CPPC v1.1.0 as v2.0 Vision | ✅ Adopted |
-| ADR-0005 | Helix-Mind Integration Architecture | ✅ Adopted |
+| ADR-0001 | 方法论初始化 + phyt-DNA 采用 | ✅ 已采纳 |
+| ADR-0002 | CI-144 v2.0 对齐（PFP+SAP） | ✅ 已采纳 |
+| ADR-0003 | Tuck 对接架构 | ✅ 已采纳 |
+| ADR-0004 | CPPC v1.1.0 作为 Cellrix v2.0 北极星愿景 | ✅ 已采纳 |
+| ADR-0005 | Helix-Mind 联调架构 | ✅ 已采纳 |
+| ADR-0006 | Anaphase 联调架构 | ✅ 已采纳 |
+| ADR-0007 | Tentacle 联调架构决策 | ✅ 已采纳 |
+| ADR-0008 | 生产就绪架构决策 | ✅ 已采纳 |
+| ADR-0009 | Anaphase 驾驶舱（候选 G）——双端协议 + TUI 先行 | ✅ Accepted |
+| ADR-0010 | transport 帧契约对齐（G-3）——mock-agent 对齐双通道字节序 | ✅ Accepted |
+| ADR-0014 | Web 面板（G2）——cellrix-web，浏览器白盒窗口 | ✅ Accepted |
+| ADR-0015 | WebUI 水之波光化（Lumtact 设计体系） | ✅ Accepted |
+| ADR-0016 | 证轨资产解耦（`prove_track.html` 955 → 5 资产） | ✅ Accepted |
+| ADR-0017 | 证轨资产语言统一（源码与界面文案一律英文） | ✅ Accepted |
+| ADR-0018 | 事件族装配层——经历与证轨成为同一事件流的两个 target | ✅ Accepted |
+| ADR-0019 | 事件流坐标与通道身份 | 🔶 Proposed（含三个决策点） |
+| ADR-0020 | 面板的解锁（密码） | 📝 Draft · 未冻结 |
+| **ADR-0021** | **Web 面板的协议投影（Protocol Projection）** | 🔶 **Proposed** |
+
+> **ADR-0021 摘要（2026-09-17）**：Web 面板必须成为协议 `GridDefinition` / `GridSlot` 的投影。
+> 根因可证——协议早已定义 `GridDefinition`/`GridSlot`（`protocol/src/manifest.rs:36-59`）、
+> `SemanticNode.slot_binding`（`snapshot.rs:38`）、`NodeType::Unknown`（`snapshot.rs:45-54`），
+> 而 **`web/src` 零使用**；TUI 走「协议网格 → 布局引擎 → `ui`」即碳硅同构（DNA 原则 3），
+> `cellrix-web` 整体绕开协议模型。**T0 槽位契约（`docs/spec/grids.md`）+ T1a 装配数据化已完成**
+> （23 次链式 `replace` + 24 个 `include_str!` → `web/assets/boot.json` 起搏图 + `web/src/boot.rs`，
+> 输出与旧机制**逐字节相同**）；T1b–T5 待做。
 
 ### CPPC v1.1.0 Vision (Cellrix Physical Protocol Charter)
 
