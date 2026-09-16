@@ -113,6 +113,12 @@
         ' — so a gap in the row numbering is expected');
     }
     out.push('- these are the rows the trajectory rendered: nothing is re-derived here');
+    /* `wait` is the interval that ENDED at the row, not a stage's own time. One
+     * model call produces thinking and answer together, so they share one call
+     * and only the call has a duration — naming it after one of them would
+     * report a certainty nobody measured. */
+    out.push('- `wait` is the interval that ended at that row; for a model row it is the');
+    out.push('  whole call (thinking and answer come from one call, so neither has its own)');
     out.push('- every row carries `ref` — `source#lineNo` — so it can be checked against its record');
     out.push('');
     var n = 0;
@@ -120,8 +126,8 @@
       out.push('## ' + (g.turn ? 'Turn ' + g.turn.index + ' · ' + cell(g.turn.note) : 'Rows'));
       out.push('');
       if (!g.rows.length) { out.push('_no rows_'); out.push(''); return; }
-      out.push('| # | ref | class | status | duration | tokens | summary |');
-      out.push('|---|-----|-------|--------|----------|--------|---------|');
+      out.push('| # | ref | class | status | wait | tokens | summary |');
+      out.push('|---|-----|-------|--------|------|--------|---------|');
       g.rows.forEach(function (r) {
         n++;
         out.push('| ' + n + ' | `' + cell(r.id) + '` | ' + cell(r.cls) + ' | ' + cell(r.status) +

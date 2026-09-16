@@ -281,6 +281,21 @@ if (NODE_SIDE && RENDER) {
   const gapRows2 = toolSession.filter(function (r) {
     return r.kind === 'ev' && gapCls.indexOf(r.cls) > -1;
   });
+  /* The direction is part of the meaning: a response-side row carries the wait
+   * that ENDED at it. Derived here from the timestamps rather than pinned to a
+   * number, so a future flip of the direction cannot pass by matching a value. */
+  check('a gap row carries the interval that ended at it, derived',
+    (function () {
+      var drawn = toolSession.filter(function (r) { return r.kind === 'ev'; });
+      for (var i = 1; i < drawn.length; i++) {
+        var r = drawn[i], prev = drawn[i - 1];
+        if (gapCls.indexOf(r.cls) < 0) { continue; }
+        var want = Math.max(0, Date.parse(r.ts) - Date.parse(prev.ts));
+        if (!isFinite(want)) { continue; }
+        if (r.dur !== want) { return false; }
+      }
+      return true;
+    })());
   check('reasoning rows are measured by the gap, not left at zero',
     gapRows2.some(function (r) { return r.dur > 0; }),
     gapRows2.length + ' rows in ' + toolChain + ', all zero');

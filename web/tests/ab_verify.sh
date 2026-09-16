@@ -27,6 +27,18 @@ if [ ! -x "$BIN" ]; then
   exit 2
 fi
 
+# ------------------------------------------------- capability parity
+# The harness must run the same way the real launcher does. `up` starts tentacle
+# with --plugins-dir; this script did not, so every run here had ZERO tools while
+# the page still passed every check — a false green of exactly the kind this file
+# exists to prevent. Its own launcher is checked, not remembered.
+if ! grep -q -- "--plugins-dir" "$(dirname "${BASH_SOURCE[0]}")/start-panel.sh"; then
+  echo "REJECT: start-panel.sh starts tentacle without --plugins-dir."
+  echo "        The harness then has NO tools while the real launcher (up) does,"
+  echo "        so every result here is about a differently-equipped system."
+  exit 2
+fi
+
 # ---------------------------------------------------------------- freshness
 # `find -newer` compares mtimes directly; no date parsing, no arithmetic.
 stale="$(find "$ASSETS" -type f -newer "$BIN" 2>/dev/null | sort)"
@@ -42,6 +54,7 @@ if [ -n "$stale" ]; then
   exit 2
 fi
 echo "fresh — the binary is newer than every asset under web/assets/"
+
 
 if [ "${1:-}" = "--check" ]; then
   exit 0

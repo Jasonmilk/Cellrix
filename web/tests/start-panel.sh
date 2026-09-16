@@ -107,7 +107,13 @@ spawn tuck "$WS/Tuck" "$TUCK_BIN" --config config.toml
 wait_port 60052 tuck 15 || exit 1
 
 echo "[2/6] tentacle  :50051 (gRPC)"
-spawn tentacle "$WS/helix-tentacle" "$TENT_BIN" --transport grpc --grpc-port 50051
+# Without --plugins-dir tentacle registers NOTHING, list_tools() returns empty,
+# and the tools block is silently dropped from the system prompt — the model then
+# truthfully reports "no tools available" (measured: 40+ periods with zero tool
+# calls after 2026-09-13 20:04, the last run that DID call one, against the same
+# model). The launcher has to name the directory that holds the tools.
+spawn tentacle "$WS/helix-tentacle" "$TENT_BIN" --transport grpc --grpc-port 50051 \
+  --plugins-dir "$WS/helix-tentacle/fixtures"
 wait_port 50051 tentacle 20 || exit 1
 
 echo "[3/6] mind      :50052 (gRPC)"
