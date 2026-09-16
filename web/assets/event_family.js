@@ -198,6 +198,12 @@
    * direction — a fifth vocabulary avoided by pushing UI semantics into the
    * contract instead. The lane table belongs to the view.
    */
+  /* The closed set of classes. Declared so a guard can check membership: a rule
+   * phrased as "cls must not name a lane" is a denylist, and a new lane named
+   * something else would pass it. */
+  var CLASSES = ['SYSTEM', 'USER', 'CONTEXT', 'THINK', 'ATTEMPT',
+                 'TOOL', 'CHECK', 'VERDICT', 'REPLY', 'USAGE', 'END'];
+
   var KIND_CLASS = {
     turn: 'SYSTEM',
     message: 'USER',
@@ -352,6 +358,7 @@
     KINDS: KINDS,
     KIND_OF: KIND_OF,
     KIND_CLASS: KIND_CLASS,
+    CLASSES: CLASSES,
     classOf: classOf,
     interpret: interpret,
     PAYLOAD_MAP: PAYLOAD_MAP,
