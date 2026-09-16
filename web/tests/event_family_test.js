@@ -130,6 +130,36 @@ check('empty data validates only for turn/start',
   check('the contract exposes no per-type interpreter functions',
     typeof EF.INTERPRETERS === 'undefined');
 
+  // P0-1: PAYLOAD_MAP and DATA_SCHEMA both answer "which fields does this type
+  // have". A name in one and not the other is a field fact that has split.
+  const undeclared = [];
+  Object.keys(EF.PAYLOAD_MAP).forEach(function (typeName) {
+    const decl = EF.DATA_SCHEMA[typeName] || {};
+    const known = Object.keys(decl.required || {}).concat(Object.keys(decl.optional || {}));
+    Object.keys(EF.PAYLOAD_MAP[typeName]).forEach(function (payloadKey) {
+      const from = EF.PAYLOAD_MAP[typeName][payloadKey][0];
+      if (from.charAt(0) === '?') { return; }        // a literal, not a field
+      if (known.indexOf(from) === -1) { undeclared.push(typeName + '.' + from); }
+    });
+  });
+  check('every field PAYLOAD_MAP reads is declared in DATA_SCHEMA',
+    undeclared.length === 0, JSON.stringify(undeclared));
+
+  // P0-2: an optional field the producer omitted is counted, not silent.
+  {
+    const missing = [];
+    EF.interpret(EF.TYPES.ASSISTANT_REPLY, { text: 'x', chars: 1 }, missing);
+    check('an omitted optional field is counted, not silently dropped',
+      missing.length === 1 && missing[0] === 'assistant/reply.model',
+      JSON.stringify(missing));
+    check('a present optional field is not counted',
+      (function () { const m = []; EF.interpret(EF.TYPES.ASSISTANT_REPLY,
+        { text: 'x', chars: 1, model: 'm' }, m); return m.length === 0; })());
+    check('a required field is null, not counted, when absent',
+      (function () { const m = []; const r = EF.interpret(EF.TYPES.USER_MESSAGE, {}, m);
+        return r.payload.text === null && m.length === 0; })());
+  }
+
   check('tool call and result share the kind, differ by stage',
     call.kind === res.kind && call.payload.stage === 'call' && res.payload.stage === 'result');
 }

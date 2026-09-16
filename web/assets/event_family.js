@@ -89,6 +89,14 @@
    * per-type functions would also have been "type knowledge in one place", but
    * it would have been twelve pieces of hardcoding in the contract layer's coat.
    *
+   * Every field named here is declared in DATA_SCHEMA for the same type, and
+   * asserted so. The first draft of this table guessed names for check/status,
+   * verdict/status and tool/call ('name', 'state', 'detail', 'args') that the
+   * declaration never had — four of them did not exist in any real event
+   * either. Measured over the real periods: tool/call carries tool/index/expect,
+   * check/status carries check_id/check/expect/actual/gate/…, verdict/status
+   * carries job_id/status.
+   *
    * Entry forms:
    *   ['field']                    copy data.field as-is
    *   ['field', 'snake']           copy, camelCasing the payload name
@@ -108,15 +116,21 @@
     'assistant/think': { text: ['text'] },
     'assistant/attempt': { text: ['text'] },
     'tool/call': {
-      stage: ['?tool/call', 'lit:call'], tool: ['tool'], index: ['index'],
-      expect: ['expect'], args: ['args', 'maybe']
+      stage: ['?tool/call', 'lit:call'], tool: ['tool'], index: ['index'], expect: ['expect']
     },
     'tool/result': {
       stage: ['?tool/result', 'lit:result'], tool: ['tool'], ok: ['ok'],
       durationMs: ['duration_ms', 'snake'], outcome: ['outcome', 'maybe']
     },
-    'check/status': { name: ['name'], state: ['state'], detail: ['detail', 'maybe'] },
-    'verdict/status': { name: ['name'], state: ['state'], detail: ['detail', 'maybe'] },
+    'check/status': {
+      checkId: ['check_id', 'snake'], check: ['check'], expect: ['expect'],
+      actual: ['actual'], gate: ['gate'], evidenceId: ['evidence_id', 'snake', 'maybe'],
+      judge: ['judge', 'maybe'], passed: ['passed', 'maybe'], reason: ['reason', 'maybe']
+    },
+    'verdict/status': {
+      jobId: ['job_id', 'snake'], status: ['status'],
+      checks: ['checks', 'maybe'], reason: ['reason', 'maybe']
+    },
     'assistant/reply': { text: ['text'], chars: ['chars'], model: ['model', 'maybe'] },
     'assistant/usage': {
       promptTokens: ['prompt_tokens', 'snake'], completionTokens: ['completion_tokens', 'snake']
@@ -132,7 +146,7 @@
    * Unknown name: no interpretation, no guess. Refusing is the caller's call;
    * this layer never invents meaning.
    */
-  function interpret(typeName, data) {
+  function interpret(typeName, data, missing) {
     var kind = KIND_OF[typeName];
     var map = PAYLOAD_MAP[typeName];
     if (!kind || !map) { return null; }
@@ -148,7 +162,17 @@
       }
       var has = Object.prototype.hasOwnProperty.call(src, from) && src[from] !== undefined;
       if (!has) {
-        if (spec.indexOf('maybe') === -1) { payload[key] = null; }
+        /* An optional field the producer did not send. Counted, never silent:
+         * a field going quiet must show up as a number, not as a payload that
+         * quietly got smaller while every assertion stayed green. Pass a
+         * collector to observe it; omitting the argument is not an error. */
+        if (spec.indexOf('maybe') !== -1) {
+          if (missing && typeof missing.push === 'function') {
+            missing.push(typeName + '.' + from);
+          }
+        } else {
+          payload[key] = null;
+        }
         continue;
       }
       payload[key] = src[from];
