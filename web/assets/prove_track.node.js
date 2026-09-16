@@ -277,4 +277,100 @@
     SUMMARY: SUMMARY,
     STATUS: STATUS
   };
+
+
+  /* ---- moved from the event-based layer, now node-based ----------------- */
+
+  function safeCount(n) {
+    return typeof n === 'number' && isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER;
+  }
+  function fmtDur(ms) { return ms === 0 ? '—' : (ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's'); }
+  function fmtTok(n) { return (n == null) ? '—' : Number(n).toLocaleString('en-US'); }
+
+  /* Metering is a kind, not a protocol name. No metering event means the
+   * upstream reported nothing means the fact does not exist — no approximation,
+   * and an overflow withholds the whole aggregate rather than publishing a
+   * wrapped sum. */
+  function derivePeriodUsage(nodes) {
+    var calls = 0, prompt = 0, completion = 0;
+    var cachedSum = 0, cachedAll = true, reasoningSum = 0, reasoningAll = true;
+    (nodes || []).forEach(function (n) {
+      if (n.kind !== 'metering') { return; }
+      var p = n.payload || {};
+      if (!safeCount(p.promptTokens) || !safeCount(p.completionTokens)) { return; }
+      calls++;
+      prompt += p.promptTokens;
+      completion += p.completionTokens;
+      if (p.cachedTokens == null) { cachedAll = false; } else { cachedSum += p.cachedTokens; }
+      if (p.reasoningTokens == null) { reasoningAll = false; } else { reasoningSum += p.reasoningTokens; }
+    });
+    if (!calls) { return null; }
+    if (!safeCount(prompt) || !safeCount(completion)) { return null; }
+    var cached = (cachedAll && safeCount(cachedSum)) ? cachedSum : null;
+    var reasoning = (reasoningAll && safeCount(reasoningSum)) ? reasoningSum : null;
+    return {
+      calls: calls, prompt: prompt, completion: completion,
+      cached: cached, reasoning: reasoning,
+      /* Disjoint input: unknowable when cached is absent (prompt - 0 would be
+       * guessing a cache miss). */
+      input: (cached == null) ? null : prompt - cached,
+      total: prompt + completion
+    };
+  }
+
+  /* The tool row's own payload, for the inspector. `stage` separates the call
+   * from the result — the same field classOf reads, not a protocol name. */
+  function resultOf(node) {
+    var p = node.payload || {};
+    if (node.kind !== 'tool' || p.stage !== 'result') { return null; }
+    return {
+      tool: p.tool, ok: p.ok, durationMs: p.durationMs,
+      outcome: p.outcome, outcomeSha: p.outcomeSha
+    };
+  }
+
+  /* ---- build: node stream -> SESSION ----------------------------------- */
+  function buildSession(nodes) {
+    var out = [];
+    var note = 'a session';
+    var shown = nodes || [];
+    var seenTurn = {};
+    shown.forEach(function (n) {
+      var cls = EF.classOf(n);
+      var lane = laneOf(n.kind);
+      /* A turn header per distinct turn, emitted where the turn first appears —
+       * a resumed session has more than one, and pinning them all to 't1'
+       * silently merged them. The ordinal now arrives on the node. */
+      if (n.turn && !seenTurn[n.turn]) {
+        seenTurn[n.turn] = true;
+        out.push({
+          kind: 'turn', id: n.turn,
+          index: Number(String(n.turn).slice(1)), note: short(note, 60)
+        });
+      }
+      if (!cls) { return; }
+      var dur = 0;
+      if (n.kind === 'tool' && n.payload && n.payload.stage === 'result') {
+        dur = n.payload.durationMs || 0;
+      }
+      out.push({
+        kind: 'ev', id: n.node, turn: n.turn, cls: cls, lane: lane,
+        ord: n.ord, ts: n.ts, dur: dur,
+        status: statusOf(n), summary: summarize(n),
+        payload: payloadOf(n), detail: detailOf(n)
+      });
+    });
+    /* The array shape is the contract with the caller: prove_track.js assigns
+     * it to S.session and iterates it. usage is derived separately by the same
+     * caller, exactly as before — changing the return shape here would be a
+     * silent break at the switch. */
+    return out;
+  }
+
+  PT.node.derivePeriodUsage = derivePeriodUsage;
+  PT.node.resultOf = resultOf;
+  PT.node.buildSession = buildSession;
+  PT.node.safeCount = safeCount;
+  PT.node.fmtDur = fmtDur;
+  PT.node.fmtTok = fmtTok;
 })();
