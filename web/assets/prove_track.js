@@ -200,7 +200,7 @@
   function onEnter() {
     if (!shell()) { return; }
     var Cx = window.Cx;
-    var want = Cx.state.chatJobId || null;
+    var want = Cx.state.nav.period || null;
     var t = Cx.tape();
     /* The window on the tape is reused when it is the one we were asked for;
      * otherwise a read is needed. An empty tape is never "reused" — that is how

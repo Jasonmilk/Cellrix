@@ -17,6 +17,15 @@
    * [GENE] 0 硬编码 —— 视图清单不写死在壳里。 */
   function navButtons() { return document.querySelectorAll('.nav [data-view]'); }
 
+  /* The default view is the one the markup marks as current. Read from the
+   * markup rather than named here: the shell is not allowed to know a view it
+   * does not own, and a name written here would be a second source for the
+   * view list. */
+  function defaultView() {
+    var on = document.querySelector('.nav [data-view].on') || navButtons()[0];
+    return on ? on.getAttribute('data-view') : null;
+  }
+
   /* Enter hooks are declared by the view assets themselves (Cx.onEnter), so
    * the shell never names a view it does not own. Leaving is the mirror of
    * entering, declared the same way. */
@@ -93,7 +102,63 @@
       });
   }
 
-  function showView(v) {
+  /* ---- ONE selection state (ADR-0022 N-003) ------------------------------
+   * At any instant there is exactly one "current view + current period", and it
+   * lives here as `Cx.state.nav`. Every entry point — nav button, session card,
+   * continuation, the address bar — funnels through `setNav`, the only writer.
+   *
+   * Measured before this change: the period was assigned at five sites across
+   * three assets, and the view existed only as `style.display`. The address bar,
+   * the sidebar and the trajectory could therefore each hold a different idea of
+   * where we are, and nothing could report which one was current. */
+  var STATE = { nav: { view: null, period: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
+  var NAV = STATE.nav;
+
+  function hashFor(state) {
+    return window.CxNormalize ? window.CxNormalize.buildHash(state) : '';
+  }
+
+  /* Writes nav, writes the address bar, renders. Nothing else writes nav —
+   * not even the two paths that adopt what the address bar already says. */
+  function setNav(patch, opts) {
+    opts = opts || {};
+    var before = NAV.view;
+    if (patch) {
+      if (patch.view) NAV.view = patch.view;
+      if (patch.period !== undefined) NAV.period = patch.period || null;
+      /* The metadata cache is written by the same hand as the period it
+       * describes, so it cannot come to describe a different period. */
+      if (patch.meta !== undefined) window.__proveTrackMeta = patch.meta;
+    }
+    var want = hashFor(NAV);
+    /* N-005: changing VIEW is a navigation and pushes an entry, so Back returns
+     * to the view we came from. A period-only change (a reply creating a period,
+     * continuing another) replaces the current entry instead, so Back does not
+     * walk the conversation message by message. N-009: either way the address
+     * bar is the serialisation of this state, never a stale copy of it.
+     *
+     * `opts.replace` is for the ADOPTING paths (boot, Back/Forward): the URL is
+     * already the authority there, and normalising it must not mint a history
+     * entry of its own. */
+    try {
+      if (opts.replace) {
+        if (location.hash !== want) {
+          history.replaceState(null, '', want || (location.pathname + location.search));
+        }
+      } else if (NAV.view !== before) {
+        if (location.hash !== want) location.hash = want;
+      } else if (location.hash !== want) {
+        history.replaceState(null, '', want || (location.pathname + location.search));
+      }
+    } catch (e) { /* an opaque origin must not stop the panel rendering */ }
+    applyView(NAV.view);
+  }
+
+  /* Renders a view and runs its enter/leave hooks. Does NOT write the state:
+   * `showView` routes here through `setNav`, so the DOM cannot disagree with
+   * `nav`. */
+  function applyView(v) {
+    v = v || defaultView();
     var bs = navButtons(), i, n;
     for (i = 0; i < bs.length; i++) {
       n = bs[i].getAttribute('data-view');
@@ -113,23 +178,39 @@
   }
 
   window.Cx = {
-    state: { chatJobId: null, sesSeq: 0, histSeq: 0, chatBusy: false },
+    state: STATE,
     esc: esc,
-    showView: showView,
-    // Explicit continuation (ADR-0026): chatJobId 置位时，下一句续接该经历。
+    /* The single writer, and the renderer that reads it. A view is chosen by
+     * setNav and by nothing else. */
+    setNav: setNav,
+    showView: function (v) { setNav({ view: v }); },
+    // Explicit continuation (ADR-0026): nav.period 置位时，下一句续接该经历。
     // No stream parameter: the trajectory reads the tape, and the tape is fed
     // once by loadWindow. Handing a stream in as well was the second way in —
     // the reason the two projections could drift apart.
-    selectPeriod: function (jobId) {
+    selectPeriod: function (jobId, patch) {
+      var p = { period: jobId || null };
+      if (patch) {
+        if (patch.view) p.view = patch.view;
+        if (patch.meta !== undefined) p.meta = patch.meta;
+      }
       /* `state` is a KEY of this object literal, not a local: writing
        * `state.x` here silently created a property on the DOM element with
        * id="state" instead (a named-access global), so Cx.state was never set
-       * and every reader of chatJobId saw null. Measured: the guard dropped
+       * and every reader of the period saw null. Measured: the guard dropped
        * from 55 passed to 46 passed / 1 failed, and the panel reported
-       * "经历列表拉取失败: Cannot read properties of undefined (reading
-       * 'chatJobId')". Name the owner. */
-      window.Cx.state.chatJobId = jobId || null;
-      if (window.__proveTrackLoad) window.__proveTrackLoad(jobId, window.__proveTrackMeta || null);
+       * "经历列表拉取失败: Cannot read properties of undefined". Name the
+       * owner. */
+      /* ORDER MATTERS, and it is not the obvious one. The trajectory's loader
+       * CLEARS the table and waits for the tape to flush it; the flush happens
+       * in the view's enter hook. So the loader must run BEFORE the view is
+       * applied. Measured: with the two reversed, the table kept whatever the
+       * flush had just drawn erased, and the panel sat on "Loading …" — 0 event
+       * rows, which is what all_views_test.js caught. */
+      if (window.__proveTrackLoad) {
+        window.__proveTrackLoad(jobId, p.meta !== undefined ? p.meta : (window.__proveTrackMeta || null));
+      }
+      setNav(p);
     },
     showToast: showToast,
     onEnter: function (name, fn) { (ENTER[name] = ENTER[name] || []).push(fn); },
@@ -215,7 +296,7 @@
     for (var i = 0; i < bs.length; i++) {
       (function (b) {
         b.addEventListener('click', function () {
-          showView(b.getAttribute('data-view'));
+          setNav({ view: b.getAttribute('data-view') });
         });
       })(bs[i]);
     }
@@ -226,7 +307,33 @@
   setInterval(loadEcosystem, refresh * 1000);
   // Inline `onclick` attributes resolve against the global scope — expose the
   // interactive entry points explicitly (they live in this IIFE).
-  window.showView = showView;
+  window.showView = function (v) { setNav({ view: v }); };
+
+  /* N-009: read the address bar once. Deferred to DOMContentLoaded because the
+   * view assets register their enter hooks while the page parses — prove_track.js
+   * defers its own registration to exactly this event — and a restored
+   * `#view=…` that ran before those hooks existed would restore the chrome and
+   * leave the view empty. */
+  function bootNav() {
+    var N = window.CxNormalize;
+    var from = N ? N.parseHash(location.hash) : { view: null, period: null };
+    /* N-010: total by construction — a hash the panel did not write yields an
+     * empty state, and the default view still renders. */
+    setNav({ view: from.view || defaultView(), period: from.period || null }, { replace: true });
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bootNav); }
+  else { bootNav(); }
+
+  /* N-005: Back and Forward keep working between views. The browser already
+   * owns that history; this only adopts what the address bar now says. Guarded
+   * against the hash this shell itself just wrote, so applying it cannot loop. */
+  window.addEventListener('hashchange', function () {
+    var N = window.CxNormalize;
+    if (!N) return;
+    var from = N.parseHash(location.hash);
+    if (from.view === NAV.view && from.period === NAV.period) { return; }
+    setNav({ view: from.view || defaultView(), period: from.period || null }, { replace: true });
+  });
   // 主题按钮状态初始化（与 head 引导脚本对齐）
   (function(){ try{
     var K='cellrix-theme', cur=localStorage.getItem(K)||'auto';

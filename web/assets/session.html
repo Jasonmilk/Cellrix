@@ -5,6 +5,11 @@
 (function () {
   var Cx = window.Cx || {};
   var st = Cx.state || {};
+  /* The shell assembles before this piece (assets/boot.json fixes the order), so
+   * the shared state exists by now — but read the selection through the live
+   * global rather than a captured copy. `nav` is the shell's ONE selection state
+   * (ADR-0022 N-003); a copy here would be a second one. */
+  function nav() { return (window.Cx && window.Cx.state && window.Cx.state.nav) || {}; }
 
   function esc(s) { return Cx.esc ? Cx.esc(s) : String(s); }
   function skRow() {
@@ -111,10 +116,10 @@
     };
     chain.forEach(function (p) {
       var div = document.createElement('div');
-      var sel = (chatMode ? st.chatJobId : null) === p.job_id;
+      var sel = (chatMode ? nav().period : null) === p.job_id;
       div.className = 'ses-item' + (sel ? ' sel' : '');
       div.setAttribute('data-ts', p.first_ts || '');
-      /* `st` is this asset's module state object (st.chatJobId / st.sesSeq) —
+      /* `st` is this asset's module state object (st.sesSeq / st.histSeq) —
        * shadowing it here with a timestamp broke every later read in this
        * function. Measured: the sidebar rendered zero rows and the panel
        * reported "经历列表拉取失败". Name the local after what it is. */
@@ -136,18 +141,23 @@
       div.onclick = function () {
         if (chatMode) {
           // 恢复进度到对话空间（DSH：点击会话 = 回放过去 + 从此续写）
-          st.chatJobId = p.job_id;
+          Cx.setNav({ period: p.job_id });
           renderSide('chat-side', periods, empty, true);
           loadPeriodToChat(p.job_id);
           setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
           document.getElementById('chat-text').focus();
         } else {
-          window.__proveTrackMeta = { job_id: p.job_id, name: p.name, preview: p.preview };
-          /* Choose the period first: the trajectory's enter hook reads the
-           * chosen job and asks the shell for exactly that window. Showing the
-           * view first would load the newest experience instead. */
-          Cx.selectPeriod(p.job_id);
-          Cx.showView('prove-track');
+          /* Period, view and the metadata that describes the period go in ONE
+           * call, so the address bar is written once and Back returns to the
+           * view we came from. The order still matters — the trajectory's enter
+           * hook reads the chosen job and asks the shell for exactly that
+           * window, so choosing the view first would load the newest
+           * experience instead — but it is now an order inside one writer
+           * rather than two calls that could drift apart. */
+          Cx.selectPeriod(p.job_id, {
+            view: 'prove-track',
+            meta: { job_id: p.job_id, name: p.name, preview: p.preview }
+          });
         }
       };
       var rn = div.querySelector('[data-ren]');
@@ -320,7 +330,7 @@
   // Fresh conversation: drop the resume anchor, clear the space, restore
   // the honest empty state. The next message opens a NEW period.
   function newChat() {
-    st.chatJobId = null;
+    Cx.setNav({ period: null });
     st.histSeq++; // 丢弃任何在途的历史加载
     var box = document.getElementById('chat-msgs');
     box.innerHTML = '<div class="empty"><div class="orb" aria-hidden="true">⌁</div><b>尚未开始的对话</b><p>说句话吧——这是给 Helix 的一段新经历。</p></div>';
@@ -352,10 +362,11 @@
       list.style.display = '';
       list.querySelectorAll('.resume-opt').forEach(function (el) {
         el.onclick = function () {
-          st.chatJobId = el.getAttribute('data-job');
+          var job = el.getAttribute('data-job');
           list.style.display = 'none';
-          setBanner('续接经历 <span class="tid">' + esc(st.chatJobId) + '</span> —— 下一句话延续这段对话');
-          loadPeriodToChat(st.chatJobId);
+          Cx.setNav({ period: job });
+          setBanner('续接经历 <span class="tid">' + esc(job) + '</span> —— 下一句话延续这段对话');
+          loadPeriodToChat(job);
           document.getElementById('chat-text').focus();
         };
       });

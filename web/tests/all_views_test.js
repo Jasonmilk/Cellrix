@@ -324,6 +324,123 @@ function skip(label, why) {
     skip("an in-table turn toggle exists", JOB ? "no turn toggle rendered" : "no period in this panel");
   }
 
+  /* ---- N2: the address bar IS the selection state (ADR-0022) -------------
+   *
+   * N-003 one current view + period; N-009 the hash expresses it and round-trips;
+   * N-005 Back still works; N-010 a hash the panel did not write still renders.
+   * None of the four is visible in the source, so all four are driven here.
+   */
+  console.log("-- navigation state is the address bar (N-003 / N-005 / N-009 / N-010) --");
+  {
+    const NAV = () => window.Cx && window.Cx.state && window.Cx.state.nav;
+    const parsed = () => window.CxNormalize.parseHash(window.location.hash);
+    const shown = () => VIEWS.filter((v) => {
+      const el = doc.getElementById("view-" + v);
+      return el && el.style.display !== "none";
+    });
+
+    check("the shell exposes exactly one selection state", !!NAV(), JSON.stringify(NAV()));
+
+    for (const v of ["chat", "flows", "cockpit"]) {
+      const btn = doc.getElementById("v-" + v);
+      const before = errors.length;
+      const histBefore = window.history.length;
+      btn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+      await sleep(800);
+      check(`clicking ${v} moves nav.view to ${v} (N-003)`, NAV() && NAV().view === v,
+        JSON.stringify(NAV()));
+      /* Derived, not counted. The visible set must BE the view we asked for.
+       * Expressed as an equality rather than a count against a literal: that
+       * shape is exactly what the [ENG] guard (run_all.js) exists to stop, and
+       * an equality is stronger anyway — it pins WHICH view, not just how many.
+       * The guard flagged the count form on the first run and was right to. */
+      check(`after ${v} the visible view is exactly ${v} (N-003)`, shown().join(",") === v,
+        shown().join(",") || "none");
+      check(`the hash round-trips to the state after ${v} (N-009)`,
+        JSON.stringify(parsed()) === JSON.stringify({ view: NAV().view, period: NAV().period }),
+        JSON.stringify(window.location.hash) + " vs " + JSON.stringify(NAV()));
+      check(`switching view pushed one history entry (N-005)`,
+        window.history.length > histBefore, histBefore + " -> " + window.history.length);
+      check(`no errors raised by ${v} navigation`, errors.length === before,
+        errors.slice(before, before + 2).join(" | "));
+    }
+
+    /* The period cache must describe the period in the state, or not exist. */
+    check("the trajectory metadata cannot describe a different period (N-003)",
+      !window.__proveTrackMeta || window.__proveTrackMeta.job_id === NAV().period,
+      JSON.stringify(window.__proveTrackMeta) + " vs period=" + NAV().period);
+
+    /* N-010: a hash the panel did not write. The malformed percent-encoding has
+     * to sit in a VALUE — `#view=%C3%28` — not in a key-less fragment. Measured:
+     * with the malformed bytes in a fragment that has no `=`, the parser skips
+     * the pair before it ever decodes it, so the check passed even against a
+     * parser mutated to rethrow. A test that cannot fail is not coverage. */
+    const before10 = errors.length;
+    window.location.hash = "#view=%C3%28";
+    await sleep(700);
+    check("a malformed hash raises no script errors (N-010)", errors.length === before10,
+      errors.slice(before10, before10 + 2).join(" | "));
+    check("a malformed hash still renders exactly one view (N-010)",
+      shown().length === 1 && doc.body.textContent.trim().length > 0,
+      shown().join(",") || "none");
+    check("a malformed hash leaves an empty state, not a stale one (N-010)",
+      NAV() && NAV().period === null && !!NAV().view, JSON.stringify(NAV()));
+  }
+
+  /* ---- N-009 the other way: a hash in the URL at boot --------------------
+   *
+   * The boot path is the one that has to wait for DOMContentLoaded, because the
+   * view assets register their enter hooks while the page parses. Nothing else
+   * in this file boots the page, so this checks that a restored view is also the
+   * one on screen — and that normalising the address bar did not mint a history
+   * entry of its own.
+   */
+  console.log("-- a hash in the URL is restored on boot (N-009) --");
+  {
+    const errs2 = [];
+    const vc2 = new VirtualConsole();
+    vc2.on("jsdomError", (e) => errs2.push("jsdomError: " + e.message));
+    vc2.on("error", (...a) => errs2.push("console.error: " + a.join(" ")));
+    const dom2 = new JSDOM(html, {
+      url: BASE + "/#view=flows", runScripts: "dangerously", pretendToBeVisual: true,
+      virtualConsole: vc2,
+      beforeParse(w) {
+        w.fetch = (input, init) => {
+          const url = typeof input === "string" && input.startsWith("/") ? BASE + input : input;
+          return fetch(url, init);
+        };
+        w.matchMedia = (q) => ({
+          matches: false, media: q, onchange: null,
+          addListener() {}, removeListener() {},
+          addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false,
+        });
+        w.addEventListener("error", (e) => errs2.push("window.error: " + e.message));
+        w.addEventListener("unhandledrejection", (e) => errs2.push("unhandledrejection: " + e.reason));
+      },
+    });
+    await sleep(2000);
+    const doc2 = dom2.window.document;
+    const nav2 = dom2.window.Cx && dom2.window.Cx.state.nav;
+    /* Derived from the restored page's own nav, so this cannot pass by naming a
+     * view list the markup does not have. */
+    const views2 = Array.from(doc2.querySelectorAll(".nav [data-view]"))
+      .map((b) => b.getAttribute("data-view"));
+    const disp2 = (v) => {
+      const el = doc2.getElementById("view-" + v);
+      return el ? el.style.display : "MISSING";
+    };
+    check("the hash in the URL is adopted on boot (N-009)",
+      nav2 && nav2.view === "flows", JSON.stringify(nav2));
+    check("the restored view is the only visible one (N-009)",
+      views2.length > 0 && disp2("flows") !== "none" &&
+        views2.filter((v) => v !== "flows").every((v) => disp2(v) === "none"),
+      views2.map((v) => v + '="' + disp2(v) + '"').join(" "));
+    check("adopting the hash at boot did not push a history entry (N-005)",
+      dom2.window.history.length === 1, "history.length=" + dom2.window.history.length);
+    check("no errors during a hash-carrying boot", errs2.length === 0, errs2.slice(0, 2).join(" | "));
+    dom2.window.close();
+  }
+
   console.log("");
   console.log("RESULT: " + pass + " passed, " + fail + " failed"
   + (skipped ? ", " + skipped + " skipped (nothing to exercise)" : ""));

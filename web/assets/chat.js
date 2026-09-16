@@ -111,7 +111,7 @@
     Cx.state.chatBusy = true;
     btn.disabled = true; btn.textContent = '思考中…';
     var done = false;
-    var job = Cx.state.chatJobId || null;
+    var job = Cx.state.nav.period || null;
     function finish() {
       if (done) return;
       done = true;
@@ -189,7 +189,7 @@
               // harmful: every message became a separate experience and the live
               // store showed it (the newest periods all had resume_from absent).
               // Continuity is the original intent, so it is restored.
-              if (j.job_id) Cx.state.chatJobId = j.job_id;
+              if (j.job_id) Cx.setNav({ period: j.job_id });
               finish(); return;
             }
           }
