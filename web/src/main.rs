@@ -123,7 +123,8 @@ const ASSEMBLY: &str = include_str!("../assets/assembly.js");
 const PROVE_TRACK_DATA: &str = include_str!("../assets/prove_track.data.js");
 const PROVE_TRACK_RENDER: &str = include_str!("../assets/prove_track.render.js");
 const PROVE_TRACK_NODE: &str = include_str!("../assets/prove_track.node.js");
-    const PROVE_TRACK_VIEW: &str = include_str!("../assets/prove_track.view.js");
+    const PROVE_TRACK_EXPORT: &str = include_str!("../assets/prove_track.export.js");
+const PROVE_TRACK_VIEW: &str = include_str!("../assets/prove_track.view.js");
     const PROVE_TRACK_CTRL: &str = include_str!("../assets/prove_track.js");
     const SCRIPT: &str = include_str!("../assets/script.html");
     // View-owned assets (ADR-0015 D8 follow-through): the shell keeps the
@@ -150,6 +151,7 @@ const PROVE_TRACK_NODE: &str = include_str!("../assets/prove_track.node.js");
         .replace("__PROVE_TRACK_DATA__", PROVE_TRACK_DATA)
         .replace("__PROVE_TRACK_RENDER__", PROVE_TRACK_RENDER)
         .replace("__PROVE_TRACK_NODE__", PROVE_TRACK_NODE)
+        .replace("__PROVE_TRACK_EXPORT__", PROVE_TRACK_EXPORT)
         .replace("__PROVE_TRACK_VIEW__", PROVE_TRACK_VIEW)
         .replace("__PROVE_TRACK_CTRL__", PROVE_TRACK_CTRL)
         .replace("__SCRIPT__", SCRIPT)

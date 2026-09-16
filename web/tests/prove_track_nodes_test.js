@@ -29,7 +29,8 @@ const A = path.join(__dirname, '..', 'assets');
 const EV = path.join(__dirname, '..', '..', '..', '.helix', 'events');
 global.window = {};
 ['event_family.js', 'period_normalize.js', 'node_shape.js', 'assembly.js',
- 'prove_track.data.js', 'prove_track.render.js', 'prove_track.node.js'].forEach(function (f) {
+ 'prove_track.data.js', 'prove_track.render.js', 'prove_track.node.js',
+ 'prove_track.export.js'].forEach(function (f) {
   const p = path.join(A, f);
   if (fs.existsSync(p)) { eval(fs.readFileSync(p, 'utf8')); }
 });
@@ -339,6 +340,58 @@ if (NODE_SIDE && RENDER) {
   });
   check('the view reads the item fields the Node layer produces',
     missingInView.length === 0, JSON.stringify(missingInView));
+}
+
+/* ---- the export is a projection of what the view rendered --------------
+ *
+ * Pull, and a pure function of the rows it is handed. Each assertion here has a
+ * control, because the interesting failure is not "the document is empty" — it
+ * is a document that looks complete and says something the view never showed.
+ */
+if (PT.export) {
+  const session = NODE_SIDE.buildSession(snap.nodes);
+  const evRows = session.filter(function (r) { return r.kind === 'ev'; });
+  const md = PT.export.markdown(session, { name: 'chain' });
+
+  const tableRows = md.split('\n').filter(function (l) { return /^\| \d+ \|/.test(l); });
+  check('the document has one table line per rendered row',
+    tableRows.length === evRows.length, tableRows.length + ' vs ' + evRows.length);
+  check('every row carries its identity anchor',
+    evRows.every(function (r) { return md.indexOf('`' + r.id + '`') !== -1; }),
+    'a row without source#lineNo cannot be checked against its record');
+  check('metering does not reach the document',
+    md.indexOf('USAGE') === -1 && md.indexOf('metering') === -1);
+
+  const replyCls = EF.KIND_CLASS.reply;
+  const reply = evRows.filter(function (r) { return r.cls === replyCls && r.full; })[0];
+  check('the deliverable is quoted in full',
+    !!reply && md.indexOf(reply.full) !== -1, reply ? reply.full.slice(0, 30) : 'no reply row');
+
+  /* Positive control: the document is a function of what it was GIVEN. If a
+   * sentinel row that exists nowhere else comes out, it cannot be re-deriving
+   * from the tape. */
+  const sentinel = [{ kind: 'ev', id: 'L#9', cls: 'REPLY', status: 'done',
+    summary: 'SENTINELSUMMARY', dur: 7, tok: 11, payload: '{"k":1}', detail: 'd',
+    full: 'SENTINELBODY', term: false, ts: null, tool: null, kindNote: '' }];
+  const m1 = PT.export.markdown(sentinel, null);
+  check('the document is built from the rows it was given (positive control)',
+    m1.indexOf('SENTINELSUMMARY') !== -1 && m1.indexOf('SENTINELBODY') !== -1 &&
+      m1.indexOf('L#9') !== -1);
+  check('an empty session yields a document, not a crash',
+    PT.export.markdown([], null).indexOf('# ProveTrack export') === 0);
+  const fenced = [{ kind: 'ev', id: 'Y#1', cls: 'REPLY', status: 'done', summary: 's',
+    dur: 0, tok: null, payload: '{"a":"```"}', detail: 'd', full: 'x```y', term: false,
+    ts: null, tool: null, kindNote: '' }];
+  check('a fence inside the body widens the fence instead of ending the block',
+    PT.export.markdown(fenced, null).indexOf('````') !== -1);
+  check('a row with nothing to quote contributes only its table line',
+    (function () {
+      const quiet = [{ kind: 'ev', id: 'Z#1', cls: 'END', status: 'done', summary: 's',
+        dur: 0, tok: null, payload: '', detail: PT.data.ABSENT, full: '', term: false,
+        ts: null, tool: null, kindNote: '' }];
+      const m2 = PT.export.markdown(quiet, null);
+      return m2.indexOf('### ') === -1 && m2.indexOf('| 1 |') !== -1;
+    })());
 }
 
 /* ---- P1-3: `when` is a function, never a string to evaluate ---- */

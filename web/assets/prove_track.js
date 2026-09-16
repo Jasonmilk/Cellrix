@@ -87,6 +87,22 @@
   $('eReplayBtn').addEventListener('click', function () {
     (S.replayIdx >= 0 || S.replayTimer) ? stopReplay() : startReplay();
   });
+  /* Export is PULL (ADR-0018 batch 5). It serialises the rows the view has
+   * already rendered — S.session — so what a reviewer opens is what the screen
+   * showed, and it registers no target: nothing is serialised when a token
+   * refreshes. The lock is structural: there is no second data path to lock. */
+  $('eExportBtn').addEventListener('click', function () {
+    var md = PT.export.markdown(S.session, S.meta);
+    var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'provetrack-' + ((S.meta && S.meta.job_id) || 'window') + '.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  });
   $('eQ').addEventListener('input', function () {
     S.q = this.value.trim(); renderTable(); renderLanes();
   });

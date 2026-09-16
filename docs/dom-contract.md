@@ -151,6 +151,7 @@
 | `eDurBtn` | prove_track.html |
 | `eDurLbl` | prove_track.html |
 | `eEmpty` | prove_track.html |
+| `eExportBtn` | prove_track.html |
 | `eHint` | prove_track.html |
 | `eInspB` | prove_track.html |
 | `eInspS` | prove_track.html |

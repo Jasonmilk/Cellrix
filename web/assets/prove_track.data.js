@@ -32,14 +32,19 @@
     pending: { t: 'pending', c: 'pending' }, done: { t: 'done', c: 'done' }
   };
 
-  function fmtDur(ms) { return ms === 0 ? '—' : (ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's'); }
+  /* The glyph for "there is no such fact". It has exactly one source, because
+   * three layers need to recognise it: the formatters write it, the panes write
+   * it, and the export must not quote a row whose detail is only this. */
+  var ABSENT = '\u2014';
+
+  function fmtDur(ms) { return ms === 0 ? ABSENT : (ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's'); }
   /* null/undefined = the fact does not exist; 0 = the fact IS zero. Two
    * different things, two different renderings (DNA principle 11: never a fake
    * placeholder). */
-  function fmtTok(n) { return (n == null) ? '—' : Number(n).toLocaleString('en-US'); }
+  function fmtTok(n) { return (n == null) ? ABSENT : Number(n).toLocaleString('en-US'); }
 
   PT.data = {
     $: $, esc: esc, jsonOf: jsonOf, short: short, firstLine: firstLine,
-    STATUS: STATUS, fmtDur: fmtDur, fmtTok: fmtTok
+    STATUS: STATUS, fmtDur: fmtDur, fmtTok: fmtTok, ABSENT: ABSENT
   };
 })();

@@ -30,7 +30,7 @@
   if (!D) {
     throw new Error('prove_track.node.js requires prove_track.data.js to load first');
   }
-  var jsonOf = D.jsonOf, short = D.short;
+  var jsonOf = D.jsonOf, short = D.short, ABSENT = D.ABSENT;
 
   function hasOutcome(p) { return p.outcome != null; }
   function hasNodes(p) { return ((p.choice && p.choice.top) || []).length > 0; }
@@ -79,11 +79,11 @@
         }).join('\n');
       case 'tool':
         if (p.stage === 'call') { return 'awaiting tool response…'; }
-        return hasOutcome(p) ? prettyJson(String(p.outcome)) : '—';
+        return hasOutcome(p) ? prettyJson(String(p.outcome)) : ABSENT;
       case 'check':
-        return 'actual=' + (p.actual || '—') + (p.reason ? '\n' + p.reason : '');
+        return 'actual=' + (p.actual || ABSENT) + (p.reason ? '\n' + p.reason : '');
       case 'verdict':
-        return p.reason || '—';
+        return p.reason || ABSENT;
       case 'reasoning':
         return '(full thinking in Payload)';
       case 'reply':
@@ -227,6 +227,7 @@
   }
 
   PT.node = {
+    /* the pageless primitives a document projection needs, named once */
     toolNameOf: toolNameOf, payloadOf: payloadOf, detailOf: detailOf,
     resultIsTerm: resultIsTerm,
     derivePeriodUsage: derivePeriodUsage,

@@ -17,6 +17,7 @@ ASSETS = [
     ("prove_track.data.js", "Cellrix prove-track primitives (ADR-0016 D1/D6)"),
     ("prove_track.render.js", "The trajectory's render tables (Cellrix:ADR-0018 batch 4)"),
     ("prove_track.node.js", "Node-side consumption for the trajectory (Cellrix:ADR-0018 batch 4)"),
+    ("prove_track.export.js", "The Markdown projection of the trajectory (ADR-0018: one tape, many targets)"),
     ("prove_track.view.js", "Cellrix ProveTrack view layer (ADR-0016 D1)"),
     ("prove_track.js", "Cellrix ProveTrack control layer (ADR-0016 D1/D3)"),
 ]
@@ -51,7 +52,8 @@ check("first bytes are <!DOCTYPE html>", page.startswith("<!DOCTYPE html>"),
 print("-- placeholder residue must be zero --")
 for ph in ["__TOKENS__", "__COMPONENTS__", "__COCKPIT__", "__CHAT__",
            "__PROVE_TRACK__", "__PROVE_TRACK_CSS__", "__PROVE_TRACK_DATA__",
-           "__PROVE_TRACK_RENDER__", "__PROVE_TRACK_NODE__", "__PROVE_TRACK_VIEW__",
+           "__PROVE_TRACK_RENDER__", "__PROVE_TRACK_NODE__", "__PROVE_TRACK_EXPORT__",
+           "__PROVE_TRACK_VIEW__",
            "__PROVE_TRACK_CTRL__", "__SCRIPT__",
            "__SESSION__", "__GLEAM__", "__FLOWS__", "__REFRESH__",
            "__TUCK_CONFIGURED__"]:
@@ -66,6 +68,7 @@ BOUND = {
     "prove_track.data.js": ("<script>", "</script>"),
     "prove_track.render.js": ("<script>", "</script>"),
     "prove_track.node.js": ("<script>", "</script>"),
+    "prove_track.export.js": ("<script>", "</script>"),
     "prove_track.view.js": ("<script>", "</script>"),
     "prove_track.js": ("<script>", "</script>"),
 }
