@@ -74,7 +74,12 @@
     switch (node.kind) {
       case 'context':
         if (!hasNodes(p)) { return '(no node hit)'; }
-        return (p.choice.top || []).map(function (n) {
+        /* The pane lists TOP hits. Saying how many there are is not decoration:
+         * `nodes=20` beside three lines reads as missing data otherwise. */
+        var top = p.choice.top || [];
+        var head = (p.nodes != null && p.nodes > top.length)
+          ? 'top ' + top.length + ' of ' + p.nodes + '\n' : '';
+        return head + top.map(function (n) {
           return n.tier + '·' + n.heat + ' ' + short(n.id || '', 12) + ' ' + (n.phase || '');
         }).join('\n');
       case 'tool':
@@ -117,6 +122,19 @@
     return typeof n === 'number' && isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER;
   }
 
+  /* Metering is a fact about ONE period. Grouping by the node's source and
+   * running the same derivation per group is the whole implementation — one
+   * derivation function, applied to the group it is about. */
+  function usageBySource(nodes) {
+    var by = {};
+    (nodes || []).forEach(function (n) {
+      if (n.kind !== 'metering') { return; }
+      (by[n.source] = by[n.source] || []).push(n);
+    });
+    Object.keys(by).forEach(function (k) { by[k] = derivePeriodUsage(by[k]); });
+    return by;
+  }
+
   function derivePeriodUsage(nodes) {
     var calls = 0, prompt = 0, completion = 0;
     var cachedSum = 0, cachedAll = true, reasoningSum = 0, reasoningAll = true;
@@ -155,7 +173,7 @@
     /* Over the WHOLE stream, not the drawn subset: metering is precisely the
      * kind that is not drawn, so deriving from `shown` would find no call to
      * total and the reply row would carry nothing. Measured: it did. */
-    var usage = derivePeriodUsage(nodes);
+    var perSource = usageBySource(nodes);
     var out = [];
     var seenTurn = {};
 
@@ -187,7 +205,7 @@
         dur = (isFinite(a) && isFinite(b)) ? Math.max(0, a - b) : 0;
       }
       out.push({
-        kind: 'ev', id: n.node, turn: n.turn, ord: n.ord, ts: n.ts,
+        kind: 'ev', id: n.node, source: n.source, turn: n.turn, ord: n.ord, ts: n.ts,
         cls: EF.classOf(n), lane: R.laneOf(n.kind),
         dur: dur,
         status: R.statusOf(n), summary: R.summarize(n),
@@ -200,8 +218,11 @@
         /* The deliverable row is kept verbatim so expanding it shows the whole
          * answer rather than the truncated summary (no fake expand). */
         full: R.bodyOf(n),
-        /* The period's metering total rides on the row that delivered it. */
-        tok: (n.kind === 'reply' && usage) ? usage.total : null
+        /* The row carries ITS OWN period's metering total, not the window's.
+         * Stamping the window total on every reply row made three different
+         * answers report the same number — measured: 1129 / 1696 / 1573 became
+         * 4398 / 4398 / 4398, which is physically impossible. */
+        tok: (n.kind === 'reply' && perSource[n.source]) ? perSource[n.source].total : null
       });
     });
     return out;
@@ -230,7 +251,7 @@
     /* the pageless primitives a document projection needs, named once */
     toolNameOf: toolNameOf, payloadOf: payloadOf, detailOf: detailOf,
     resultIsTerm: resultIsTerm,
-    derivePeriodUsage: derivePeriodUsage,
+    derivePeriodUsage: derivePeriodUsage, usageBySource: usageBySource,
     buildSession: buildSession, computeRepeats: computeRepeats
   };
 })();

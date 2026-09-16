@@ -153,7 +153,10 @@
       opt: { reason: function (p) { return hasReason(p) ? ' · ' + p.reason : ''; } }
     },
     reply: {
-      tpl: 'reply: {prefix}{text} (click to expand)',
+      /* No "(click to expand)" here: that is an instruction to a person at a
+       * screen, and this string is shared with the export, where there is nothing
+       * to click. The affordance belongs to the view that has the pointer. */
+      tpl: 'reply: {prefix}{text}',
       body: 'text',
       fmt: {
         prefix: function (p) { return hasModel(p) ? '[' + p.model + '] ' : ''; },

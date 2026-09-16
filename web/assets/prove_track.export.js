@@ -56,15 +56,62 @@
     return groups;
   }
 
-  function markdown(session, meta) {
+  function source(session) {
+    var first = null, last = null, seen = {};
+    (session || []).forEach(function (r) {
+      if (r.kind !== 'ev' || !r.source) { return; }
+      if (!first) { first = r.source; }
+      last = r.source;
+      seen[r.source] = true;
+    });
+    return { root: first, leaf: last, count: Object.keys(seen).length };
+  }
+
+  function span(session) {
+    var a = null, b = null;
+    (session || []).forEach(function (r) {
+      if (r.kind !== 'ev' || !r.ts) { return; }
+      if (!a) { a = r.ts; }
+      b = r.ts;
+    });
+    var ms = (a && b) ? Date.parse(b) - Date.parse(a) : NaN;
+    return { from: a, to: b, ms: isFinite(ms) ? ms : null };
+  }
+
+  function markdown(session, meta, usage) {
     var groups = group(session);
     var rowCount = groups.reduce(function (a, g) { return a + g.rows.length; }, 0);
     var out = [];
     out.push('# ProveTrack export' + (meta && (meta.name || meta.job_id)
       ? ' — ' + cell(meta.name || meta.job_id) : ''));
     out.push('');
+    var src = source(session), sp = span(session);
+    out.push('- window: ' + (src.root ? '`' + cell(src.root) + '` → `' + cell(src.leaf) +
+      '` · ' + src.count + ' period' + (src.count === 1 ? '' : 's') : 'no periods'));
     out.push('- rows: ' + rowCount + ' over ' + groups.length + ' turn' +
       (groups.length === 1 ? '' : 's'));
+    if (sp.from) {
+      out.push('- span: ' + cell(sp.from) + ' → ' + cell(sp.to) +
+        (sp.ms == null ? '' : ' (' + (sp.ms / 1000).toFixed(1) + 's)'));
+    }
+    if (usage) {
+      out.push('- tokens: ' + D.fmtTok(usage.total) + ' over ' + usage.calls + ' call' +
+        (usage.calls === 1 ? '' : 's') + ' · prompt ' + D.fmtTok(usage.prompt) +
+        ' · completion ' + D.fmtTok(usage.completion) +
+        (usage.cached == null ? '' : ' · cached ' + D.fmtTok(usage.cached)));
+    }
+    /* A `#` column that skips a number looks like missing data. The kinds that
+     * are measured but not drawn are declared rather than left to be inferred. */
+    var notDrawn = [];
+    if (PT.render && PT.render.NOT_DRAWN) {
+      Object.keys(PT.render.NOT_DRAWN).forEach(function (k) {
+        notDrawn.push(k + ' (' + PT.render.NOT_DRAWN[k] + ')');
+      });
+    }
+    if (notDrawn.length) {
+      out.push('- not drawn as rows: ' + notDrawn.join('; ') +
+        ' — so a gap in the row numbering is expected');
+    }
     out.push('- these are the rows the trajectory rendered: nothing is re-derived here');
     out.push('- every row carries `ref` — `source#lineNo` — so it can be checked against its record');
     out.push('');
@@ -113,5 +160,5 @@
     return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
   }
 
-  PT.export = { markdown: markdown, hasArtifact: hasArtifact };
+  PT.export = { markdown: markdown, hasArtifact: hasArtifact, source: source, span: span };
 })();

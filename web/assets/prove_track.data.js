@@ -23,7 +23,18 @@
 
   function jsonOf(d) { try { return JSON.stringify(d, null, 2); } catch (e) { return String(d); } }
   function short(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; }
-  function firstLine(s, n) { s = String(s || '').split('\n')[0]; return short(s, n || 100); }
+  /* The first line a PERSON reads, not the zero-th line of the string. A body
+   * that opens with a blank line and nothing else made every reply's one-line
+   * summary empty — visible only once a UI hint that used to trail it was
+   * removed, which is why "the hint is leaking into the document" turned out to
+   * be two things: the hint, and this. */
+  function firstLine(s, n) {
+    var lines = String(s || '').split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() !== '') { return short(lines[i], n || 100); }
+    }
+    return '';
+  }
 
   /* The status vocabulary the view renders. A closed set: the four words a row
    * can be in, each with its colour class. */

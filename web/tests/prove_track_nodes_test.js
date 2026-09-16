@@ -241,9 +241,16 @@ if (NODE_SIDE && RENDER) {
   const others = session.filter(function (r) { return r.kind === 'ev' && r.cls !== replyCls; });
   check('exactly one reply row per period', replies.length === ids.length,
     replies.length + ' replies for ' + ids.length + ' periods');
-  check('every reply row carries the period total',
-    !!usage && replies.every(function (r) { return r.tok === usage.total; }),
+  /* Each row carries ITS OWN period's total. The window total stamped on every
+   * reply row was the defect: three different answers reported 4398 apiece,
+   * measured, because the window total is the sum of all of them. */
+  const perSource = NODE_SIDE.usageBySource(snap.nodes);
+  check('every reply row carries its own period\'s total',
+    replies.every(function (r) { return r.tok === perSource[r.source].total; }),
     JSON.stringify(replies.map(function (r) { return r.tok; })));
+  check('no reply row carries the window total to stand for its own',
+    !!usage && ids.length < 2 || replies.every(function (r) { return r.tok !== usage.total; }),
+    'window total ' + (usage && usage.total) + ' vs ' + JSON.stringify(replies.map(function (r) { return r.tok; })));
   check('no other row carries a token figure',
     others.every(function (r) { return r.tok === null; }));
   /* The expand shows the row's OWN text, verbatim — not the truncated summary
@@ -359,8 +366,14 @@ if (PT.export) {
   check('every row carries its identity anchor',
     evRows.every(function (r) { return md.indexOf('`' + r.id + '`') !== -1; }),
     'a row without source#lineNo cannot be checked against its record');
-  check('metering does not reach the document',
-    md.indexOf('USAGE') === -1 && md.indexOf('metering') === -1);
+  /* The DOCUMENT declares which kinds are measured but not drawn — so the word
+   * appears on purpose. What must not appear is a metering ROW. */
+  const meteringCls = EF.KIND_CLASS.metering;
+  check('metering is not drawn as a row in the document',
+    tableRows.every(function (l) { return l.indexOf('| ' + meteringCls + ' |') === -1; }) &&
+      md.indexOf('| ' + meteringCls + ' |') === -1);
+  check('and the document says so, rather than leaving a gap in the numbering to be inferred',
+    md.indexOf('not drawn as rows') !== -1);
 
   const replyCls = EF.KIND_CLASS.reply;
   const reply = evRows.filter(function (r) { return r.cls === replyCls && r.full; })[0];

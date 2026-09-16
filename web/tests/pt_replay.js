@@ -152,6 +152,17 @@ check('REPLY.tok == the derived total',
 check('only REPLY rows carry tok', nonReply.every(function (r) { return r.tok === null; }));
 
 console.log('\n=== 6) the panes a reviewer reads ===');
+/* A one-line summary must be the first line a person reads. A body opening with
+ * a blank line used to summarise as '' — and an empty summary is indistinguishable
+ * from a row that had nothing to say. */
+{
+  const D2 = PT.data;
+  check('firstLine skips a leading blank line',
+    D2.firstLine('\n\nactual answer\nmore', 60) === 'actual answer',
+    JSON.stringify(D2.firstLine('\n\nactual answer\nmore', 60)));
+  check('and still truncates', D2.firstLine('x'.repeat(50), 10) === 'x'.repeat(10) + '\u2026');
+  check('and an all-blank body is empty, not invented', D2.firstLine('\n\n', 60) === '');
+}
 const PANE = load(pick(['tool/result', 'check/status']));
 console.log('tool + check fixture: ' + PANE.jobId + ' (' + PANE.rows.length + ' events)');
 const paneNodes = PANE.nodes;

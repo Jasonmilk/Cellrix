@@ -92,7 +92,7 @@
    * showed, and it registers no target: nothing is serialised when a token
    * refreshes. The lock is structural: there is no second data path to lock. */
   $('eExportBtn').addEventListener('click', function () {
-    var md = PT.export.markdown(S.session, S.meta);
+    var md = PT.export.markdown(S.session, S.meta, S.usage);
     var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
