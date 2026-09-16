@@ -121,6 +121,7 @@ const NORMALIZE: &str = include_str!("../assets/period_normalize.js");
 const NODE_SHAPE: &str = include_str!("../assets/node_shape.js");
 const ASSEMBLY: &str = include_str!("../assets/assembly.js");
 const PROVE_TRACK_DATA: &str = include_str!("../assets/prove_track.data.js");
+const PROVE_TRACK_NODE: &str = include_str!("../assets/prove_track.node.js");
     const PROVE_TRACK_VIEW: &str = include_str!("../assets/prove_track.view.js");
     const PROVE_TRACK_CTRL: &str = include_str!("../assets/prove_track.js");
     const SCRIPT: &str = include_str!("../assets/script.html");
@@ -146,6 +147,7 @@ const PROVE_TRACK_DATA: &str = include_str!("../assets/prove_track.data.js");
         .replace("__NODE_SHAPE__", NODE_SHAPE)
         .replace("__ASSEMBLY__", ASSEMBLY)
         .replace("__PROVE_TRACK_DATA__", PROVE_TRACK_DATA)
+        .replace("__PROVE_TRACK_NODE__", PROVE_TRACK_NODE)
         .replace("__PROVE_TRACK_VIEW__", PROVE_TRACK_VIEW)
         .replace("__PROVE_TRACK_CTRL__", PROVE_TRACK_CTRL)
         .replace("__SCRIPT__", SCRIPT)
@@ -293,7 +295,7 @@ mod tests {
             i = start + 2;
         }
         // The scan must have found them — otherwise it would pass vacuously.
-        assert!(checked >= 20, "placeholder scan found only {checked} tokens");
+        assert!(checked >= 21, "placeholder scan found only {checked} tokens");
         // ADR-0016: all four split assets must land in the page.
         assert!(html.contains("--e-trk-tl")); // prove_track.css (tokens)
         assert!(html.contains("function buildSession")); // prove_track.data.js
