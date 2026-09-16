@@ -44,7 +44,12 @@ const SELF_CONTAINED = [
   ['prove_track_nodes_test.js', 'trajectory — real chain through the Node layer'],
   ['pt_replay.js', 'trajectory — metering and panes against real files'],
   ['hash_state_test.js', 'URL hash — the addressable selection state'],
-  ['nav_state_test.js', 'ONE selection state — structurally (ADR-0022 N-003)']
+  ['nav_state_test.js', 'ONE selection state — structurally (ADR-0022 N-003)'],
+  /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
+   * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
+   * the one entry point that actually gets run — a criterion nobody runs is a
+   * sentence, not an acceptance test. */
+  ['../../tools/adr_anchor.js', 'ADR anchoring table + references (ADR-0022 §4.1)']
 ];
 
 /* The panel test is RUN when the panel is reachable and SKIPPED only when it is
