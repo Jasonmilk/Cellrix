@@ -160,6 +160,22 @@ check('empty data validates only for turn/start',
         return r.payload.text === null && m.length === 0; })());
   }
 
+  // The track table must cover every kind, or a row silently draws as nothing.
+  const kinds2 = Object.keys(EF.KINDS).map(function (k) { return EF.KINDS[k]; });
+  const missing = kinds2.filter(function (k) { return !EF.KIND_CLASS[k]; });
+  check('KIND_CLASS covers every declared kind', missing.length === 0, JSON.stringify(missing));
+  check('every KIND_CLASS entry names a class and a track',
+    kinds2.every(function (k) { return EF.KIND_CLASS[k].cls && EF.KIND_CLASS[k].track; }));
+
+  // turn/start and turn/end share a kind; only the payload tells them apart
+  const startN = { kind: EF.KINDS.TURN, payload: { start: true } };
+  const endN = { kind: EF.KINDS.TURN, payload: { end: true } };
+  check('classOf separates the two ends of a turn without the protocol name',
+    EF.classOf(startN).cls === 'SYSTEM' && EF.classOf(endN).cls === 'END',
+    EF.classOf(startN).cls + '/' + EF.classOf(endN).cls);
+  check('classOf refuses an unknown kind instead of guessing',
+    EF.classOf({ kind: 'nonsense', payload: {} }) === null);
+
   check('tool call and result share the kind, differ by stage',
     call.kind === res.kind && call.payload.stage === 'call' && res.payload.stage === 'result');
 }

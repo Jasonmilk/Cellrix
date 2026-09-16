@@ -180,6 +180,40 @@
     return { kind: kind, payload: payload };
   }
 
+  /* Which track each semantic kind belongs to, and how it is drawn.
+   *
+   * A type fact, not a view fact: it says what a kind IS in the system, and the
+   * view merely renders that. It lives here for the same reason KIND_OF does —
+   * otherwise the trajectory carries its own vocabulary, which is exactly the
+   * duplication this layer exists to end. A view with no type knowledge cannot
+   * re-interpret the protocol; one with a table of its own always can.
+   */
+  var KIND_CLASS = {
+    turn: { cls: 'SYSTEM', track: 'model' },
+    message: { cls: 'USER', track: 'input' },
+    context: { cls: 'CONTEXT', track: 'input' },
+    reasoning: { cls: 'THINK', track: 'model' },
+    plan: { cls: 'ATTEMPT', track: 'model' },
+    tool: { cls: 'TOOL', track: 'tool' },
+    check: { cls: 'CHECK', track: 'tool' },
+    verdict: { cls: 'VERDICT', track: 'tool' },
+    reply: { cls: 'REPLY', track: 'model' },
+    metering: { cls: 'USAGE', track: 'model' }
+  };
+
+  /* A turn has two ends and they are not drawn the same. Which end a row is
+   * comes from payload.end — a fact about the payload this layer produces, so
+   * the rule for reading it belongs here too rather than being guessed at by
+   * every consumer. */
+  function classOf(node) {
+    var base = KIND_CLASS[node && node.kind];
+    if (!base) { return null; }
+    if (node.kind === KINDS.TURN && node.payload && node.payload.end) {
+      return { cls: 'END', track: base.track };
+    }
+    return base;
+  }
+
   /* data shape per type, split into required and optional.
    *
    * A field the producer omits when the fact does not exist is OPTIONAL.
@@ -304,6 +338,8 @@
     TYPES: TYPES,
     KINDS: KINDS,
     KIND_OF: KIND_OF,
+    KIND_CLASS: KIND_CLASS,
+    classOf: classOf,
     interpret: interpret,
     PAYLOAD_MAP: PAYLOAD_MAP,
     DATA_SCHEMA: DATA_SCHEMA,
