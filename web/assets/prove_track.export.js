@@ -91,8 +91,18 @@
     out.push('- rows: ' + rowCount + ' over ' + groups.length + ' turn' +
       (groups.length === 1 ? '' : 's'));
     if (sp.from) {
+      /* Wall-clock in the window is a fact; so is the part of it the rows
+       * account for. Reporting only the span let a reviewer assume the waits add
+       * up — measured on one period: span 8.0s, visible waits 4.6s, and 3.4s of
+       * inference that belongs to no row. Naming the difference turns an
+       * unaccounted silence into a number someone can chase. */
+      var waits = 0;
+      (session || []).forEach(function (r) { if (r.kind === 'ev' && r.dur > 0) { waits += r.dur; } });
       out.push('- span: ' + cell(sp.from) + ' → ' + cell(sp.to) +
-        (sp.ms == null ? '' : ' (' + (sp.ms / 1000).toFixed(1) + 's)'));
+        (sp.ms == null ? '' : ' (' + (sp.ms / 1000).toFixed(1) + 's)') +
+        ' · waits on rows: ' + D.fmtDur(waits) +
+        (sp.ms == null ? '' :
+          ' · **not attributed to any row: ' + ((sp.ms - waits) / 1000).toFixed(1) + 's**'));
     }
     if (usage) {
       out.push('- tokens: ' + D.fmtTok(usage.total) + ' over ' + usage.calls + ' call' +
@@ -126,8 +136,11 @@
       out.push('## ' + (g.turn ? 'Turn ' + g.turn.index + ' · ' + cell(g.turn.note) : 'Rows'));
       out.push('');
       if (!g.rows.length) { out.push('_no rows_'); out.push(''); return; }
-      out.push('| # | ref | class | status | wait | tokens | summary |');
-      out.push('|---|-----|-------|--------|------|--------|---------|');
+      /* The figure is a CALL's total (prompt + completion) — on a row whose
+       * call re-sent a large context, most of it is prompt. Calling the column
+       * 'tokens' invited reading it as the answer's size. */
+      out.push('| # | ref | class | status | wait | call tok | summary |');
+      out.push('|---|-----|-------|--------|------|----------|---------|');
       g.rows.forEach(function (r) {
         n++;
         out.push('| ' + n + ' | `' + cell(r.id) + '` | ' + cell(r.cls) + ' | ' + cell(r.status) +
