@@ -23,7 +23,8 @@ const SELF_CONTAINED = [
 ];
 
 const NEEDS_INPUT = [
-  ['all_views_test.js', 'needs the panel live on :18932 (see start-panel.sh)']
+  ['all_views_test.js', 'needs the panel live on :18932 (see start-panel.sh)'],
+  ['layout_test.js', 'needs the panel live + Chrome on :9222: node layout_test.js (see README)']
 ];
 
 let failed = 0;

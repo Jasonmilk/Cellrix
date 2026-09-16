@@ -133,8 +133,32 @@
      消息流 + 思考折叠 + 续接列表（内联样式清零） */
   .chat-grid { display:grid; grid-template-columns:240px 1fr; gap:12px; padding:12px; }
   .chat-col { min-width:0; display:flex; flex-direction:column; }
-  .chat-msgs { max-height:420px; overflow-y:auto; padding:12px; display:flex;
+  /* A transcript is unbounded, so its window has to be bounded by something.
+     That something is the viewport, not a number: the old 420px was a constant,
+     and the content it cropped (measured: 581px of transcript in a 420px window)
+     was the content the box was supposed to show. */
+  .chat-msgs { max-height:min(70vh,720px); overflow-y:auto; padding:12px; display:flex;
     flex-direction:column; gap:8px; }
+  /* A scroller's items must not be compressed BY the scroller.
+     `display:flex` here makes every child a flex item, and a flex item SHRINKS by
+     default: when the content exceeds the window, flexbox squeezes the ITEMS
+     instead of letting the window scroll. Measured on the transcript: a row whose
+     content was 306px got a 35px box, and its overflow was painted over by the
+     next row — "展开思考被遮住" was this, not the row's own CSS. Same shape in the
+     sidebar, where 2682px of cards were squeezed to their 44px minimum.
+     The division is: the WINDOW scrolls, an ITEM keeps the size its content gives
+     it. One declaration, and it is the same declaration at both scrollers. */
+  .chat-msgs > * { flex-shrink:0; }
+  /* A scroller's items must not be compressed BY the scroller.
+     `display:flex` here makes every child a flex item, and a flex item SHRINKS by
+     default: when the content exceeds the window, flexbox squeezes the ITEMS
+     instead of letting the window scroll. Measured on the transcript: a row whose
+     content was 306px got a 35px box, and its overflow was painted over by the
+     next row — "展开思考被遮住" was this, not the row's own CSS. Same shape in the
+     sidebar, where 2682px of cards were squeezed to their 44px minimum.
+     The division is: the WINDOW scrolls, an ITEM keeps the size its content gives
+     it. One declaration, and it is the same declaration at both scrollers. */
+  .chat-msgs > * { flex-shrink:0; }
   .msg { max-width:85%; padding:8px 12px; border-radius:var(--r-md); font-size:12.5px;
     line-height:1.65; white-space:pre-wrap; word-break:break-word; }
   .msg.user { align-self:flex-end; background:var(--accent-soft); color:var(--text); }
@@ -145,16 +169,33 @@
   .chat-input { position:relative; display:flex; gap:8px; padding:10px 12px;
     border-top:1px solid var(--line); align-items:center; }
   .chat-input .inp { flex:1; }
+  /* A process row's FORM follows its content. Closed, the body shares the
+     label's line and is elided; open, it takes a full line of its own and the
+     row grows to whatever the text needs. `flex-wrap` is what makes that
+     possible: without it a flex row cannot give one child a line of its own, and
+     the box was left at a fixed height while its content spilled out — measured:
+     row 36px, content 267px, with the NEXT row painted over it.
+     `min-height` is a floor (the 44px-touch-area lineage), never a cap. */
   .think-row { padding:8px 12px; font-size:11px; color:var(--text-dim); cursor:pointer;
-    display:flex; gap:8px; align-items:baseline; border-bottom:1px solid var(--line);
-    min-height:36px; }
+    display:flex; flex-wrap:wrap; gap:8px; align-items:baseline;
+    border-bottom:1px solid var(--line); min-height:36px; }
   .think-row:hover { background:var(--surface-hover); }
   .think-row .think-head { color:var(--accent); font-weight:600; flex-shrink:0; }
-  .think-row .think-body { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:88%; }
-  .think-row.open .think-body { white-space:pre-wrap; word-break:break-all; max-height:200px; overflow:auto; }
+  .think-row .think-body { flex:1 1 auto; min-width:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:88%; }
+  /* No cap and no inner scroller: a transcript has ONE scroll context (the
+     message list). A second one inside a row makes the box decide the content
+     instead of the content deciding the box. */
+  .think-row.open .think-body { flex:1 1 100%; max-width:100%;
+    white-space:pre-wrap; word-break:break-word; }
   .think-row.fold .think-head { color:var(--text-dim); } /* 过程行（计划/工具）次级强调，思考行保持 accent */
   .msg .mdl { color:var(--accent); font-weight:500; font-size:10px; }
-  .fold { display:inline-block; vertical-align:middle; cursor:pointer; }
+  /* `.fold` is a STATE (open/closed), not a layout. It used to declare
+     `display:inline-block` for an inline fold widget — and process rows carry
+     `fold` too, so that one declaration quietly overrode the row's own
+     `display:flex` (equal specificity, later in source). One element has one
+     display, and only the element's own layout rule may declare it. */
+  .fold { cursor:pointer; }
   .fold .fold-head { color:var(--accent); font-weight:600; }
   .fold .fold-tip { color:var(--text-dim); transition:transform var(--dur) var(--ease); }
   .fold.open .fold-tip { transform:rotate(90deg); display:inline-block; }
@@ -166,6 +207,8 @@
      持久事实可回放 [DSH 理念]：左侧会话列表 = 经历的索引，点击即恢复进度。 */
   .ses-side { border-right:1px solid var(--line); padding-right:12px; max-height:480px;
     overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
+  .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
   .ses-head { display:flex; align-items:center; justify-content:space-between; gap:8px;
     padding:2px 2px 6px; font-size:11px; color:var(--text-dim); }
   .ses-item { padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-md);
@@ -185,16 +228,27 @@
     gap:6px; flex-wrap:wrap; }
   /* iOS swipe 风格操作区：绝对定位右缘浮出（滑入），不占文档流 → 内容零挤压。
      渐变遮罩 = 涟漪消散：按钮盖住文本尾部时平滑过渡，不穿帮 */
-  .ses-item .t .act { position:absolute; right:12px; top:0; bottom:0; margin:auto;
+  /* The card's actions live ON THE META LINE and RESERVE their room. They used
+     to be centred over the whole card with a background gradient masking the
+     text beneath them — a cover-up, not a layout: measured, the points inside
+     the name and the preview resolved to the buttons instead of the text. The
+     space is derived from the button the actions are made of (.btn-icon.sm). */
+  .ses-item .t { position:relative; }
+  .ses-item .t .act { position:absolute; right:0; top:50%;
+    transform:translateY(-50%) translateX(10px);
     height:fit-content; display:flex; align-items:center; gap:4px; opacity:0;
-    transform:translateX(10px); pointer-events:none;
-    background:linear-gradient(90deg, transparent, var(--ses-bg) 14px, var(--ses-bg));
-    padding-left:22px;
+    pointer-events:none;
     transition:opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
   .ses-item:hover .t .act, .ses-item.sel .t .act,
-  .ses-item.editing .t .act { opacity:1; transform:none; pointer-events:auto; }
+  .ses-item.editing .t .act { opacity:1; transform:translateY(-50%); pointer-events:auto; }
+  .ses-item:hover .t, .ses-item.sel .t, .ses-item.editing .t {
+    padding-right:calc(34px * 2 + 20px); }
+  /* A 2-line clamp with `white-space:nowrap` is not a style, it is a
+     contradiction: the box promises two lines and `nowrap` renders one, so the
+     preview was squeezed to half of what it was designed to show. Measured:
+     clamp 2, shown 1. The clamp does its own ellipsis, so `text-overflow` here
+     was the second copy of one fact. */
   .ses-item .p { margin-top:3px; color:var(--text); word-break:break-all;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .ses-item .p.dim { color:var(--text-dim); font-style:italic; }
   /* 会话聚合（线程化）：续接轮次缩进跟随其根，视觉上是一段连续对话 */
