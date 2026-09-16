@@ -67,13 +67,28 @@
   function renderSide(id, periods, empty, chatMode) {
     var box = document.getElementById(id);
     if (!periods.length) { box.innerHTML = empty; return; }
-    /* resume_from stays in the protocol layer: it is a causal link between
-     * periods, not a way to organise them on screen. Grouping by it produced a
-     * count to compute, a traversal to write, a depth to bound and a second
-     * half of the tree that never reached the DOM. The model was wrong, not
-     * the code. */
-    /* Flat, newest first — the order the API already returns. No grouping, no
-     * traversal: a period is a session, and clicking one continues it. */
+    /* HISTORY, REVISED 2026-09-17. A previous revision removed grouping and
+     * concluded "The model was wrong, not the code." That diagnosis was WRONG,
+     * and it is recorded here rather than silently deleted.
+     *
+     * Grouping had failed because its INPUT was corrupt: 83 of 139 periods had
+     * no usable parent — 71 empty plus 12 carrying prose or an arbitrary caller
+     * string, because the writer fell back to the human-readable continuation
+     * summary when no job id was supplied (anaphase `run_cycle.rs`). The writer
+     * is fixed and the reader now refuses anything that is not a period id
+     * (`session_events.rs::is_period_id`), so lineage is trustworthy for NEW
+     * periods while the old rows stay as written (append-only).
+     *
+     * Therefore grouping by lineage is still the intended model, deferred only
+     * until trustworthy data accumulates again — not rejected. It is NOT what
+     * failed before: a TREE render did ("a second half of the tree never
+     * reached the DOM"), whereas the intended unit is a THREAD (root -> leaf
+     * path), which cannot have a second half by construction.
+     *
+     * Kept flat for now, newest first (the order the API returns): a period is
+     * one card, and clicking it continues from there. The next step turns cards
+     * into threads, reusing the existing `chainJobIds` traversal. */
+    /* Flat, newest first — no grouping, no traversal yet. */
     var chain = periods.slice();
     var rootCount = periods.length;
     var head = '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
@@ -89,8 +104,7 @@
     chain.forEach(function (p) {
       var div = document.createElement('div');
       var sel = (chatMode ? st.chatJobId : null) === p.job_id;
-      var isChild = false;
-      div.className = 'ses-item' + (sel ? ' sel' : '') + (isChild ? ' child' : '');
+      div.className = 'ses-item' + (sel ? ' sel' : '');
       div.setAttribute('data-ts', p.first_ts || '');
       /* `st` is this asset's module state object (st.chatJobId / st.sesSeq) —
        * shadowing it here with a timestamp broke every later read in this
@@ -239,7 +253,13 @@
       events.forEach(function (e) {
         if (e.type === 'user/message') { Cx.addMsg('user', e.data.text || '', false); }
         else if (e.type === 'assistant/think') { Cx.foldRow('思考', e.data.text || ''); }
-        else if (e.type === 'assistant/attempt') { Cx.foldRow('计划', e.data.text || ''); }
+        else if (e.type === 'assistant/attempt') {
+          // DSH-style timeline: the plan row shows the READABLE plan
+          // ("调用 weather · city=New York"), never the raw JSON — the raw
+          // payload stays in the expanded state.
+          var p = Cx.parsePlan(e.data.text || '');
+          Cx.foldRow('计划', p.raw ? p.label + '\n' + p.raw : p.label);
+        }
         else if (e.type === 'tool/call') {
           // tool/call + tool/result pair into ONE fold row (no duplicate
           // helix messages): buffer the call, render on the matching result.
@@ -251,6 +271,18 @@
           var label = '工具 · ' + t.tool + (e.data.ok === false ? ' · 失败' : '');
           var text = (t.args ? '调用 ' + JSON.stringify(t.args) + '\n' : '') + (e.data.outcome || '');
           Cx.foldRow(label, text);
+        }
+        else if (e.type === 'check/status') {
+          // One timeline row per criterion: label carries the verdict so the
+          // flow reads "exec_ok PASS" / "answer.delivered PASS" at a glance;
+          // the reason opens on click.
+          var c = e.data || {};
+          var tag = '检查 · ' + (c.check || '?') + ' · ' + (c.passed === false ? 'FAIL' : 'PASS');
+          Cx.foldRow(tag, (c.reason || '') + (c.actual ? '\nactual=' + c.actual : ''), c.passed === false ? 'chk-fail' : 'chk-pass');
+        }
+        else if (e.type === 'verdict/status') {
+          var v = e.data || {};
+          Cx.foldRow('结论 · ' + (v.status || '?'), v.reason || '');
         }
         else if (e.type === 'assistant/reply') { sawReply = true; Cx.addReplyMsg(e.data.text || '', e.data.model || ''); }
         else if (e.type === 'assistant/usage') {
