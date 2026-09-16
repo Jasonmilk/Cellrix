@@ -71,11 +71,13 @@
 | 名字 | 声明处 |
 |---|---|
 | `.e-trk-nm` | prove_track.html |
+| `eHint` | prove_track.html |
 | `eInsp` | prove_track.html |
 | `eInspX` | prove_track.html |
 | `eOvNote` | prove_track.html |
 | `eStats` | prove_track.html |
 | `eTblVp` | prove_track.html |
+| `eTraj` | prove_track.html |
 | `.foot` | base.html |
 | `v-` | — |
 | `view-` | — |
@@ -151,7 +153,6 @@
 | `eDurLbl` | prove_track.html |
 | `eEmpty` | prove_track.html |
 | `eExportBtn` | prove_track.html |
-| `eHint` | prove_track.html |
 | `eInspB` | prove_track.html |
 | `eInspS` | prove_track.html |
 | `eInspT` | prove_track.html |
@@ -163,7 +164,6 @@
 | `eReplayBtn` | prove_track.html |
 | `eScrim` | prove_track.html |
 | `eTblScroll` | prove_track.html |
-| `eTraj` | prove_track.html |
 | `eTurnBtn` | prove_track.html |
 | `eWrap` | prove_track.html |
 | `.esc(c.state)` | script.html |

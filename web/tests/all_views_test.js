@@ -387,6 +387,37 @@ function skip(label, why) {
       NAV() && NAV().period === null && !!NAV().view, JSON.stringify(NAV()));
   }
 
+  /* ---- the hint travels with the trajectory it explains -------------------
+   *
+   * Measured before this: `#eHint` carried TWO `style` attributes. The HTML
+   * parser keeps the first and drops the second, so `display:none` was lost and
+   * the EMPTY state invited the reader to "click any row" when there was no
+   * table at all — a lie in the one place a confused user looks. The markup is
+   * fixed and the three sites that show/hide the trajectory now move both
+   * through one helper; this checks both halves of that.
+   */
+  console.log("-- the hint and the trajectory it explains move together --");
+  {
+    const tag = (html.match(/<p[^>]*id="eHint"[^>]*>/) || [""])[0];
+    const styles = (tag.match(/style=/g) || []).length;
+    check("the hint's markup carries one style attribute, not two",
+      styles === 1, styles + " in: " + tag.slice(0, 90));
+    const traj = doc.getElementById("eTraj");
+    const hint = doc.getElementById("eHint");
+    const vis = (el) => !!el && el.style.display !== "none";
+    const beforeHint = errors.length;
+    check("with a period loaded, the hint is visible",
+      vis(traj) && vis(hint),
+      "traj=" + (traj && traj.style.display) + " hint=" + (hint && hint.style.display));
+    window.__proveTrackClear();
+    await sleep(200);
+    check("clearing the trajectory hides the hint too",
+      !vis(traj) && !vis(hint),
+      "traj=" + (traj && traj.style.display) + " hint=" + (hint && hint.style.display));
+    check("no errors from clearing the trajectory", errors.length === beforeHint,
+      errors.slice(beforeHint, beforeHint + 2).join(" | "));
+  }
+
   /* ---- N-009 the other way: a hash in the URL at boot --------------------
    *
    * The boot path is the one that has to wait for DOMContentLoaded, because the

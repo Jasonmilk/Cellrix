@@ -157,12 +157,26 @@
   PT.target = function () { return { name: TARGET, onSnapshot: onSnapshot }; };
 
   /* ---------- Public interface (called by main.rs selectPeriod) ---------- */
+  /* The hint and the trajectory it explains travel together.
+   *
+   * They are siblings in the markup, so every load/clear/error has to move both.
+   * Measured before this: the hint carried TWO `style` attributes, the HTML
+   * parser keeps the first and drops the second, so `display:none` was lost and
+   * the empty state told the reader to "click any row" when there was no table
+   * at all. Pairing them in one place is what makes that impossible to
+   * reintroduce at only one of the three sites. */
+  function showTrajectory(on) {
+    var traj = $('eTraj'), hint = $('eHint');
+    if (traj) traj.style.display = on ? '' : 'none';
+    if (hint) hint.style.display = on ? '' : 'none';
+  }
+
   window.__proveTrackClear = function () {
     stopReplay();
     if (S.sel) closeInsp();
     S.session = []; S.turnIds = []; S.turnIndex = {}; S.usage = null;
     S.q = ''; $('eQ').value = '';
-    $('eTraj').style.display = 'none';
+    showTrajectory(false);
     $('eEmpty').style.display = '';
     $('eTbody').innerHTML = '';
     $('eStats').innerHTML = '';
@@ -181,7 +195,7 @@
     S.q = ''; $('eQ').value = ''; S.sel = null;
     if (!jobId) return;
     $('eEmpty').style.display = 'none';
-    $('eTraj').style.display = '';
+    showTrajectory(true);
     $('eTbody').innerHTML = '<tr class="e-turn-hd"><td colspan="5" style="color:var(--e-dim)">Loading ' +
       esc(jobId) + '…</td></tr>';
   };
@@ -212,7 +226,7 @@
       t.activate(TARGET);
       t.flush();
     }).catch(function (e) {
-      $('eTraj').style.display = 'none';
+      showTrajectory(false);
       $('eEmpty').style.display = '';
       $('eEmpty').textContent = 'Load failed: ' + e.message;
     });
