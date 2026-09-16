@@ -165,46 +165,38 @@
    * tiebreak, so the same data always yields the same order.
    */
   function chainJobIds(periods, startId) {
-    var byId = {}, children = {}, list = periods || [];
+    var byId = {};
+    var list = periods || [];
     for (var i = 0; i < list.length; i++) { byId[list[i].job_id] = list[i]; }
-    for (var j = 0; j < list.length; j++) {
-      var p = list[j];
-      if (p.parent && byId[p.parent]) {
-        (children[p.parent] = children[p.parent] || []).push(p.job_id);
-      }
-    }
 
-    /* Backwards to the root: the oldest period is the one nothing points from. */
-    var root = startId, guard = {};
-    while (byId[root] && byId[root].parent && byId[byId[root].parent] && !guard[root]) {
-      guard[root] = true;
-      root = byId[root].parent;
-    }
-
-    /* Forwards from the root, breadth-first so a branch does not bury a sibling. */
-    var out = [], queue = [root], seen = {};
-    while (queue.length) {
-      var id = queue.shift();
-      if (seen[id] || !byId[id]) { continue; }
-      seen[id] = true;
-      out.push(id);
-      var kids = children[id] || [];
-      for (var k = 0; k < kids.length; k++) { queue.push(kids[k]); }
-    }
-
-    /* NO global timestamp sort. Measured on a real 10-node chain: the period
-     * that resumes from the root can carry an EARLIER first_ts than the root
-     * itself, so sorting by time moves it in front of the period it continues
-     * from — the chain comes out in an order that contradicts resume_from.
+    /* The window is the LINEAGE PATH: root → the period the human opened.
      *
-     * The walk order is already correct: it starts at the root and visits
-     * children after their parent. Siblings are ordered by the API's own
-     * ordering, which is newest-first, so reverse each sibling group to read
-     * oldest-first within a branch. */
-    for (var s = 0; s < out.length; s++) {
-      var kids2 = children[out[s]];
-      if (kids2 && kids2.length > 1) { kids2.reverse(); }
+     * It deliberately does NOT walk forward into descendants or siblings. The
+     * previous version breadth-first'd the whole subtree from the root, so every
+     * later branch landed in the same window — a brand-new experience appeared
+     * inside the old one it had resumed from. Measured on the live store: three
+     * roots held 10-period subtrees and two parents had two children each, so
+     * opening any of them merged periods the human never opened.
+     *
+     * Ancestors stay included, so "continue from this period" keeps the context
+     * it inherits; what it no longer inherits is a future it did not have yet.
+     * One period, one window.
+     *
+     * NO global timestamp sort, either. Measured on a real 10-node chain: the
+     * period that resumes from the root can carry an EARLIER first_ts than the
+     * root itself, so sorting by time would move it in front of the period it
+     * continues from. The ancestry walk already yields the correct order once
+     * reversed — root first, then each period after the one it continues.
+     */
+    var path = [], cur = startId, guard = {};
+    while (byId[cur] && !guard[cur]) {
+      guard[cur] = true;
+      path.push(cur);
+      var par = byId[cur].parent;
+      if (!par || !byId[par]) { break; }
+      cur = par;
     }
+    var out = path.reverse();
     return out;
   }
 

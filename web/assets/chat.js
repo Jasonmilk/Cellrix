@@ -177,11 +177,16 @@
                 var who = bodyEl.parentElement && bodyEl.parentElement.querySelector('.who');
                 if (who) who.innerHTML = helixWho(j.model);
               }
-              // Continuation anchor (ADR-0026): this period's job becomes
-              // the next resume_from, so consecutive messages stay ONE
-              // conversation (threaded in the ProveTrack session list), never
-              // fragments. Cleared only by "+ 新对话".
-              if (j.job_id) Cx.state.chatJobId = j.job_id;
+              // Continuation anchor (ADR-0026): only an EXPLICIT continuation
+              // keeps chaining. Adopting the reply's job_id unconditionally is
+              // what made a fresh conversation silently become a child of the
+              // previous period — a new experience appearing inside the old one
+              // it happened to resume from. The resume banner promises that the
+              // NEXT message continues a period (session.html); it does not
+              // promise that a conversation the human started fresh quietly
+              // becomes one. `job` is the anchor captured when the message was
+              // sent, so a null anchor stays null: one question, one experience.
+              if (job && j.job_id) Cx.state.chatJobId = j.job_id;
               finish(); return;
             }
           }

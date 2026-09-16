@@ -132,15 +132,50 @@ check('48 unique node ids',
   check('chainJobIds ends at the period we asked from',
     ordered[ordered.length - 1] === 'p4', JSON.stringify(ordered));
 
-  // Asking from the middle must give the same chain, same order.
+  // Asking from the middle gives root..middle: the periods that came AFTER it
+  // are NOT retroactively merged. This assertion REPLACES an earlier one that
+  // demanded the opposite ("asking from the middle yields the same order"),
+  // which encoded the very defect the human then reported: a brand-new
+  // experience showed up inside the old period it had resumed from. The
+  // decision is recorded in Cellrix:ADR-0021; the old intent was superseded,
+  // not quietly dropped.
   const fromMiddle = NORM.chainJobIds(chainPeriods, 'p2');
-  check('asking from the middle yields the same order',
-    JSON.stringify(fromMiddle) === JSON.stringify(ordered), JSON.stringify(fromMiddle));
+  check('asking from the middle yields root..middle only',
+    JSON.stringify(fromMiddle) === JSON.stringify(['p1', 'p2']), JSON.stringify(fromMiddle));
 
   // MUTATION: newest-first, the naive walk. Must disagree with the assertions.
   const naive = ['p4', 'p3', 'p2', 'p1'];
   check('MUTATION: newest-first disagrees with the direction assertions',
     naive[0] !== 'p1' && JSON.stringify(naive) !== JSON.stringify(ordered));
+}
+
+// ---------------------------------------------------- one period, one window
+//
+// The reported defect: a BRANCHED tree merged every sibling into one window, so
+// a new experience appeared inside an older one. Live evidence: three roots held
+// 10-period subtrees and two parents had two children each. The window is the
+// lineage path, so a branch the human did not open stays out of it.
+{
+  const branched = [
+    { job_id: 'root', parent: null },
+    { job_id: 'a', parent: 'root' },
+    { job_id: 'b', parent: 'root' },      // sibling of `a` — must NOT join it
+    { job_id: 'a2', parent: 'a' },
+  ];
+  const winA = NORM.chainJobIds(branched, 'a');
+  check('opening a branch excludes its sibling',
+    JSON.stringify(winA) === JSON.stringify(['root', 'a']), JSON.stringify(winA));
+
+  const winA2 = NORM.chainJobIds(branched, 'a2');
+  check('opening a descendant keeps its ancestry only',
+    JSON.stringify(winA2) === JSON.stringify(['root', 'a', 'a2']), JSON.stringify(winA2));
+
+  const winRoot = NORM.chainJobIds(branched, 'root');
+  check('opening the root does not absorb its descendants',
+    JSON.stringify(winRoot) === JSON.stringify(['root']), JSON.stringify(winRoot));
+
+  check('MUTATION: the subtree walk would merge the sibling',
+    JSON.stringify(NORM.chainJobIds(branched, 'a')) !== JSON.stringify(['root', 'a', 'b', 'a2']));
 }
 
 // ------------------------------------------------- single period (the common case)

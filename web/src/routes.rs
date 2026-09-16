@@ -269,6 +269,20 @@ pub fn route_ecosystem(
                 "off"
             };
             comps.push(format!("{{\"name\":\"tuck\",\"port\":60052,\"state\":\"{t_state}\"}}"));
+            // FlowModus was absent from this strip entirely, so the panel could
+            // not even show that the router existed (its Flows view read a URL
+            // nothing had wired). Port is its own protocol default, like the
+            // others here — not a guess.
+            let f_state = if tcp_up(60053) {
+                let base = cfg
+                    .flowmodus_url
+                    .as_deref()
+                    .unwrap_or("http://127.0.0.1:60053");
+                http_state(base, "/api/status", None)
+            } else {
+                "off"
+            };
+            comps.push(format!("{{\"name\":\"flowmodus\",\"port\":60053,\"state\":\"{f_state}\"}}"));
             comps.push("{\"name\":\"panel\",\"port\":0,\"state\":\"ok\"}".to_string());
             let body = format!("{{\"components\":[{}]}}", comps.join(","));
             respond(stream, 200, "application/json", body.as_bytes())?;

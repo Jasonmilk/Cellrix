@@ -11,6 +11,14 @@ pub const WEB_PORT_DEFAULT: u16 = 8080;
 /// Anaphase cap_http protocol default (ADR-0010).
 pub const ANAPHASE_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:50061";
 
+/// FlowModus supplier pool / router protocol default — the port its own
+/// `serve` subcommand documents. Same reasoning as the Anaphase default above:
+/// a documented protocol default, not a guess. It is a read-only display source
+/// for the Flows view, so a service that is down simply yields the honest zero
+/// state (`flows: null`) rather than being treated as a security decision —
+/// which is why it gets a default while `tuck_endpoint` deliberately does not.
+pub const FLOWMODUS_URL_DEFAULT: &str = "http://127.0.0.1:60053";
+
 /// Tuck audit query window default (matches the CLI contract).
 pub const TUCK_LIMIT_DEFAULT: usize = 200;
 
@@ -50,7 +58,17 @@ impl PanelConfig {
             .or_else(|| env("TUCK_LIMIT").and_then(|v| v.parse().ok()))
             .unwrap_or(TUCK_LIMIT_DEFAULT);
 
-        let flowmodus_url = flag("--flowmodus-url").or_else(|| env("FLOWMODUS_URL"));
+        // Protocol default, not None. It used to be flag/env-only, so whichever
+        // launcher forgot the flag produced a silently empty Flows view — and
+        // `up`, the one-command path, was exactly that launcher (`up.rs` passed
+        // it only when the user supplied it), while `start-panel.sh` did pass
+        // it. A display source with a documented protocol port should not
+        // depend on remembering a flag.
+        let flowmodus_url = Some(
+            flag("--flowmodus-url")
+                .or_else(|| env("FLOWMODUS_URL"))
+                .unwrap_or_else(|| FLOWMODUS_URL_DEFAULT.to_string()),
+        );
 
         Self {
             anaphase_endpoint,

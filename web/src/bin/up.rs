@@ -31,6 +31,12 @@ const ANAPHASE_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:50061";
 // local audit key. `up` never guesses — these are the protocol's own values.
 const TUCK_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:60052";
 const TUCK_KEY_DEFAULT: &str = "tk-local-gate";
+/// FlowModus protocol defaults: the port its own `serve` documents, and the URL
+/// the panel's Flows view reads. `up` starts it and wires it — the same shape
+/// `start-panel.sh` already had, which is why the test panel's Flows view was
+/// populated while the one-command path's was silently empty.
+const FLOWMODUS_PORT: u16 = 60053;
+const FLOWMODUS_URL_DEFAULT: &str = "http://127.0.0.1:60053";
 /// User config file: `$HOME/.cellrix/up.toml` (per-user, 0600, never in a
 /// repository). Key name is a fixed convention, not a hardcoded path.
 const CONFIG_REL_PATH: &str = ".cellrix/up.toml";
@@ -436,6 +442,20 @@ fn mind_cmd() -> String {
     )
 }
 
+/// FlowModus supplier pool / router. It resolves its registry through a
+/// RELATIVE path (`registry`), so it must be started from `flowmodus-rs/` —
+/// starting it from the workspace root reports an empty pool. `start-panel.sh`
+/// chdirs for the same reason; this is the `up` path learning it.
+fn flowmodus_cmd() -> String {
+    let ws = workspace_root();
+    format!(
+        "cd {} && {} serve --port {}",
+        ws.join("FlowModus/flowmodus-rs").to_string_lossy(),
+        ws.join("FlowModus/flowmodus-rs/target/debug/flowmodus").to_string_lossy(),
+        FLOWMODUS_PORT
+    )
+}
+
 fn tuck_default_cmd() -> String {
     let ws = workspace_root();
     format!(
@@ -465,11 +485,12 @@ fn restart_all(
     println!();
 
     // 1. Stop, reverse dependency order: face → gateway → orchestrator →
-    //    memory → executor.
+    //    router → memory → executor.
     for (name, p) in [
         ("panel", 8080u16),
         ("tuck", 60052),
         ("anaphase", 50061),
+        ("flowmodus", FLOWMODUS_PORT),
         ("mind", 50052),
         ("tentacle", 50051),
     ] {
@@ -484,9 +505,10 @@ fn restart_all(
         .unwrap_or_else(|| format!("{} --config {}", anaphase_bin_path(), anaphase_config_path()));
     let tuck_cmd = cfg.tuck_cmd.clone().unwrap_or_else(tuck_default_cmd);
 
-    let components: [(&str, String, PollKind); 4] = [
+    let components: [(&str, String, PollKind); 5] = [
         ("tentacle", tentacle_cmd(), PollKind::Tcp(50051)),
         ("mind", mind_cmd(), PollKind::Tcp(50052)),
+        ("flowmodus", flowmodus_cmd(), PollKind::Tcp(FLOWMODUS_PORT)),
         (
             "anaphase",
             anaphase_cmd,
@@ -533,9 +555,14 @@ fn restart_all(
         .arg(port.to_string());
     cmd.arg("--tuck-endpoint").arg(tuck_endpoint);
     cmd.arg("--tuck-key").arg(tuck_key);
-    if let Some(fm) = flag(args, "--flowmodus-url") {
-        cmd.arg("--flowmodus-url").arg(fm);
-    }
+    // Always wired, not only when the user passed the flag: FlowModus is a
+    // display source with a documented protocol port, so the Flows view must not
+    // depend on remembering a flag (that is how it came up empty here while
+    // start-panel.sh's panel was populated).
+    let flowmodus_url = flag(args, "--flowmodus-url")
+        .or_else(|| env("FLOWMODUS_URL"))
+        .unwrap_or_else(|| FLOWMODUS_URL_DEFAULT.to_string());
+    cmd.arg("--flowmodus-url").arg(flowmodus_url);
     if !cfg.no_open {
         cmd.arg("--open");
     }

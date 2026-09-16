@@ -180,6 +180,24 @@ mod tests {
     }
 
     #[test]
+    fn config_derive_flowmodus_defaults_to_the_protocol_port() {
+        // It used to be flag/env-only, so whichever launcher forgot the flag
+        // produced a silently empty Flows view — and `up` was exactly that
+        // launcher. A display source with a documented protocol port must not
+        // depend on remembering a flag.
+        let cfg = PanelConfig::derive(&["cellrix-web".to_string()]);
+        assert_eq!(cfg.flowmodus_url.as_deref(), Some(config::FLOWMODUS_URL_DEFAULT));
+
+        // The flag still wins when the operator points somewhere else.
+        let cfg = PanelConfig::derive(&[
+            "cellrix-web".to_string(),
+            "--flowmodus-url".to_string(),
+            "http://127.0.0.1:7000".to_string(),
+        ]);
+        assert_eq!(cfg.flowmodus_url.as_deref(), Some("http://127.0.0.1:7000"));
+    }
+
+    #[test]
     fn panel_already_up_detects_own_panel_and_ignores_foreign() {
         // Our panel: a listener answering with the index page marker.
         let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

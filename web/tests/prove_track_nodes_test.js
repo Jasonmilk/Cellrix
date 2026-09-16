@@ -15,9 +15,18 @@
  * what such a script is for. It is not an assertion, because the thing it
  * compares is gone.)
  *
- * So: run the real 10-period chain through the tape, take the snapshot's nodes,
+ * So: run a real 10-period chain through the tape, take the snapshot's nodes,
  * and require that the Node-side consumption layer handles all of them — and
  * that the defects the comparison found cannot come back.
+ *
+ * The fixture is a LEAF, not a root (2026-09-17). `chainJobIds` used to walk
+ * breadth-first over the whole subtree, so a root's ten periods happened to be
+ * a ten-period chain. The window is now the lineage path — root → the period
+ * opened — because walking the subtree merged every later branch into one
+ * window and a new experience appeared inside the old one it had resumed from.
+ * Asking from a leaf gives the same real 10-period, 80-event, tool-free chain
+ * this file always exercised, with the semantics the panel now has. Same
+ * criterion, same numbers, different (and correct) reason.
  *
  * Usage: node prove_track_nodes_test.js
  */
@@ -66,7 +75,8 @@ fs.readdirSync(EV).forEach(function (name) {
   periods.push({ job_id: jobId, parent: parent, first_ts: rows[0].time || '' });
 });
 
-const ids = NORM.chainJobIds(periods, 'run-9e901b965a772d51');
+// A leaf, so the lineage path is the full 10 periods (see the header note).
+const ids = NORM.chainJobIds(periods, 'run-0537fb101ecccb5e');
 const merged = NORM.mergeChain(byJob, ids);
 const tape = ASM.create();
 tape.feed(merged.events);
@@ -225,8 +235,15 @@ if (NODE_SIDE && RENDER) {
       NODE_SIDE.detailOf({ kind: 'tool', payload: { stage: 'result', tool: 't' } }) === '—');
   }
 
-  /* 3. The context row lost the node hits it was given. */
-  const ctxNode = snap.nodes.filter(function (n) { return n.kind === 'context'; })[0];
+  /* 3. The context row lost the node hits it was given. Ask the first context
+   * node that actually CARRIES hits: which period leads the window is a
+   * property of the fixture (the lineage path's root can legitimately have no
+   * memory hits), while the criterion here is the rendering. The no-hit path
+   * has its own assertion immediately below, so nothing is left uncovered. */
+  const ctxNode = snap.nodes.filter(function (n) {
+    return n.kind === 'context'
+      && n.payload && n.payload.choice && (n.payload.choice.top || []).length > 0;
+  })[0];
   check('the context pane lists the node hits',
     !!ctxNode && NODE_SIDE.detailOf(ctxNode).indexOf('·') > -1,
     JSON.stringify(ctxNode ? NODE_SIDE.detailOf(ctxNode).slice(0, 60) : null));
