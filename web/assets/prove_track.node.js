@@ -197,12 +197,19 @@
       if (spec.dur) {
         dur = n.payload[spec.dur] || 0;
       } else if (spec.gap) {
-        /* A duration is the gap to the next DRAWN row: the sequence is the
-         * clock. Wall-clock between arbitrary events would measure the read,
-         * not the work. */
-        var nxt = shown[i + 1];
-        var a = nxt ? Date.parse(nxt.ts) : NaN, b = Date.parse(n.ts);
-        dur = (isFinite(a) && isFinite(b)) ? Math.max(0, a - b) : 0;
+        /* The wait that ENDED at this row, not the wait that follows it.
+         *
+         * These rows are the RESPONSE side of a call: the runtime writes them
+         * once the model has answered, so the interval that produced them sits
+         * between the previous drawn row and this one. Measured on the chain
+         * under review: request side at 08:30:49, response side at 08:30:54 —
+         * five seconds of inference, which the old (forward-looking) gap
+         * attributed to whatever came NEXT and therefore reported as nothing.
+         * The call latency was in the data the whole time; it was being read
+         * off the wrong end. */
+        var prev = shown[i - 1];
+        var a = prev ? Date.parse(prev.ts) : NaN, b = Date.parse(n.ts);
+        dur = (isFinite(a) && isFinite(b)) ? Math.max(0, b - a) : 0;
       }
       out.push({
         kind: 'ev', id: n.node, source: n.source, turn: n.turn, ord: n.ord, ts: n.ts,
