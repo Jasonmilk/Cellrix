@@ -22,6 +22,18 @@ pub const FLOWMODUS_URL_DEFAULT: &str = "http://127.0.0.1:60053";
 /// Tuck audit query window default (matches the CLI contract).
 pub const TUCK_LIMIT_DEFAULT: usize = 200;
 
+/// Period-list window the `/api/sessions` proxy forwards when the caller names
+/// no limit. Matches Anaphase's own `/v1/sessions` default (50), so omitting the
+/// parameter behaves exactly as calling the service directly would.
+pub const SESSIONS_LIMIT_DEFAULT: usize = 50;
+
+/// Upper bound on a forwarded period-list window. The caller's limit used to be
+/// discarded outright (hardcoded 50), which silently truncated lineage chains;
+/// it is now honoured, but bounded so a stray value cannot turn a 2 s panel poll
+/// into an unbounded directory scan. 500 is what the shell asks for and is well
+/// clear of the 130 periods on this machine.
+pub const SESSIONS_LIMIT_MAX: usize = 500;
+
 /// Panel auto-refresh seconds (browser polling interval).
 pub const REFRESH_SECS: u64 = 2;
 

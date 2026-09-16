@@ -180,6 +180,29 @@ mod tests {
     }
 
     #[test]
+    fn sessions_limit_honours_the_caller_and_stays_bounded() {
+        // The defect this pins: `/api/sessions` hardcoded `limit=50`, so the
+        // browser's value was accepted and discarded (`script.html` asks 500).
+        // `loadWindow` walks a lineage chain to its root, so ancestry older than
+        // the newest 50 vanished from the window with no diagnostic —
+        // measured on the live store: 130 periods on disk, 50 visible; the
+        // deepest real chain is 10 periods and the panel resolved 3.
+        assert_eq!(routes::sessions_limit("limit=500"), 500, "the caller wins");
+        assert_eq!(routes::sessions_limit("limit=10"), 10);
+        assert_eq!(routes::sessions_limit(""), config::SESSIONS_LIMIT_DEFAULT);
+        assert_eq!(routes::sessions_limit("other=1"), config::SESSIONS_LIMIT_DEFAULT);
+        assert_eq!(routes::sessions_limit("a=1&limit=7&b=2"), 7);
+        // A stray value must not become an unbounded directory scan.
+        assert_eq!(
+            routes::sessions_limit("limit=999999"),
+            config::SESSIONS_LIMIT_MAX
+        );
+        // Unparseable is treated as absent, never as zero (a zero window would
+        // look like "no experiences exist", which is a different claim).
+        assert_eq!(routes::sessions_limit("limit=abc"), config::SESSIONS_LIMIT_DEFAULT);
+    }
+
+    #[test]
     fn config_derive_flowmodus_defaults_to_the_protocol_port() {
         // It used to be flag/env-only, so whichever launcher forgot the flag
         // produced a silently empty Flows view — and `up` was exactly that

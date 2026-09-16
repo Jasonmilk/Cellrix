@@ -106,6 +106,21 @@ pub fn route_trace(
     Ok(())
 }
 
+/// Resolve the period-list window from a raw query string.
+///
+/// Pure on purpose: the contract that matters here — "the caller's limit is
+/// honoured, and bounded" — was previously unstated and unenforced (the proxy
+/// hardcoded 50 and discarded whatever the browser asked for), so it is now
+/// pinned by a test rather than only by a live request.
+pub fn sessions_limit(query: &str) -> usize {
+    query
+        .split('&')
+        .find_map(|kv| kv.strip_prefix("limit="))
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(crate::config::SESSIONS_LIMIT_DEFAULT)
+        .min(crate::config::SESSIONS_LIMIT_MAX)
+}
+
 /// `Sessions`.
 pub fn route_sessions(
     stream: &mut TcpStream,
@@ -114,9 +129,29 @@ pub fn route_sessions(
 ) -> Result<(), Box<dyn std::error::Error>> {
             // Session-management sidebar (ProveTrack v2): proxy the Anaphase
             // period list (one summary per cognitive period, newest first).
+            //
+            // The caller's `limit` is FORWARDED, not replaced. It used to be
+            // hardcoded to 50, so the parameter was accepted and ignored:
+            // `script.html` asks for 500 and got 50. That is not cosmetic —
+            // `loadWindow` walks a lineage chain to its ROOT, so any ancestor
+            // older than the newest 50 silently drops out of the window.
+            // Measured: the deepest real chain is 10 periods / 80 events and the
+            // panel resolved 3; disk held 130 periods and the panel showed 50.
+            // Anaphase's own default is 50 and it honours whatever it is given,
+            // so the loss was entirely on this side.
+            //
+            // Bounded by SESSIONS_LIMIT_MAX: a stray value must not turn a
+            // panel poll into an unbounded directory scan.
+            let q = text
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .unwrap_or("/api/sessions");
+            let query = q.split('?').nth(1).unwrap_or("");
+            let limit = sessions_limit(query);
+            let target = format!("/v1/sessions?limit={limit}");
             let auth = cellrix_web::client_bearer();
-            let target = "/v1/sessions?limit=50";
-            match cellrix_web::fetch_json(&cfg.anaphase_endpoint, target, auth.as_deref()) {
+            match cellrix_web::fetch_json(&cfg.anaphase_endpoint, &target, auth.as_deref()) {
                 Ok(body) => respond(stream, 200, "application/json", body.as_bytes())?,
                 Err(e) => {
                     let msg = format!("{{\"configured\":false,\"periods\":[],\"error\":\"{e}\"}}");
