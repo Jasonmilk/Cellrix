@@ -18,6 +18,7 @@
     { "id": "prove_track_css",     "placeholder": "__PROVE_TRACK_CSS__",   "asset": "prove_track.css" },
     { "id": "event_family",        "placeholder": "__EVENT_FAMILY__",      "asset": "event_family.js" },
     { "id": "period_normalize",    "placeholder": "__NORMALIZE__",         "asset": "period_normalize.js" },
+    { "id": "wayout",              "placeholder": "__WAYOUT__",            "asset": "wayout.js" },
     { "id": "node_shape",          "placeholder": "__NODE_SHAPE__",        "asset": "node_shape.js" },
     { "id": "assembly",            "placeholder": "__ASSEMBLY__",          "asset": "assembly.js" },
     { "id": "prove_track_data",    "placeholder": "__PROVE_TRACK_DATA__",  "asset": "prove_track.data.js" },

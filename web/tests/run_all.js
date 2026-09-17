@@ -44,6 +44,7 @@ const SELF_CONTAINED = [
   ['prove_track_nodes_test.js', 'trajectory — real chain through the Node layer'],
   ['pt_replay.js', 'trajectory — metering and panes against real files'],
   ['hash_state_test.js', 'URL hash — the addressable selection state'],
+  ['wayout_test.js', 'the exit layer — state to (sentence, action) (ADR-0044)'],
   ['nav_state_test.js', 'ONE selection state — structurally (ADR-0022 N-003)'],
   /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
    * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
