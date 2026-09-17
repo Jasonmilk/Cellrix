@@ -34,7 +34,7 @@ function check(label, cond, detail) {
 /* The fields that make up the one selection state. `[^=]` keeps `==`, `===` and
  * `!==` out; the zero-state initialiser (`nav: { view: null, period: null }`)
  * uses `:` and is therefore not a writer. */
-const WRITER = /\b(?:NAV|nav|state\.nav)\.(?:view|period)\s*=[^=]/;
+const WRITER = /\b(?:NAV|nav|state\.nav)\.(?:view|period|panel)\s*=[^=]/;
 /* Anything that used to be a second copy of the period. */
 const LEGACY = /\bchatJobId\b/;
 const META_WRITER = /\b__proveTrackMeta\s*=[^=]/;

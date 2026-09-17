@@ -43,21 +43,32 @@
 | `episode` | cockpit.html, cockpit.js |
 | `.inp` | chat.html, session_list.js |
 | `mode` | base.html, script.html |
-| `.nav` | base.html, script.html |
+| `.nav` | script.html |
 | `nledger` | cockpit.html, cockpit.js |
 | `.nm` | flows.html, session_list.js |
 | `resume-list` | chat.html, session_list.js |
 | `.resume-opt` | session_list.js |
 | `s-side` | base.html, prove_track.view.js, session.html |
 | `.ses-edit` | session_list.js |
+| `.ses-head` | session_list.js |
 | `sub` | base.html, flows.html, script.html |
-| `.t` | prove_track.html, session_list.js |
+| `.t` | base.html, prove_track.html, session_list.js |
 | `.tbl-scroll` | cockpit.html, gleam.html |
 | `.tbl-shell` | cockpit.html, gleam.html |
+| `tglSide` | base.html, script.html |
 | `.theme-switch` | base.html, script.html |
 | `.think-body` | chat.js |
 | `tick` | cockpit.html, cockpit.js |
 | `.toast` | script.html |
+| `uxFrame` | base.html, script.html |
+| `uxMain` | base.html, script.html |
+| `uxPanel` | base.html, script.html |
+| `uxPanelMax` | base.html, script.html |
+| `uxPanelT` | base.html, script.html |
+| `uxPanelX` | base.html, script.html |
+| `uxSide` | base.html, script.html |
+| `uxSideBody` | base.html, script.html |
+| `uxSideVp` | base.html, script.html |
 | `view-flows` | base.html, flows.html |
 | `view-prove-track` | base.html, prove_track.js, prove_track.view.js |
 | `.who` | chat.js |
@@ -83,7 +94,10 @@
 | `eTblVp` | prove_track.html |
 | `eTraj` | prove_track.html |
 | `.foot` | base.html |
+| `p-` | — |
+| `p-prove-track` | base.html |
 | `.ses-side` | base.html |
+| `uxMainBody` | base.html |
 | `v-` | — |
 | `view-` | — |
 
@@ -107,12 +121,15 @@
 | `.:` | flows.html |
 | `.===` | flows.html |
 | `.?` | flows.html |
-| `.b` | prove_track.html |
+| `.app` | base.html |
+| `.b` | base.html, prove_track.html |
 | `.badge` | base.html |
 | `.brand` | base.html |
 | `.btn` | base.html, chat.html |
-| `.btn-ghost` | chat.html |
+| `.btn-ghost` | base.html, chat.html |
+| `.btn-icon` | base.html |
 | `.btn-primary` | chat.html |
+| `.btn-sm` | base.html |
 | `.c` | script.html |
 | `.chat-col` | chat.html |
 | `.chat-grid` | chat.html |
@@ -168,6 +185,7 @@
 | `eTblScroll` | prove_track.html |
 | `eTurnBtn` | prove_track.html |
 | `eWrap` | prove_track.html |
+| `.eg` | base.html |
 | `.esc(c.state)` | script.html |
 | `.fl-badge` | flows.html |
 | `.fl-body` | flows.html |
@@ -191,17 +209,23 @@
 | `.fl-v` | flows.html |
 | `.frame` | base.html |
 | `.fxMain` | base.html |
-| `.fxMainHd` | base.html |
+| `.fxMainBody` | base.html |
+| `.fxPanel` | base.html |
+| `.fxPanelBody` | base.html |
+| `.fxPanelBox` | base.html |
+| `.fxPanelHd` | base.html |
+| `.fxPanelT` | base.html |
+| `.fxPanels` | base.html |
+| `.fxPanelsLbl` | base.html |
 | `.fxSide` | base.html |
 | `.fxSideBody` | base.html |
-| `.fxSideFt` | base.html |
-| `.fxSideHd` | base.html |
+| `.fxSideVp` | base.html |
 | `.ico` | prove_track.html |
 | `.info` | base.html |
 | `.input` | prove_track.html |
 | `.k` | cockpit.html |
 | `.kv` | flows.html |
-| `.l` | prove_track.html |
+| `.l` | base.html, prove_track.html |
 | `.ledger` | cockpit.html |
 | `ltScroll` | cockpit.html |
 | `ltShell` | cockpit.html |
@@ -210,34 +234,37 @@
 | `.ok` | base.html, flows.html |
 | `.on` | base.html |
 | `.orb` | chat.html |
+| `p-cockpit` | base.html |
+| `p-flows` | base.html |
 | `.panel` | chat.html, cockpit.html |
 | `.prove-track-main` | base.html |
-| `.r` | prove_track.html |
+| `.r` | base.html, prove_track.html |
 | `.row` | flows.html |
 | `s-main` | base.html |
 | `.sb` | prove_track.html |
+| `.seg` | base.html |
 | `.sk` | session.html |
 | `.sk-l1` | session.html |
 | `.sk-l2` | session.html |
+| `.sm` | base.html |
 | `.small` | cockpit.html |
-| `.sp` | prove_track.html |
+| `.sp` | base.html, prove_track.html |
 | `.stat` | cockpit.html |
 | `state` | base.html, script.html |
 | `.stats-bar` | cockpit.html |
 | `.tag` | base.html |
 | `.tool` | prove_track.html |
+| `.topbar` | base.html |
+| `.topspacer` | base.html |
 | `.ts` | flows.html |
-| `uxFrame` | base.html |
-| `uxMain` | base.html |
-| `uxSide` | base.html |
-| `uxSideBody` | base.html |
+| `uxApp` | base.html |
+| `uxPanelBox` | base.html |
+| `uxTopbar` | base.html |
 | `.v` | cockpit.html |
 | `v-chat` | base.html |
-| `v-cockpit` | base.html |
-| `v-flows` | base.html |
-| `v-prove-track` | base.html |
 | `view-chat` | base.html |
 | `view-cockpit` | base.html |
+| `.vp` | base.html |
 
 ## 维护
 

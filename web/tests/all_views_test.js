@@ -14,6 +14,8 @@ const BASE = process.argv[2] || "http://127.0.0.1:18932";
 const JOB_ARG = process.argv[3] || "";
 let JOB = JOB_ARG;
 const VIEWS = ["cockpit", "prove-track", "chat", "flows"];
+/* N-001：主面只有一个（对话），其余是辅助面——住进右栏侧板，不再是平级视图。 */
+const AUX = ["cockpit", "prove-track", "flows"];
 const CJK = /[\u4e00-\u9fff]/;
 const cjkCount = (s) => (s.match(new RegExp(CJK.source, "g")) || []).length;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,29 +105,47 @@ function skip(label, why) {
   check("shell CJK > 0 (i.e. not accidentally anglicised)",
     cjkCount(doc.body.textContent) > 0, `cjk=${cjkCount(doc.body.textContent)}`);
 
-  console.log("-- switch every view through its real toolbar button --");
-  for (const v of VIEWS) {
-    const btn = doc.getElementById("v-" + v);
-    if (!btn) { check(`button #v-${v} exists`, false); continue; }
-    const before = errors.length;
-    btn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-    await sleep(v === "flows" || v === "prove-track" ? 1400 : 800);
+  /* N-001（钻石）：**存在唯一主视图**，其余是辅助、不得与主平级。
+   * 可检查的那一半是结构：辅助面住在侧板里，主面不在。改之前四个 `#view-*` 是
+   * 四个并列的兄弟，各自一个等权按钮。 */
+  console.log("-- N-001: one main surface, the rest are panels --");
+  {
+    check("the main surface is the conversation (N-001)",
+      !!doc.querySelector("#uxMainBody #view-chat"), "chat lives in the main body");
+    check("no auxiliary surface is a peer of the main one (N-001)",
+      AUX.every((v) => { const el = doc.getElementById("view-" + v); return !!el && !!el.closest("#uxPanel"); }),
+      AUX.map((v) => { const el = doc.getElementById("view-" + v);
+        return v + "=" + (!el ? "missing" : (el.closest("#uxPanel") ? "panel" : "PEER")); }).join(" "));
+    check("auxiliaries have toggles; none of them has a main-view button (N-001)",
+      AUX.every((v) => !!doc.getElementById("p-" + v)) && !AUX.some((v) => !!doc.getElementById("v-" + v)),
+      AUX.map((v) => "p-" + v).join(","));
 
-    const el = doc.getElementById("view-" + v);
-    check(`#view-${v} exists`, el !== null);
-    check(`#view-${v} visible after click`, el && el.style.display !== "none",
-      'display="' + (el && el.style.display) + '"');
-    const others = VIEWS.filter((o) => o !== v)
-      .map((o) => doc.getElementById("view-" + o))
-      .filter(Boolean);
-    check(`all other views hidden while on ${v}`,
-      others.every((o) => o.style.display === "none"),
-      others.map((o) => o.id + '="' + o.style.display + '"').join(" "));
-    check(`#v-${v} marked active`, btn.className.includes("on"), btn.className);
-    check(`#view-${v} rendered content`, el && el.textContent.trim().length > 20,
-      el ? el.textContent.trim().length + " chars" : "n/a");
-    check(`no errors raised by switching to ${v}`, errors.length === before,
-      errors.slice(before, before + 2).join(" | "));
+    for (const v of AUX) {
+      const btn = doc.getElementById("p-" + v);
+      if (!btn) continue;
+      const before = errors.length;
+      const histBefore = window.history.length;
+      btn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+      await sleep(v === "flows" || v === "prove-track" ? 1400 : 800);
+      const el = doc.getElementById("view-" + v);
+      check(`opening ${v} shows its panel`, !!el && !el.hasAttribute("hidden"),
+        el ? "hidden=" + el.hasAttribute("hidden") : "missing");
+      check(`opening ${v} does not replace the main surface (N-001)`,
+        !!doc.querySelector("#uxMainBody #view-chat"), "chat still in the main body");
+      check(`the hash names the open panel after ${v} (N-009)`,
+        window.CxNormalize.parseHash(window.location.hash).panel === v,
+        window.location.hash);
+      check(`opening ${v} pushed a history entry (N-005)`,
+        window.history.length > histBefore, histBefore + " -> " + window.history.length);
+      check(`${v} rendered content`, !!el && el.textContent.trim().length > 20,
+        el ? el.textContent.trim().length + " chars" : "n/a");
+      check(`no errors raised by opening ${v}`, errors.length === before,
+        errors.slice(before, before + 2).join(" | "));
+      btn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));   /* 收起 */
+      await sleep(400);
+      check(`closing ${v} hides its panel`, !!el && el.hasAttribute("hidden"),
+        el ? "hidden=" + el.hasAttribute("hidden") : "missing");
+    }
   }
 
   /* ---- the trajectory opened ON ITS OWN ---------------------------------
@@ -137,6 +157,9 @@ function skip(label, why) {
    */
   console.log("-- prove-track: opened on its own, with no period chosen --");
   {
+    /* N-001：'自己打开' 现在就是打开证轨**侧板**（不再是切到一个平级的视图）。 */
+    const ptBtn = doc.getElementById("p-prove-track");
+    if (ptBtn) { ptBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); await sleep(1800); }
     /* The chain logic, run here rather than asked for: the same public
      * functions the panel uses, on the same API, in this process. */
     let expect = null;
@@ -215,22 +238,17 @@ function skip(label, why) {
     const row = items.find((el) => el.textContent.includes(KEY)) || items[0];
     const before = errors.length;
 
-    /* P3a: what a row means is now an EXPLICIT mode, not a property of which
-     * container the row happens to be in. So this drives the mode switch first —
-     * and that is the point of the change: the active semantics is visible and
-     * chosen, instead of being implied by the surrounding view. */
-    const modeBtn = Array.from(doc.querySelectorAll("#s-side button"))
-      .find((b) => b.getAttribute("data-panel") === "track");
-    check("the sidebar offers an explicit mode switch (N-015)", !!modeBtn,
-      Array.from(doc.querySelectorAll("#s-side button"))
-        .map((b) => b.getAttribute("data-panel") || "?").join(","));
-    if (modeBtn) modeBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-    await sleep(300);
-
+    /* N-001 + N-015：点一张卡只剩一个答案（载进对话）。证轨侧板若开着，它**跟着
+     * period 走**——那是 shell 的 period 通知在做的事，不是第二个点卡入口。
+     * （P3a 那个显式模式开关已被 N-001 取代：辅助面有自己的开关，留着模式开关就是
+     * 同一件事的第二个入口。） */
+    check("the sidebar has no second entry for opening the trajectory (N-015)",
+      !Array.from(doc.querySelectorAll("#s-side button")).some((b) => b.getAttribute("data-panel")),
+      "no data-panel control inside the list");
     row.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     await sleep(1800);
     const view = doc.getElementById("view-prove-track");
-    check("with 证轨 chosen, a row click opens the trajectory", view && view.style.display !== "none");
+    check("the open 证轨 panel follows the row click", view && !view.hasAttribute("hidden"));
     check("prove-track rendered real content", view && view.textContent.trim().length > 200,
       view ? view.textContent.trim().length + " chars" : "n/a");
     /* 容器真的亮着，不只是"DOM 里有字"。
@@ -258,10 +276,6 @@ function skip(label, why) {
      * jsdom has no layout, so it cannot see the scroll reset itself. It CAN see
      * the cause — the extra fetch and the rebuilt nodes — which is why this
      * asserts those and not a scrollTop. */
-    const chatModeBtn = Array.from(doc.querySelectorAll("#s-side button"))
-      .find((b) => b.getAttribute("data-panel") === "chat");
-    if (chatModeBtn) chatModeBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-    await sleep(300);
     const nodesBefore = Array.from(doc.querySelectorAll("#s-side .ses-item"));
     const stamped = nodesBefore[nodesBefore.length - 1];
     if (stamped) stamped.setAttribute("data-observed", "1");
@@ -414,36 +428,50 @@ function skip(label, why) {
   {
     const NAV = () => window.Cx && window.Cx.state && window.Cx.state.nav;
     const parsed = () => window.CxNormalize.parseHash(window.location.hash);
+    /* N-001 之后辅助面用 `hidden` 属性控制（它们不再靠内联 display 藏）。 */
     const shown = () => VIEWS.filter((v) => {
       const el = doc.getElementById("view-" + v);
-      return el && el.style.display !== "none";
+      return el && !el.hasAttribute("hidden") && el.style.display !== "none";
     });
 
     check("the shell exposes exactly one selection state", !!NAV(), JSON.stringify(NAV()));
 
-    for (const v of ["chat", "flows", "cockpit"]) {
-      const btn = doc.getElementById("v-" + v);
+    /* 前面的段落把证轨侧板留在了开着的位置；先收起，下面的步骤才是绝对断言。 */
+    {
+      const x = doc.getElementById("uxPanelX");
+      if (x && NAV().panel) { x.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); await sleep(400); }
+    }
+
+    /* N-001 之后位置状态有三种变化：period（同一面内换一段）、panel（开/收辅助面）、
+     * view（回到主面并收起辅助面）。三种都走同一个写者，也都要在 hash 里往返一致。 */
+    const roundTrips = () =>
+      JSON.stringify(parsed()) ===
+      JSON.stringify({ view: NAV().view, period: NAV().period, panel: NAV().panel });
+    const steps = [
+      ["opening the 证轨 panel", "p-prove-track", (n) => n.panel === "prove-track"],
+      ["closing it again", "p-prove-track", (n) => n.panel === null],
+      ["opening the 驾驶舱 panel", "p-cockpit", (n) => n.panel === "cockpit"],
+      ["returning to the main surface", "v-chat", (n) => n.panel === null && n.view === "chat"]
+    ];
+    for (const [label, id, expect] of steps) {
+      const btn = doc.getElementById(id);
       const before = errors.length;
       const histBefore = window.history.length;
+      if (!btn) { check(`a control for ${label}`, false); continue; }
       btn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-      await sleep(800);
-      check(`clicking ${v} moves nav.view to ${v} (N-003)`, NAV() && NAV().view === v,
-        JSON.stringify(NAV()));
-      /* Derived, not counted. The visible set must BE the view we asked for.
-       * Expressed as an equality rather than a count against a literal: that
-       * shape is exactly what the [ENG] guard (run_all.js) exists to stop, and
-       * an equality is stronger anyway — it pins WHICH view, not just how many.
-       * The guard flagged the count form on the first run and was right to. */
-      check(`after ${v} the visible view is exactly ${v} (N-003)`, shown().join(",") === v,
-        shown().join(",") || "none");
-      check(`the hash round-trips to the state after ${v} (N-009)`,
-        JSON.stringify(parsed()) === JSON.stringify({ view: NAV().view, period: NAV().period }),
+      await sleep(700);
+      check(`${label} lands in the one state (N-003)`, !!NAV() && expect(NAV()), JSON.stringify(NAV()));
+      check(`the hash round-trips after ${label} (N-009)`, roundTrips(),
         JSON.stringify(window.location.hash) + " vs " + JSON.stringify(NAV()));
-      check(`switching view pushed one history entry (N-005)`,
+      check(`${label} pushed one history entry (N-005)`,
         window.history.length > histBefore, histBefore + " -> " + window.history.length);
-      check(`no errors raised by ${v} navigation`, errors.length === before,
+      check(`no errors while ${label}`, errors.length === before,
         errors.slice(before, before + 2).join(" | "));
     }
+    /* 主面永远是对话：没有任何一步把它换掉（N-001）。 */
+    check("the main surface is still the conversation after all of that (N-001)",
+      !!doc.querySelector("#uxMainBody #view-chat") && NAV().view === "chat", JSON.stringify(NAV()));
+    void shown;
 
     /* The period cache must describe the period in the state, or not exist. */
     check("the trajectory metadata cannot describe a different period (N-003)",
@@ -640,7 +668,9 @@ function skip(label, why) {
     vc2.on("jsdomError", (e) => errs2.push("jsdomError: " + e.message));
     vc2.on("error", (...a) => errs2.push("console.error: " + a.join(" ")));
     const dom2 = new JSDOM(html, {
-      url: BASE + "/#view=flows", runScripts: "dangerously", pretendToBeVisual: true,
+      /* N-001 之后，"深链到某个辅助面"的写法是 view=chat&panel=…：主面永远是对话，
+         辅助面是它旁边打开的面板。 */
+      url: BASE + "/#view=chat&panel=flows", runScripts: "dangerously", pretendToBeVisual: true,
       virtualConsole: vc2,
       beforeParse(w) {
         w.fetch = (input, init) => {
@@ -659,20 +689,20 @@ function skip(label, why) {
     await sleep(2000);
     const doc2 = dom2.window.document;
     const nav2 = dom2.window.Cx && dom2.window.Cx.state.nav;
-    /* Derived from the restored page's own nav, so this cannot pass by naming a
-     * view list the markup does not have. */
-    const views2 = Array.from(doc2.querySelectorAll(".nav [data-view]"))
-      .map((b) => b.getAttribute("data-view"));
-    const disp2 = (v) => {
+    /* 辅助面板与主面都从恢复后的页面自己身上取，而不是在这里写死名字。 */
+    const panels2 = Array.from(doc2.querySelectorAll("[data-panel]"))
+      .map((b) => b.getAttribute("data-panel"));
+    const hidden2 = (v) => {
       const el = doc2.getElementById("view-" + v);
-      return el ? el.style.display : "MISSING";
+      return el ? el.hasAttribute("hidden") : "MISSING";
     };
     check("the hash in the URL is adopted on boot (N-009)",
-      nav2 && nav2.view === "flows", JSON.stringify(nav2));
-    check("the restored view is the only visible one (N-009)",
-      views2.length > 0 && disp2("flows") !== "none" &&
-        views2.filter((v) => v !== "flows").every((v) => disp2(v) === "none"),
-      views2.map((v) => v + '="' + disp2(v) + '"').join(" "));
+      nav2 && nav2.view === "chat" && nav2.panel === "flows", JSON.stringify(nav2));
+    check("the named panel is open and the main surface is untouched (N-009 / N-001)",
+      panels2.indexOf("flows") >= 0 && hidden2("flows") === false &&
+        hidden2("chat") === false &&
+        panels2.filter((p) => p !== "flows").every((p) => hidden2(p) === true),
+      panels2.map((p) => p + " hidden=" + hidden2(p)).join(" ") + " chat hidden=" + hidden2("chat"));
     check("adopting the hash at boot did not push a history entry (N-005)",
       dom2.window.history.length === 1, "history.length=" + dom2.window.history.length);
     check("no errors during a hash-carrying boot", errs2.length === 0, errs2.slice(0, 2).join(" | "));

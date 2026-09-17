@@ -7,14 +7,15 @@
   <meta name="color-scheme" content="dark light">
   <script>
   (function(){
-    var K='cellrix-theme', R=document.documentElement, mq=matchMedia('(prefers-color-scheme: dark)');
+    /* 主题三段式（模板 v8）：data-theme 直接写 auto/light/dark，
+       auto 的跟随由 CSS @media (prefers-color-scheme) 负责，无需 JS 轮询。 */
+    var K='cellrix-theme', R=document.documentElement;
     function cur(){ try{ return localStorage.getItem(K)||'auto'; }catch(e){ return 'auto'; } }
-    function apply(m){ var real=m==='auto'?(mq.matches?'dark':'light'):m; R.setAttribute('data-theme',real); }
+    function apply(m){ R.setAttribute('data-theme', m); }
     apply(cur());
     window.__setTheme=function(m){ try{ localStorage.setItem(K,m); }catch(e){} apply(m);
       var bs=document.querySelectorAll('.theme-switch button');
       for(var i=0;i<bs.length;i++){ bs[i].className=bs[i].getAttribute('data-t')===m?'on':''; } };
-    if(mq.addEventListener) mq.addEventListener('change',function(){ if(cur()==='auto') apply('auto'); });
   })();
   </script>
   __TOKENS__
@@ -26,67 +27,105 @@
   <style>__PROVE_TRACK_CSS__</style>
 </head>
 <body>
-  <!-- 框架 · 外壳就是视口（ADR-0022 N3 / Q3·Q4）。
-       形状借自成熟实践：**页面级没有任何堆叠的家具**——chrome 活在栏内。
-       左栏 = 经历列表（唯一一份）+ 状态/主题沉到栏底；中栏 = 主视图，自己一条高度链。
-       真 Chrome 实测：改前内容要等 218px 的 h1/sub/bar/eco 四层堆完才开始；
-       改后顶部只剩栏自己的头部（≈44px），且页面永不滚动，滚的是栏内部。 -->
-  <div class="frame" id="uxFrame">
+  <!-- 结构层级（照「水之波光 · 卷四」的 L0–L5 纪律）：
+       L0 壳     视口，唯一外边界，纵向不滚
+       L1 顶栏   **单行、恒定高度、挤不下让位不换行** —— 品牌/导航/运行时/主题都在这一条上
+       L2 主区   经历列表 + 内容
+       L3 内容   头（恒定高）+ 体（伸缩）
+       L4 体     滚动层 + 遮挡自证（四方向 .eg）
+       L5 内列   阅读尺度（--read-w），居中
+       真 Chrome 实测：四层堆叠的旧版内容要等 218px 才开始；现在顶栏只有一条。 -->
+  <div class="app" id="uxApp">
 
-    <aside class="fxSide" id="uxSide">
-      <div class="fxSideHd">
-        <span class="brand">Cellrix</span>
-        <span class="badge info" id="mode">…</span>
-        <span class="badge info" id="state">…</span>
-        <span class="badge info" id="conn">…</span>
+    <!-- ═══ L1 顶栏 ═══ -->
+    <div class="topbar" id="uxTopbar">
+      <button type="button" class="btn btn-sm" id="tglSide" aria-expanded="true"
+        aria-controls="uxSide" title="收起 / 展开经历列表">☰ 经历</button>
+      <span class="brand"><span class="logo">C</span>Cellrix <small>Anaphase-Helix</small></span>
+      <button type="button" class="btn on" id="v-chat" data-view="chat"
+        title="伙伴模式 · 单周期一轮 · 走 Tuck 网关审计（点击收起辅助面板）">对话 Chat</button>
+      <div class="fxPanels" role="group" aria-label="辅助面板">
+        <span class="fxPanelsLbl">辅助</span>
+        <button type="button" class="btn btn-ghost" id="p-cockpit" data-panel="cockpit"
+          aria-pressed="false" title="生态态势 · Anaphase 快照 · Ledger 白盒审计链">驾驶舱</button>
+        <button type="button" class="btn btn-ghost" id="p-prove-track" data-panel="prove-track"
+          aria-pressed="false" title="全链路可审计证轨（会话 = 经历 · 判据与行动同线）">证轨</button>
+        <button type="button" class="btn btn-ghost" id="p-flows" data-panel="flows"
+          aria-pressed="false" title="供应商池与路由 · 审计统计">检定台</button>
       </div>
-      <!-- 唯一的滚动上下文（左栏）。列表只有这一份：#chat-side 已经删掉。 -->
-      <div class="fxSideBody" id="uxSideBody">
-        <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
+      <span class="topspacer"></span>
+      <!-- 运行时：常态静默（S3 不标记）。只有异常时才升为标记。 -->
+      <span class="sub" id="sub">连接中…</span>
+      <span class="badge info" id="mode">…</span>
+      <span class="badge info" id="state">…</span>
+      <span class="badge info" id="conn">…</span>
+      <div class="eco" id="eco">生态点亮探测中…</div>
+      <div class="theme-switch" role="group" aria-label="主题">
+        <button type="button" data-t="auto" class="on" onclick="__setTheme('auto')">跟随</button>
+        <button type="button" data-t="light" onclick="__setTheme('light')">浅色</button>
+        <button type="button" data-t="dark" onclick="__setTheme('dark')">深色</button>
       </div>
-      <div class="fxSideFt">
-        <span class="sub" id="sub">连接中…</span>
-        <div class="eco" id="eco">生态点亮探测中…</div>
-        <div class="theme-switch" role="group" aria-label="主题">
-          <button type="button" data-t="auto" class="on" onclick="__setTheme('auto')">跟随</button>
-          <button type="button" data-t="light" onclick="__setTheme('light')">日间</button>
-          <button type="button" data-t="dark" onclick="__setTheme('dark')">暗黑</button>
+    </div>
+
+    <!-- ═══ L2 主区 ═══ -->
+    <div class="frame" id="uxFrame" data-side="1">
+
+      <aside class="fxSide" id="uxSide">
+        <!-- 唯一的滚动上下文（左栏）；遮挡自证挂在 .vp 上，四方向由 JS 置位。 -->
+        <!-- L4：遮罩层（.vp，不滚）套滚动层（.fxSideBody，唯一滚动上下文）。
+             两层是必须的：.vp 用 overflow:clip 把边缘渐隐裁进圆角，而滚动层自己 overflow:auto。 -->
+        <div class="vp fxSideVp" id="uxSideVp">
+          <div class="fxSideBody" id="uxSideBody">
+            <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
+          </div>
+          <i class="eg t" aria-hidden="true"></i><i class="eg b" aria-hidden="true"></i>
+          <i class="eg l" aria-hidden="true"></i><i class="eg r" aria-hidden="true"></i>
         </div>
-      </div>
-    </aside>
+      </aside>
 
-    <main class="fxMain" id="uxMain">
-      <div class="fxMainHd">
-        <nav class="nav" aria-label="视图">
-          <!-- 每个视图"是干什么的"写在 title 上：导航因此解释用途，而不必让每个视图
-               自己常驻一行说明（那几行与这里的标签重复，各占 22px）。 -->
-          <button type="button" class="btn on" id="v-cockpit" data-view="cockpit" title="生态态势 · Anaphase 快照（ADR-0010）· Ledger 白盒审计链">驾驶舱 Cockpit</button>
-          <button type="button" class="btn" id="v-prove-track" data-view="prove-track" title="全链路可审计证轨（会话 = 经历 · 判据与行动同线）">证轨 ProveTrack</button>
-          <button type="button" class="btn" id="v-chat" data-view="chat" title="伙伴模式 · 单周期一轮 · 走 Tuck 网关审计">对话 Chat</button>
-          <button type="button" class="btn" id="v-flows" data-view="flows" title="供应商池与路由 · 审计统计">检定台 Flows</button>
-        </nav>
-        <span class="foot">auto __REFRESH__s · <span id="audit" class="tag ok">…</span>
-          <a href="/api/snapshot">snapshot</a> · <a href="/api/audit">audit</a></span>
-      </div>
-
-      <div id="view-cockpit">
-        __COCKPIT__
-      </div>
-
-      <div id="view-prove-track" style="display:none;">
-        <div class="prove-track-main">
-          <div id="s-main">__PROVE_TRACK__</div>
+      <main class="fxMain" id="uxMain">
+        <div class="fxMainBody" id="uxMainBody">
+          <div id="view-chat">
+            __CHAT__
+          </div>
         </div>
-      </div>
 
-      <div id="view-chat" style="display:none;">
-        __CHAT__
-      </div>
+        <aside class="fxPanel" id="uxPanel" hidden aria-label="辅助面板">
+          <div class="fxPanelBox" id="uxPanelBox">
+            <div class="fxPanelHd">
+              <span class="fxPanelT" id="uxPanelT">…</span>
+              <button type="button" class="btn-icon sm" id="uxPanelMax" aria-pressed="false"
+                title="全屏 / 还原">⤢</button>
+              <button type="button" class="btn-icon sm" id="uxPanelX" title="关闭辅助面板">✕</button>
+            </div>
+            <div class="fxPanelBody">
+              <div id="view-cockpit" hidden>
+                __COCKPIT__
+              </div>
+              <div id="view-prove-track" hidden>
+                <div class="prove-track-main">
+                  <div id="s-main">__PROVE_TRACK__</div>
+                </div>
+              </div>
+              <div id="view-flows" hidden>
+                __FLOWS__
+              </div>
+            </div>
+          </div>
+        </aside>
+      </main>
+    </div>
 
-      <div id="view-flows" style="display:none;">
-        __FLOWS__
-      </div>
-    </main>
+    <!-- 底栏：数据来源与出处。可追溯性不是装饰，所以它不随视图变化。 -->
+    <div class="foot">
+      <span class="seg">数据源 · Anaphase /v1/agent/snapshot（ADR-0010） · Tuck /v1/audit 链</span>
+      <span class="sp"></span>
+      <span class="seg">自动刷新 __REFRESH__s</span>
+      <span class="seg">视图切换 Ctrl+E</span>
+      <span class="seg">审计 <span id="audit" class="tag ok">…</span></span>
+      <span class="seg"><a href="/api/snapshot">snapshot JSON</a></span>
+      <span class="seg"><a href="/api/audit">audit JSON</a></span>
+    </div>
   </div>
 <script>__EVENT_FAMILY__</script>
 <script>__NORMALIZE__</script>

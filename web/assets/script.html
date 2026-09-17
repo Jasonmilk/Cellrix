@@ -15,7 +15,7 @@
    * `data-view` on every button. Adding a view = one nav entry + one
    * `#view-<name>` container + one asset file. This function never changes.
    * [GENE] 0 硬编码 —— 视图清单不写死在壳里。 */
-  function navButtons() { return document.querySelectorAll('.nav [data-view]'); }
+  function navButtons() { return document.querySelectorAll('[data-view]'); }
 
   /* The default view is the one the markup marks as current. Read from the
    * markup rather than named here: the shell is not allowed to know a view it
@@ -111,7 +111,9 @@
    * three assets, and the view existed only as `style.display`. The address bar,
    * the sidebar and the trajectory could therefore each hold a different idea of
    * where we are, and nothing could report which one was current. */
-  var STATE = { nav: { view: null, period: null, panel: 'chat' }, sesSeq: 0, histSeq: 0, chatBusy: false };
+  /* `panel` = 右栏侧板里开着哪个辅助面（N-001：主只有一个，其余是辅助）。
+   * 它的语义在 N-001 落地时变了：以前是侧栏的"点击模式"，现在是"哪个辅助面开着"。 */
+  var STATE = { nav: { view: null, period: null, panel: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
   var NAV = STATE.nav;
 
   function hashFor(state) {
@@ -122,16 +124,19 @@
    * not even the two paths that adopt what the address bar already says. */
   function setNav(patch, opts) {
     opts = opts || {};
-    var before = NAV.view, beforePeriod = NAV.period;
+    var before = NAV.view, beforePeriod = NAV.period, beforePanel = NAV.panel;
     if (patch) {
       if (patch.view) NAV.view = patch.view;
       if (patch.period !== undefined) NAV.period = patch.period || null;
+      /* 侧板状态也由这只手写：N-001 之后"哪个辅助面开着"是同一份位置状态的一部分。 */
+      if (patch.panel !== undefined) NAV.panel = patch.panel || null;
       /* The metadata cache is written by the same hand as the period it
        * describes, so it cannot come to describe a different period. */
       if (patch.meta !== undefined) window.__proveTrackMeta = patch.meta;
     }
     var viewChanged = NAV.view !== before;
     var periodChanged = NAV.period !== beforePeriod;
+    var panelChanged = NAV.panel !== beforePanel;
     var want = hashFor(NAV);
     /* N-005: changing VIEW is a navigation and pushes an entry, so Back returns
      * to the view we came from. A period-only change (a reply creating a period,
@@ -147,7 +152,8 @@
         if (location.hash !== want) {
           history.replaceState(null, '', want || (location.pathname + location.search));
         }
-      } else if (NAV.view !== before) {
+      } else if (NAV.view !== before || NAV.panel !== beforePanel) {
+        /* 开/收一个辅助面板也是导航：N-005 的后退要能退回上一个位置。 */
         if (location.hash !== want) location.hash = want;
       } else if (location.hash !== want) {
         history.replaceState(null, '', want || (location.pathname + location.search));
@@ -162,8 +168,57 @@
      * 分工：enter = 进入这个视图时该做什么（取数、聚焦）；period = 同一视图内换了
      * 一段经历时该做什么（更新高亮、重载证轨的窗口）。选择变化不该重建你正在选择
      * 的那个集合——这是任何有列表的界面的基本形状。 */
-    if (viewChanged) { applyView(NAV.view); }
-    else if (periodChanged) { notifyPeriod(NAV.view); }
+    if (viewChanged || panelChanged) { applyView(NAV.view); applyPanel(); }
+    else if (periodChanged) {
+      /* 主视图与**开着的辅助面**都要知道 period 变了：证轨的窗口要跟着换。 */
+      notifyPeriod(NAV.view);
+      if (NAV.panel) notifyPeriod(NAV.panel);
+    }
+  }
+
+  /* ── 右栏侧板（N-001）────────────────────────────────────────────────────
+   * 辅助面住在这里：零宽轨道时它**悬在中栏之上**（DSH 的 rightbar 形状），
+   * 全屏时中栏让位。面板自己一条高度链，内部各自滚。 */
+  var PANEL_TITLE = { cockpit: '驾驶舱 Cockpit', 'prove-track': '证轨 ProveTrack', flows: '检定台 Flows' };
+  function applyPanel() {
+    var panel = NAV.panel || null;
+    var box = document.getElementById('uxPanel');
+    var main = document.getElementById('uxMain');
+    if (!box || !main) return;
+    box.hidden = !panel;
+    /* 钩子叫 `data-open`，**不能叫 `data-panel`**：后者已经属于开关按钮，而下面
+     * 那段接线是 `querySelectorAll('[data-panel]')` —— 同名会让它把框架也选中，
+     * 于是框架的 className 被覆盖成按钮的类、`fxMain` 消失、grid 随之失效。
+     * 实测：`#uxMain` 变成了 `class="btn btn-ghost on"`，主区高度塌成 297、侧板为 0。
+     * 一个属性名两个含义——这类 bug 的教科书形态。 */
+    if (panel) { main.setAttribute('data-open', panel); }
+    else { main.removeAttribute('data-open'); main.removeAttribute('data-max'); }
+    var t = document.getElementById('uxPanelT');
+    if (t) t.textContent = panel ? (PANEL_TITLE[panel] || panel) : '';
+    ['cockpit', 'prove-track', 'flows'].forEach(function (v) {
+      var el = document.getElementById('view-' + v);
+      if (el) { if (v === panel) { el.removeAttribute('hidden'); } else { el.setAttribute('hidden', ''); } }
+    });
+    /* 辅助面的 enter/leave hook 与主视图共用一套注册表：资产只声明一次。 */
+    ['cockpit', 'prove-track', 'flows'].forEach(function (v) {
+      if (v === panel) return;
+      var lv = LEAVE[v] || [];
+      for (var i = 0; i < lv.length; i++) lv[i]();
+    });
+    if (panel) {
+      var hooks = ENTER[panel] || [];
+      for (var k = 0; k < hooks.length; k++) hooks[k]();
+    }
+    var btns = document.querySelectorAll('[data-panel]');
+    for (var b = 0; b < btns.length; b++) {
+      var on = btns[b].getAttribute('data-panel') === panel;
+      btns[b].setAttribute('aria-pressed', String(on));
+      btns[b].className = 'btn btn-ghost' + (on ? ' on' : '');
+    }
+  }
+
+  function togglePanel(name) {
+    setNav({ panel: (NAV.panel === name) ? null : name });
   }
 
   function notifyPeriod(v) {
@@ -322,10 +377,90 @@
     for (var i = 0; i < bs.length; i++) {
       (function (b) {
         b.addEventListener('click', function () {
-          setNav({ view: b.getAttribute('data-view') });
+          /* 点主视图按钮 = 回到主界面：顺带收起辅助面板（title 里写着）。 */
+          setNav({ view: b.getAttribute('data-view'), panel: null });
         });
       })(bs[i]);
     }
+  })();
+
+  /* ── 运行时能力清单 + 降级路径（照「水之波光 · 卷四」的纪律）──────────────
+   * 原则：**检测不到，一律走更安全的一侧**。多一道暗示无害，缺一道才丢信息。
+   * 这张表是给测试与审计看的：每项能力都必须写明缺失时走哪条路，
+   * 而"每一行都有那一列"是机器可检查的（见 all_views_test.js）。
+   */
+  var HAS = (function () {
+    function mq(q) { try { return !!(window.matchMedia && matchMedia(q).matches); } catch (e) { return false; } }
+    function sup(prop, val) { try { return !!(window.CSS && CSS.supports && CSS.supports(prop, val)); } catch (e) { return false; } }
+    var passive = false;
+    try {
+      var o = Object.defineProperty({}, 'passive', { get: function () { passive = true; return false; } });
+      window.addEventListener('_cx_probe', null, o); window.removeEventListener('_cx_probe', null, o);
+    } catch (e) {}
+    return {
+      passive: passive,
+      ro: !!window.ResizeObserver,
+      clip: sup('overflow', 'clip'),
+      gutter: sup('scrollbar-gutter', 'stable'),
+      dvh: sup('height', '100dvh'),
+      fv: sup('selector(:focus-visible)'),
+      hover: mq('(hover:hover)'),
+      fine: mq('(pointer:fine)'),
+      coarse: mq('(pointer:coarse)'),
+      reduced: mq('(prefers-reduced-motion: reduce)'),
+      contrast: mq('(prefers-contrast: more)'),
+      forced: mq('(forced-colors: active)')
+    };
+  })();
+
+  /* 每一项能力缺失时走哪条路。缺一行就是"没想清楚"，不是"不需要"。 */
+  var FALLBACK = {
+    passive: 'addEventListener 退化为 false：滚动照常，仅性能略降',
+    ro: '改用 scroll + resize 事件重算边缘暗示',
+    clip: '退化为 overflow:hidden：容器无法外部溢出（本页无此需求）',
+    gutter: '退化为 html{overflow-y:scroll}：滚动条槽位常驻，同样不横移',
+    dvh: '应用区用 100vh：移动端地址栏收放会有一次高度跳变（可接受）',
+    fv: '改用 :focus 兜底：键盘与鼠标都有焦点环（多一道无害）',
+    hover: '禁用全部粘滞 hover：点完还亮着 = 让已处理内容保持显著',
+    fine: '按触摸处理：热区升 44px',
+    coarse: '按桌面处理：热区 36px',
+    reduced: '缩短动效而非删除：因果仍可见，位移取消',
+    contrast: '边界改用实色线，渐隐类暗示让位于实色边界',
+    forced: '图案让位于系统色，阶段名仍是文字，编码不丢'
+  };
+
+  /* ── 遮挡自证（L4）：容器被裁掉的那一边才亮渐隐 ─────────────────────────
+   * 与证轨的 .e-eg 同一套令牌（--fade-w / --fade-l / --fade-r），只是推广到
+   * 所有滚动容器。四方向各一个 data 位；滚动、尺寸变化、窗口变化都要重算。 */
+  function initEdges(vp, sc) {
+    if (!vp || !sc) return;
+    function upd() {
+      if (!sc.parentNode) return;
+      vp.setAttribute('data-t', sc.scrollTop <= 1 ? '0' : '1');
+      vp.setAttribute('data-b', (sc.scrollTop + sc.clientHeight < sc.scrollHeight - 1) ? '1' : '0');
+      vp.setAttribute('data-l', sc.scrollLeft > 1 ? '1' : '0');
+      vp.setAttribute('data-r', (sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 1) ? '1' : '0');
+    }
+    sc.addEventListener('scroll', upd, HAS.passive ? { passive: true } : false);
+    if (HAS.ro) { new ResizeObserver(upd).observe(sc); }
+    window.addEventListener('resize', upd);
+    upd();
+    return upd;
+  }
+  var updSideEdges = initEdges(document.getElementById('uxSideVp'), document.getElementById('uxSideBody'));
+  /* 侧栏收起：一格轨道归零，列表隐藏（它自己那条滚动上下文随之消失）。 */
+  (function () {
+    var t = document.getElementById('tglSide');
+    var frame = document.getElementById('uxFrame');
+    var side = document.getElementById('uxSide');
+    if (!t || !frame || !side) return;
+    t.addEventListener('click', function () {
+      var on = frame.getAttribute('data-side') === '1';
+      if (on) { frame.setAttribute('data-side', '0'); side.setAttribute('hidden', ''); }
+      else { frame.setAttribute('data-side', '1'); side.removeAttribute('hidden'); }
+      t.setAttribute('aria-expanded', String(!on));
+      if (updSideEdges) setTimeout(updSideEdges, 0);
+    });
   })();
 
   tick(); loadEcosystem();
@@ -335,6 +470,25 @@
   // interactive entry points explicitly (they live in this IIFE).
   window.showView = function (v) { setNav({ view: v }); };
 
+  /* 辅助面板：切换 / 关闭 / 全屏。开关本身只写状态，显示由 applyPanel 负责。 */
+  (function () {
+    var bs = document.querySelectorAll('[data-panel]');
+    for (var i = 0; i < bs.length; i++) {
+      (function (b) {
+        b.addEventListener('click', function () { togglePanel(b.getAttribute('data-panel')); });
+      })(bs[i]);
+    }
+    var x = document.getElementById('uxPanelX');
+    if (x) x.addEventListener('click', function () { setNav({ panel: null }); });
+    var mx = document.getElementById('uxPanelMax');
+    if (mx) mx.addEventListener('click', function () {
+      var main = document.getElementById('uxMain');
+      var on = main.getAttribute('data-max') === '1';
+      if (on) { main.removeAttribute('data-max'); } else { main.setAttribute('data-max', '1'); }
+      this.setAttribute('aria-pressed', String(!on));
+    });
+  })();
+
   /* N-009: read the address bar once. Deferred to DOMContentLoaded because the
    * view assets register their enter hooks while the page parses — prove_track.js
    * defers its own registration to exactly this event — and a restored
@@ -342,10 +496,11 @@
    * leave the view empty. */
   function bootNav() {
     var N = window.CxNormalize;
-    var from = N ? N.parseHash(location.hash) : { view: null, period: null };
+    var from = N ? N.parseHash(location.hash) : { view: null, period: null, panel: null };
     /* N-010: total by construction — a hash the panel did not write yields an
      * empty state, and the default view still renders. */
-    setNav({ view: from.view || defaultView(), period: from.period || null }, { replace: true });
+    setNav({ view: from.view || defaultView(), period: from.period || null, panel: from.panel || null },
+      { replace: true });
   }
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bootNav); }
   else { bootNav(); }
@@ -357,8 +512,9 @@
     var N = window.CxNormalize;
     if (!N) return;
     var from = N.parseHash(location.hash);
-    if (from.view === NAV.view && from.period === NAV.period) { return; }
-    setNav({ view: from.view || defaultView(), period: from.period || null }, { replace: true });
+    if (from.view === NAV.view && from.period === NAV.period && from.panel === NAV.panel) { return; }
+    setNav({ view: from.view || defaultView(), period: from.period || null, panel: from.panel || null },
+      { replace: true });
   });
   // 主题按钮状态初始化（与 head 引导脚本对齐）
   (function(){ try{

@@ -45,22 +45,18 @@
     return '经历 ' + when.date + ' ' + when.time + (when.secs ? ':' + when.secs : '');
   }
 
-  /* ── 侧栏：**一个**组件，两种被显式选择的用途（ADR-0022 N3 / N-015 / N-016）──
+  /* ── 经历列表：一份组件、一个宿主、**一种点击语义**（ADR-0022 N-001 / N-015）──
    *
-   * `chatMode` 参数没有了。它曾经让同一个组件在两个容器里**行为不同**：
-   *   * 证轨那侧的选中高亮恒为 false —— `(chatMode ? nav().period : null) === p.job_id`
-   *     在 chatMode 为假时永远不等，于是「当前 period 必须在视图内可见地标示」
-   *     （**N-004，钻石**）在证轨侧栏里被直接违反；
-   *   * 点一张卡做什么，取决于**它装在哪个容器里**，而不是取决于任何可见的东西。
+   * 它经历过三态，值得记下来：
+   *   1. `chatMode` 参数让同一次点击在两个容器里**行为不同**，而证轨那侧的选中高亮
+   *      因此恒为 false —— 直接违反 N-004（钻石：当前 period 必须可见地标示）；
+   *   2. 改成侧栏顶部的「对话 | 证轨」显式模式开关（P3a），两个容器行为一致了；
+   *   3. **N-001 之后模式开关本身多余**：辅助面成了右栏侧板、由它自己的开关打开，
+   *      于是"点一张卡"只剩一个答案 —— 把这段载进对话。留着开关就是同一件事的
+   *      第二个入口（N-015 不允许）。所以它退场了。
    *
-   * 现在模式只有一处真相：`nav().panel`（显式、可见、位置固定在侧栏顶部），
-   * 两个容器渲染同一个模式、同一条高亮、同一种点击语义。这就是 N-015 要求的
-   * 「两个入口行为一致」；把「渲染两遍」本身去掉是 P3b 的事。 */
-  function sidePanel() {
-    return nav().panel === 'track' ? 'track' : 'chat';
-  }
-
-  /* 今天仍有两个宿主（P3b 会只剩一个）。宿主清单由调用点给——组件不该知道谁在装它。 */
+   * 现在点卡永远：写 period → 载进对话；而证轨侧板若开着，它会跟着 period 走
+   * （证轨在 shell 的 onPeriod 上登记了自己）。 */
   var HOSTS = [], LAST = null;
 
   function renderSides(ids, periods, empty) {
@@ -74,11 +70,6 @@
     HOSTS.forEach(function (id) {
       if (document.getElementById(id)) renderOne(id, LAST.periods, LAST.empty);
     });
-  }
-
-  function setSidePanel(p) {
-    if (window.Cx && Cx.state && Cx.state.nav) { Cx.state.nav.panel = (p === 'track') ? 'track' : 'chat'; }
-    rerenderSides();
   }
 
   /* 只搬选中态，**不重建列表**。
@@ -116,7 +107,6 @@
      * the call site, which is how the same zero state came to have two
      * derivations (here and chat.html's static markup). */
     if (!periods.length) { window.CxWayout.render(box, empty); return; }
-    var panel = sidePanel();
     /* HISTORY, REVISED 2026-09-17. A previous revision removed grouping and
      * concluded "The model was wrong, not the code." That diagnosis was WRONG,
      * and it is recorded here rather than silently deleted.
@@ -141,26 +131,12 @@
     /* Flat, newest first — no grouping, no traversal yet. */
     var chain = periods.slice();
     var rootCount = periods.length;
-    var mode = '<div class="ses-mode" role="group" aria-label="点击一张卡做什么">' +
-      '<button type="button" class="btn btn-sm' + (panel === 'chat' ? ' on' : '') + '" data-panel="chat" aria-pressed="' + (panel === 'chat') + '">对话</button>' +
-      '<button type="button" class="btn btn-sm' + (panel === 'track' ? ' on' : '') + '" data-panel="track" aria-pressed="' + (panel === 'track') + '">证轨</button>' +
-      '</div>';
-    var head = mode + '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
-      (panel === 'chat' ? '<button type="button" class="btn btn-sm btn-ghost">+ 新对话</button>' : '') +
+    var head = '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
+      '<button type="button" class="btn btn-sm btn-ghost">+ 新对话</button>' +
       '</div>';
     box.innerHTML = head;
-    /* 头部此刻只有这三个按钮（行还没插进去）。模式开关与「新对话」共用一条接线，
-     * 靠 `data-panel` 区分——不用 id，因为同样的控件会出现两份，而 id 只能有一份。 */
-    var btns = box.getElementsByTagName('button');
-    for (var bi = 0; bi < btns.length; bi++) {
-      (function (b) {
-        var want = b.getAttribute('data-panel');
-        b.onclick = function (ev) {
-          ev.stopPropagation();
-          if (want) { setSidePanel(want); } else { newChat(); }
-        };
-      })(btns[bi]);
-    }
+    var nb = box.querySelector('.ses-head button');
+    if (nb) nb.onclick = function (ev) { ev.stopPropagation(); newChat(); };
     chain.forEach(function (p) {
       var div = document.createElement('div');
       /* N-004（钻石）：当前 period 在两个容器里都要可见地标示。旧式写法在证轨模式下恒假。 */
@@ -190,29 +166,13 @@
         '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.job_id) + '" title="重命名">✎</button></span></div>' +
         preview + reply;
       div.onclick = function () {
-        if (sidePanel() === 'chat') {
-          // 恢复进度到对话空间（DSH：点击会话 = 回放过去 + 从此续写）
-          Cx.setNav({ period: p.job_id });
-          moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
-          loadPeriodToChat(p.job_id);
-          setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
-          document.getElementById('chat-text').focus();
-        } else {
-          /* Period, view and the metadata that describes the period go in ONE
-           * call, so the address bar is written once and Back returns to the
-           * view we came from. The order still matters — the trajectory's enter
-           * hook reads the chosen job and asks the shell for exactly that
-           * window, so choosing the view first would load the newest
-           * experience instead — but it is now an order inside one writer
-           * rather than two calls that could drift apart. */
-          Cx.selectPeriod(p.job_id, {
-            view: 'prove-track',
-            meta: { job_id: p.job_id, name: p.name, preview: p.preview }
-          });
-          /* 高亮也要就地搬：这条分支以前靠"换视图 → enter hook → loadSessions
-           * 重渲染"顺带更新，而那条路已不再因 period 变化而触发。 */
-          moveSelection();
-        }
+        /* 一种语义（N-001）：把这段载进对话。证轨侧板若开着，它跟着 period 走——
+         * 那是 shell 的 period 通知在做的事，不是这里的分支。 */
+        Cx.setNav({ period: p.job_id, meta: { job_id: p.job_id, name: p.name, preview: p.preview } });
+        moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
+        loadPeriodToChat(p.job_id);
+        setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
+        document.getElementById('chat-text').focus();
       };
       var rn = div.querySelector('[data-ren]');
       if (rn) rn.onclick = function (ev) {
