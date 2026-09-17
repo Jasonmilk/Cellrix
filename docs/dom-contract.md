@@ -33,7 +33,6 @@
 | `.btn:not(` | gleam.html |
 | `.chat-input` | chat.html, chat.js |
 | `chat-msgs` | chat.html, chat.js, session_list.js |
-| `chat-side` | chat.html, session.html |
 | `chat-text` | chat.html, chat.js, session.html, session_list.js |
 | `conn` | base.html, script.html |
 | `cont-banner` | chat.html, session_list.js |
@@ -85,6 +84,7 @@
 | `eTblVp` | prove_track.html |
 | `eTraj` | prove_track.html |
 | `.foot` | base.html |
+| `.ses-side` | base.html |
 | `v-` | — |
 | `view-` | — |
 
@@ -110,7 +110,7 @@
 | `.?` | flows.html |
 | `.b` | prove_track.html |
 | `.badge` | base.html |
-| `.bar` | base.html |
+| `.brand` | base.html |
 | `.btn` | base.html, chat.html |
 | `.btn-ghost` | chat.html |
 | `.btn-primary` | chat.html |
@@ -160,6 +160,8 @@
 | `eLaneInput` | prove_track.html |
 | `eLaneModel` | prove_track.html |
 | `eLaneTool` | prove_track.html |
+| `eOv` | prove_track.html |
+| `eOvBtn` | prove_track.html |
 | `eQ` | prove_track.html |
 | `eQClr` | prove_track.html |
 | `eReplayBtn` | prove_track.html |
@@ -188,7 +190,14 @@
 | `fl-stat-badge` | flows.html |
 | `fl-stats` | flows.html |
 | `.fl-v` | flows.html |
-| `.head` | base.html, chat.html, cockpit.html, flows.html |
+| `.frame` | base.html |
+| `.fxMain` | base.html |
+| `.fxMainHd` | base.html |
+| `.fxSide` | base.html |
+| `.fxSideBody` | base.html |
+| `.fxSideFt` | base.html |
+| `.fxSideHd` | base.html |
+| `.head` | chat.html, cockpit.html, flows.html |
 | `.ico` | prove_track.html |
 | `.info` | base.html |
 | `.input` | prove_track.html |
@@ -209,7 +218,6 @@
 | `.row` | flows.html |
 | `s-main` | base.html |
 | `.sb` | prove_track.html |
-| `.ses-side` | base.html, chat.html |
 | `.sk` | session.html |
 | `.sk-l1` | session.html |
 | `.sk-l2` | session.html |
@@ -221,6 +229,10 @@
 | `.tag` | base.html |
 | `.tool` | prove_track.html |
 | `.ts` | flows.html |
+| `uxFrame` | base.html |
+| `uxMain` | base.html |
+| `uxSide` | base.html |
+| `uxSideBody` | base.html |
 | `.v` | cockpit.html |
 | `v-chat` | base.html |
 | `v-cockpit` | base.html |

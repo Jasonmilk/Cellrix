@@ -84,6 +84,15 @@
     this.textContent = S.callsOpen ? 'Expand all calls' : 'Collapse all calls';
     renderTable();
   });
+  /* 概览的收/放。默认收起（见 markup 里的那次实测），因此这里负责的是"放出来"。
+   * 收起时它不占高度——表格因此拿回约 216px。 */
+  $('eOvBtn').addEventListener('click', function () {
+    var ov = $('eOv');
+    var show = ov.hasAttribute('hidden');
+    if (show) { ov.removeAttribute('hidden'); } else { ov.setAttribute('hidden', ''); }
+    this.setAttribute('aria-pressed', String(show));
+    this.className = 'e-btn e-btn-sm' + (show ? ' e-btn-primary' : '');
+  });
   $('eReplayBtn').addEventListener('click', function () {
     (S.replayIdx >= 0 || S.replayTimer) ? stopReplay() : startReplay();
   });

@@ -88,14 +88,30 @@
   }
 
   * { box-sizing:border-box; margin:0; padding:0; }
+  html { height:100%; }
+  /* ── 框架（ADR-0022 N3 / Q3·Q4）：外壳就是视口，页面永不滚动 ──────────────
+     形状借自成熟实践：chrome 活在栏内，页面级不堆家具。每一栏
+     overflow:hidden，**滚动发生在栏内部**，且每栏只有一个滚动上下文。 */
+  .frame { flex:1 1 auto; min-height:0; display:grid; overflow:hidden;
+    grid-template-columns:clamp(200px,18vw,320px) minmax(0,1fr); gap:12px; }
+  .fxSide { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .fxSideHd { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding-bottom:8px; border-bottom:1px solid var(--line); }
+  .fxSideBody { flex:1 1 auto; min-height:0; overflow-y:auto; padding-top:8px; }
+  .fxSideFt { display:flex; flex-direction:column; gap:6px; align-items:flex-start;
+    padding-top:8px; border-top:1px solid var(--line); }
+  .fxMain { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+  .fxMainHd { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding-bottom:8px; border-bottom:1px solid var(--line); }
+  .fxMainHd .foot { margin:0 0 0 auto; }
   body { background:var(--bg); color:var(--text);
     font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",
-          "Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
-    -webkit-font-smoothing:antialiased; padding:20px;
+          "Microsoft YaHei","Noto Sans SC",system-ui,sans-serif; height:100%;
+    -webkit-font-smoothing:antialiased; padding:10px 14px;
     transition:background var(--dur) var(--ease), color var(--dur) var(--ease); }
-  h1 { font-size:16px; font-weight:600; color:var(--accent); margin-bottom:4px; }
+  /* 品牌名进顶栏（.brand），不再单占一行标题——标签页上已经有它。 */
+  .brand { font-size:12px; font-weight:600; color:var(--accent); letter-spacing:.3px; }
   .sub { color:var(--text-dim); font-size:12px; margin-bottom:14px; }
-  .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
   .theme-switch { display:flex; gap:2px; margin-left:auto; border:1px solid var(--line);
     border-radius:var(--r-md); padding:2px; }
   .theme-switch button { appearance:none; background:transparent; border:0; color:var(--text-dim);
@@ -105,14 +121,14 @@
   .theme-switch button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
   /* 视图切换（导航 ≤5 项 [PHYS:P-020] 工作记忆 ~4 组块） */
   .nav { display:flex; gap:8px; }
-  .eco { display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); padding:8px 0 4px; }
-  .eco .c { display:inline-flex; align-items:center; gap:6px; }
-  .eco .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .eco { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--text-dim); padding:0; }
+  .eco .c { display:inline-flex; align-items:center; gap:4px; }
+  .eco .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
   .eco .dot.ok { background:var(--ok); }
   .eco .dot.off { background:var(--text-3); }
   .eco .dot.starting { background:var(--warn); }
   .eco .dot.error { background:var(--risk); }
-  .foot { color:var(--text-dim); font-size:11px; margin-top:14px; }
+  .foot { color:var(--text-dim); font-size:11px; margin:0; }
   .foot a { color:var(--accent); }
   /* 视图级头（不在面板内）：层级同构 [PURPOSE] */
   .view-head { font-size:12px; color:var(--text-dim); margin-bottom:12px;

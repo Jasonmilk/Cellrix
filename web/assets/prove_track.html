@@ -15,6 +15,10 @@
       <button type="button" class="e-btn e-btn-sm" id="eCallBtn" data-e-ripple aria-pressed="true" data-page-node-id="RatDbhugNqkRyJe3XRn5jC">Expand all calls</button>
       <button type="button" class="e-btn e-btn-sm e-btn-primary" id="eReplayBtn" data-e-ripple data-page-node-id="3CmfjeQCFDjEnKWnNHVdLx">Replay</button>
       <button type="button" class="e-btn e-btn-sm" id="eExportBtn" data-e-ripple>Export</button>
+      <!-- 概览默认收起：真 Chrome 实测（1440×813）它常驻占 216px（证轨整块的 45%），
+           而承载"明细"的表格只拿到 137px（29%）。三轨条是"再看一眼"的读法，
+           不是每次都要占着的家具。 -->
+      <button type="button" class="e-btn e-btn-sm" id="eOvBtn" data-e-ripple aria-pressed="false" data-page-node-id="VLcyHwdhBBjSskpWkia2uU">概览</button>
       <div class="sp" data-page-node-id="mvXAX87CqgBsmtKJKn4Ydg"></div>
       <div class="e-search" data-page-node-id="gielH0J8kGvDvVAArBbKB0">
         <span class="ico" aria-hidden="true" data-page-node-id="dQeytUKvSGP1dutKb22imU">⌕</span>
@@ -23,7 +27,7 @@
       </div>
     </div>
 
-    <div class="e-ov" data-page-node-id="CjLEEiUh752QghNUGdRHWt">
+    <div class="e-ov" id="eOv" hidden data-page-node-id="CjLEEiUh752QghNUGdRHWt">
       <div class="e-ov-hd" data-page-node-id="jch27BIfD3G6eq1MSGoCqB">
         <span class="e-ov-t" data-page-node-id="3ClAN1UqdMMp4Omv0ovTcR">OVERVIEW · time projection</span>
         <span class="e-mini" id="eOvNote" style="margin:0" data-page-node-id="dH8TWPxIfCVstgHo2WP5aA">Equal width: see what happened</span>

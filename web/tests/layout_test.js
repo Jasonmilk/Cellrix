@@ -37,7 +37,7 @@ const PROBE = `(async function () {
              bottom: Math.round(r.bottom) }; }
   document.getElementById('v-chat').click();
   await sleep(400);
-  var item = document.querySelector('#chat-side .ses-item');
+  var item = document.querySelector('#s-side .ses-item');
   out_clicked: { if (item) { item.click(); await sleep(2500); } }
   var c = document.querySelector('#chat-msgs');
   if (!c) { return { error: 'no #chat-msgs' }; }
@@ -72,7 +72,7 @@ const PROBE = `(async function () {
   }
   function bodies(el) { return el.offsetHeight; }
   /* --- the session card, asked the same way ---------------------------- */
-  var card = document.querySelector('#chat-side .ses-item');
+  var card = document.querySelector('#s-side .ses-item');
   if (card) {
     card.classList.add('sel');
     await sleep(300);
@@ -114,7 +114,7 @@ const PROBE = `(async function () {
 })()`;
 
 const GEOM = `(function () {
-  var c = document.querySelector('#chat-side .ses-item');
+  var c = document.querySelector('#s-side .ses-item');
   if (!c) { return null; }
   var t = c.querySelector('.t'), nm = c.querySelector('.nm'), pv = c.querySelector('.p');
   function r(e) { if (!e) { return null; } var b = e.getBoundingClientRect();
@@ -142,7 +142,7 @@ const PROBE_4A = `(async function () {
   /* --- chat view: B and C --- */
   var nav = document.getElementById('v-chat'); if (nav) { nav.click(); }
   await sleep(400);
-  var item = document.querySelector('#chat-side .ses-item');
+  var item = document.querySelector('#s-side .ses-item');
   if (item) { item.click(); await sleep(2500); }
   var col = document.querySelector('.chat-col'), msgs = document.querySelector('#chat-msgs');
   var inp = document.querySelector('.chat-input'), ban = document.getElementById('cont-banner');

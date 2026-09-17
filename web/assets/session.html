@@ -38,10 +38,9 @@
 
   function loadSessions() {
     var seq = ++st.sesSeq;
+    /* 列表只有一份，住在框架左栏。骨架屏也只刷这一处。 */
     var s = document.getElementById('s-side');
-    var c = document.getElementById('chat-side');
     s.innerHTML = skRow() + skRow() + skRow();
-    if (c) c.innerHTML = skRow() + skRow() + skRow();
     fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
       if (seq !== st.sesSeq) return; // 晚到的旧响应，丢弃
       var periods = j.periods || [];
@@ -56,7 +55,7 @@
             } } }
         : { code: 'sessions-unconfigured' };
       /* 宿主清单由调用点给：今天两个（P3b 会只剩一个），两个渲染的是同一份模式。 */
-      L.renderSides(['s-side', 'chat-side'], periods, empty);
+      L.renderSides(['s-side'], periods, empty);   /* 唯一的一份列表 */
     }).catch(function (e) {
       if (seq !== st.sesSeq) return;
       /* 就地给出路：重试 = 再拉一次（本函数自己）。注意这个 catch 曾经把
@@ -68,8 +67,6 @@
         action: { run: function () { loadSessions(); } }
       };
       window.CxWayout.render(document.getElementById('s-side'), failState);
-      var c = document.getElementById('chat-side');
-      if (c) window.CxWayout.render(c, failState);
     });
   }
 

@@ -26,48 +26,66 @@
   <style>__PROVE_TRACK_CSS__</style>
 </head>
 <body>
-  <h1>Cellrix — 驾驶舱 · 证轨</h1>
-  <div class="sub" id="sub">连接中…</div>
-  <div class="bar">
-    <nav class="nav" aria-label="视图">
-      <button type="button" class="btn on" id="v-cockpit" data-view="cockpit">驾驶舱 Cockpit</button>
-      <button type="button" class="btn" id="v-prove-track" data-view="prove-track">证轨 ProveTrack</button>
-      <button type="button" class="btn" id="v-chat" data-view="chat">对话 Chat</button>
-      <button type="button" class="btn" id="v-flows" data-view="flows">检定台 Flows</button>
-    </nav>
-    <span class="badge info" id="mode">…</span>
-    <div class="theme-switch" role="group" aria-label="主题">
-      <button type="button" data-t="auto" class="on" onclick="__setTheme('auto')">跟随</button>
-      <button type="button" data-t="light" onclick="__setTheme('light')">日间</button>
-      <button type="button" data-t="dark" onclick="__setTheme('dark')">暗黑</button>
-    </div>
-    <span class="badge info" id="state">…</span>
-    <span class="badge info" id="conn">…</span>
+  <!-- 框架 · 外壳就是视口（ADR-0022 N3 / Q3·Q4）。
+       形状借自成熟实践：**页面级没有任何堆叠的家具**——chrome 活在栏内。
+       左栏 = 经历列表（唯一一份）+ 状态/主题沉到栏底；中栏 = 主视图，自己一条高度链。
+       真 Chrome 实测：改前内容要等 218px 的 h1/sub/bar/eco 四层堆完才开始；
+       改后顶部只剩栏自己的头部（≈44px），且页面永不滚动，滚的是栏内部。 -->
+  <div class="frame" id="uxFrame">
+
+    <aside class="fxSide" id="uxSide">
+      <div class="fxSideHd">
+        <span class="brand">Cellrix</span>
+        <span class="badge info" id="mode">…</span>
+        <span class="badge info" id="state">…</span>
+        <span class="badge info" id="conn">…</span>
+      </div>
+      <!-- 唯一的滚动上下文（左栏）。列表只有这一份：#chat-side 已经删掉。 -->
+      <div class="fxSideBody" id="uxSideBody">
+        <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
+      </div>
+      <div class="fxSideFt">
+        <span class="sub" id="sub">连接中…</span>
+        <div class="eco" id="eco">生态点亮探测中…</div>
+        <div class="theme-switch" role="group" aria-label="主题">
+          <button type="button" data-t="auto" class="on" onclick="__setTheme('auto')">跟随</button>
+          <button type="button" data-t="light" onclick="__setTheme('light')">日间</button>
+          <button type="button" data-t="dark" onclick="__setTheme('dark')">暗黑</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="fxMain" id="uxMain">
+      <div class="fxMainHd">
+        <nav class="nav" aria-label="视图">
+          <button type="button" class="btn on" id="v-cockpit" data-view="cockpit">驾驶舱 Cockpit</button>
+          <button type="button" class="btn" id="v-prove-track" data-view="prove-track">证轨 ProveTrack</button>
+          <button type="button" class="btn" id="v-chat" data-view="chat">对话 Chat</button>
+          <button type="button" class="btn" id="v-flows" data-view="flows">检定台 Flows</button>
+        </nav>
+        <span class="foot">auto __REFRESH__s · <span id="audit" class="tag ok">…</span>
+          <a href="/api/snapshot">snapshot</a> · <a href="/api/audit">audit</a></span>
+      </div>
+
+      <div id="view-cockpit">
+        __COCKPIT__
+      </div>
+
+      <div id="view-prove-track" style="display:none;">
+        <div class="prove-track-main">
+          <div id="s-main">__PROVE_TRACK__</div>
+        </div>
+      </div>
+
+      <div id="view-chat" style="display:none;">
+        __CHAT__
+      </div>
+
+      <div id="view-flows" style="display:none;">
+        __FLOWS__
+      </div>
+    </main>
   </div>
-  <div class="eco" id="eco">生态点亮探测中…</div>
-
-
-  <div id="view-cockpit">
-    __COCKPIT__
-  </div>
-
-  <div id="view-prove-track" style="display:none;">
-    <div class="head" style="margin-bottom:12px">证轨 ProveTrack — 全链路可审计轨迹（会话 = 经历 · 判据与行动同线 · 水之波光 v11.2.0 骨架）</div>
-    <div class="prove-track-main">
-      <div class="ses-side" id="s-side"><div class="empty">经历列表加载中…</div></div>
-      <div id="s-main">__PROVE_TRACK__</div>
-    </div>
-  </div>
-
-  <div id="view-chat" style="display:none;">
-    __CHAT__
-  </div>
-
-  <div id="view-flows" style="display:none;">
-    __FLOWS__
-  </div>
-
-    <div class="foot">数据源: Anaphase /v1/agent/snapshot（ADR-0010）· Tuck /v1/audit 链 · 自动刷新 __REFRESH__s · 视图切换同 TUI Ctrl+E · <span id="audit" class="tag ok">…</span> · <a href="/api/snapshot">snapshot JSON</a> · <a href="/api/audit">audit JSON</a></div>
 <script>__EVENT_FAMILY__</script>
 <script>__NORMALIZE__</script>
 <script>__WAYOUT_WORDS__</script>

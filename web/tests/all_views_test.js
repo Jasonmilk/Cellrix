@@ -262,7 +262,7 @@ function skip(label, why) {
       .find((b) => b.getAttribute("data-panel") === "chat");
     if (chatModeBtn) chatModeBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     await sleep(300);
-    const nodesBefore = Array.from(doc.querySelectorAll("#chat-side .ses-item"));
+    const nodesBefore = Array.from(doc.querySelectorAll("#s-side .ses-item"));
     const stamped = nodesBefore[nodesBefore.length - 1];
     if (stamped) stamped.setAttribute("data-observed", "1");
     const fetchBefore = sessionFetches;
@@ -271,11 +271,11 @@ function skip(label, why) {
     await sleep(700);
     check("clicking a card does not re-fetch the period list",
       sessionFetches === fetchBefore, "+" + (sessionFetches - fetchBefore) + " /api/sessions");
-    const survivor = Array.from(doc.querySelectorAll("#chat-side .ses-item"))
+    const survivor = Array.from(doc.querySelectorAll("#s-side .ses-item"))
       .find((el) => el.getAttribute("data-observed") === "1");
     check("clicking a card does not rebuild the list rows",
       !!survivor, survivor ? "the marked row survived" : "the rows were replaced");
-    const selNow = Array.from(doc.querySelectorAll("#chat-side .ses-item"))
+    const selNow = Array.from(doc.querySelectorAll("#s-side .ses-item"))
       .filter((el) => el.className.split(" ").indexOf("sel") >= 0);
     check("the highlight still lands on exactly one row", selNow.length === 1,
       selNow.length + " marked");
@@ -286,14 +286,17 @@ function skip(label, why) {
     /* N-004 is a DIAMOND: the current period must be visibly marked. It was
      * violated in the trajectory sidebar before P3a — the old expression made
      * `sel` false whenever that container rendered, so the row you had just
-     * chosen carried no marker at all. Both containers are checked, because
-     * "marked in one of the two lists" is exactly the state that shipped. */
+     * chosen carried no marker at all. P3b then removed the duplication itself:
+     * there is ONE list now, so this asserts the mark AND that no second copy
+     * exists — "marked in one of the two lists" is exactly the state that
+     * shipped, and it cannot ship again if there is only one list. */
     const marked = (host) => Array.from(doc.querySelectorAll(host + " .ses-item"))
       .filter((el) => el.className.split(" ").indexOf("sel") >= 0).length;
-    check("the chosen period is marked in the trajectory sidebar (N-004)",
+    check("the chosen period is marked in the sidebar (N-004)",
       marked("#s-side") === 1, marked("#s-side") + " marked");
-    check("the chosen period is marked in the chat sidebar too (N-004)",
-      marked("#chat-side") === 1, marked("#chat-side") + " marked");
+    check("the period list exists exactly once in the document (N-015)",
+      doc.querySelectorAll(".ses-side").length === 1,
+      doc.querySelectorAll(".ses-side").length + " list container(s)");
 
     // Chrome-only scope: conversation payloads legitimately carry CJK.
     const chromeText = [

@@ -1,9 +1,8 @@
 <style>
-  /* ---------- 会话列表组件（DSH 骨架 + 水之波光血统） ----------
-     持久事实可回放 [DSH 理念]：左侧会话列表 = 经历的索引，点击即恢复进度。 */
-  .ses-side { border-right:1px solid var(--line); padding-right:12px; min-height:0;
-    overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
-  .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
+  /* ---------- 经历列表（水之波光血统） ----------
+     它是**唯一**的一份，住在框架左栏里（`.fxSideBody` 提供那一个滚动上下文）。
+     边框与内边距不再由它自己带：那是栏的事，栏已经在做。 */
+  .ses-side { min-height:0; display:flex; flex-direction:column; gap:8px; }
   .ses-side > * { flex-shrink:0; }   /* see .chat-msgs: the window scrolls, the card keeps its size */
   /* 侧栏模式切换：同一个列表，两种**被显式选择**的用途（N-015 / N-016）。
      模式是可见的、被选中的，位置固定在侧栏顶部——不随视图变化。 */
@@ -110,10 +109,10 @@
   /* 证轨比例 2D 网格（概览 / 明细）—— 具体列比由视图内联 style 裁决 */
   /* 4a geometry: prove-track main grid fills the shell (Q4); at ≥1180px the
      inspector becomes the third column (Q1, see prove_track.css media rule). */
-  .prove-track-main { display:grid; grid-template-columns:280px minmax(0,1fr); gap:12px;
+  /* 侧栏已在框架左栏，这里只剩主区（见 Q1：两栏足够，不要第三栏）。 */
+  .prove-track-main { display:grid; grid-template-columns:minmax(0,1fr); gap:12px;
     margin-bottom:16px; flex:1 1 auto; min-height:0; }
-  #view-prove-track #s-side, #view-prove-track #s-main { min-height:0; }
-  #view-prove-track #s-side { overflow-y:auto; }
+  #view-prove-track #s-main { min-height:0; }
   #view-prove-track #s-main { overflow:hidden; display:flex; flex-direction:column; }
   #view-prove-track #s-main .e-wrap { flex:1 1 auto; min-height:0;
     display:flex; flex-direction:column; }
