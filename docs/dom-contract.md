@@ -35,12 +35,12 @@
 | `.chat-input` | chat.html, chat.js |
 | `chat-msgs` | chat.html, chat.js, session_list.js |
 | `chat-side` | chat.html, session.html |
-| `chat-text` | chat.html, chat.js, session_list.js |
+| `chat-text` | chat.html, chat.js, session.html, session_list.js |
 | `conn` | base.html, script.html |
 | `cont-banner` | chat.html, session_list.js |
 | `eTbody` | prove_track.html, prove_track.view.js |
 | `eco` | base.html, script.html |
-| `.empty` | base.html, chat.html, chat.js, cockpit.html, session.html |
+| `.empty` | base.html, chat.html, chat.js, cockpit.html |
 | `entries` | cockpit.html, cockpit.js |
 | `episode` | cockpit.html, cockpit.js |
 | `.fl-bar` | flows.html |

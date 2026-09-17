@@ -50,7 +50,11 @@
   // opens its trajectory. One component, two intents [极致复用].
   function renderSide(id, periods, empty, chatMode) {
     var box = document.getElementById(id);
-    if (!periods.length) { box.innerHTML = empty; return; }
+    /* `empty` is an exit-layer STATE, not an HTML string: the sentence and the
+     * action come from one place (ADR-0044). It used to be markup assembled at
+     * the call site, which is how the same zero state came to have two
+     * derivations (here and in chat.html's static markup). */
+    if (!periods.length) { window.CxWayout.render(box, empty); return; }
     /* HISTORY, REVISED 2026-09-17. A previous revision removed grouping and
      * concluded "The model was wrong, not the code." That diagnosis was WRONG,
      * and it is recorded here rather than silently deleted.
@@ -226,7 +230,14 @@
       if (seq !== st.histSeq) return;
       var events = win.events;
       if (!events.length) {
-        box.innerHTML = '<div class="empty">事件全部被拒收（未知类型或格式不符）</div>';
+        /* 事件全被拒收不是「暂无数据」：是数据来了、一条都没被认出来。出路是
+         * 让人自己去看原始事件，而不是猜。 */
+        window.CxWayout.render(box, {
+          code: 'events-all-rejected',
+          action: { run: function () {
+            if (window.open) { window.open('/api/events?job_id=' + encodeURIComponent(jobId), '_blank'); }
+          } }
+        });
         return;
       }
 
@@ -294,7 +305,12 @@
       if (Cx.selectPeriod) { Cx.selectPeriod(jobId); }
     }).catch(function (e) {
       if (seq !== st.histSeq) return;
-      box.innerHTML = '<div class="empty">历史加载失败: ' + esc(e.message) + '</div>';
+      /* 就地给出路：重试就是把这一段再载一次。 */
+      window.CxWayout.render(box, {
+        code: 'history-fetch-failed',
+        detail: String(e && e.message || e),
+        action: { run: function () { loadPeriodToChat(jobId); } }
+      });
     });
   }
 
@@ -341,7 +357,15 @@
           document.getElementById('chat-text').focus();
         };
       });
-    }).catch(function () { list.innerHTML = '<div class="empty">经历列表拉取失败</div>'; list.style.display = ''; });
+    }).catch(function (e) {
+      /* 就地给出路：重试 = 收起再展开这个下拉，它自己会重新取一次。 */
+      list.style.display = '';
+      window.CxWayout.render(list, {
+        code: 'sessions-fetch-failed',
+        detail: String(e && e.message || e),
+        action: { run: function () { list.style.display = 'none'; toggleResume(); } }
+      });
+    });
   }
 
   window.CxSessionList = {

@@ -267,7 +267,10 @@
       var conn = document.getElementById('conn');
       conn.textContent = '✗ 断开';
       conn.className = 'badge';
-      document.getElementById('sub').textContent = 'snapshot 拉取失败: ' + e;
+      /* 出路是时间：本函数由 setInterval 反复调用，面板自己在重试。所以这里渲染
+       * 成说明而不是按钮——状态行的职责只是报告状态（ADR-0044 D5）。 */
+      window.CxWayout.renderInline(document.getElementById('sub'),
+        { code: 'snapshot-fetch-failed', detail: String(e && e.message || e) });
     });
   }
 
@@ -284,7 +287,8 @@
       box.innerHTML = html;
     }).catch(function () {
       var box = document.getElementById('eco');
-      if (box) box.textContent = '生态探测不可用（proxy 未就绪）';
+      /* 同样：loadEcosystem 也在定时器上，出路是下几秒的重试。 */
+      if (box) window.CxWayout.renderInline(box, 'ecosystem-unavailable');
     });
   }
 

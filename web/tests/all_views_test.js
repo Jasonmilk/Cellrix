@@ -439,7 +439,13 @@ function skip(label, why) {
       blocks.length + " block(s)");
     const dead = blocks.filter((b) => {
       const k = b.getAttribute("data-wo-kind");
-      return (k === "error" || k === "blocked") && !b.querySelector("button");
+      /* An exit is either a control or a note. Both count: "用 --tuck-endpoint
+       * 指定" tells you exactly what to do, and it is what the exit layer
+       * renders when it has the words but no capability to run. A BUTTON there
+       * would be a control that does nothing. */
+      const hasExit = !!b.querySelector("button") ||
+        Array.from(b.querySelectorAll("span")).some((s) => s.getAttribute("data-wo-act"));
+      return (k === "error" || k === "blocked") && !hasExit;
     });
     check("no problem slot on the desk is a dead end (N-011)", dead.length === 0,
       dead.map((b) => b.getAttribute("data-wo-code")).join(", "));
@@ -448,6 +454,66 @@ function skip(label, why) {
       blocks.map((b) => b.getAttribute("data-wo-code")).join(", "));
     console.log("        slots: " +
       blocks.map((b) => b.getAttribute("data-wo-kind") + "/" + b.getAttribute("data-wo-code")).join(" · "));
+  }
+
+  /* ---- P1c: a dead backend still offers a way out (N-011) ----------------
+   *
+   * Every fetch fails. Before P1c the panel reported each failure as a sentence
+   * and stopped there; the raw exception WAS the message. Now each failure
+   * carries an exit, and the sentence never contains the raw text — which is
+   * kept, but behind a disclosure (ADR-0044 D3). This is what makes N-011
+   * falsifiable instead of aspirational: "no failure state is a dead end" is
+   * checked against a page that is failing in every direction at once.
+   */
+  console.log("-- a dead backend still offers a way out (ADR-0044 P1c) --");
+  {
+    const errs3 = [];
+    const vc3 = new VirtualConsole();
+    vc3.on("jsdomError", (e) => errs3.push("jsdomError: " + e.message));
+    vc3.on("error", (...a) => errs3.push("console.error: " + a.join(" ")));
+    const dom3 = new JSDOM(html, {
+      url: BASE + "/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc3,
+      beforeParse(w) {
+        w.fetch = () => Promise.reject(new Error("ECONNREFUSED 127.0.0.1:50061"));
+        w.matchMedia = (q) => ({
+          matches: false, media: q, onchange: null,
+          addListener() {}, removeListener() {},
+          addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false,
+        });
+        w.addEventListener("error", (e) => errs3.push("window.error: " + e.message));
+      },
+    });
+    await sleep(2000);
+    const doc3 = dom3.window.document;
+    const marks = Array.from(doc3.querySelectorAll("span,div"))
+      .filter((el) => el.getAttribute && el.getAttribute("data-wo-kind") === "error");
+    check("a dead backend still produces exit-layer states", marks.length > 0,
+      marks.length + " state(s)");
+    const dead = marks.filter((m) => !m.querySelector("button") &&
+      !Array.from(m.querySelectorAll("span")).some((s) => s.getAttribute("data-wo-act")));
+    check("no failure state on a dead backend is a dead end (N-011)", dead.length === 0,
+      dead.map((m) => m.getAttribute("data-wo-code")).join(", "));
+    /* Tighter than "has some exit": the period list's retry is a function the
+     * panel is holding right there, so this surface must offer a real control.
+     * A note saying "（重试拉取）" would be words without a way to act on them —
+     * which is what a missing site capability degrades to, and why this asserts
+     * the button rather than mere non-emptiness. */
+    const listFail = marks.find((m) => m.getAttribute("data-wo-code") === "sessions-fetch-failed");
+    check("the period-list failure offers a real retry, not just words (N-011)",
+      !!listFail && !!listFail.querySelector("button"),
+      listFail ? listFail.textContent.trim().slice(0, 60) : "no state");
+    const sentences = marks.map((m) => {
+      const s = m.querySelector("p") || m.querySelector("span");
+      return s ? s.textContent : "";
+    });
+    check("no sentence pastes the raw exception (D3)",
+      sentences.every((s) => s.indexOf("ECONNREFUSED") < 0),
+      (sentences[0] || "").slice(0, 70));
+    check("the raw exception is kept, not dropped (D3)",
+      doc3.body.textContent.indexOf("ECONNREFUSED") >= 0);
+    console.log("        states: " +
+      marks.map((m) => m.getAttribute("data-wo-kind") + "/" + m.getAttribute("data-wo-code")).join(" · "));
+    dom3.window.close();
   }
 
   /* ---- N-009 the other way: a hash in the URL at boot --------------------

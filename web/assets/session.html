@@ -45,15 +45,31 @@
     fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
       if (seq !== st.sesSeq) return; // 晚到的旧响应，丢弃
       var periods = j.periods || [];
-      var empty = '<div class="empty">' + (j.configured ? '尚无经历（先和 Helix 说句话）' : '未开启会话事件流（Anaphase config `session_events_path`）') + '</div>';
+      /* 零态也走出路层（ADR-0044）：这两句原先在本文件里手写，而同一段零态在
+       * chat.html 的静态标记里还有第二份——两处会漂。出路就是让人去说第一句
+       * 话，所以动作是「切到对话并把光标放进输入框」。 */
+      var empty = j.configured
+        ? { code: 'sessions-empty', action: { run: function () {
+              Cx.setNav({ view: 'chat' });
+              var t = document.getElementById('chat-text');
+              if (t) t.focus();
+            } } }
+        : { code: 'sessions-unconfigured' };
       L.renderSide('s-side', periods, empty, false);
       L.renderSide('chat-side', periods, empty, true);
     }).catch(function (e) {
       if (seq !== st.sesSeq) return;
-      var msg = '<div class="empty">经历列表拉取失败: ' + esc(e.message) + '</div>';
-      document.getElementById('s-side').innerHTML = msg;
+      /* 就地给出路：重试 = 再拉一次（本函数自己）。注意这个 catch 曾经把
+       * ReferenceError 也接住并渲染成「经历列表拉取失败」——把代码缺陷说成
+       * 取数失败。原始信息现在降级为可展开的 detail，不再冒充原因。 */
+      var failState = {
+        code: 'sessions-fetch-failed',
+        detail: String(e && e.message || e),
+        action: { run: function () { loadSessions(); } }
+      };
+      window.CxWayout.render(document.getElementById('s-side'), failState);
       var c = document.getElementById('chat-side');
-      if (c) c.innerHTML = msg;
+      if (c) window.CxWayout.render(c, failState);
     });
   }
 

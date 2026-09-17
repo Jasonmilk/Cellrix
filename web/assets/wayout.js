@@ -55,12 +55,12 @@
     'snapshot-fetch-failed': {
       surface: 'shell', kind: 'error',
       text: '拉不到 Anaphase 快照——面板上的数字会停在最后一次成功的值。',
-      action: { label: '重试连接', kind: 'retry' }
+      action: { label: '面板每几秒自动重试一次', kind: 'auto' }
     },
     'ecosystem-unavailable': {
       surface: 'shell', kind: 'error',
       text: '生态探测不可用（代理未就绪）。各组件是否在线暂时无法确认。',
-      action: { label: '重试探测', kind: 'retry' }
+      action: { label: '面板每几秒自动重试一次', kind: 'auto' }
     },
     'events-unreadable': {
       surface: 'shell', kind: 'error',
@@ -205,7 +205,11 @@
   };
 
   var KINDS = { empty: 1, loading: 1, error: 1, blocked: 1 };
-  var ACTION_KINDS = { retry: 1, focus: 1, open: 1, command: 1, 'switch-view': 1 };
+  /* `auto` = the exit is TIME, not a click: the panel already retries on its own
+   * timer. Rendering that as a button would be packaging "the system is already
+   * doing this" as "you must press something" — and it would put a control on a
+   * surface whose only job is to report state. It renders as a note instead. */
+  var ACTION_KINDS = { retry: 1, focus: 1, open: 1, command: 1, 'switch-view': 1, auto: 1 };
 
   function entryOf(code) {
     return Object.prototype.hasOwnProperty.call(WORDS, code) ? WORDS[code] : null;
@@ -293,54 +297,122 @@
     var p = doc.createElement('p');
     p.textContent = r.text;
     box.appendChild(p);
-
-    if (r.action) {
-      var b = doc.createElement('button');
-      b.type = 'button';
-      b.className = 'btn btn-sm';
-      b.setAttribute('data-wo-act', r.action.kind);
-      b.textContent = r.action.label;
-      b.onclick = function () {
-        if (typeof r.action.run === 'function') { r.action.run(); }
-      };
-      box.appendChild(b);
-    }
-
-    if (r.detail) {
-      /* Collapsed: the raw message is for the person debugging, not the person
-       * reading. Kept, not shown by default (ADR-0044 D3). */
-      var d = doc.createElement('details');
-      var sum = doc.createElement('summary');
-      sum.textContent = '原始信息';
-      var pre = doc.createElement('pre');
-      pre.textContent = r.detail;
-      d.appendChild(sum);
-      d.appendChild(pre);
-      box.appendChild(d);
-    }
+    if (r.action) box.appendChild(actionNode(doc, r));
+    if (r.detail) box.appendChild(detailNode(doc, r));
 
     return box;
   }
 
+  /* The action, as a node.
+   *
+   * A button is rendered ONLY when there is a capability behind it. Two cases
+   * fall back to a note instead:
+   *
+   *   `auto`          the exit is time, not a click (see ACTION_KINDS).
+   *   no `run`        the vocabulary has words for this exit (often a command to
+   *                   type, e.g. a flag name) but the surface supplied no
+   *                   function. A button here would be a CONTROL THAT DOES
+   *                   NOTHING — measured: removing a site's action still left a
+   *                   button behind, because the label comes from the
+   *                   vocabulary. A note says the same thing without lying.
+   */
+  function actionNode(doc, r) {
+    var honourable = typeof r.action.run === 'function';
+    if (r.action.kind === 'auto' || !honourable) {
+      var n = doc.createElement('span');
+      /* Why it is not a button matters to whoever reads the DOM: `auto` means
+       * time is the exit, `note` means the layer has words but no capability. */
+      n.setAttribute('data-wo-act', r.action.kind === 'auto' ? 'auto' : 'note');
+      n.textContent = '（' + r.action.label + '）';
+      return n;
+    }
+    var b = doc.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-sm';
+    b.setAttribute('data-wo-act', r.action.kind);
+    b.textContent = r.action.label;
+    b.onclick = function () {
+      if (typeof r.action.run === 'function') { r.action.run(); }
+    };
+    return b;
+  }
+
+  /* Collapsed: the raw message is for the person debugging, not the person
+   * reading. Kept, not shown by default (ADR-0044 D3). */
+  function detailNode(doc, r) {
+    var d = doc.createElement('details');
+    var sum = doc.createElement('summary');
+    sum.textContent = '原始信息';
+    var pre = doc.createElement('pre');
+    pre.textContent = r.detail;
+    d.appendChild(sum);
+    d.appendChild(pre);
+    return d;
+  }
+
+  /* The same content with NO wrapper element, for surfaces whose own layout is
+   * already the box: the status line, the ecosystem board, the trajectory's
+   * empty area. Putting a `.empty` block inside a one-line status bar would be
+   * the exit layer deciding a surface's styling, which is the surface's own
+   * business — and would have meant new CSS for every such surface. */
+  function buildInline(state, opts) {
+    opts = opts || {};
+    var doc = opts.document || (typeof document !== 'undefined' ? document : null);
+    if (!doc || typeof doc.createElement !== 'function') return null;
+    var r = resolve(state);
+
+    var frag = doc.createElement('span');
+    frag.setAttribute('data-wo-kind', r.kind);
+    if (r.code) frag.setAttribute('data-wo-code', r.code);
+
+    var t = doc.createElement('span');
+    t.textContent = r.text;
+    frag.appendChild(t);
+    /* A separator only when something follows, so a bare sentence has no
+     * trailing space to get underlined by a hover style. */
+    if (r.action) {
+      frag.appendChild(doc.createTextNode(' '));
+      frag.appendChild(actionNode(doc, r));
+    }
+    if (r.detail) {
+      frag.appendChild(doc.createTextNode(' '));
+      frag.appendChild(detailNode(doc, r));
+    }
+    return frag;
+  }
+
   /* Clear `el` and put the block in it. Returns the block (or null when there is
    * nowhere to render — a caller with no host gets null, never an exception). */
+  function put(el, node) {
+    if (!el || !el.ownerDocument || !node) return null;
+    while (el.firstChild) el.removeChild(el.firstChild);
+    el.appendChild(node);
+    return node;
+  }
+
   function render(el, state, opts) {
     if (!el || !el.ownerDocument) return null;
     var o = {}, k;
     if (opts) { for (k in opts) { if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k]; } }
     o.document = el.ownerDocument;
-    var box = build(state, o);
-    if (!box) return null;
-    while (el.firstChild) el.removeChild(el.firstChild);
-    el.appendChild(box);
-    return box;
+    return put(el, build(state, o));
+  }
+
+  function renderInline(el, state, opts) {
+    if (!el || !el.ownerDocument) return null;
+    var o = {}, k;
+    if (opts) { for (k in opts) { if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k]; } }
+    o.document = el.ownerDocument;
+    return put(el, buildInline(state, o));
   }
 
   window.CxWayout = {
     VERSION: VERSION,
     resolve: resolve,
     build: build,
+    buildInline: buildInline,
     render: render,
+    renderInline: renderInline,
     has: function (code) { return !!entryOf(code); },
     codes: function () { return Object.keys(WORDS); },
     /* Exposed for the test to audit the vocabulary itself rather than trust it. */

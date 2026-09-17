@@ -228,7 +228,12 @@
     }).catch(function (e) {
       showTrajectory(false);
       $('eEmpty').style.display = '';
-      $('eEmpty').textContent = 'Load failed: ' + e.message;
+      /* 就地给出路：重试 = 再走一次这个函数（它读的还是 nav.period）。 */
+      window.CxWayout.renderInline($('eEmpty'), {
+        code: 'trajectory-load-failed',
+        detail: String(e && e.message || e),
+        action: { run: function () { onEnter(); } }
+      });
     });
   }
 

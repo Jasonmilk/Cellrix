@@ -181,13 +181,13 @@ const SURFACES = ['shell', 'sessions', 'chat', 'prove-track', 'flows', 'cockpit'
   const host = doc.getElementById('host');
 
   let ran = 0;
-  const box = W.render(host, { code: 'snapshot-fetch-failed', detail: 'TypeError: boom',
+  const box = W.render(host, { code: 'trajectory-load-failed', detail: 'TypeError: boom',
                                action: { run: () => { ran++; } } });
   check('render builds a block', !!box && !!box.id === false && box.parentNode === host);
   const btn = host.querySelector('button[data-wo-act]');
   check('an error renders a real <button> (keyboard-reachable)', !!btn,
     btn ? 'tag=' + btn.tagName : 'no button');
-  check('the button carries the vocabulary\'s label', !!btn && btn.textContent === '重试连接',
+  check('the button carries the vocabulary\'s label', !!btn && btn.textContent === '重新载入',
     btn && btn.textContent);
   if (btn) btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   check('clicking it runs the caller\'s capability', ran === 1, 'ran=' + ran);
@@ -226,6 +226,50 @@ const SURFACES = ['shell', 'sessions', 'chat', 'prove-track', 'flows', 'cockpit'
   W.render(host, 'chat-empty', { className: 'fl-empty' });
   check('render forwards the wrapper choice',
     host.firstChild.className === 'fl-empty', host.firstChild.className);
+
+  /* ── `auto`: the exit is time, not a click ────────────────────────────────
+   * The shell already retries on its own timer. A button there would package
+   * "this is being handled" as "you must press something", and would put a
+   * control on a surface whose only job is to report state. */
+  W.render(host, 'snapshot-fetch-failed');
+  check('an `auto` exit renders as a note, not a button',
+    host.querySelector('button') === null &&
+      host.querySelector('[data-wo-act="auto"]') !== null,
+    host.querySelector('div').textContent.trim());
+  check('the note says what will happen', /自动重试/.test(host.textContent), host.textContent.trim());
+  check('an `auto` state is still an error with an exit',
+    W.resolve('snapshot-fetch-failed').kind === 'error' &&
+      !!W.resolve('snapshot-fetch-failed').action, JSON.stringify(W.resolve('snapshot-fetch-failed').action));
+
+  /* ── a button the layer cannot honour is a lie ────────────────────────────
+   * The vocabulary carries words for exits whose capability belongs to the
+   * surface (a command to type, a flag to pass). When no function came with
+   * them, rendering a button would be a CONTROL THAT DOES NOTHING. Measured:
+   * this is how removing a site's action still left a button behind — the
+   * mutation proved the check was too weak, and this is the fix it forced. */
+  W.render(host, 'providers-empty');
+  check('an exit with no capability renders as a note, not a button',
+    host.querySelector('button') === null &&
+      host.querySelector('[data-wo-act="note"]') !== null,
+    host.querySelector('div').textContent.trim());
+  check('that note still names the way out',
+    /flowmodus supplier add/.test(host.textContent), host.textContent.trim());
+
+  /* ── renderInline: no wrapper, the surface's own layout is the box ──────── */
+  const line = doc.createElement('div');
+  line.className = 'sub';
+  W.renderInline(line, { code: 'ecosystem-unavailable' });
+  check('inline render adds no block wrapper', line.querySelector('div') === null,
+    line.innerHTML.slice(0, 60));
+  check('inline render still marks the state', !!line.firstChild.getAttribute('data-wo-kind'),
+    line.firstChild.getAttribute('data-wo-kind'));
+  check('inline render keeps the sentence', /生态探测不可用/.test(line.textContent), line.textContent.trim());
+  W.renderInline(line, { code: 'no-snapshot', action: { run: () => { ran++; } } });
+  const ib = line.querySelector('button');
+  check('an inline exit that IS a click renders a button', !!ib, ib ? ib.textContent : 'none');
+  if (ib) ib.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  check('the inline button runs the caller\'s capability', ran === 2, 'ran=' + ran);
+  check('renderInline returns null with nowhere to render', W.renderInline(null, 'chat-empty') === null);
   dom.window.close();
 }
 
