@@ -177,7 +177,9 @@
    * when the address bar contains something it did not write.
    */
   function parseHash(hash) {
-    var out = { view: null, period: null };
+    /* `panel` = 主视图内打开的辅助面板（ADR-0022 N-001：主只有一个，其余是侧板）。
+     * 它是**加法**：未知键照旧被忽略，畸形 hash 照旧返回空态而不抛。 */
+    var out = { view: null, period: null, panel: null };
     var raw = String(hash == null ? '' : hash);
     if (raw.charAt(0) === '#') raw = raw.slice(1);
     if (!raw) return out;
@@ -194,6 +196,7 @@
       }
       if (k === 'view' && v) out.view = v;
       else if (k === 'period' && v) out.period = v;
+      else if (k === 'panel' && v) out.panel = v;
     }
     return out;
   }
@@ -206,6 +209,7 @@
     var parts = [];
     if (st.view) parts.push('view=' + encodeURIComponent(st.view));
     if (st.period) parts.push('period=' + encodeURIComponent(st.period));
+    if (st.panel) parts.push('panel=' + encodeURIComponent(st.panel));
     return parts.length ? '#' + parts.join('&') : '';
   }
 
