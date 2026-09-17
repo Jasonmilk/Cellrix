@@ -191,8 +191,19 @@
      * 于是框架的 className 被覆盖成按钮的类、`fxMain` 消失、grid 随之失效。
      * 实测：`#uxMain` 变成了 `class="btn btn-ghost on"`，主区高度塌成 297、侧板为 0。
      * 一个属性名两个含义——这类 bug 的教科书形态。 */
-    if (panel) { main.setAttribute('data-open', panel); }
-    else { main.removeAttribute('data-open'); main.removeAttribute('data-max'); }
+    if (panel) {
+      main.setAttribute('data-open', panel);
+      /* 每个视图单独展示（用户反馈 #2）：面板默认全屏（data-max），
+         证轨/驾驶舱/检定台打开即占满主区，对话完全退场。
+         ⤢ 按钮可手动切回分栏（data-open 无 data-max = Chat 挤到左侧）。 */
+      main.setAttribute('data-max', '1');
+      var mx = document.getElementById('uxPanelMax');
+      if (mx) mx.setAttribute('aria-pressed', 'true');
+    }
+    else { main.removeAttribute('data-open'); main.removeAttribute('data-max');
+      var mx2 = document.getElementById('uxPanelMax');
+      if (mx2) mx2.setAttribute('aria-pressed', 'false');
+    }
     var t = document.getElementById('uxPanelT');
     if (t) t.textContent = panel ? (PANEL_TITLE[panel] || panel) : '';
     ['cockpit', 'prove-track', 'flows'].forEach(function (v) {
@@ -448,19 +459,32 @@
     return upd;
   }
   var updSideEdges = initEdges(document.getElementById('uxSideVp'), document.getElementById('uxSideBody'));
-  /* 侧栏收起：一格轨道归零，列表隐藏（它自己那条滚动上下文随之消失）。 */
+  /* 侧栏收起：一格轨道归零，列表隐藏（它自己那条滚动上下文随之消失）。
+     宽/窄两态共用一个开关：桌面走 data-side 网格归零 + hidden；
+     窄屏（<860px）抽屉是 off-canvas（.on 类），hidden 归零时同步 .on，
+     否则收起后无法再展开（实测 bug：窄窗下「经历」按钮点了像没点）。 */
   (function () {
     var t = document.getElementById('tglSide');
     var frame = document.getElementById('uxFrame');
     var side = document.getElementById('uxSide');
     if (!t || !frame || !side) return;
-    t.addEventListener('click', function () {
-      var on = frame.getAttribute('data-side') === '1';
-      if (on) { frame.setAttribute('data-side', '0'); side.setAttribute('hidden', ''); }
-      else { frame.setAttribute('data-side', '1'); side.removeAttribute('hidden'); }
-      t.setAttribute('aria-expanded', String(!on));
+    function setSide(on) {
+      frame.setAttribute('data-side', on ? '1' : '0');
+      side.classList.toggle('on', on);
+      side.toggleAttribute('hidden', !on);
+      t.setAttribute('aria-expanded', String(on));
       if (updSideEdges) setTimeout(updSideEdges, 0);
+    }
+    t.addEventListener('click', function () {
+      setSide(frame.getAttribute('data-side') !== '1');
     });
+    /* 窄屏移动惯例：选择一段经历 / 新对话 / 顶栏导航后抽屉自动收起，不挡内容。 */
+    document.addEventListener('click', function (e) {
+      if (window.innerWidth > 860) return;
+      var trg = e.target;
+      if (!trg || !trg.closest) return;
+      if (trg.closest('.ses-item, .ses-head button, .topbar button')) setSide(false);
+    }, true);
   })();
 
   tick(); loadEcosystem();

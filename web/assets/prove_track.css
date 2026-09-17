@@ -5,40 +5,28 @@
   Origin: moved out of prove_track.html (formerly lines 7-289), declarations unchanged
   ============================================================ */
   #view-prove-track{
-    --e-bg:#F4F6F8; --e-surface:#FFFFFF; --e-sunk:#F7F8FA;
-    --e-hover:#F0F2F5; --e-press:#E6E9EE;
-    --e-line:#E3E6EB; --e-line2:#C9CED6;
-    --e-text:#14171C; --e-dim:#5A626E;
-    --e-accent:#1F6F9B; --e-accent-h:#1A5F86; --e-accent-p:#165272;
-    --e-soft:rgba(31,111,155,.10); --e-onacc:#FFFFFF;
-    --e-ok:#1E7A45; --e-warn:#8A5A00; --e-risk:#A93226; --e-pend:#5A626E;
-    --e-trk-in:#5A6B80; --e-trk-md:#1F6F9B; --e-trk-tl:#8A5A00;
-    --e-fade:rgba(16,20,28,.32); --e-fade-w:4px;
-    --e-gleam:rgba(255,255,255,.62);
+    /* template v8 applied: e-* tokens map to the global water-light tokens, follow the 3-state theme */
+    --e-bg:var(--bg-base); --e-surface:var(--bg-surface); --e-sunk:var(--bg-inset);
+    --e-hover:var(--row-hover); --e-press:var(--btn-sec-active);
+    --e-line:var(--line); --e-line2:var(--line-strong);
+    --e-text:var(--text-1); --e-dim:var(--text-2);
+    --e-accent:var(--brand-fill); --e-accent-h:var(--brand-fill-hi); --e-accent-p:var(--brand-fill-hi);
+    --e-soft:color-mix(in srgb, var(--brand-fg) 14%, transparent); --e-onacc:var(--on-brand);
+    --e-ok:var(--success-fg); --e-warn:var(--warn-fg); --e-risk:var(--danger-fg); --e-pend:var(--text-3);
+    --e-trk-in:var(--text-3); --e-trk-md:var(--brand-fg); --e-trk-tl:var(--warn-fg);
+    --e-fade:rgba(var(--edge-veil),var(--edge-a)); --e-fade-w:4px;
+    --e-gleam:var(--gleam);
     --e-r-s:6px; --e-r-m:8px; --e-r-l:14px;
-    --e-dur:200ms; --e-ease:cubic-bezier(.2,.7,.3,1);
-    --e-bg-rgb:244,246,248;
-    --e-sh1:0 1px 2px rgba(16,20,28,.06),0 2px 8px rgba(16,20,28,.05);
-    --e-sh2:0 2px 4px rgba(16,20,28,.07),0 8px 22px rgba(16,20,28,.09);
+    --e-dur:200ms; --e-ease:var(--ease-out);
+    --e-bg-rgb:var(--bg-rgb);
+    --e-sh1:var(--shadow-1);
+    --e-sh2:var(--shadow-2);
     font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
     color:var(--e-text);
     -webkit-font-smoothing:antialiased;
   }
-  [data-theme="dark"] #view-prove-track{
-    --e-bg:#121212; --e-surface:#1A1B1E; --e-sunk:#16171A;
-    --e-hover:#24262A; --e-press:#2C2F34;
-    --e-line:#2A2D33; --e-line2:#3A3E46;
-    --e-text:#E8EAED; --e-dim:#9AA1AC;
-    --e-accent:#4FA8D8; --e-accent-h:#63B5E0; --e-accent-p:#7CC2E7;
-    --e-soft:rgba(79,168,216,.14); --e-onacc:#0B1A22;
-    --e-ok:#5FCC8C; --e-warn:#E0B357; --e-risk:#EC8471; --e-pend:#9AA1AC;
+  [data-theme="dark"] #view-prove-track{ /* dark tweak: lane colors lifted, semantics unchanged */
     --e-trk-in:#8496AB; --e-trk-md:#4FA8D8; --e-trk-tl:#E0B357;
-    --e-bg-rgb:18,18,18;
-    --e-gleam:rgba(226,244,255,.52);
-    /* On a dark ground nothing blocks light, so "shadow" does not hold → renegotiated as a faint glow [PHYS:D-004] */
-    --e-fade:rgba(150,205,240,.50);
-    --e-sh1:0 1px 2px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.35);
-    --e-sh2:0 2px 6px rgba(0,0,0,.55),0 12px 30px rgba(0,0,0,.45);
   }
   #view-prove-track :focus{outline:2px solid var(--e-accent);outline-offset:2px}
   @supports selector(:focus-visible){ #view-prove-track :focus:not(:focus-visible){outline:none} }
@@ -66,7 +54,7 @@
   /* ---------- Trajectory: one closed-loop object ---------- */
   #view-prove-track .e-traj{border:1px solid var(--e-line);border-radius:var(--e-r-l);overflow:hidden;
     background:var(--e-surface)}
-  #view-prove-track .e-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;
+  #view-prove-track .e-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;
     background:var(--e-surface);border-bottom:1px solid var(--e-line)}
   #view-prove-track .e-tools .sp{flex:1 1 auto;min-width:0}
   #view-prove-track .e-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;
@@ -90,11 +78,11 @@
   #view-prove-track .e-hit{background:var(--e-warn);color:var(--e-surface);border-radius:2px;padding:0 1px;font-weight:700}
 
   /* ---------- Overview: three lanes share one ruler ---------- */
-  #view-prove-track .e-ov{background:var(--e-surface);border-bottom:1px solid var(--e-line);padding:12px 14px}
+  #view-prove-track .e-ov{background:var(--e-surface);border-bottom:1px solid var(--e-line);padding:10px 12px}
   #view-prove-track .e-ov-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;flex-wrap:wrap}
   #view-prove-track .e-ov-t{font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--e-dim)}
   #view-prove-track .e-mini{font-size:12.5px;color:var(--e-dim);line-height:1.75;margin:0}
-  #view-prove-track .e-trk{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  #view-prove-track .e-trk{display:flex;align-items:center;gap:7px;margin-bottom:4px}
   #view-prove-track .e-trk-nm{flex:0 0 58px;font-size:11px;font-weight:600;color:var(--e-dim);letter-spacing:.4px}
   #view-prove-track .e-lane{flex:1 1 auto;display:flex;gap:1px;height:24px;border-radius:5px;overflow:hidden;
     background:var(--e-sunk);border:1px solid var(--e-line)}
@@ -149,7 +137,7 @@
     font-size:11px;font-weight:700;letter-spacing:.5px;text-align:left;padding:7px 10px;
     white-space:nowrap;border-bottom:2px solid var(--e-line2)}
   @supports not (position:sticky){ #view-prove-track .e-scroll thead th{position:static} }
-  #view-prove-track .e-scroll td{padding:0 10px;height:44px;border-bottom:1px solid var(--e-line);vertical-align:middle;
+  #view-prove-track .e-scroll td{padding:0 9px;height:38px;border-bottom:1px solid var(--e-line);vertical-align:middle;
     overflow:hidden}
   #view-prove-track .e-scroll tr.ev{cursor:pointer;transition:background var(--e-dur) var(--e-ease)}
   #view-prove-track .e-scroll tr.ev:hover td{background:var(--e-hover)}
@@ -157,10 +145,10 @@
   #view-prove-track .e-scroll tr.ev[aria-current="true"] td{background:var(--e-soft);
     box-shadow:inset 3px 0 0 var(--e-accent)}
   #view-prove-track .e-scroll tr.ev:focus-visible{outline:2px solid var(--e-accent);outline-offset:-2px}
-  #view-prove-track .e-scroll tr.e-turn-hd td{background:var(--e-sunk);height:44px;padding:0 10px}
+  #view-prove-track .e-scroll tr.e-turn-hd td{background:var(--e-sunk);height:32px;padding:0 9px}
   #view-prove-track .e-scroll tr.e-turn-hd:hover td{background:var(--e-hover)}
   #view-prove-track .e-turn-btn{appearance:none;border:0;background:transparent;color:var(--e-dim);
-    display:flex;align-items:center;gap:6px;width:100%;min-height:44px;padding:0;
+    display:flex;align-items:center;gap:6px;width:100%;min-height:32px;padding:0;
     text-align:left;font:inherit;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer;
     border-radius:var(--e-r-s)}
   #view-prove-track .e-turn-btn .cnt{font-weight:400;font-size:11.5px}
@@ -213,7 +201,7 @@
     border-top:1px solid var(--e-line2)}
   @media (max-width:1040px){ #view-prove-track .e-stats{grid-template-columns:repeat(4,1fr)} }
   @media (max-width:560px){ #view-prove-track .e-stats{grid-template-columns:repeat(2,1fr)} }
-  #view-prove-track .e-stat{background:var(--e-sunk);padding:10px 12px;min-width:0}
+  #view-prove-track .e-stat{background:var(--e-sunk);padding:8px 10px;min-width:0}
   #view-prove-track .e-stat b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
   #view-prove-track .e-stat span{font-size:11px;color:var(--e-dim);letter-spacing:.3px}
 
@@ -227,11 +215,11 @@
     transition:transform 220ms var(--e-ease),visibility 0s linear 220ms;
     color:var(--e-text)}
   #view-prove-track .e-insp.on{transform:translateX(0);visibility:visible;transition-delay:0s}
-  #view-prove-track .e-insp-hd{padding:12px 14px;border-bottom:1px solid var(--e-line);display:flex;
+  #view-prove-track .e-insp-hd{padding:10px 12px;border-bottom:1px solid var(--e-line);display:flex;
     align-items:flex-start;justify-content:space-between;gap:10px}
   #view-prove-track .e-insp-hd h3{font-size:14px;margin:0 0 3px;color:var(--e-text)}
   #view-prove-track .e-insp-hd .sb{font-size:12px;color:var(--e-dim)}
-  #view-prove-track .e-insp-bd{flex:1 1 auto;overflow:auto;padding:12px 14px}
+  #view-prove-track .e-insp-bd{flex:1 1 auto;overflow:auto;padding:10px 12px}
   #view-prove-track .e-sec{margin-bottom:16px}
   #view-prove-track .e-sec > h4{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--e-dim);
     text-transform:uppercase;margin:0 0 6px}

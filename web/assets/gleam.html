@@ -184,6 +184,14 @@
     var small = 0, min = Infinity;
     els.forEach(function(el){
       var h = el.getBoundingClientRect().height;
+      /* P-010 官方手法：小按钮用 ::after 把热区撑到 44px（视觉盒高不含伪元素，
+         物理点击区是伪元素盒）。审计按实际热区口径计，不按视觉盒高误报。 */
+      if (h < 43.5) {
+        try {
+          var ah = parseFloat(getComputedStyle(el, '::after').height);
+          if (ah >= 43.5) h = ah;
+        } catch (e) {}
+      }
       if(h>0){ if(h<min) min=h; if(h<43.5) small++; }
     });
     add('热区 ≥44px', small===0, small ? small+' 个不足（min '+Math.round(min)+'px）' : '');

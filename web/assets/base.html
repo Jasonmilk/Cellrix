@@ -27,6 +27,13 @@
   <style>__PROVE_TRACK_CSS__</style>
 </head>
 <body>
+  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H10l-4 4v-4H4z"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 14a8 8 0 0 1 16 0"/><path d="M12 14l3-3"/><circle cx="12" cy="14" r="1.6"/></symbol>
+    <symbol id="i-track" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/><path d="M18 15v6M21 18h-6"/></symbol>
+    <symbol id="i-bench" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></symbol>
+  </svg>
   <!-- 结构层级（照「水之波光 · 卷四」的 L0–L5 纪律）：
        L0 壳     视口，唯一外边界，纵向不滚
        L1 顶栏   **单行、恒定高度、挤不下让位不换行** —— 品牌/导航/运行时/主题都在这一条上
@@ -40,18 +47,18 @@
     <!-- ═══ L1 顶栏 ═══ -->
     <div class="topbar" id="uxTopbar">
       <button type="button" class="btn btn-sm" id="tglSide" aria-expanded="true"
-        aria-controls="uxSide" title="收起 / 展开经历列表">☰ 经历</button>
+        aria-controls="uxSide" title="收起 / 展开经历列表"><svg class="ic"><use href="#i-menu"/></svg><span class="lbl">经历</span></button>
       <span class="brand"><span class="logo">C</span>Cellrix <small>Anaphase-Helix</small></span>
       <button type="button" class="btn on" id="v-chat" data-view="chat"
-        title="伙伴模式 · 单周期一轮 · 走 Tuck 网关审计（点击收起辅助面板）">对话 Chat</button>
+        title="伙伴模式 · 单周期一轮 · 走 Tuck 网关审计（点击收起辅助面板）"><svg class="ic"><use href="#i-chat"/></svg><span class="lbl">对话<span class="x"> Chat</span></span></button>
       <div class="fxPanels" role="group" aria-label="辅助面板">
         <span class="fxPanelsLbl">辅助</span>
         <button type="button" class="btn btn-ghost" id="p-cockpit" data-panel="cockpit"
-          aria-pressed="false" title="生态态势 · Anaphase 快照 · Ledger 白盒审计链">驾驶舱</button>
+          aria-pressed="false" title="生态态势 · Anaphase 快照 · Ledger 白盒审计链"><svg class="ic"><use href="#i-gauge"/></svg><span class="lbl">驾驶舱</span></button>
         <button type="button" class="btn btn-ghost" id="p-prove-track" data-panel="prove-track"
-          aria-pressed="false" title="全链路可审计证轨（会话 = 经历 · 判据与行动同线）">证轨</button>
+          aria-pressed="false" title="全链路可审计证轨（会话 = 经历 · 判据与行动同线）"><svg class="ic"><use href="#i-track"/></svg><span class="lbl">证轨</span></button>
         <button type="button" class="btn btn-ghost" id="p-flows" data-panel="flows"
-          aria-pressed="false" title="供应商池与路由 · 审计统计">检定台</button>
+          aria-pressed="false" title="供应商池与路由 · 审计统计"><svg class="ic"><use href="#i-bench"/></svg><span class="lbl">检定台</span></button>
       </div>
       <span class="topspacer"></span>
       <!-- 运行时：常态静默（S3 不标记）。只有异常时才升为标记。 -->
