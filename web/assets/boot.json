@@ -30,6 +30,7 @@
     { "id": "script",              "placeholder": "__SCRIPT__",            "asset": "script.html" },
     { "id": "chat_js",             "placeholder": "__CHAT_JS__",           "asset": "chat.js" },
     { "id": "cockpit_js",          "placeholder": "__COCKPIT_JS__",        "asset": "cockpit.js" },
+    { "id": "session_list",        "placeholder": "__SESSION_LIST__",      "asset": "session_list.js" },
     { "id": "session",             "placeholder": "__SESSION__",           "asset": "session.html" },
     { "id": "gleam",               "placeholder": "__GLEAM__",             "asset": "gleam.html" },
     { "id": "flows",               "placeholder": "__FLOWS__",             "asset": "flows.html" }

@@ -27,28 +27,34 @@
 
 | 名字 | 声明 / 读取处 |
 |---|---|
+| `.act` | session_list.js |
 | `audit` | base.html, gleam.html |
 | `.body` | chat.js |
+| `btn-newchat` | session_list.js |
 | `.btn:not(` | gleam.html |
 | `.chat-input` | chat.html, chat.js |
-| `chat-msgs` | chat.html, chat.js, session.html |
+| `chat-msgs` | chat.html, chat.js, session_list.js |
 | `chat-side` | chat.html, session.html |
-| `chat-text` | chat.html, chat.js, session.html |
+| `chat-text` | chat.html, chat.js, session_list.js |
 | `conn` | base.html, script.html |
-| `cont-banner` | chat.html, session.html |
+| `cont-banner` | chat.html, session_list.js |
 | `eTbody` | prove_track.html, prove_track.view.js |
 | `eco` | base.html, script.html |
 | `.empty` | base.html, chat.html, chat.js, cockpit.html, session.html |
 | `entries` | cockpit.html, cockpit.js |
 | `episode` | cockpit.html, cockpit.js |
 | `.fl-bar` | flows.html |
+| `.inp` | chat.html, session_list.js |
 | `mode` | base.html, script.html |
 | `.nav` | base.html, script.html |
 | `nledger` | cockpit.html, cockpit.js |
-| `resume-list` | chat.html, session.html |
+| `.nm` | flows.html, session_list.js |
+| `resume-list` | chat.html, session_list.js |
+| `.resume-opt` | session_list.js |
 | `s-side` | base.html, prove_track.view.js, session.html |
-| `.ses-edit` | session.html |
+| `.ses-edit` | session_list.js |
 | `sub` | base.html, flows.html, script.html |
+| `.t` | prove_track.html, session_list.js |
 | `.tbl-scroll` | cockpit.html, gleam.html |
 | `.tbl-shell` | cockpit.html, gleam.html |
 | `.theme-switch` | base.html, script.html |
@@ -102,23 +108,18 @@
 | `.:` | flows.html |
 | `.===` | flows.html |
 | `.?` | flows.html |
-| `.act` | session.html |
 | `.b` | prove_track.html |
 | `.badge` | base.html |
 | `.bar` | base.html |
-| `.btn` | base.html, chat.html, session.html |
-| `.btn-ghost` | chat.html, session.html |
-| `.btn-icon` | session.html |
-| `btn-newchat` | session.html |
+| `.btn` | base.html, chat.html |
+| `.btn-ghost` | chat.html |
 | `.btn-primary` | chat.html |
-| `.btn-sm` | session.html |
 | `.c` | script.html |
 | `.chat-col` | chat.html |
 | `.chat-grid` | chat.html |
 | `.chat-panel` | chat.html |
 | `.clr` | prove_track.html |
 | `cockpit-stats` | cockpit.html |
-| `.dim` | session.html |
 | `.dot` | script.html |
 | `.e-btn` | prove_track.html |
 | `.e-btn-primary` | prove_track.html |
@@ -190,7 +191,6 @@
 | `.head` | base.html, chat.html, cockpit.html, flows.html |
 | `.ico` | prove_track.html |
 | `.info` | base.html |
-| `.inp` | chat.html, session.html |
 | `.input` | prove_track.html |
 | `.k` | cockpit.html |
 | `.kv` | flows.html |
@@ -198,37 +198,27 @@
 | `.ledger` | cockpit.html |
 | `ltScroll` | cockpit.html |
 | `ltShell` | cockpit.html |
-| `.mdl` | session.html |
 | `.model` | prove_track.html |
 | `.mono` | flows.html |
-| `.nm` | flows.html, session.html |
 | `.ok` | base.html, flows.html |
 | `.on` | base.html |
-| `.orb` | chat.html, session.html |
-| `.p` | session.html |
+| `.orb` | chat.html |
 | `.panel` | chat.html, cockpit.html |
-| `.period-head` | session.html |
 | `.prove-track-main` | base.html |
 | `.r` | prove_track.html |
-| `.resume-opt` | session.html |
 | `.row` | flows.html |
-| `.rp` | session.html |
 | `s-main` | base.html |
 | `.sb` | prove_track.html |
-| `.ses-head` | session.html |
 | `.ses-side` | base.html, chat.html |
 | `.sk` | session.html |
 | `.sk-l1` | session.html |
 | `.sk-l2` | session.html |
-| `.sm` | session.html |
 | `.small` | cockpit.html |
 | `.sp` | prove_track.html |
 | `.stat` | cockpit.html |
 | `state` | base.html, script.html |
 | `.stats-bar` | cockpit.html |
-| `.t` | prove_track.html, session.html |
 | `.tag` | base.html |
-| `.tid` | session.html |
 | `.tool` | prove_track.html |
 | `.ts` | flows.html |
 | `.v` | cockpit.html |
