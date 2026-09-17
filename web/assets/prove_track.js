@@ -216,6 +216,17 @@
     var Cx = window.Cx;
     var want = Cx.state.nav.period || null;
     var t = Cx.tape();
+    /* 载体先亮出来，**在**下面那条"复用带子"的快分支之前。
+     *
+     * 以前只有"数据要新取"那条路才会点亮容器，于是只要带子上已经握着这一段
+     * ——从对话视图载过一次、或第二次进本视图——就会走快分支直接 return：
+     * 表格里 7 行都在，而 #eTraj 是 `display:none`、宽 0 高 0，**界面看上去
+     * 什么都没有**。实测（真 Chrome，1440×813）：切到证轨视图时正是这个状态。
+     *
+     * 「数据在不在」与「载体亮不亮」是两件事。真正没东西可看时，下面的
+     * catch 会走 showTrajectory(false) 并给出出路——那才是"没有"的表示法。 */
+    showTrajectory(true);
+    $('eEmpty').style.display = 'none';
     /* The window on the tape is reused when it is the one we were asked for;
      * otherwise a read is needed. An empty tape is never "reused" — that is how
      * an empty trajectory would look identical to a loaded one. */
@@ -247,6 +258,10 @@
   function bindLifecycle() {
     window.Cx.onEnter(TARGET, onEnter);
     window.Cx.onLeave(TARGET, onLeave);
+    /* period 变化（在同一视图里点了另一段经历）也要重载窗口。以前靠"每次 setNav
+     * 都重跑 enter hook"顺带做到，但那条路会让**列表**每点一次卡就重建一遍。
+     * 两者分开之后，证轨在这里显式登记自己要跟着 period 走。 */
+    if (window.Cx.onPeriod) { window.Cx.onPeriod(TARGET, onEnter); }
   }
   if (!window.CxAssembly) {
     /* Nothing to project from: leave the view in its honest empty state. */

@@ -76,12 +76,43 @@ function panelReachable() {
 
 const PANEL_UP = panelReachable();
 
-const NEEDS_INPUT = [
-  ['layout_test.js', 'needs Chrome on :9222: node layout_test.js (see README)']
-];
+/* ── 几何守卫：能连上浏览器就跑，连不上才 SKIP ────────────────────────────────
+ *
+ * `layout_test.js` 以前**无条件**列为 SKIP，哪怕 Chrome 就在 9222 上等着。结果是
+ * 项目里唯一能看见"盒子按内容长"的检查长期不在网里——而它正是唯一能抓到下面这类
+ * 缺陷的检查：切到证轨视图时表格已有 7 行，而装它的容器是 `display:none`（宽 0
+ * 高 0），**界面一片空**。jsdom 看得见 textContent、看不见布局，那个 bug 在
+ * jsdom 里是隐形的，只有真浏览器能抓。
+ *
+ * 这正是本文件头一句在讲的形状：一个悄悄没跑的套件与一个通过的套件无法区分。
+ * 所以判据与面板套件一致——**可达就跑，不可达才说明原因**。 */
+const CDP = process.env.CELLRIX_CDP || 'http://127.0.0.1:9222';
+function cdpReachable() {
+  let host = '127.0.0.1', port = 9222;
+  try { const u = new URL(CDP); host = u.hostname; port = u.port || 9222; } catch { return false; }
+  try {
+    execFileSync(process.execPath, ['-e',
+      'const s=require("net").connect(' + Number(port) + ',' + JSON.stringify(host) + ');' +
+      's.on("connect",()=>{s.end();process.exit(0)});' +
+      's.on("error",()=>process.exit(1));' +
+      'setTimeout(()=>process.exit(1),1500);'
+    ], { stdio: 'ignore' });
+    return true;
+  } catch { return false; }
+}
+const CDP_UP = cdpReachable();
+
+const NEEDS_INPUT = [];
+if (!(PANEL_UP && CDP_UP)) {
+  NEEDS_INPUT.push(['layout_test.js',
+    'needs the panel + a browser on ' + CDP + ': node layout_test.js ' + PANEL + ' ' + CDP + ' (see README)']);
+}
 
 if (PANEL_UP) {
   SELF_CONTAINED.push(['all_views_test.js', 'all views against the live panel — ' + PANEL]);
+}
+if (PANEL_UP && CDP_UP) {
+  SELF_CONTAINED.push(['layout_test.js', 'geometry in a real browser — ' + CDP]);
 }
 
 /* The concrete instance ADR-0022 §2.5 guards: the panel's own navigation shape.
@@ -113,7 +144,8 @@ if (engBad.length) {
 for (const [file, what] of SELF_CONTAINED) {
   const target = path.join(__dirname, file);
   try {
-    const extra = file === 'all_views_test.js' ? [PANEL] : [];
+    const extra = file === 'all_views_test.js' ? [PANEL]
+      : file === 'layout_test.js' ? [PANEL, CDP] : [];
     execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' });
     results.push(['PASS', file, what]);
   } catch (e) {

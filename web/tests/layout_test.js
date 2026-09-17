@@ -162,9 +162,15 @@ const PROBE_4A = `(async function () {
   await sleep(1600);
   /* Pick a session first: the trajectory (and thus the third column) exists
      only when a session is selected. The measure is the MAIN CONTENT width —
-     the trajectory itself — which the inspector column takes from (4a Q1). */
+     the trajectory itself — which the inspector column takes from (4a Q1).
+     What a card click MEANS is the sidebar's explicit mode (P3a), so the
+     trajectory mode is chosen first: without it this probe clicks its way into
+     the conversation and then measures a trajectory that is display:none. */
+  var modeBtn = Array.from(document.querySelectorAll('#s-side button'))
+    .filter(function (b) { return b.getAttribute('data-panel') === 'track'; })[0];
+  if (modeBtn) { modeBtn.click(); await sleep(300); }
   var sItem = document.querySelector('#s-side .ses-item');
-  if (sItem) { sItem.click(); await sleep(1200); }
+  if (sItem) { sItem.click(); await sleep(1800); }
   var main = document.querySelector('#view-prove-track .e-traj') ||
              document.querySelector('#view-prove-track .e-wrap') ||
              document.querySelector('#s-main');

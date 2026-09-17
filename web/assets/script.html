@@ -29,7 +29,7 @@
   /* Enter hooks are declared by the view assets themselves (Cx.onEnter), so
    * the shell never names a view it does not own. Leaving is the mirror of
    * entering, declared the same way. */
-  var ENTER = {}, LEAVE = {};
+  var ENTER = {}, LEAVE = {}, PERIOD = {};
 
   /* ---- the tape ---------------------------------------------------------
    * ONE tape for the panel (ADR-0018: one tape, many targets). Every view that
@@ -122,7 +122,7 @@
    * not even the two paths that adopt what the address bar already says. */
   function setNav(patch, opts) {
     opts = opts || {};
-    var before = NAV.view;
+    var before = NAV.view, beforePeriod = NAV.period;
     if (patch) {
       if (patch.view) NAV.view = patch.view;
       if (patch.period !== undefined) NAV.period = patch.period || null;
@@ -130,6 +130,8 @@
        * describes, so it cannot come to describe a different period. */
       if (patch.meta !== undefined) window.__proveTrackMeta = patch.meta;
     }
+    var viewChanged = NAV.view !== before;
+    var periodChanged = NAV.period !== beforePeriod;
     var want = hashFor(NAV);
     /* N-005: changing VIEW is a navigation and pushes an entry, so Back returns
      * to the view we came from. A period-only change (a reply creating a period,
@@ -151,7 +153,22 @@
         history.replaceState(null, '', want || (location.pathname + location.search));
       }
     } catch (e) { /* an opaque origin must not stop the panel rendering */ }
-    applyView(NAV.view);
+
+    /* 视图变了才跑 enter hook。**这条是实测逼出来的**：以前每次 setNav（哪怕只是
+     * 点了一张卡，period 变了而视图没变）都重跑 enter hook，于是 loadSessions
+     * ——它是个 enter hook——每点一次卡就把整个侧栏 innerHTML 重建一遍：多打两次
+     * /api/sessions、列表滚回顶部、刚点的那张卡被甩出视野（"不知道点了哪张卡了"）。
+     *
+     * 分工：enter = 进入这个视图时该做什么（取数、聚焦）；period = 同一视图内换了
+     * 一段经历时该做什么（更新高亮、重载证轨的窗口）。选择变化不该重建你正在选择
+     * 的那个集合——这是任何有列表的界面的基本形状。 */
+    if (viewChanged) { applyView(NAV.view); }
+    else if (periodChanged) { notifyPeriod(NAV.view); }
+  }
+
+  function notifyPeriod(v) {
+    var hooks = PERIOD[v] || [];
+    for (var i = 0; i < hooks.length; i++) hooks[i]();
   }
 
   /* Renders a view and runs its enter/leave hooks. Does NOT write the state:
@@ -201,20 +218,25 @@
        * from 55 passed to 46 passed / 1 failed, and the panel reported
        * "经历列表拉取失败: Cannot read properties of undefined". Name the
        * owner. */
-      /* ORDER MATTERS, and it is not the obvious one. The trajectory's loader
-       * CLEARS the table and waits for the tape to flush it; the flush happens
-       * in the view's enter hook. So the loader must run BEFORE the view is
-       * applied. Measured: with the two reversed, the table kept whatever the
-       * flush had just drawn erased, and the panel sat on "Loading …" — 0 event
-       * rows, which is what all_views_test.js caught. */
-      if (window.__proveTrackLoad) {
-        window.__proveTrackLoad(jobId, p.meta !== undefined ? p.meta : (window.__proveTrackMeta || null));
-      }
+      /* 这里**不再**直接去清证轨的表格。
+       *
+       * 曾经的写法是先调 `__proveTrackLoad()` 再 `setNav()`，理由是「加载器先清、
+       * 视图的 enter hook 负责填」。但那条理由只在**证轨是活动视图**时成立：
+       * 在对话视图里点一张卡时，没有任何 enter hook 会来填它，于是表格被清成
+       * "Loading…" 之后**永远停在那里**——和 Flows 那个「永恒加载态」是同一形状。
+       *
+       * 现在壳只写状态。谁显示、谁负责加载：证轨的 onEnter / onPeriod 自己清并
+       * 自己填（`onEnter` 里本来就是「先清后 loadWindow」，顺序没变），而它不在
+       * 屏上时不动它的 DOM——那时它本来也看不见，进视图时 onEnter 会把它换成正确
+       * 的那一段。壳因此不再需要知道另一个资产里那个函数的名字。 */
       setNav(p);
     },
     showToast: showToast,
     onEnter: function (name, fn) { (ENTER[name] = ENTER[name] || []).push(fn); },
     onLeave: function (name, fn) { (LEAVE[name] = LEAVE[name] || []).push(fn); },
+    /* 同一视图内 period 变化。与 onEnter 分开，是因为两者的正确触发时机不同：
+     * 进入视图要重新取数，换一段经历不该把列表重建一遍。 */
+    onPeriod: function (name, fn) { (PERIOD[name] = PERIOD[name] || []).push(fn); },
     /* The tape and its read, for a view that projects from it. */
     tape: tape,
     tapeJob: function () { return TAPE_JOB; },

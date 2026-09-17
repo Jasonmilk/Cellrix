@@ -54,6 +54,10 @@ function skip(label, why) {
   }
 
   const errors = [];
+  /* Counted so a click can be asked "did you re-fetch the list?". Only the plain
+   * list read counts: loadWindow asks with ?limit=, and that one is legitimately
+   * per-period. */
+  let sessionFetches = 0;
   const vc = new VirtualConsole();
   vc.on("jsdomError", (e) => errors.push("jsdomError: " + e.message));
   vc.on("error", (...a) => errors.push("console.error: " + a.join(" ")));
@@ -68,6 +72,7 @@ function skip(label, why) {
       window.fetch = (input, init) => {
         const url = typeof input === "string" && input.startsWith("/")
           ? BASE + input : input;
+        if (/\/api\/sessions$/.test(String(url))) sessionFetches++;
         return fetch(url, init);
       };
       window.matchMedia = (q) => ({
@@ -228,8 +233,55 @@ function skip(label, why) {
     check("with 证轨 chosen, a row click opens the trajectory", view && view.style.display !== "none");
     check("prove-track rendered real content", view && view.textContent.trim().length > 200,
       view ? view.textContent.trim().length + " chars" : "n/a");
+    /* 容器真的亮着，不只是"DOM 里有字"。
+     *
+     * 这条是被真 Chrome 抓出来的：切到证轨视图时 #eTbody 已有 7 行，而 #eTraj
+     * 是 display:none、宽 0 高 0——界面看上去一片空。**textContent 看不见这件事**：
+     * display:none 的子元素照样有文字，所以上面那条"rendered real content"一直
+     * 是绿的。style.display 在 jsdom 里是可测的，所以这一条补得住那道缝。 */
+    check("the trajectory container is shown, not merely populated",
+      doc.getElementById("eTraj").style.display !== "none",
+      'display=' + JSON.stringify(doc.getElementById("eTraj").style.display) +
+      " rows=" + doc.querySelectorAll("#eTbody tr.ev[data-e-ev]").length);
     check("no errors from the row click", errors.length === before,
       errors.slice(before).join(" | "));
+
+    /* 选择变化不得重建你正在选择的那个集合（人报的 bug）。
+     *
+     * Measured before the fix: clicking one card issued TWO more
+     * `/api/sessions` calls and replaced the sidebar's innerHTML wholesale — in a
+     * real browser that resets the list's scroll and throws the card you just
+     * clicked out of view ("不知道点了哪张卡了"). The cause was the shell
+     * re-running the view's ENTER hook on every period change, so the fetch that
+     * belongs to "entering a view" fired on every click.
+     *
+     * jsdom has no layout, so it cannot see the scroll reset itself. It CAN see
+     * the cause — the extra fetch and the rebuilt nodes — which is why this
+     * asserts those and not a scrollTop. */
+    const chatModeBtn = Array.from(doc.querySelectorAll("#s-side button"))
+      .find((b) => b.getAttribute("data-panel") === "chat");
+    if (chatModeBtn) chatModeBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    const nodesBefore = Array.from(doc.querySelectorAll("#chat-side .ses-item"));
+    const stamped = nodesBefore[nodesBefore.length - 1];
+    if (stamped) stamped.setAttribute("data-observed", "1");
+    const fetchBefore = sessionFetches;
+    const row2 = nodesBefore.find((el) => el.textContent.includes(KEY)) || nodesBefore[0];
+    if (row2) row2.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(700);
+    check("clicking a card does not re-fetch the period list",
+      sessionFetches === fetchBefore, "+" + (sessionFetches - fetchBefore) + " /api/sessions");
+    const survivor = Array.from(doc.querySelectorAll("#chat-side .ses-item"))
+      .find((el) => el.getAttribute("data-observed") === "1");
+    check("clicking a card does not rebuild the list rows",
+      !!survivor, survivor ? "the marked row survived" : "the rows were replaced");
+    const selNow = Array.from(doc.querySelectorAll("#chat-side .ses-item"))
+      .filter((el) => el.className.split(" ").indexOf("sel") >= 0);
+    check("the highlight still lands on exactly one row", selNow.length === 1,
+      selNow.length + " marked");
+    check("the selection is discernible without colour (N-019)",
+      selNow.length === 1 && selNow[0].getAttribute("aria-current") === "true",
+      selNow.length ? String(selNow[0].getAttribute("aria-current")) : "none");
 
     /* N-004 is a DIAMOND: the current period must be visibly marked. It was
      * violated in the trajectory sidebar before P3a — the old expression made

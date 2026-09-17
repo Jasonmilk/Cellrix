@@ -81,6 +81,34 @@
     rerenderSides();
   }
 
+  /* 只搬选中态，**不重建列表**。
+   *
+   * 实测：点一张卡会打两次 /api/sessions、把侧栏 innerHTML 整个换掉——真实浏览器里
+   * 列表因此滚回顶部，刚点的那张被甩出视野（"不知道点了哪张卡了"）。**选择变化不该
+   * 重建你正在选择的那个集合**：任何有列表的界面都是这条形状。
+   *
+   * 同时留一条非颜色通道（aria-current）：选中目前只体现为颜色，而 N-019 要求状态
+   * 变化不靠颜色也能辨。 */
+  function moveSelection() {
+    var want = nav().period || null;
+    HOSTS.forEach(function (id) {
+      var box = document.getElementById(id);
+      if (!box) return;
+      var all = box.getElementsByTagName('div');
+      for (var i = 0; i < all.length; i++) {
+        var el = all[i];
+        if (!el.getAttribute) continue;
+        var job = el.getAttribute('data-job');
+        if (!job) continue;
+        var on = (job === want);
+        var has = el.className.split(' ').indexOf('sel') >= 0;
+        if (on === has) continue;
+        el.className = on ? (el.className + ' sel') : el.className.replace(/\s*sel\b/, '');
+        if (on) { el.setAttribute('aria-current', 'true'); } else { el.removeAttribute('aria-current'); }
+      }
+    });
+  }
+
   function renderOne(id, periods, empty) {
     var box = document.getElementById(id);
     /* `empty` is an exit-layer STATE, not an HTML string: the sentence and the
@@ -139,6 +167,9 @@
       var sel = nav().period === p.job_id;
       div.className = 'ses-item' + (sel ? ' sel' : '');
       div.setAttribute('data-ts', p.first_ts || '');
+      /* 行要自带身份，选中态才搬得动——否则只能重建整个列表来换高亮。 */
+      div.setAttribute('data-job', p.job_id);
+      if (sel) div.setAttribute('aria-current', 'true');
       /* `st` is this asset's module state object (st.sesSeq / st.histSeq) —
        * shadowing it here with a timestamp broke every later read in this
        * function. Measured: the sidebar rendered zero rows and the panel
@@ -162,7 +193,7 @@
         if (sidePanel() === 'chat') {
           // 恢复进度到对话空间（DSH：点击会话 = 回放过去 + 从此续写）
           Cx.setNav({ period: p.job_id });
-          rerenderSides();
+          moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
           loadPeriodToChat(p.job_id);
           setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
           document.getElementById('chat-text').focus();
@@ -178,6 +209,9 @@
             view: 'prove-track',
             meta: { job_id: p.job_id, name: p.name, preview: p.preview }
           });
+          /* 高亮也要就地搬：这条分支以前靠"换视图 → enter hook → loadSessions
+           * 重渲染"顺带更新，而那条路已不再因 period 变化而触发。 */
+          moveSelection();
         }
       };
       var rn = div.querySelector('[data-ren]');
@@ -432,6 +466,7 @@
   window.CxSessionList = {
     esc: esc,
     renderSides: renderSides,
+    moveSelection: moveSelection,
     toggleResume: toggleResume,
     newChat: newChat
   };
