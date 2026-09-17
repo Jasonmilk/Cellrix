@@ -26,7 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
-const ASSET = path.join(__dirname, '..', 'assets', 'wayout.js');
+const ASSETS = path.join(__dirname, '..', 'assets');
 
 let pass = 0, fail = 0;
 function check(label, cond, detail) {
@@ -35,15 +35,18 @@ function check(label, cond, detail) {
   else { fail++; console.log('  FAIL  ' + label + tail); }
 }
 
-/* Load the real asset the way the page does: an IIFE that hangs its interface
- * on `window`. No copy of the vocabulary lives in this file — a second copy is
- * the thing this whole ecosystem keeps removing. */
+/* Load the real assets the way the page does: two IIFEs, words first, and the
+ * logic asset reads the words off `window`. No copy of the vocabulary lives in
+ * this file — a second copy is the thing this whole ecosystem keeps removing. */
 function loadAsset() {
-  const src = fs.readFileSync(ASSET, 'utf8');
   const prev = global.window;
   global.window = {};
-  try { (0, eval)(src); return global.window.CxWayout; }
-  finally { global.window = prev; }
+  try {
+    for (const f of ['wayout.words.js', 'wayout.js']) {
+      (0, eval)(fs.readFileSync(path.join(ASSETS, f), 'utf8'));
+    }
+    return global.window.CxWayout;
+  } finally { global.window = prev; }
 }
 
 /* ── the audit, as a pure function so it can audit a fake too ──────────────
