@@ -119,11 +119,14 @@ check('48 unique node ids',
 {
   // A chain of four, in the shape the producer emits: each period names its
   // predecessor, and the newest was created last.
+  /* Keyed by `period_id`: the producer's identity for one run. `job_id` is a
+   * content digest that two runs of one input share, so the chain cannot be
+   * walked on it (B16 / anaphase K-006). */
   const chainPeriods = [
-    { job_id: 'p4', parent: 'p3', first_ts: '2026-09-16T04:00:00Z' },
-    { job_id: 'p3', parent: 'p2', first_ts: '2026-09-16T03:00:00Z' },
-    { job_id: 'p2', parent: 'p1', first_ts: '2026-09-16T02:00:00Z' },
-    { job_id: 'p1', parent: null, first_ts: '2026-09-16T01:00:00Z' }
+    { period_id: 'p4', job_id: 'p4', parent: 'p3', first_ts: '2026-09-16T04:00:00Z' },
+    { period_id: 'p3', job_id: 'p3', parent: 'p2', first_ts: '2026-09-16T03:00:00Z' },
+    { period_id: 'p2', job_id: 'p2', parent: 'p1', first_ts: '2026-09-16T02:00:00Z' },
+    { period_id: 'p1', job_id: 'p1', parent: null, first_ts: '2026-09-16T01:00:00Z' }
   ];
   const ordered = NORM.chainJobIds(chainPeriods, 'p4');
   check('chainJobIds returns the whole chain', ordered.length === 4, JSON.stringify(ordered));
@@ -157,11 +160,31 @@ check('48 unique node ids',
 // lineage path, so a branch the human did not open stays out of it.
 {
   const branched = [
-    { job_id: 'root', parent: null },
-    { job_id: 'a', parent: 'root' },
-    { job_id: 'b', parent: 'root' },      // sibling of `a` — must NOT join it
-    { job_id: 'a2', parent: 'a' },
+    { period_id: 'root', job_id: 'root', parent: null },
+    { period_id: 'a', job_id: 'a', parent: 'root' },
+    { period_id: 'b', job_id: 'b', parent: 'root' },   // sibling of `a` — must NOT join it
+    { period_id: 'a2', job_id: 'a2', parent: 'a' },
   ];
+  /* B16 criterion, at the level this harness can hold: two runs of ONE input.
+   * They share `job_id` — that is what a content digest does — and differ only
+   * in the allocated `period_id`. The old keying (`byId[job_id]`) kept the last
+   * one and silently dropped the other, so the panel showed one row for two
+   * experiences. Keying by `period_id` must keep both.
+   *
+   * This exists so the regression cannot come back unnoticed: if someone
+   * re-keys the walk on `job_id`, this goes red and names the reason. */
+  const sameInput = [
+    { period_id: 'run-aaaa-p0001', job_id: 'run-aaaa', parent: null, first_ts: '2026-09-16T01:00:00Z' },
+    { period_id: 'run-aaaa-p0002', job_id: 'run-aaaa', parent: null, first_ts: '2026-09-16T02:00:00Z' },
+  ];
+  check('two runs of one input stay two periods',
+    NORM.chainJobIds(sameInput, 'run-aaaa-p0001').length === 1 &&
+    NORM.chainJobIds(sameInput, 'run-aaaa-p0002').length === 1,
+    JSON.stringify(NORM.chainJobIds(sameInput, 'run-aaaa-p0002')));
+  check('a shared digest is not a usable period key',
+    NORM.chainJobIds(sameInput, 'run-aaaa').length === 0,
+    'the digest must not resolve to either run');
+
   const winA = NORM.chainJobIds(branched, 'a');
   check('opening a branch excludes its sibling',
     JSON.stringify(winA) === JSON.stringify(['root', 'a']), JSON.stringify(winA));

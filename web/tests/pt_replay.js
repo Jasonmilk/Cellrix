@@ -53,6 +53,8 @@ function pick(needs) {
   let best = null, bestN = -1;
   fs.readdirSync(EV).forEach(function (name) {
     if (!name.endsWith('.events.jsonl')) { return; }
+    /* The name is a locator only. Identity lives in the row (`period_id`); rows
+     * written before that field existed fall back to the file stem. */
     const rows = fs.readFileSync(path.join(EV, name), 'utf8').split('\n')
       .filter(function (l) { return l.trim(); }).map(function (l) { return JSON.parse(l); });
     const types = {};

@@ -60,10 +60,15 @@ const periods = [];
 const byJob = {};
 fs.readdirSync(EV).forEach(function (name) {
   if (!name.endsWith('.events.jsonl')) { return; }
-  const jobId = name.slice(0, -'.events.jsonl'.length);
+  const stem = name.slice(0, -'.events.jsonl'.length);
   const rows = fs.readFileSync(path.join(EV, name), 'utf8').trim()
     .split('\n').filter(Boolean).map(JSON.parse);
   if (!rows.length) { return; }
+  /* Identity comes from the ROW (period_id), never from the file name. A name is
+   * a locator; reading identity out of it is the mistake B15 removed. Rows
+   * written before the field existed fall back to the stem, which is exactly the
+   * legacy case and nothing else. */
+  const jobId = (rows[0] && rows[0].period_id) || stem;
   byJob[jobId] = rows;
   let parent = null;
   for (let i = 0; i < rows.length; i++) {
@@ -72,7 +77,7 @@ fs.readdirSync(EV).forEach(function (name) {
       break;
     }
   }
-  periods.push({ job_id: jobId, parent: parent, first_ts: rows[0].time || '' });
+  periods.push({ period_id: jobId, job_id: (rows[0] && rows[0].job_id) || jobId, parent: parent, first_ts: rows[0].time || '' });
 });
 
 // A leaf, so the lineage path is the full 10 periods (see the header note).

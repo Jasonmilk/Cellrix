@@ -216,7 +216,11 @@
   function chainJobIds(periods, startId) {
     var byId = {};
     var list = periods || [];
-    for (var i = 0; i < list.length; i++) { byId[list[i].job_id] = list[i]; }
+    /* Keyed by PERIOD ID, not by job_id. `job_id` is a content digest: two runs
+     * of one input share it, so keying by it silently drops every run but the
+     * last one — measured as the panel showing one row for two experiences.
+     * `period_id` is allocated per run, which is what makes the chain walkable. */
+    for (var i = 0; i < list.length; i++) { byId[list[i].period_id] = list[i]; }
 
     /* The window is the LINEAGE PATH: root → the period the human opened.
      *

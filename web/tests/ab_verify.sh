@@ -108,7 +108,25 @@ fi
 # assumed, because the probe silently skipped when the path did not exist.
 WS_ROOT="$(cd "$CELLRIX/.." && pwd)"
 CAP_JOB="run-7efbf0f8aacf96d5"
-CAP_FILE="$WS_ROOT/.helix/events/$CAP_JOB.events.jsonl"
+# Resolve the sample BY ITS ROWS, never by the file name. The writer names files
+# after an allocated period identity (anaphase K-006 / B15), so
+# "$CAP_JOB.events.jsonl" no longer exists even though the period does — and a
+# name-based lookup would have failed the whole CAPABILITY check for a rename.
+EV_DIR="$WS_ROOT/.helix/events"
+CAP_FILE="$(node -e '
+  const fs = require("fs"), path = require("path");
+  const dir = process.argv[1], want = process.argv[2];
+  let hit = "";
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".events.jsonl")) continue;
+    const first = fs.readFileSync(path.join(dir, name), "utf8").split("\n").find(l => l.trim());
+    if (!first) continue;
+    let row; try { row = JSON.parse(first); } catch (e) { continue; }
+    const id = (row && row.period_id) || name.slice(0, -".events.jsonl".length);
+    if (id === want || (row && row.job_id) === want) { hit = path.join(dir, name); break; }
+  }
+  process.stdout.write(hit);
+' "$EV_DIR" "$CAP_JOB")"
 CAP_WANT_EVENTS=55
 CAP_WANT_TURNS=5
 

@@ -237,7 +237,10 @@
               // harmful: every message became a separate experience and the live
               // store showed it (the newest periods all had resume_from absent).
               // Continuity is the original intent, so it is restored.
-              if (j.job_id) Cx.setNav({ period: j.job_id });
+              /* The nav key is the period IDENTITY, not the digest: two runs of one
+               * input share `job_id`, and the list is keyed by `period_id` (B16).
+               * Falls back to the digest for a server that has not sent one yet. */
+              if (j.period_id || j.job_id) Cx.setNav({ period: j.period_id || j.job_id });
               finish(); return;
             }
           }

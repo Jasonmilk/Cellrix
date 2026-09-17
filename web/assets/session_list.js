@@ -140,11 +140,11 @@
     chain.forEach(function (p) {
       var div = document.createElement('div');
       /* N-004（钻石）：当前 period 在两个容器里都要可见地标示。旧式写法在证轨模式下恒假。 */
-      var sel = nav().period === p.job_id;
+      var sel = nav().period === p.period_id;
       div.className = 'ses-item' + (sel ? ' sel' : '');
       div.setAttribute('data-ts', p.first_ts || '');
       /* 行要自带身份，选中态才搬得动——否则只能重建整个列表来换高亮。 */
-      div.setAttribute('data-job', p.job_id);
+      div.setAttribute('data-job', p.period_id);
       if (sel) div.setAttribute('aria-current', 'true');
       /* `st` is this asset's module state object (st.sesSeq / st.histSeq) —
        * shadowing it here with a timestamp broke every later read in this
@@ -162,22 +162,22 @@
       var tag = '';
       div.innerHTML =
         '<div class="nm">' + tag + esc(nm) + '</div>' +
-        '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.job_id.slice(0, 12)) + '</span>' + mdl +
-        '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.job_id) + '" title="重命名">✎</button></span></div>' +
+        '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.period_id.slice(0, 12)) + '</span>' + mdl +
+        '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.period_id) + '" title="重命名">✎</button></span></div>' +
         preview + reply;
       div.onclick = function () {
         /* 一种语义（N-001）：把这段载进对话。证轨侧板若开着，它跟着 period 走——
          * 那是 shell 的 period 通知在做的事，不是这里的分支。 */
-        Cx.setNav({ period: p.job_id, meta: { job_id: p.job_id, name: p.name, preview: p.preview } });
+        Cx.setNav({ period: p.period_id, meta: { job_id: p.job_id, period_id: p.period_id, name: p.name, preview: p.preview } });
         moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
-        loadPeriodToChat(p.job_id);
-        setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
+        loadPeriodToChat(p.period_id);
+        setBanner('续接经历 <span class="tid">' + esc(p.period_id) + '</span> —— 下一句话延续这段对话');
         document.getElementById('chat-text').focus();
       };
       var rn = div.querySelector('[data-ren]');
       if (rn) rn.onclick = function (ev) {
         ev.stopPropagation();
-        beginRename(div, p.job_id, p.name || '');
+        beginRename(div, p.period_id, p.name || '');
       };
       box.appendChild(div);
     });
@@ -399,7 +399,7 @@
     fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
       var periods = (j.periods || []).slice(0, 8);
       list.innerHTML = periods.map(function (p) {
-        return '<div class="resume-opt" data-job="' + esc(p.job_id) + '">' + esc(autoName(p)) + ' <span class="dim">' + esc(p.job_id.slice(0, 20)) + '</span></div>';
+        return '<div class="resume-opt" data-job="' + esc(p.period_id) + '">' + esc(autoName(p)) + ' <span class="dim">' + esc(p.period_id.slice(0, 20)) + '</span></div>';
       }).join('') || '<div class="empty">尚无经历</div>';
       list.style.display = '';
       list.querySelectorAll('.resume-opt').forEach(function (el) {
