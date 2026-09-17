@@ -43,6 +43,10 @@
   #view-flows .fl-list .row:last-child { border-bottom:none; }
   #view-flows .fl-list .row .ts { font-family:ui-monospace,Menlo,monospace; }
   #view-flows .fl-empty { color:var(--text-3); font-size:12px; padding:18px 0; text-align:center; }
+  /* The exit layer puts its sentence in a <p>; without this the browser's
+   * default paragraph margin would make every empty line here taller. Same
+   * convention as `.empty p` in components.html. */
+  #view-flows .fl-empty p { margin:0; }
   #view-flows .fl-bar { display:flex; align-items:center; justify-content:space-between;
     margin-bottom:12px; }
   #view-flows .fl-refresh { min-width:44px; height:44px; padding:0 14px; }
@@ -92,32 +96,42 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  function zero(el, msg) { el.innerHTML = '<div class="fl-empty">' + esc(msg || '暂无数据') + '</div>'; }
+  /* Every empty/loading/failed slot on this desk goes through here, and here
+   * goes through the exit layer (ADR-0044). Before this, each of the eleven call
+   * sites carried its own sentence and none of them offered a way out.
+   *
+   * The wrapper class stays `.fl-empty`: this desk's empty line is a plain
+   * centred one while the shared `.empty` is a wide block, and swapping them
+   * would be a visual change smuggled in as a refactor. The exit layer supplies
+   * the sentence and the action, not the styling. */
+  function zero(el, state) {
+    window.CxWayout.render(el, state, { className: 'fl-empty' });
+  }
 
   function load() {
     var my = ++seq;
-    zero(document.getElementById('fl-route'), '加载中…');
-    zero(document.getElementById('fl-stats'), '加载中…');
-    zero(document.getElementById('fl-free'), '加载中…');
-    zero(document.getElementById('fl-paid'), '加载中…');
-    zero(document.getElementById('fl-recent'), '加载中…');
+    zero(document.getElementById('fl-route'), 'flows-loading');
+    zero(document.getElementById('fl-stats'), 'flows-loading');
+    zero(document.getElementById('fl-free'), 'flows-loading');
+    zero(document.getElementById('fl-paid'), 'flows-loading');
+    zero(document.getElementById('fl-recent'), 'flows-loading');
     fetch('/api/flows').then(function (r) { return r.json(); }).then(function (d) {
       if (my !== seq) return;
       renderFlows(d.flows);
       renderStats(d.stats);
     }).catch(function (e) {
       if (my !== seq) return;
-      zero(document.getElementById('fl-route'), '拉取失败: ' + e.message);
+      zero(document.getElementById('fl-route'), { code: 'flows-fetch-failed', detail: String(e.message || e) });
     });
   }
 
   function renderFlows(fm) {
     var routeEl = document.getElementById('fl-route');
     var badge = document.getElementById('fl-route-badge');
-    if (!fm) { zero(routeEl, 'FlowModus 未配置或不可达（--flowmodus-url）'); badge.textContent = '未配置'; badge.className = 'fl-badge warn'; return; }
+    if (!fm) { zero(routeEl, 'flowmodus-unconfigured'); badge.textContent = '未配置'; badge.className = 'fl-badge warn'; return; }
     var cur = fm.current || {};
     if (cur.error) {
-      zero(routeEl, '路由决策失败: ' + cur.error);
+      zero(routeEl, { code: 'route-decision-failed', detail: String(cur.error) });
       badge.textContent = '不可用'; badge.className = 'fl-badge warn';
     } else {
       routeEl.innerHTML =
@@ -138,7 +152,7 @@
   }
 
   function renderPool(el, list, isFree) {
-    if (!list.length) { zero(el, '暂无供应商（flowmodus supplier add）'); return; }
+    if (!list.length) { zero(el, 'providers-empty'); return; }
     el.innerHTML = list.map(function (s) {
       var m = (s.models || [])[0] || {};
       var b = m.billing || {};
@@ -156,7 +170,7 @@
 
   function renderStats(st) {
     var el = document.getElementById('fl-stats');
-    if (!st) { zero(el, 'Tuck 未配置或不可达（--tuck-endpoint）'); return; }
+    if (!st) { zero(el, 'tuck-unconfigured'); return; }
     var kinds = st.kinds || {};
     var req = kinds.request || 0;
     var resp = kinds.response || 0;
@@ -181,7 +195,7 @@
       '<h4 style="margin-top:10px">动作</h4>' + (actHtml || '<div class="fl-empty">无</div>');
     var rec = st.last_requests || [];
     var recEl = document.getElementById('fl-recent');
-    if (!rec.length) { zero(recEl, '暂无推理调用'); return; }
+    if (!rec.length) { zero(recEl, 'calls-empty'); return; }
     recEl.innerHTML = rec.map(function (r) {
       return '<div class="row"><span class="ts">#' + r.seq + '</span><span>' + esc(r.ts || '') + '</span>' +
         '<span>' + esc(r.destination || '') + '</span>' +
@@ -205,7 +219,23 @@
   window.CxFlows = { load: load };
 
   /* The shell never names a view it does not own — declare this view's enter
-   * hook here (ADR-0015 D8 follow-through). */
-  if (window.Cx && window.Cx.onEnter) window.Cx.onEnter('flows', load);
+   * hook here (ADR-0015 D8 follow-through).
+   *
+   * DEFERRED, and it has to be. This asset is assembled INSIDE `#view-flows`,
+   * which sits ABOVE every `<script>` in the page, so `window.Cx` does not exist
+   * yet when this line runs: the guarded registration evaluated to false and
+   * silently did nothing. Measured: the desk sat on its static 「加载中…」 from
+   * first paint until someone found the 刷新 button, because its enter hook had
+   * never been registered — a loading state with no way out, which is exactly the
+   * shape ADR-0044 §1.2 is about. prove_track.js defers for the same reason;
+   * this now matches it. */
+  function bindEnter() {
+    if (window.Cx && window.Cx.onEnter) { window.Cx.onEnter('flows', load); return true; }
+    return false;
+  }
+  if (!bindEnter()) {
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindEnter); }
+    else { bindEnter(); }
+  }
 })();
 </script>

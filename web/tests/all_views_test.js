@@ -418,6 +418,38 @@ function skip(label, why) {
       errors.slice(beforeHint, beforeHint + 2).join(" | "));
   }
 
+  /* ---- P1b: the empty/loading slots come from the exit layer --------------
+   *
+   * Before P1b the metering desk wrote its own sentence into each slot and
+   * offered nothing to do about it. Now every one of those slots is produced by
+   * `CxWayout`, carries `data-wo-kind`, and — if it reports a problem — carries
+   * a way out (N-011). Checked on the live page rather than the source, because
+   * "the code calls the resolver" and "the pixel shows a way out" are different
+   * claims and only the second one is the constraint.
+   */
+  console.log("-- the exit layer is what fills the empty slots (ADR-0044 P1b) --");
+  {
+    const desk = doc.getElementById("view-flows");
+    /* `div` + hasAttribute rather than an attribute selector: the DOM-contract
+     * scanner reads querySelector strings and would file `[data-wo-kind]` as a
+     * name the page declares somewhere, which it does not. */
+    const blocks = Array.from(desk.querySelectorAll("div"))
+      .filter((el) => el.hasAttribute("data-wo-kind"));
+    check("the desk's empty slots are produced by the exit layer", blocks.length > 0,
+      blocks.length + " block(s)");
+    const dead = blocks.filter((b) => {
+      const k = b.getAttribute("data-wo-kind");
+      return (k === "error" || k === "blocked") && !b.querySelector("button");
+    });
+    check("no problem slot on the desk is a dead end (N-011)", dead.length === 0,
+      dead.map((b) => b.getAttribute("data-wo-code")).join(", "));
+    check("every exit-layer block carries the code it resolved",
+      blocks.every((b) => !!b.getAttribute("data-wo-code")),
+      blocks.map((b) => b.getAttribute("data-wo-code")).join(", "));
+    console.log("        slots: " +
+      blocks.map((b) => b.getAttribute("data-wo-kind") + "/" + b.getAttribute("data-wo-code")).join(" · "));
+  }
+
   /* ---- N-009 the other way: a hash in the URL at boot --------------------
    *
    * The boot path is the one that has to wait for DOMContentLoaded, because the

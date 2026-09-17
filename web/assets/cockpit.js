@@ -14,7 +14,16 @@
     document.getElementById('tick').textContent = new Date().toLocaleTimeString();
     var box = document.getElementById('entries');
     if (!ledger.length) {
-      box.innerHTML = '<tr><td colspan="5"><div class="empty">暂无记录（Noop 模式 ledger 为空——配置 reasoning 后产生）</div></td></tr>';
+      /* Through the exit layer (ADR-0044): the sentence and the way out come
+       * from one place, and `.empty` is kept because it is already this
+       * cockpit's block. */
+      var td = document.createElement('td');
+      td.colSpan = 5;
+      td.appendChild(window.CxWayout.build('ledger-empty'));
+      var tr = document.createElement('tr');
+      tr.appendChild(td);
+      box.innerHTML = '';
+      box.appendChild(tr);
       return;
     }
     // 水之波光 Ledger 表格：状态/时间/trace_id/调用/说明 五列 + 点击展开 payload。

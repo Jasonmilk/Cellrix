@@ -46,7 +46,7 @@
 | `.nav` | base.html, script.html |
 | `nledger` | cockpit.html, cockpit.js |
 | `resume-list` | chat.html, session.html |
-| `s-side` | base.html, session.html |
+| `s-side` | base.html, prove_track.view.js, session.html |
 | `.ses-edit` | session.html |
 | `sub` | base.html, flows.html, script.html |
 | `.tbl-scroll` | cockpit.html, gleam.html |

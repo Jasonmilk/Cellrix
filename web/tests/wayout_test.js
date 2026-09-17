@@ -209,6 +209,23 @@ const SURFACES = ['shell', 'sessions', 'chat', 'prove-track', 'flows', 'cockpit'
   check('render survives a garbage state', !!W.render(host, { code: 'nope', detail: 'x' }));
   check('render replaces previous content rather than stacking it',
     host.querySelectorAll('p').length === 1, host.querySelectorAll('p').length + ' <p>');
+
+  /* ── build: each surface keeps its own wrapper ────────────────────────────
+   * `.empty` is a wide centred block and `.fl-empty` is a plain centred line.
+   * Imposing either on the other would be a visual change smuggled inside a
+   * refactor, so the wrapper is the caller's to choose. */
+  const made = W.build('chat-empty', { document: doc });
+  check('build makes a block without a host', !!made && made.tagName === 'DIV');
+  check('the default wrapper is the repo\'s established block', !!made && made.className === 'empty',
+    made && made.className);
+  const custom = W.build('flows-fetch-failed', { document: doc, className: 'fl-empty' });
+  check('a surface may keep its own wrapper class', !!custom && custom.className === 'fl-empty',
+    custom && custom.className);
+  check('build needs a document and says so instead of throwing',
+    W.build('chat-empty') === null && W.build('chat-empty', {}) === null);
+  W.render(host, 'chat-empty', { className: 'fl-empty' });
+  check('render forwards the wrapper choice',
+    host.firstChild.className === 'fl-empty', host.firstChild.className);
   dom.window.close();
 }
 

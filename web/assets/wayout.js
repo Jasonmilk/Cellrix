@@ -266,20 +266,27 @@
     };
   }
 
-  /* Render into an existing element. Returns the element it built (or null).
+  /* Build the block, with no host. Returns the element (or null with no document).
    *
    * Built with createElement rather than innerHTML: `detail` is untrusted text
    * (it comes from an exception), and the button has to be a real <button> so
    * it is reachable by keyboard — N-018 asks for a reachable focus, and a div
-   * with an onclick is not one. */
-  function render(el, state) {
-    if (!el || !el.ownerDocument) return null;
+   * with an onclick is not one.
+   *
+   * `opts.className` keeps each surface's OWN wrapper instead of forcing one on
+   * all of them: `.empty` is a wide centred block and `.fl-empty` is a plain
+   * centred line, and swapping either for the other is a visual change that has
+   * no business riding along inside a refactor. `opts.document` exists so that
+   * `render` can hand over its host's document and this never reaches for a
+   * global. */
+  function build(state, opts) {
+    opts = opts || {};
+    var doc = opts.document || (typeof document !== 'undefined' ? document : null);
+    if (!doc || typeof doc.createElement !== 'function') return null;
     var r = resolve(state);
-    var doc = el.ownerDocument;
-    while (el.firstChild) el.removeChild(el.firstChild);
 
     var box = doc.createElement('div');
-    box.className = 'empty';                       /* the established inline block */
+    box.className = opts.className || 'empty';
     box.setAttribute('data-wo-kind', r.kind);
     if (r.code) box.setAttribute('data-wo-code', r.code);
 
@@ -312,6 +319,19 @@
       box.appendChild(d);
     }
 
+    return box;
+  }
+
+  /* Clear `el` and put the block in it. Returns the block (or null when there is
+   * nowhere to render — a caller with no host gets null, never an exception). */
+  function render(el, state, opts) {
+    if (!el || !el.ownerDocument) return null;
+    var o = {}, k;
+    if (opts) { for (k in opts) { if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k]; } }
+    o.document = el.ownerDocument;
+    var box = build(state, o);
+    if (!box) return null;
+    while (el.firstChild) el.removeChild(el.firstChild);
     el.appendChild(box);
     return box;
   }
@@ -319,6 +339,7 @@
   window.CxWayout = {
     VERSION: VERSION,
     resolve: resolve,
+    build: build,
     render: render,
     has: function (code) { return !!entryOf(code); },
     codes: function () { return Object.keys(WORDS); },

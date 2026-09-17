@@ -120,6 +120,28 @@
         '<td class="e-dur">' + fmtDur(it.dur) + '</td>' +
         '<td class="e-tok">' + fmtTok(it.tok) + '</td></tr>';
     }
+    /* Nothing to draw. Before this the table simply went blank, which is
+     * indistinguishable from "still loading" and gives no way forward
+     * (ADR-0044 §1.2 listed it as the missing zero state). Which of the two it
+     * is depends on whether a filter is on, and the exit layer says so. */
+    if (!h) {
+      var code = S.q ? 'trajectory-no-match' : 'trajectory-no-rows';
+      var act = S.q
+        ? { run: function () { S.q = ''; $('eQ').value = ''; renderTable(); } }
+        : { label: '看左边的经历列表', run: function () {
+              var side = document.getElementById('s-side');
+              if (side && side.scrollIntoView) { side.scrollIntoView({ block: 'nearest' }); }
+            } };
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = COLS;
+      td.appendChild(window.CxWayout.build({ code: code, action: act }));
+      tr.appendChild(td);
+      $('eTbody').innerHTML = '';
+      $('eTbody').appendChild(tr);
+      updTbl();
+      return;
+    }
     $('eTbody').innerHTML = h;
     updTbl();
   }
