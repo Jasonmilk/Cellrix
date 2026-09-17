@@ -45,16 +45,50 @@
     return '经历 ' + when.date + ' ' + when.time + (when.secs ? ':' + when.secs : '');
   }
 
-  // `chatMode` drives the click behaviour: the chat sidebar loads the
-  // period's history into the chat space (resume), the prove_track sidebar
-  // opens its trajectory. One component, two intents [极致复用].
-  function renderSide(id, periods, empty, chatMode) {
+  /* ── 侧栏：**一个**组件，两种被显式选择的用途（ADR-0022 N3 / N-015 / N-016）──
+   *
+   * `chatMode` 参数没有了。它曾经让同一个组件在两个容器里**行为不同**：
+   *   * 证轨那侧的选中高亮恒为 false —— `(chatMode ? nav().period : null) === p.job_id`
+   *     在 chatMode 为假时永远不等，于是「当前 period 必须在视图内可见地标示」
+   *     （**N-004，钻石**）在证轨侧栏里被直接违反；
+   *   * 点一张卡做什么，取决于**它装在哪个容器里**，而不是取决于任何可见的东西。
+   *
+   * 现在模式只有一处真相：`nav().panel`（显式、可见、位置固定在侧栏顶部），
+   * 两个容器渲染同一个模式、同一条高亮、同一种点击语义。这就是 N-015 要求的
+   * 「两个入口行为一致」；把「渲染两遍」本身去掉是 P3b 的事。 */
+  function sidePanel() {
+    return nav().panel === 'track' ? 'track' : 'chat';
+  }
+
+  /* 今天仍有两个宿主（P3b 会只剩一个）。宿主清单由调用点给——组件不该知道谁在装它。 */
+  var HOSTS = [], LAST = null;
+
+  function renderSides(ids, periods, empty) {
+    HOSTS = (ids || []).filter(function (id) { return !!document.getElementById(id); });
+    LAST = { periods: periods, empty: empty };
+    rerenderSides();
+  }
+
+  function rerenderSides() {
+    if (!LAST) return;
+    HOSTS.forEach(function (id) {
+      if (document.getElementById(id)) renderOne(id, LAST.periods, LAST.empty);
+    });
+  }
+
+  function setSidePanel(p) {
+    if (window.Cx && Cx.state && Cx.state.nav) { Cx.state.nav.panel = (p === 'track') ? 'track' : 'chat'; }
+    rerenderSides();
+  }
+
+  function renderOne(id, periods, empty) {
     var box = document.getElementById(id);
     /* `empty` is an exit-layer STATE, not an HTML string: the sentence and the
      * action come from one place (ADR-0044). It used to be markup assembled at
      * the call site, which is how the same zero state came to have two
-     * derivations (here and in chat.html's static markup). */
+     * derivations (here and chat.html's static markup). */
     if (!periods.length) { window.CxWayout.render(box, empty); return; }
+    var panel = sidePanel();
     /* HISTORY, REVISED 2026-09-17. A previous revision removed grouping and
      * concluded "The model was wrong, not the code." That diagnosis was WRONG,
      * and it is recorded here rather than silently deleted.
@@ -79,19 +113,30 @@
     /* Flat, newest first — no grouping, no traversal yet. */
     var chain = periods.slice();
     var rootCount = periods.length;
-    var head = '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
-      (chatMode ? '<button type="button" class="btn btn-sm btn-ghost" id="btn-newchat">+ 新对话</button>' : '') +
+    var mode = '<div class="ses-mode" role="group" aria-label="点击一张卡做什么">' +
+      '<button type="button" class="btn btn-sm' + (panel === 'chat' ? ' on' : '') + '" data-panel="chat" aria-pressed="' + (panel === 'chat') + '">对话</button>' +
+      '<button type="button" class="btn btn-sm' + (panel === 'track' ? ' on' : '') + '" data-panel="track" aria-pressed="' + (panel === 'track') + '">证轨</button>' +
+      '</div>';
+    var head = mode + '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
+      (panel === 'chat' ? '<button type="button" class="btn btn-sm btn-ghost">+ 新对话</button>' : '') +
       '</div>';
     box.innerHTML = head;
-    var headEl = box.firstChild;
-    var nbtn = headEl && headEl.querySelector('#btn-newchat');
-    if (nbtn) nbtn.onclick = function (ev) {
-      ev.stopPropagation();
-      newChat();
-    };
+    /* 头部此刻只有这三个按钮（行还没插进去）。模式开关与「新对话」共用一条接线，
+     * 靠 `data-panel` 区分——不用 id，因为同样的控件会出现两份，而 id 只能有一份。 */
+    var btns = box.getElementsByTagName('button');
+    for (var bi = 0; bi < btns.length; bi++) {
+      (function (b) {
+        var want = b.getAttribute('data-panel');
+        b.onclick = function (ev) {
+          ev.stopPropagation();
+          if (want) { setSidePanel(want); } else { newChat(); }
+        };
+      })(btns[bi]);
+    }
     chain.forEach(function (p) {
       var div = document.createElement('div');
-      var sel = (chatMode ? nav().period : null) === p.job_id;
+      /* N-004（钻石）：当前 period 在两个容器里都要可见地标示。旧式写法在证轨模式下恒假。 */
+      var sel = nav().period === p.job_id;
       div.className = 'ses-item' + (sel ? ' sel' : '');
       div.setAttribute('data-ts', p.first_ts || '');
       /* `st` is this asset's module state object (st.sesSeq / st.histSeq) —
@@ -114,10 +159,10 @@
         '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.job_id) + '" title="重命名">✎</button></span></div>' +
         preview + reply;
       div.onclick = function () {
-        if (chatMode) {
+        if (sidePanel() === 'chat') {
           // 恢复进度到对话空间（DSH：点击会话 = 回放过去 + 从此续写）
           Cx.setNav({ period: p.job_id });
-          renderSide('chat-side', periods, empty, true);
+          rerenderSides();
           loadPeriodToChat(p.job_id);
           setBanner('续接经历 <span class="tid">' + esc(p.job_id) + '</span> —— 下一句话延续这段对话');
           document.getElementById('chat-text').focus();
@@ -386,7 +431,7 @@
 
   window.CxSessionList = {
     esc: esc,
-    renderSide: renderSide,
+    renderSides: renderSides,
     toggleResume: toggleResume,
     newChat: newChat
   };

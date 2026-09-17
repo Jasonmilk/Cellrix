@@ -111,7 +111,7 @@
    * three assets, and the view existed only as `style.display`. The address bar,
    * the sidebar and the trajectory could therefore each hold a different idea of
    * where we are, and nothing could report which one was current. */
-  var STATE = { nav: { view: null, period: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
+  var STATE = { nav: { view: null, period: null, panel: 'chat' }, sesSeq: 0, histSeq: 0, chatBusy: false };
   var NAV = STATE.nav;
 
   function hashFor(state) {

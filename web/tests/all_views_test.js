@@ -209,14 +209,39 @@ function skip(label, why) {
     const KEY = JOB.slice(0, 12); // session.html renders job_id.slice(0, 12)
     const row = items.find((el) => el.textContent.includes(KEY)) || items[0];
     const before = errors.length;
+
+    /* P3a: what a row means is now an EXPLICIT mode, not a property of which
+     * container the row happens to be in. So this drives the mode switch first —
+     * and that is the point of the change: the active semantics is visible and
+     * chosen, instead of being implied by the surrounding view. */
+    const modeBtn = Array.from(doc.querySelectorAll("#s-side button"))
+      .find((b) => b.getAttribute("data-panel") === "track");
+    check("the sidebar offers an explicit mode switch (N-015)", !!modeBtn,
+      Array.from(doc.querySelectorAll("#s-side button"))
+        .map((b) => b.getAttribute("data-panel") || "?").join(","));
+    if (modeBtn) modeBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+
     row.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     await sleep(1800);
     const view = doc.getElementById("view-prove-track");
-    check("row click switched to prove-track", view && view.style.display !== "none");
+    check("with 证轨 chosen, a row click opens the trajectory", view && view.style.display !== "none");
     check("prove-track rendered real content", view && view.textContent.trim().length > 200,
       view ? view.textContent.trim().length + " chars" : "n/a");
     check("no errors from the row click", errors.length === before,
       errors.slice(before).join(" | "));
+
+    /* N-004 is a DIAMOND: the current period must be visibly marked. It was
+     * violated in the trajectory sidebar before P3a — the old expression made
+     * `sel` false whenever that container rendered, so the row you had just
+     * chosen carried no marker at all. Both containers are checked, because
+     * "marked in one of the two lists" is exactly the state that shipped. */
+    const marked = (host) => Array.from(doc.querySelectorAll(host + " .ses-item"))
+      .filter((el) => el.className.split(" ").indexOf("sel") >= 0).length;
+    check("the chosen period is marked in the trajectory sidebar (N-004)",
+      marked("#s-side") === 1, marked("#s-side") + " marked");
+    check("the chosen period is marked in the chat sidebar too (N-004)",
+      marked("#chat-side") === 1, marked("#chat-side") + " marked");
 
     // Chrome-only scope: conversation payloads legitimately carry CJK.
     const chromeText = [

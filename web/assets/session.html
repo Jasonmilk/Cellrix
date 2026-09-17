@@ -55,8 +55,8 @@
               if (t) t.focus();
             } } }
         : { code: 'sessions-unconfigured' };
-      L.renderSide('s-side', periods, empty, false);
-      L.renderSide('chat-side', periods, empty, true);
+      /* 宿主清单由调用点给：今天两个（P3b 会只剩一个），两个渲染的是同一份模式。 */
+      L.renderSides(['s-side', 'chat-side'], periods, empty);
     }).catch(function (e) {
       if (seq !== st.sesSeq) return;
       /* 就地给出路：重试 = 再拉一次（本函数自己）。注意这个 catch 曾经把

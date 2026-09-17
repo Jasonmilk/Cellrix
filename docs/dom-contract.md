@@ -30,7 +30,6 @@
 | `.act` | session_list.js |
 | `audit` | base.html, gleam.html |
 | `.body` | chat.js |
-| `btn-newchat` | session_list.js |
 | `.btn:not(` | gleam.html |
 | `.chat-input` | chat.html, chat.js |
 | `chat-msgs` | chat.html, chat.js, session_list.js |
