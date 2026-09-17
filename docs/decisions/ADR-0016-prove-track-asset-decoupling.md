@@ -71,6 +71,7 @@
 
 - 不改任何行为、不改任何视觉、不改任何线协议或 API 契约——纯结构搬迁。
 - 不回溯改名 `tokens.html` / `components.html` / `gleam.html` / `script.html` / `session.html`（命名不一致属历史遗留，另议）。
+  > **2026-09-17 追记（记录，不重写）**：`components.html` 后来因**越过 `DNA` 铁律 2 的 400 行**（448 行）被按职责拆为 `components.core / chat / sessions / track / degrade` 五件——那是 400 行红线要求的解耦，**不是本条禁止的那种「为命名一致性而回溯改名」**。本条关于命名的推迟**不变**：五件仍用 `.html` 扩展名，命名不一致的老问题照旧另议。拆分的等价性由「去壳拼接 == 原 CSS，逐行相同」证明。
 - 不把证轨组件沉淀到 lumtract（ADR-0015 D14 曾把会话组件沉淀为 `lumtact-sessions.css`；证轨组件沉淀是独立议题）。
 - 不引入模块加载器 / 打包器 / 构建步骤（DNA 原则 2 极致解耦 + 零构建依赖）。
 

@@ -1,0 +1,132 @@
+<style>
+  /* ================================================================
+     水之波光组件资产（Cellrix 子集）—— 卷四实例档案实现
+     每个组件 = 一条约束链的可见末端。降级是重协商，不是删除。
+     ================================================================ */
+  /* ---------- 按钮体系 ----------
+     [PHYS:P-010] 热区 44px · [PHYS:R-001] 状态互斥（背景覆盖非叠加）
+     [PHYS:L-003] 一次一个最高意图 · 涟漪 currentColor 同源 */
+  .btn { position:relative; overflow:hidden; display:inline-flex; align-items:center;
+    justify-content:center; gap:8px; min-height:44px; min-width:64px; padding:0 16px;
+    border:1px solid transparent; border-radius:var(--r-md); font:inherit; font-size:13px;
+    font-weight:500; cursor:pointer; user-select:none; white-space:nowrap;
+    background:var(--surface-sunk); color:var(--text);
+    transition:background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+               color var(--dur) var(--ease), transform 90ms var(--ease); }
+  .btn:hover { background:var(--surface-hover); }
+  .btn:active { background:var(--surface-press); transform:scale(.985); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn:disabled { background:var(--surface-sunk); color:var(--text-3); opacity:.55;
+    cursor:not-allowed; pointer-events:none; }
+  .btn.on { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+  .btn-primary { background:var(--accent); color:var(--on-accent); box-shadow:var(--shadow-1); }
+  .btn-primary:hover { background:var(--accent-hover); }
+  .btn-primary:active { background:var(--accent-press); }
+  .btn-secondary { background:var(--surface); border-color:var(--line-strong); }
+  .btn-ghost { background:transparent; color:var(--text); }
+  .btn-ghost:hover { background:var(--accent-soft); }
+  .btn-danger { background:var(--danger); color:var(--on-danger); box-shadow:var(--shadow-1); }
+  .btn-danger:hover { background:var(--danger-hover); }
+  .btn-sm { min-height:44px; padding:0 14px; font-size:12px; }
+  .btn-icon { min-width:44px; padding:0; }
+  /* 涟漪：currentColor 与前景同源，实心按钮无需「白涟漪」特例 [FIX-02] */
+  .ripple { position:absolute; border-radius:50%; pointer-events:none; background:currentColor;
+    opacity:.24; transform:translate(-50%,-50%) scale(0); animation:ripple 460ms var(--ease) forwards; }
+  @keyframes ripple { 0%{ transform:translate(-50%,-50%) scale(0); opacity:.26; }
+    55%{ opacity:.17; } 100%{ transform:translate(-50%,-50%) scale(2.6); opacity:0; } }
+  /* reduced-motion 下涟漪降级：无位移的明暗起伏 [FIX-12]
+     「反馈必须存在」不可降级 —— 去位移，留反馈 */
+  .ripple-static { position:absolute; inset:0; pointer-events:none; background:currentColor;
+    opacity:.20; animation:rippleStatic 200ms var(--ease) forwards; }
+  @keyframes rippleStatic { from{ opacity:.20; } to{ opacity:0; } }
+  .spin { width:15px; height:15px; border-radius:50%; border:2px solid currentColor;
+    border-top-color:transparent; animation:spin 720ms linear infinite; }
+  @keyframes spin { to{ transform:rotate(360deg); } }
+
+  /* ---------- 输入框 ----------
+     [PHYS:P-010] 44px · 聚焦光环 200ms [PHYS:P-005] · 颜色非唯一区分 [PHYS:L-001] */
+  .inp { width:100%; min-height:44px; padding:0 12px; border:1px solid var(--line-strong);
+    border-radius:var(--r-md); background:var(--surface); color:var(--text); font:inherit; font-size:13px;
+    transition:border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+               background var(--dur) var(--ease); }
+  .inp::placeholder { color:var(--text-dim); opacity:.75; }
+  .inp:hover { background:var(--surface-hover); }
+  .inp:focus { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .inp:disabled { background:var(--surface-sunk); color:var(--text-dim); cursor:not-allowed; }
+
+  /* ---------- 标签与徽标 ----------
+     [PHYS:L-002] 语义色 + 文字双编码 · [PHYS:C-004] 红-危险稳定 */
+  .badge { display:inline-flex; align-items:center; font-size:11px; font-weight:600;
+    padding:2px 8px; border-radius:999px; border:1px solid currentColor; }
+  .badge.ok { color:var(--ok); } .badge.warn { color:var(--warn); }
+  .badge.risk { color:var(--risk); } .badge.info { color:var(--accent); }
+  .badge.partner { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+  .badge.drive { color:var(--ok); border-color:var(--ok); }
+  .badge.survive { color:var(--risk); border-color:var(--risk); }
+  .badge.live { color:var(--ok); }
+  .tag { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:500; }
+  .tag::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
+  .tag.ok { color:var(--ok); } .tag.warn { color:var(--warn); } .tag.risk { color:var(--risk); }
+  /* 语义 chip：单色相（accent 系）分级亮度 [PHYS:L-002] 语义 + 收敛 */
+  .chip { display:inline-flex; align-items:center; font-size:10px; padding:2px 8px; border-radius:999px;
+    border:1px solid var(--line); color:var(--text-dim); background:var(--surface-sunk);
+    font-weight:600; white-space:nowrap; }
+  .chip.tier-L0 { color:var(--text-dim); }
+  .chip.tier-L1 { color:var(--accent); }
+  .chip.tier-L2 { color:var(--accent); background:var(--accent-soft); }
+  .chip.tier-L3 { color:var(--accent); background:var(--accent-soft); border-color:var(--accent); }
+  .chip.mnode { color:var(--accent); background:var(--accent-soft); }
+  .chip.none { background:transparent; color:var(--text-dim); }
+  .chip.gate.hard { color:var(--risk); background:var(--danger-soft); border-color:var(--danger); }
+  .chip.gate.soft { color:var(--warn); background:rgba(138,90,0,.10); border-color:var(--warn); }
+  .chip.judge { color:var(--accent); background:var(--accent-soft); }
+  .chip.e-ok { color:var(--ok); background:rgba(30,122,69,.10); border-color:transparent; }
+  .chip.e-warn { color:var(--warn); background:rgba(138,90,0,.10); border-color:transparent; }
+  .chip.e-bad { color:var(--risk); background:var(--danger-soft); border-color:transparent; }
+
+  /* ---------- 表格体系 ----------
+     [PHYS:P-014] 裁切可见（滚动指示）· [PHYS:D-003] 表头线 2px
+     [FIX-09] ≤620px 转纵向卡片堆叠（data-label 标签在上/值在下）
+     [FIX-11] 粘性表头真正生效（容器可纵向滚动） */
+  .tbl-shell { position:relative; background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--r-lg); overflow:hidden; }
+  .tbl-shell::before, .tbl-shell::after {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:2;
+    background-repeat:no-repeat; opacity:0; transition:opacity 160ms var(--ease);
+    border-radius:calc(var(--r-lg) - 1px); }
+  .tbl-shell::before { background-image:var(--fade-l); background-size:var(--fade-w) 100%; background-position:left center; }
+  .tbl-shell::after  { background-image:var(--fade-r); background-size:var(--fade-w) 100%; background-position:right center; }
+  .tbl-shell[data-more-l="1"]::before { opacity:1; }
+  .tbl-shell[data-more-r="1"]::after  { opacity:1; }
+  .tbl-scroll { overflow:auto; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
+  .tbl-scroll:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+  .tbl-scroll table { width:100%; border-collapse:collapse; font-size:13px; min-width:760px; }
+  .tbl-scroll thead th { position:sticky; top:0; z-index:1; background:var(--surface-sunk);
+    color:var(--text-dim); font-size:11px; font-weight:600; letter-spacing:.4px; text-align:left;
+    padding:10px 14px; white-space:nowrap; border-bottom:2px solid var(--line-strong); }
+  .tbl-scroll tbody td { padding:0 14px; min-height:44px; height:44px; border-bottom:1px solid var(--line);
+    white-space:nowrap; vertical-align:middle; }
+  .tbl-scroll tbody tr:last-child td { border-bottom:0; }
+  .tbl-scroll tbody tr:not(.lt-exp):hover td { background:var(--surface-hover); cursor:pointer; }
+  .tbl-scroll tbody tr.lt-open td { background:var(--accent-soft); }
+  .lt-c-ts { color:var(--text-dim); font-variant-numeric:tabular-nums; }
+  .lt-c-tid { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; color:var(--text-dim); }
+  .lt-c-call { color:var(--text); }
+  .lt-c-note { color:var(--text-dim); }
+  /* 展开行：payload 全宽，标签在上/值在下不再适用 —— 内容即全部 */
+  .lt-exp { display:table-row; }
+  .lt-exp[hidden] { display:none; }
+  .lt-exp td { padding:0 14px 12px; height:auto; background:var(--surface-sunk); cursor:default; }
+  .lt-exp pre { white-space:pre-wrap; word-break:break-all; font-size:11px;
+    font-family:ui-monospace,Menlo,Consolas,monospace; color:var(--text);
+    border:1px solid var(--line); border-radius:var(--r-md); padding:10px; margin:8px 0 0; }
+
+  /* ---------- 空态：没有内容，也要自证 [PHYS:P-014] [PHYS:C-002] ---------- */
+  .empty { max-width:480px; text-align:center; padding:26px 18px; margin:12px auto;
+    border:1px dashed var(--line-strong); border-radius:var(--r-md); background:var(--surface); }
+  .empty .orb { width:44px; height:44px; margin:0 auto 12px; border-radius:50%;
+    background:var(--accent-soft); display:grid; place-items:center; color:var(--accent); }
+  .empty b { display:block; font-size:14px; margin-bottom:4px; color:var(--text); }
+  .empty p { margin:0; font-size:12.5px; color:var(--text-dim); }
+
+</style>

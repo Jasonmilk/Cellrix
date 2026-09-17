@@ -1,0 +1,67 @@
+<style>
+  /* ---------- TIER 降级阶梯（运行时探针设置 data-tier） ----------
+     T1：流转缩短（FPS<46）· T2：停流转（FPS<28 或 reduced-motion）
+     反馈权/识读权永不降级 [卷三 3.5.4] */
+  html[data-tier="T1"] * { transition-duration:120ms!important; }
+  html[data-tier="T2"] * { animation:none!important; transition:none!important; }
+  html[data-tier="T2"] .ripple, html[data-tier="T2"] .ripple-static { display:none!important; }
+
+  /* 等待可视化：不可降级 [PHYS:C-003] */
+  .loading { display:inline-block; width:12px; height:12px; border:2px solid var(--line);
+    border-top-color:var(--accent); border-radius:50%; animation:spin 720ms linear infinite; }
+
+  /* ---------- 降级 · reduced-motion：流转权降级，识读/反馈保留 ---------- */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after { animation-duration:1ms!important; animation-iteration-count:1!important;
+      transition-duration:1ms!important; }
+    .spin, .loading { animation:spin 720ms linear infinite!important; }
+  }
+  /* ---------- 降级 · 高对比：半透明剥离，实色边界承担层级 ---------- */
+  @media (prefers-contrast:more){
+    :root { --line:#8A9099; --line-strong:#4A5058; --text-dim:#33383F;
+      --accent:#14506F; --danger:#96271A; --accent-soft:transparent; --danger-soft:transparent;
+      --fade-l:none; --fade-r:none; --shim:transparent; }
+    [data-theme="dark"] { --line:#7A8089; --line-strong:#A8AEB6; --text-dim:#C7CDD4;
+      --accent:#8FC8E8; --danger:#F5A192; }
+    .panel, .ses-item, .btn, .msg, .chip, .tbl-shell { border-width:2px; }
+    .tbl-shell::before, .tbl-shell::after { display:none; }
+  }
+  /* ---------- 降级 · forced-colors：裁切自证回归滚动条原生通道 ---------- */
+  @media (forced-colors:active){
+    .btn, .panel, .tbl-shell { border:1px solid CanvasText; }
+    .tbl-shell::before, .tbl-shell::after { display:none; }
+    .tbl-scroll { scrollbar-color:CanvasText Canvas; scrollbar-width:auto; }
+  }
+  /* ---------- 降级 · 窄屏（≤620px）：表格转纵向卡片堆叠 [FIX-09] ----------
+     标签在上（--text-dim · 400 · 11px）/ 值在下（--text）—— 识读权保留，
+     显著性收敛 [PHYS:L-001]。横向滚动在此侵蚀识读权，故换手段。 */
+  @media (max-width:620px){
+    .tbl-scroll table { min-width:0; display:block; }
+    .tbl-scroll thead { position:absolute; width:1px; height:1px; overflow:hidden;
+      clip:rect(0 0 0 0); }
+    .tbl-scroll tbody { display:block; }
+    .tbl-scroll tbody tr { display:block; position:relative; border-bottom:2px solid var(--line-strong);
+      padding:10px 14px 8px; }
+    .tbl-scroll tbody tr:last-child { border-bottom:0; }
+    .tbl-scroll tbody td { display:flex; flex-direction:column; align-items:flex-start;
+      justify-content:center; gap:2px; height:auto; min-height:36px; padding:5px 0;
+      border-bottom:1px solid var(--line); white-space:normal; text-align:left; }
+    .tbl-scroll tbody tr td:last-child { border-bottom:0; padding-top:8px; }
+    .tbl-scroll tbody td::before { content:attr(data-label); font-size:11px; font-weight:400;
+      color:var(--text-dim); letter-spacing:.3px; opacity:.85; }
+    /* 第一列自明（状态 chip 自带文字），无需列名 */
+    .tbl-scroll tbody td:first-child::before { display:none; }
+    .tbl-scroll tbody tr:hover td { background:transparent; }
+    .tbl-shell::before, .tbl-shell::after { display:none!important; }
+    .lt-exp td { display:block; }
+    .lt-exp td::before { display:none; }
+  }
+  /* ---------- 降级 · 窄屏（≤800px）：侧栏单列 [PHYS:P-012] ---------- */
+  @media (max-width:800px){
+    .prove-track-main { grid-template-columns:1fr; }
+    .ses-side { border-right:0; padding-right:0; max-height:220px; }
+    .chat-grid { flex-direction:column; }
+    .chat-grid > .ses-side { width:auto; flex-shrink:1; max-height:120px; }
+    body { padding:12px; }
+  }
+</style>

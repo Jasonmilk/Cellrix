@@ -35,7 +35,11 @@ const BOOT_JSON: &str = include_str!("../assets/boot.json");
 const EMBEDDED: &[(&str, &str)] = &[
     ("base.html", include_str!("../assets/base.html")),
     ("tokens.html", include_str!("../assets/tokens.html")),
-    ("components.html", include_str!("../assets/components.html")),
+    ("components.core.html", include_str!("../assets/components.core.html")),
+    ("components.chat.html", include_str!("../assets/components.chat.html")),
+    ("components.sessions.html", include_str!("../assets/components.sessions.html")),
+    ("components.track.html", include_str!("../assets/components.track.html")),
+    ("components.degrade.html", include_str!("../assets/components.degrade.html")),
     ("cockpit.html", include_str!("../assets/cockpit.html")),
     ("chat.html", include_str!("../assets/chat.html")),
     ("prove_track.html", include_str!("../assets/prove_track.html")),
@@ -205,7 +209,11 @@ mod tests {
     /// only a mechanism regression can separate them.
     const LEGACY: &[(&str, &str)] = &[
         ("__TOKENS__", "tokens.html"),
-        ("__COMPONENTS__", "components.html"),
+        ("__COMPONENTS_CORE__", "components.core.html"),
+        ("__COMPONENTS_CHAT__", "components.chat.html"),
+        ("__COMPONENTS_SESSIONS__", "components.sessions.html"),
+        ("__COMPONENTS_TRACK__", "components.track.html"),
+        ("__COMPONENTS_DEGRADE__", "components.degrade.html"),
         ("__COCKPIT__", "cockpit.html"),
         ("__CHAT__", "chat.html"),
         ("__PROVE_TRACK__", "prove_track.html"),

@@ -10,7 +10,7 @@
 | 事实                                                      | 出处 / 实测                                                  |
 | ------------------------------------------------------- | -------------------------------------------------------- |
 | 页面**整体滚动**（没有 app-shell 高度链）                            | 视图容器 `#view-*` 无确定高度 ⇒ 子元素无法 `flex:1` 填满                 |
-| 对话两栏 `240px + 1fr`                                      | `components.html` `.chat-grid`                           |
+| 对话两栏 `240px + 1fr`                                      | `components.chat.html` `.chat-grid`                      |
 | 两个面板的**窗口**上限是 `--pane-h: min(70vh,720px)`              | 本轮临时收敛（原为 `420px` / `480px` 两个常数，各自裁掉 581px / 6254px 内容） |
 | 证轨：侧栏 `240px` + 主区；三轨条高 `24px`，标签列固定 `58px`             | `prove_track.css`                                        |
 | 检查器：`min(430px,100vw)` `position:fixed`；**<1180px 转模态** | `prove_track.css`，`all_views_test.js` 断言 `aria-modal`    |

@@ -11,7 +11,11 @@
   ],
   "pieces": [
     { "id": "tokens",              "placeholder": "__TOKENS__",            "asset": "tokens.html" },
-    { "id": "components",          "placeholder": "__COMPONENTS__",        "asset": "components.html" },
+    { "id": "components_core",           "placeholder": "__COMPONENTS_CORE__",   "asset": "components.core.html" },
+    { "id": "components_chat",           "placeholder": "__COMPONENTS_CHAT__",   "asset": "components.chat.html" },
+    { "id": "components_sessions",       "placeholder": "__COMPONENTS_SESSIONS__", "asset": "components.sessions.html" },
+    { "id": "components_track",          "placeholder": "__COMPONENTS_TRACK__",  "asset": "components.track.html" },
+    { "id": "components_degrade",        "placeholder": "__COMPONENTS_DEGRADE__", "asset": "components.degrade.html" },
     { "id": "cockpit",             "placeholder": "__COCKPIT__",           "asset": "cockpit.html" },
     { "id": "chat",                "placeholder": "__CHAT__",              "asset": "chat.html" },
     { "id": "prove_track",         "placeholder": "__PROVE_TRACK__",       "asset": "prove_track.html" },

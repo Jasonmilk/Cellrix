@@ -1,0 +1,42 @@
+<style>
+  /* ---------- 事件行与证轨共享行（驾驶舱详情 / 会话） ---------- */
+  .ev-row { padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px;
+    display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; min-height:36px; }
+  .ev-row:hover { background:var(--surface-hover); }
+  .ev-row .badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px;
+    letter-spacing:.5px; background:var(--surface-sunk); color:var(--text-dim);
+    border:1px solid var(--line); }
+  .ev-row .badge.verdict-status { color:var(--risk); border-color:var(--danger); }
+  .ev-row .body { color:var(--text); word-break:break-all; }
+  .ev-row .ok { color:var(--ok); } .ev-row .bad { color:var(--risk); }
+  .row { padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px; cursor:pointer;
+    display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; min-height:36px; }
+  .row:hover { background:var(--surface-hover); }
+  .row.sel { background:var(--accent-soft); }
+  .row .seq { color:var(--text-dim); }
+  .row .kind { color:var(--accent); font-weight:600; }
+  .row .tid { color:var(--text-dim); }
+  .row .ok { color:var(--ok); } .row .bad { color:var(--risk); }
+  .grp-head { padding:8px 12px; font-size:12px; cursor:pointer; background:var(--surface-sunk);
+    border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:baseline; user-select:none; }
+  .grp-head:hover { background:var(--surface-hover); }
+  .grp-head .arrow { color:var(--accent); width:12px; display:inline-block;
+    transition:transform var(--dur) var(--ease); }
+  .grp-head.open .arrow { transform:rotate(90deg); }
+  .grp-head .tid { color:var(--accent); font-weight:600; }
+  .grp-body .row { padding-left:22px; }
+  .detail { padding:12px; font-size:12px; }
+  .detail .line { margin-bottom:6px; display:flex; gap:8px; flex-wrap:wrap; }
+  .detail .key { color:var(--text-dim); min-width:90px; }
+  .detail .val { color:var(--text); word-break:break-all; }
+  .detail pre { margin-top:8px; background:var(--surface-sunk); border:1px solid var(--line);
+    border-radius:var(--r-md); padding:10px; font-size:11px; overflow-x:auto; max-height:260px;
+    color:var(--text); white-space:pre-wrap; word-break:break-all; }
+  .redact { color:var(--risk); background:var(--danger-soft); border-radius:3px;
+    padding:0 3px; font-weight:600; white-space:nowrap; }
+  .sha { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10px; color:var(--text-dim); }
+  .sa-core { color:var(--accent); font-weight:600; }
+  .mnode { color:var(--accent); }
+  .period-head { padding:8px 12px; font-size:11px; color:var(--text-dim); border-bottom:1px solid var(--line); }
+
+</style>
