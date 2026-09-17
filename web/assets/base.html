@@ -58,10 +58,12 @@
     <main class="fxMain" id="uxMain">
       <div class="fxMainHd">
         <nav class="nav" aria-label="视图">
-          <button type="button" class="btn on" id="v-cockpit" data-view="cockpit">驾驶舱 Cockpit</button>
-          <button type="button" class="btn" id="v-prove-track" data-view="prove-track">证轨 ProveTrack</button>
-          <button type="button" class="btn" id="v-chat" data-view="chat">对话 Chat</button>
-          <button type="button" class="btn" id="v-flows" data-view="flows">检定台 Flows</button>
+          <!-- 每个视图"是干什么的"写在 title 上：导航因此解释用途，而不必让每个视图
+               自己常驻一行说明（那几行与这里的标签重复，各占 22px）。 -->
+          <button type="button" class="btn on" id="v-cockpit" data-view="cockpit" title="生态态势 · Anaphase 快照（ADR-0010）· Ledger 白盒审计链">驾驶舱 Cockpit</button>
+          <button type="button" class="btn" id="v-prove-track" data-view="prove-track" title="全链路可审计证轨（会话 = 经历 · 判据与行动同线）">证轨 ProveTrack</button>
+          <button type="button" class="btn" id="v-chat" data-view="chat" title="伙伴模式 · 单周期一轮 · 走 Tuck 网关审计">对话 Chat</button>
+          <button type="button" class="btn" id="v-flows" data-view="flows" title="供应商池与路由 · 审计统计">检定台 Flows</button>
         </nav>
         <span class="foot">auto __REFRESH__s · <span id="audit" class="tag ok">…</span>
           <a href="/api/snapshot">snapshot</a> · <a href="/api/audit">audit</a></span>

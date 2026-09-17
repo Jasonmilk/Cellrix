@@ -41,7 +41,6 @@
 | `.empty` | base.html, chat.html, chat.js, cockpit.html |
 | `entries` | cockpit.html, cockpit.js |
 | `episode` | cockpit.html, cockpit.js |
-| `.fl-bar` | flows.html |
 | `.inp` | chat.html, session_list.js |
 | `mode` | base.html, script.html |
 | `.nav` | base.html, script.html |
@@ -197,7 +196,6 @@
 | `.fxSideBody` | base.html |
 | `.fxSideFt` | base.html |
 | `.fxSideHd` | base.html |
-| `.head` | chat.html, cockpit.html, flows.html |
 | `.ico` | prove_track.html |
 | `.info` | base.html |
 | `.input` | prove_track.html |
@@ -240,7 +238,6 @@
 | `v-prove-track` | base.html |
 | `view-chat` | base.html |
 | `view-cockpit` | base.html |
-| `.view-head` | cockpit.html |
 
 ## 维护
 

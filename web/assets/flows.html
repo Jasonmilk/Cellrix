@@ -55,7 +55,6 @@
   }
 </style>
 
-<div class="head" style="margin-bottom:12px">检定台 Flows — 供应商池与路由 · 审计统计（水之波光 v11.2.0 血统）</div>
 
 <div class="fl-body">
   <div class="fl-card">
@@ -205,16 +204,16 @@
   }
 
   // 触境：刷新按钮 → 重新拉取（行结构铁轨，就地更新）
-  var bar = view.querySelector('.fl-bar');
+  // 锚点是视图容器的**第一个子元素**，不是某个 `.head`——那行说明已经移进导航的
+  // title（它以前在这里被当作锚点，删掉它就让本资产在启动时抛 null.parentNode）。
   var btn = document.createElement('button');
   btn.type = 'button'; btn.className = 'btn fl-refresh'; btn.textContent = '刷新';
   btn.onclick = load;
-  var head = view.querySelector('.head');
   var headRow = document.createElement('div');
   headRow.className = 'fl-bar';
   headRow.appendChild(document.createElement('span'));
   headRow.appendChild(btn);
-  head.parentNode.insertBefore(headRow, head.nextSibling);
+  view.insertBefore(headRow, view.firstChild);
 
   window.CxFlows = { load: load };
 

@@ -60,21 +60,26 @@ const SELF_CONTAINED = [
  * test because it looks like coverage. Override with CELLRIX_PANEL. */
 const PANEL = process.env.CELLRIX_PANEL || 'http://127.0.0.1:8080';
 
-function panelReachable() {
-  let host = '127.0.0.1', port = 80;
-  try { const u = new URL(PANEL); host = u.hostname; port = u.port || 80; } catch { return false; }
-  try {
-    execFileSync(process.execPath, ['-e',
-      'const s=require("net").connect(' + Number(port) + ',' + JSON.stringify(host) + ');' +
-      's.on("connect",()=>{s.end();process.exit(0)});' +
-      's.on("error",()=>process.exit(1));' +
-      'setTimeout(()=>process.exit(1),1500);'
-    ], { stdio: 'ignore' });
-    return true;
-  } catch { return false; }
+/* 可达性探针：**超时要宽、失败要重试**。
+ *
+ * 实测三次（面板两次、浏览器一次）：单一 1500ms 的探测会在机器忙时偶发失败，而
+ * 失败一侧的后果是"套件静默消失"——本文件头一句讲的正是这个形状。探不到就等于
+ * 没覆盖，所以宁可贵一点：4 秒 × 2 次。 */
+function reachable(url, defPort, tries = 2) {
+  let host = '127.0.0.1', port = defPort;
+  try { const u = new URL(url); host = u.hostname; port = u.port || defPort; } catch { return false; }
+  const probe = 'const s=require("net").connect(' + Number(port) + ',' + JSON.stringify(host) + ');' +
+    's.on("connect",()=>{s.end();process.exit(0)});' +
+    's.on("error",()=>process.exit(1));' +
+    'setTimeout(()=>process.exit(1),4000);';
+  for (let i = 0; i < tries; i++) {
+    try { execFileSync(process.execPath, ['-e', probe], { stdio: 'ignore' }); return true; }
+    catch { /* 再试一次 */ }
+  }
+  return false;
 }
 
-const PANEL_UP = panelReachable();
+const PANEL_UP = reachable(PANEL, 80);
 
 /* ── 几何守卫：能连上浏览器就跑，连不上才 SKIP ────────────────────────────────
  *
@@ -87,20 +92,7 @@ const PANEL_UP = panelReachable();
  * 这正是本文件头一句在讲的形状：一个悄悄没跑的套件与一个通过的套件无法区分。
  * 所以判据与面板套件一致——**可达就跑，不可达才说明原因**。 */
 const CDP = process.env.CELLRIX_CDP || 'http://127.0.0.1:9222';
-function cdpReachable() {
-  let host = '127.0.0.1', port = 9222;
-  try { const u = new URL(CDP); host = u.hostname; port = u.port || 9222; } catch { return false; }
-  try {
-    execFileSync(process.execPath, ['-e',
-      'const s=require("net").connect(' + Number(port) + ',' + JSON.stringify(host) + ');' +
-      's.on("connect",()=>{s.end();process.exit(0)});' +
-      's.on("error",()=>process.exit(1));' +
-      'setTimeout(()=>process.exit(1),1500);'
-    ], { stdio: 'ignore' });
-    return true;
-  } catch { return false; }
-}
-const CDP_UP = cdpReachable();
+const CDP_UP = reachable(CDP, 9222);
 
 const NEEDS_INPUT = [];
 if (!(PANEL_UP && CDP_UP)) {
