@@ -51,6 +51,27 @@ NODE_PATH=/path/to/node/workspace/node_modules node web/tests/render_test.js htt
 (proxy relative paths to the live server) and `window.matchMedia` (the theme
 bootstrap in `base.html`).
 
+### The geometry guard needs a browser, and it is only as good as the browser being up
+
+`run_all.js` runs `layout_test.js` whenever a browser answers on `:9222`, and only
+then prints it as "needs input". It was previously listed as needing input
+**unconditionally**, so the one check that can see layout sat idle while the
+panel looked fine — and it was hiding a real defect (the trajectory's container
+was `display:none` with seven rows already in it; `textContent` cannot see that,
+and jsdom has no layout).
+
+Start one like this before running the net:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=old --no-sandbox --disable-gpu --disable-dev-shm-usage \
+  --remote-debugging-port=9222 --user-data-dir=/tmp/cellrix-chrome about:blank &
+```
+
+`--headless=new` dies here with `GPU process isn't usable`; the sandboxed profile
+also needs `--no-sandbox` (its own sandbox cannot initialise). Override the
+endpoint with `CELLRIX_CDP` / the panel with `CELLRIX_PANEL`.
+
 ## Method
 
 - **A/B, always.** If the binary's mtime is older than the asset's, it still
