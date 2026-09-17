@@ -181,6 +181,22 @@
       item.classList.remove('editing');
     }
     cancel.onclick = function (ev) { ev.stopPropagation(); done(); };
+    /* 失败**不收起编辑态**：原先失败即 done()（恢复原名、撤掉输入框），于是人刚
+     * 输入的名字连同重试的机会一起没了，只剩一个 5 秒的 toast。现在保留输入，并在
+     * 编辑行里就地把出路摆出来（ADR-0044 D5）。 */
+    function renameFailed(err) {
+      var host = edit.querySelector('.wo-fail');
+      if (!host) {
+        host = document.createElement('div');
+        host.className = 'wo-fail';
+        edit.appendChild(host);
+      }
+      window.CxWayout.render(host, {
+        code: 'rename-failed',
+        detail: String(err && err.message || err || 'unknown'),
+        action: { run: function () { if (save) { save.disabled = false; save.click(); } } }
+      });
+    }
     save.onclick = function (ev) {
       ev.stopPropagation();
       var name = inp.value.trim();
@@ -193,14 +209,14 @@
       }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.ok) {
           done(name || autoName({ first_ts: String(item.getAttribute('data-ts') || '') }));
-          Cx.showToast(name ? '已重命名' : '已恢复自动名');
+          Cx.showToast(name ? '已重命名' : '已恢复自动名');   /* 成功是瞬时通知，toast 正合适 */
         } else {
-          done();
-          Cx.showToast('重命名失败: ' + (j.error || 'unknown'));
+          if (btn) btn.disabled = false;
+          renameFailed({ message: j.error || 'unknown' });
         }
       }).catch(function (e) {
-        done();
-        Cx.showToast('重命名失败: ' + e.message);
+        if (btn) btn.disabled = false;
+        renameFailed(e);
       });
     };
     inp.onkeydown = function (ev) {

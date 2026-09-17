@@ -10,6 +10,24 @@
 (function () {
   var Cx = window.Cx;
 
+  /* 失败就地内联（ADR-0044 D5）：贴在对话区末尾，重发用同一段文本。
+   *
+   * 这里本来是 `Cx.showToast('发送失败: …')`——5 秒后消失，而输入框在发送时已被
+   * 清空，于是"重发"这件事没有任何东西托着。`lastFail` 是为了替换而不是堆叠：
+   * 连发两次失败只该留一条。 */
+  var lastFail = null;
+  function clearFail() {
+    if (lastFail && lastFail.parentNode) { lastFail.parentNode.removeChild(lastFail); }
+    lastFail = null;
+  }
+  function failRow(state) {
+    var box = document.getElementById('chat-msgs');
+    if (!box || !window.CxWayout) return;
+    clearFail();
+    lastFail = window.CxWayout.build(state);
+    if (lastFail) { box.appendChild(lastFail); box.scrollTop = box.scrollHeight; }
+  }
+
   function nowTs() {
     var d = new Date();
     function p(n) { return (n < 10 ? '0' : '') + n; }
@@ -128,6 +146,7 @@
     if (!text) return;
     if (Cx.state.chatBusy) return; // 一轮思考未结，防并发连发
     var btn = document.querySelector('.chat-input .btn');
+    clearFail();                       /* 新一轮尝试不该把上一次的失败留在上面 */
     addMsg('user', text, false);
     input.value = '';
     Cx.state.chatBusy = true;
@@ -169,10 +188,17 @@
             var j;
             try { j = JSON.parse(payload); } catch (e) { continue; }
             if (j.error) {
-              // A transport fault is the cockpit's business, not Helix's.
-              // If the answer already streamed, keep it and finish quietly;
-              // only a fault with no content gets a toast.
-              if (!bodyEl && !thinkEl) Cx.showToast(j.error);
+              // A transport fault is the cockpit's business, not Helix's. If the
+              // answer already streamed, keep it and finish quietly; only a
+              // fault with no content becomes a row — inline, with the retry
+              // that the cleared input box no longer provides (ADR-0044 D5).
+              if (!bodyEl && !thinkEl) {
+                failRow({
+                  code: 'send-rejected',
+                  detail: String(j.error),
+                  action: { run: function () { input.value = text; sendChat(); } }
+                });
+              }
               finish(); return;
             }
             if (j.think) {
@@ -220,7 +246,12 @@
       }
       return pump();
     }).catch(function (e) {
-      Cx.showToast('发送失败: ' + e.message);
+      /* 出路就在这儿：同一段文本，重发一次。 */
+      failRow({
+        code: 'send-failed',
+        detail: String(e && e.message || e),
+        action: { run: function () { input.value = text; sendChat(); } }
+      });
     }).finally(function () {
       finish();
     });

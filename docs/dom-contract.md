@@ -64,6 +64,7 @@
 | `view-flows` | base.html, flows.html |
 | `view-prove-track` | base.html, prove_track.js, prove_track.view.js |
 | `.who` | chat.js |
+| `.wo-fail` | session_list.js |
 
 **两条非名字的跨资产契约**（同样冻结）：
 

@@ -513,6 +513,35 @@ function skip(label, why) {
       doc3.body.textContent.indexOf("ECONNREFUSED") >= 0);
     console.log("        states: " +
       marks.map((m) => m.getAttribute("data-wo-kind") + "/" + m.getAttribute("data-wo-code")).join(" · "));
+
+    /* P1c-2: a failed send offers the retry that the cleared input cannot.
+     * The input is emptied when a message is sent, so without this row the
+     * message is still on screen but there is nothing left to act on — which is
+     * what the 5-second toast used to paper over. */
+    const input3 = doc3.getElementById("chat-text");
+    const msgs3 = doc3.getElementById("chat-msgs");
+    input3.value = "这句话发不出去";
+    dom3.window.sendChat();
+    await sleep(700);
+    const fail3 = () => Array.from(msgs3.querySelectorAll("div"))
+      .filter((el) => el.getAttribute("data-wo-code") === "send-failed");
+    const first3 = fail3();
+    check("a failed send renders its way out in the conversation (N-011)",
+      first3.length === 1, first3.length + " row(s)");
+    check("that way out is a real control, not just words",
+      first3.length === 1 && !!first3[0].querySelector("button"));
+    if (first3.length) {
+      const retry3 = first3[0].querySelector("button");
+      /* Guarded: with the capability removed there is no button, and calling
+       * dispatchEvent on null would abort the whole suite — a crash hides every
+       * later assertion, which is worse than one clean red. */
+      if (retry3) {
+        retry3.dispatchEvent(new dom3.window.MouseEvent("click", { bubbles: true }));
+        await sleep(700);
+      }
+    }
+    check("retrying replaces the failure row instead of stacking it",
+      fail3().length === 1, fail3().length + " row(s) after the retry");
     dom3.window.close();
   }
 
