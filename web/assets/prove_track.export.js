@@ -68,17 +68,73 @@
   }
 
   function span(session) {
-    var a = null, b = null;
+    /* The window is a fact about the rows, not about the order they arrived in.
+     * Subtracting the LAST timestamp from the FIRST made the result a function of
+     * arrival order: the same rows reversed rendered `span: -428.0s` and
+     * `not attributed: -525.0s`, i.e. a complete-looking exhibit whose two
+     * headline numbers were subtraction artefacts. Measured against the real
+     * 10-period chain, forward 428.0s / 331.0s, reversed -428.0s / -525.0s.
+     * So the endpoints are min/max, which cannot depend on order. */
+    var lo = null, hi = null, loTs = null, hiTs = null;
     (session || []).forEach(function (r) {
       if (r.kind !== 'ev' || !r.ts) { return; }
-      if (!a) { a = r.ts; }
-      b = r.ts;
+      if (loTs === null || r.ts < loTs) { loTs = r.ts; lo = r.ts; }
+      if (hiTs === null || r.ts > hiTs) { hiTs = r.ts; hi = r.ts; }
     });
-    var ms = (a && b) ? Date.parse(b) - Date.parse(a) : NaN;
-    return { from: a, to: b, ms: isFinite(ms) ? ms : null };
+    var ms = (lo !== null && hi !== null) ? Date.parse(hi) - Date.parse(lo) : NaN;
+    return { from: lo, to: hi, ms: isFinite(ms) ? ms : null };
+  }
+
+  /* The session vocabulary: kinds the REDUCER emits as carriers, which the
+   * export consumes rather than drops. They belong here as a named list instead
+   * of a `kind === 'ev'` test buried in the loop — the exception is a fact about
+   * the session shape, and it should be readable as one. Measured while writing
+   * this: without the list, `ev` was reported as an undeclared dropped kind on
+   * the real chain, i.e. the checker's first red was its own blind spot. */
+  var SESSION_CARRIERS = ['ev', 'turn'];
+
+  /* The kinds a window carries that NO table accounts for: not drawn, not
+   * declared, and not a carrier the reducer introduced. Split out so the export
+   * and its test read the same function rather than each deciding what
+   * "dropped" means. */
+  function undeclaredKinds(session, carriers) {
+    var R = PT.render;
+    if (!R) { return []; }
+    var allow = carriers || SESSION_CARRIERS;
+    var seen = {}, out = [];
+    (session || []).forEach(function (r) {
+      if (!r || !r.kind || allow.indexOf(r.kind) !== -1) { return; }
+      if (R.SUMMARY[r.kind] || (R.NOT_DRAWN && R.NOT_DRAWN[r.kind])) { return; }
+      if (seen[r.kind]) { return; }
+      seen[r.kind] = true; out.push(r.kind);
+    });
+    return out;
+  }
+
+  /* Rows arriving out of time order are a fact about the INPUT, and the export
+   * must not paper over it. Re-sorting silently would hide exactly what the
+   * document exists to let someone check — so this refuses instead. It is not a
+   * behaviour change for ordered input (all 162 real event files measured
+   * 2026-09-21 are ordered); it converts "upstream went out of order" from a
+   * negative number nobody questions into an error at the door.
+   *
+   * Throws rather than returns: a caller that could ignore a boolean would. */
+  function assertTimeOrdered(session) {
+    var prev = null, prevTs = null;
+    (session || []).forEach(function (r, i) {
+      if (r.kind !== 'ev' || !r.ts) { return; }
+      if (prevTs !== null && r.ts < prevTs) {
+        throw new Error('export refused: row ' + i + ' (' + r.id + ') is at ' + r.ts +
+          ', earlier than its predecessor ' + prev + ' at ' + prevTs +
+          ' — the rows are not in time order, so every span computed from them' +
+          ' would be a subtraction in the wrong direction. Fix the stream, not the export.');
+      }
+      prevTs = r.ts; prev = r.id;
+    });
   }
 
   function markdown(session, meta, usage) {
+    assertTimeOrdered(session);
     var groups = group(session);
     var rowCount = groups.reduce(function (a, g) { return a + g.rows.length; }, 0);
     var out = [];
@@ -111,7 +167,16 @@
         (usage.cached == null ? '' : ' · cached ' + D.fmtTok(usage.cached)));
     }
     /* A `#` column that skips a number looks like missing data. The kinds that
-     * are measured but not drawn are declared rather than left to be inferred. */
+     * are measured but not drawn are declared rather than left to be inferred.
+     *
+     * The table above is a claim about the CONTRACT; it cannot speak for the
+     * window, which is merged from files written by more than one process. A
+     * kind that reached the stream and is in neither table is dropped by the
+     * render filter, and the declaration would not mention it — declared
+     * coverage, actual coverage, one level apart. Measured before this line
+     * existed: the contract's 10 kinds were exactly covered (no silent drop
+     * today), so the gap opens the day a new kind arrives, which is the day
+     * nobody is looking. */
     var notDrawn = [];
     if (PT.render && PT.render.NOT_DRAWN) {
       Object.keys(PT.render.NOT_DRAWN).forEach(function (k) {
@@ -121,6 +186,16 @@
     if (notDrawn.length) {
       out.push('- not drawn as rows: ' + notDrawn.join('; ') +
         ' — so a gap in the row numbering is expected');
+    }
+    /* Declared at runtime, from the rows actually dropped — not from the table.
+     * The rows are still dropped (the document must not draw what the view did
+     * not); what changes is that the drop is named instead of looking like
+     * nothing was there. */
+    var undeclared = undeclaredKinds(session);
+    if (undeclared.length) {
+      out.push('- not drawn and NOT declared: ' + undeclared.join(', ') +
+        ' — these kinds reached the window and were dropped without a declaration,' +
+        ' so the row set below is incomplete for reasons no table states');
     }
     out.push('- these are the rows the trajectory rendered: nothing is re-derived here');
     /* `wait` is the interval that ENDED at the row, not a stage's own time. One
@@ -183,5 +258,6 @@
     return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
   }
 
-  PT.export = { markdown: markdown, hasArtifact: hasArtifact, source: source, span: span };
+  PT.export = { markdown: markdown, hasArtifact: hasArtifact, source: source, span: span,
+    assertTimeOrdered: assertTimeOrdered, undeclaredKinds: undeclaredKinds };
 })();

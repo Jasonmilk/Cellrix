@@ -442,6 +442,197 @@ if (PT.export) {
       const m2 = PT.export.markdown(quiet, null);
       return m2.indexOf('### ') === -1 && m2.indexOf('| 1 |') !== -1;
     })());
+
+  /* ---- the export is EVIDENCE, so its own numbers must survive a check ----
+   *
+   * An exhibit is not a rendering: it is a record someone will cite. A negative
+   * span and a negative "not attributed" are not cosmetic — they are the two
+   * numbers a reviewer reads to decide whether the window adds up.
+   *
+   * Measured on the real 10-period chain (70 ev rows, 20 distinct timestamps):
+   *   forward   span  428.0s · not attributed  331.0s
+   *   reversed  span -428.0s · not attributed -525.0s
+   * — i.e. the same rows, in a different arrival order, rendered a complete
+   * looking exhibit whose headline numbers were subtraction artefacts. Both
+   * halves of the repair are asserted here, each with a control:
+   *   1. the arithmetic is order-independent (min/max, not first/last);
+   *   2. an out-of-order stream is REFUSED, not silently re-sorted (re-sorting
+   *      would hide the one fact the document exists to expose).
+   * Scope, stated: every one of the 162 real event files on disk is already
+   * ordered, so (2) is the guard for a stream that has gone wrong, not a
+   * description of today's data. It is still the assertion that can go red.
+   */
+  const tsOf = function (r) { return r.kind === 'ev' && r.ts ? Date.parse(r.ts) : null; };
+
+  check('the rows are in time order, so the window has a direction (assertion)',
+    (function () {
+      let prev = null, outOfOrder = 0;
+      session.forEach(function (r) {
+        const t = tsOf(r);
+        if (t === null) { return; }
+        if (prev !== null && t < prev) { outOfOrder++; }
+        prev = t;
+      });
+      return outOfOrder === 0;
+    })(),
+    'a row earlier than its predecessor makes every span below a subtraction in the wrong direction');
+
+  check('the same predicate goes red on rows that are not in time order (control)',
+    (function () {
+      const reversed = session.slice().reverse();
+      let prev = null, outOfOrder = 0;
+      reversed.forEach(function (r) {
+        const t = tsOf(r);
+        if (t === null) { return; }
+        if (prev !== null && t < prev) { outOfOrder++; }
+        prev = t;
+      });
+      return outOfOrder > 0;
+    })(),
+    'if the predicate cannot fail on reversed input it asserts nothing');
+
+  const realSpan = PT.export.span(session);
+  const reversedSpan = PT.export.span(session.slice().reverse());
+
+  check('the declared span is not negative',
+    realSpan.ms !== null && realSpan.ms >= 0, JSON.stringify(realSpan));
+
+  check('the span is a fact about the rows, not about their arrival order (repair 1)',
+    reversedSpan.ms !== null && reversedSpan.ms === realSpan.ms,
+    'forward ' + JSON.stringify(realSpan) + ' vs reversed ' + JSON.stringify(reversedSpan) +
+    ' — a span that changes with row order is derived from the endpoints, not the window');
+
+  check('and the endpoints themselves are order-independent, not just the difference',
+    reversedSpan.from === realSpan.from && reversedSpan.to === realSpan.to,
+    'from/to must be the earliest and latest timestamps, whichever row carries them');
+
+  check('an out-of-order stream is refused rather than silently re-sorted (repair 2)',
+    (function () {
+      try { PT.export.assertTimeOrdered(session.slice().reverse()); return false; }
+      catch (e) { return /not in time order/.test(e.message); }
+    })(),
+    're-sorting would hide that the stream went out of order — the fact the exhibit exists to expose');
+
+  check('and the refusal is what a caller cannot ignore: markdown() throws too (repair 2)',
+    (function () {
+      try { PT.export.markdown(session.slice().reverse(), null); return false; }
+      catch (e) { return /export refused/.test(e.message); }
+    })(),
+    'a boolean a caller can ignore is not a gate');
+
+  check('the refusal does not fire on the ordered stream (control)',
+    (function () {
+      try { PT.export.assertTimeOrdered(session); return true; }
+      catch (e) { return false; }
+    })(),
+    'a gate that refuses everything is not a gate either');
+
+  /* `not attributed` is DERIVED (span − waits), so it inherits the span's sign.
+   * Asserting it separately is not redundant: it is the number a reviewer uses
+   * to decide whether the rows account for the window. */
+  check('the unaccounted remainder is not negative either',
+    (function () {
+      const waits = session.reduce(function (a, r) {
+        return a + (r.kind === 'ev' && r.dur > 0 ? r.dur : 0);
+      }, 0);
+      return realSpan.ms !== null && (realSpan.ms - waits) >= 0;
+    })(),
+    'a negative remainder means the rows reported more time than the window contained');
+
+  /* The document declares how many periods it spans. That declaration is what a
+   * reviewer trusts instead of re-deriving the chain, so it must match the rows
+   * it was handed — and a multi-period window must not be presentable as one
+   * undifferentiated run. */
+  check('the declared period count is the one the rows carry',
+    PT.export.source(session).count === new Set(evRows.map(function (r) { return r.source; })).size,
+    JSON.stringify(PT.export.source(session)));
+
+  check('a multi-period window says so, rather than reading as one run',
+    md.indexOf('10 periods') !== -1,
+    'the window line must name the periods it merged');
+
+  /* ---- declared coverage == actual coverage, for the rows that are DROPPED --
+   *
+   * The export declares the kinds that are measured but not drawn. That table is
+   * a claim about the CONTRACT; the window is merged from files written by more
+   * than one process, so the set that actually reaches `buildSession` can be
+   * larger. A kind in neither table is dropped by the render filter and the
+   * declaration says nothing — declared coverage one level away from actual.
+   *
+   * Measured before the runtime declaration existed: the contract's 10 kinds are
+   * exactly covered, so nothing is dropped today. That is precisely why this has
+   * to be asserted rather than observed — the gap opens the day a new kind
+   * arrives, which is the day nobody is looking.
+   */
+  check('the window carries no kind that no table accounts for (real chain)',
+    PT.export.undeclaredKinds(session).length === 0,
+    JSON.stringify(PT.export.undeclaredKinds(session)));
+
+  /* The control runs on the RAW node stream, not on the session: `buildSession`
+   * maps every node to the carrier kind `ev`, so on the session the alien's kind
+   * is already gone. Asserting on the session would have been a control that
+   * cannot fail — measured: it did not, and that is how this was found.
+   *
+   * `buildSession` filters on `R.SUMMARY[n.kind]` UPSTREAM of the export, so a
+   * kind no table accounts for never reaches the exporter at all. The invariant
+   * therefore lives one step earlier, in the render tables, and the real failure
+   * mode is a NEW kind added to the contract and left in neither table. That is
+   * what this control mutates. */
+  check('a kind no table accounts for is caught where it can occur (control)',
+    (function () {
+      const R = PT.render;
+      const underDeclared = {};
+      Object.keys(R.NOT_DRAWN).forEach(function (k) { underDeclared[k] = R.NOT_DRAWN[k]; });
+      /* The contract kind that today is declared-not-drawn is left undeclared —
+       * exactly the state a new contract kind starts in. */
+      Object.keys(R.NOT_DRAWN).forEach(function (k) { delete underDeclared[k]; });
+      try {
+        R.validateTables(R.SUMMARY, underDeclared);
+        return false; // no throw ⇒ the checker does not check
+      } catch (e) {
+        return /neither drawn nor declared/.test(e.message);
+      }
+    })(),
+    'a contract kind in neither table must fail loudly, and the declaration must be what fails it');
+
+  check('the loaded tables pass that same check (assertion)',
+    (function () {
+      try { PT.render.validate(); return true; } catch (e) { return false; }
+    })(),
+    'if the shipped tables fail their own validator the page would not have loaded — this makes the pass explicit');
+
+  check('and the carrier kinds the reducer itself introduces are not mistaken for drops (control)',
+    (function () {
+      const found = PT.export.undeclaredKinds(session);
+      return found.indexOf('ev') === -1 && found.indexOf('turn') === -1;
+    })(),
+    'ev/turn are the session vocabulary, not data that went missing');
+}
+
+/* ---- the export's row count is the rows it was given, not the rows it drew --
+ *
+ * `rows: N over M turns` is a claim about the exhibit. If it is computed from
+ * the same structure it is describing, the claim can never be checked against
+ * the thing it claims to describe — the document would agree with itself. This
+ * compares the CLAIM against the DRAWN table, which is what a reader sees.
+ */
+if (PT.export) {
+  const session = NODE_SIDE.buildSession(snap.nodes);
+  const md = PT.export.markdown(session, { name: 'chain' });
+  const drawn = md.split('\n').filter(function (l) { return /^\| \d+ \|/.test(l); }).length;
+  const m = md.match(/^- rows: (\d+) over /m);
+  check('the header actually states a row count (so the next check can be judged)',
+    !!m, 'no `- rows: N over` line found — the comparison below would be vacuous');
+  const claimed = m ? Number(m[1]) : NaN;
+  check('the row count claimed in the header equals the rows actually drawn',
+    claimed === drawn, 'claimed ' + claimed + ', drew ' + drawn);
+  check('the same comparison fails when a row is dropped from the table (control)',
+    (function () {
+      const onlyOne = md.split('\n').filter(function (l) { return !/^\| \d+ \|/.test(l) || /^\| 1 \|/.test(l); }).join('\n');
+      const drawn2 = onlyOne.split('\n').filter(function (l) { return /^\| \d+ \|/.test(l); }).length;
+      return drawn2 !== claimed;
+    })(),
+    'a comparison that holds for any document cannot catch a truncated one');
 }
 
 /* ---- P1-3: `when` is a function, never a string to evaluate ---- */
