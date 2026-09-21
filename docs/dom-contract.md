@@ -220,13 +220,21 @@
 | `.fxSide` | base.html |
 | `.fxSideBody` | base.html |
 | `.fxSideVp` | base.html |
+| `i-bench` | base.html |
+| `i-chat` | base.html |
+| `i-gauge` | base.html |
+| `i-menu` | base.html |
+| `i-track` | base.html |
+| `.ic` | base.html |
 | `.ico` | prove_track.html |
 | `.info` | base.html |
 | `.input` | prove_track.html |
 | `.k` | cockpit.html |
 | `.kv` | flows.html |
 | `.l` | base.html, prove_track.html |
+| `.lbl` | base.html |
 | `.ledger` | cockpit.html |
+| `.logo` | base.html |
 | `ltScroll` | cockpit.html |
 | `ltShell` | cockpit.html |
 | `.model` | prove_track.html |
@@ -265,6 +273,7 @@
 | `view-chat` | base.html |
 | `view-cockpit` | base.html |
 | `.vp` | base.html |
+| `.x` | base.html |
 
 ## 维护
 
