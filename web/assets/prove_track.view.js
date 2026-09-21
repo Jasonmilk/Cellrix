@@ -384,17 +384,21 @@
     while (fold.firstChild) { fold.removeChild(fold.firstChild); }
 
     /* The conclusion first, and by itself. It is the one line a reader came for,
-     * so nothing is allowed to share its row. */
+     * so nothing shares its row. When there is no conclusion the empty state IS
+     * the conclusion line — saying "no verdict" and then "no session" would be
+     * two sentences for one fact. */
     var v = st.verdict;
-    head.appendChild(certRow('e-cert-verdict', 0,
-      v ? (v.status || 'verdict') : 'no conclusion in this window',
-      v ? String(v.id) : 'a window with no verdict row is not a verdict'));
-
     if (!st.totals.checks) {
       head.appendChild(certRow('e-cert-note', 0,
-        'no judgements in this window', 'nothing to rest on yet'));
+        v ? 'no judgements in this window' : 'no conclusion to read yet',
+        v ? 'nothing rests on anything yet' : 'pick a session on the left; the reading follows its rows'));
+      $('eCert').removeAttribute('hidden');
+      $('eTblVp').setAttribute('hidden', '');
       return;
     }
+    head.appendChild(certRow('e-cert-verdict', 0,
+      v.status || 'verdict',
+      String(v.id)));
 
     /* What needs the reader: a citation that resolves to nothing. Named, with the
      * id it cites, because that id is what has to be chased. */
