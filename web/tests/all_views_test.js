@@ -60,9 +60,23 @@ function skip(label, why) {
    * list read counts: loadWindow asks with ?limit=, and that one is legitimately
    * per-period. */
   let sessionFetches = 0;
+  /* jsdom reports the page's own story and its own limitations through the same
+   * channel. `Not implemented: …` is jsdom saying IT lacks a browser API — the
+   * page cannot fix it and neither can this test. Counting those as script
+   * errors made three assertions permanently red while telling us nothing about
+   * the page, which is the "always red is a ritual" failure.
+   *
+   * They are not dropped silently: the count is reported, because a document
+   * claiming "no errors" while filtering a whole class of events has to say how
+   * many it filtered — otherwise "no errors" and "errors I cannot see" read the
+   * same. Define once, use at every capture site, so the three virtual consoles
+   * cannot drift apart in what they consider an error. */
+  let jsdomGaps = 0;
+  const isJsdomGap = (m) => /Not implemented:/.test(m);
+  const noteError = (list, msg) => { if (isJsdomGap(msg)) { jsdomGaps++; } else { list.push(msg); } };
   const vc = new VirtualConsole();
-  vc.on("jsdomError", (e) => errors.push("jsdomError: " + e.message));
-  vc.on("error", (...a) => errors.push("console.error: " + a.join(" ")));
+  vc.on("jsdomError", (e) => noteError(errors, "jsdomError: " + e.message));
+  vc.on("error", (...a) => noteError(errors, "console.error: " + a.join(" ")));
 
   const html = await (await fetch(BASE + "/")).text();
   const dom = new JSDOM(html, {
@@ -75,6 +89,25 @@ function skip(label, why) {
         const url = typeof input === "string" && input.startsWith("/")
           ? BASE + input : input;
         if (/\/api\/sessions$/.test(String(url))) sessionFetches++;
+        /* The metering desk is asserted on its EMPTY state below — "the slots come
+         * from the exit layer". Left to the live server, that assertion depends on
+         * this workspace happening to have no flows: measured against a configured
+         * FlowModus, `/api/flows` returns real suppliers and tiers, every slot is
+         * filled with content, no exit-layer block is built, and the check reads 0
+         * while nothing about the page is wrong. A test whose precondition is
+         * "the environment is empty" is red or vacuous depending on the machine.
+         *
+         * So the empty desk is supplied here, deterministically, with the same
+         * `{flows: null}` shape the panel's own error-free empty path expects
+         * (`renderFlows(null)` → `flowmodus-unconfigured`, `renderStats(null)` →
+         * `tuck-unconfigured`, empty pools → `providers-empty`). Everything else
+         * in this suite still runs against the live panel. */
+        if (/\/api\/flows$/.test(String(url))) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ flows: null, stats: null }),
+          });
+        }
         return fetch(url, init);
       };
       window.matchMedia = (q) => ({
@@ -473,9 +506,22 @@ function skip(label, why) {
       !!doc.querySelector("#uxMainBody #view-chat") && NAV().view === "chat", JSON.stringify(NAV()));
     void shown;
 
-    /* The period cache must describe the period in the state, or not exist. */
+    /* The period cache must describe the period in the state, or not exist.
+     *
+     * Compares `period_id`, not `job_id`. `NAV().period` is the period id
+     * (`session_list.js` sets `period: p.period_id`), while the meta object
+     * carries BOTH ids because the export names its download after the job. The
+     * first version compared `meta.job_id` against `NAV().period`, which is a job
+     * against a period: the two disagree by construction, so the assertion could
+     * never pass — a criterion pointed at the wrong field, which is the same
+     * shape this project has now recorded seven times. Measured red with the real
+     * values: `{"job_id":"run-fcc5d8141bd5a90c","period_id":"run-fcc5d8141bd5a90c-p006ab0c50700000e"}
+     * vs period=run-fcc5d8141bd5a90c-p006ab0c50700000e`.
+     *
+     * The intent — the cached metadata must not describe a DIFFERENT period — is
+     * kept exactly; only the field it reads is corrected. */
     check("the trajectory metadata cannot describe a different period (N-003)",
-      !window.__proveTrackMeta || window.__proveTrackMeta.job_id === NAV().period,
+      !window.__proveTrackMeta || window.__proveTrackMeta.period_id === NAV().period,
       JSON.stringify(window.__proveTrackMeta) + " vs period=" + NAV().period);
 
     /* N-010: a hash the panel did not write. The malformed percent-encoding has
@@ -577,8 +623,8 @@ function skip(label, why) {
   {
     const errs3 = [];
     const vc3 = new VirtualConsole();
-    vc3.on("jsdomError", (e) => errs3.push("jsdomError: " + e.message));
-    vc3.on("error", (...a) => errs3.push("console.error: " + a.join(" ")));
+    vc3.on("jsdomError", (e) => noteError(errs3, "jsdomError: " + e.message));
+    vc3.on("error", (...a) => noteError(errs3, "console.error: " + a.join(" ")));
     const dom3 = new JSDOM(html, {
       url: BASE + "/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc3,
       beforeParse(w) {
@@ -665,8 +711,8 @@ function skip(label, why) {
   {
     const errs2 = [];
     const vc2 = new VirtualConsole();
-    vc2.on("jsdomError", (e) => errs2.push("jsdomError: " + e.message));
-    vc2.on("error", (...a) => errs2.push("console.error: " + a.join(" ")));
+    vc2.on("jsdomError", (e) => noteError(errs2, "jsdomError: " + e.message));
+    vc2.on("error", (...a) => noteError(errs2, "console.error: " + a.join(" ")));
     const dom2 = new JSDOM(html, {
       /* N-001 之后，"深链到某个辅助面"的写法是 view=chat&panel=…：主面永远是对话，
          辅助面是它旁边打开的面板。 */
@@ -712,6 +758,8 @@ function skip(label, why) {
   console.log("");
   console.log("RESULT: " + pass + " passed, " + fail + " failed"
   + (skipped ? ", " + skipped + " skipped (nothing to exercise)" : ""));
+  if (jsdomGaps) console.log("jsdom gaps (environment, not the page): " + jsdomGaps +
+    " — asserted as NOT page errors; see the note where jsdomGaps is defined");
   if (errors.length) console.log("captured errors:\n  " + errors.slice(0, 8).join("\n  "));
   dom.window.close();
   process.exit(fail ? 1 : 0);
