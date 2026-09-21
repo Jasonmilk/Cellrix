@@ -651,4 +651,87 @@ if (RENDER) {
 
 console.log('');
 console.log(failures === 0 ? 'OK — all passed' : 'FAILED: ' + failures);
+/* ---- the derivation: what each conclusion rests on ----------------------
+ *
+ * A timeline says when; a certificate says what supports what. `derivation()`
+ * is the second half, and `dangling` is the assertion that matters: a check
+ * citing evidence the window does not contain is the failure this structure
+ * exists to make visible, and it is NOT the same as a check that passed.
+ *
+ * The fixture is written from the real event shape, measured in
+ * `.helix/events/run-0212da5381eee6a3.events.jsonl`:
+ *   check/status   { check_id, check, expect, actual, gate, judge, passed,
+ *                    reason, evidence_id }
+ *   tool/result    { tool, index, ok, duration_ms, outcome, outcome_sha }
+ *   verdict/status { job_id, status, checks, reason }
+ * and one property the synthetic chain cannot exercise: the real trajectory
+ * fixture used elsewhere in this file has no CHECK or TOOL rows at all, so
+ * "the citation resolves" was unverifiable there. That is why this fixture
+ * exists rather than a longer assertion on the old one.
+ *
+ * A naming fact the fixture must respect, and the first version got wrong: the
+ * exhibit id is DERIVED as `{source}#{index}`, where `source` is the period the
+ * row came from — not the short node prefix (`run#6`). A fixture that invents
+ * `source: "run"` produces a citation that cannot resolve and would read as a
+ * dangling reference the page never had.
+ */
+const DERIV_PERIOD = 'run-0212da5381eee6a3';
+function derivationFixture() {
+  const ev = (id, cls, payload) => ({
+    kind: 'ev', id: id, source: DERIV_PERIOD, turn: 't1', ord: 1,
+    ts: '2026-09-07T18:17:00Z', cls: cls, lane: 'x', dur: 0, status: 'done',
+    summary: cls + ' ' + id, tool: null, kindNote: '',
+    fields: [], payload: JSON.stringify(payload), detail: '', term: false,
+  });
+  return [
+    ev('p#5', 'TOOL', { stage: 'result', tool: 'calc', index: 0, ok: true, durationMs: 277 }),
+    ev('p#6', 'TOOL', { stage: 'result', tool: 'fs.read', index: 1, ok: true, durationMs: 12 }),
+    ev('p#7', 'CHECK', { checkId: DERIV_PERIOD + '#c0', check: 'exec_ok', expect: 'ok',
+      actual: 'ok=true echo=false', gate: 'hard', judge: 'rule', passed: false,
+      reason: 'ok=true echo=false', evidenceId: DERIV_PERIOD + '#0' }),
+    ev('p#8', 'CHECK', { checkId: DERIV_PERIOD + '#c1', check: 'shape', expect: 'numbers',
+      actual: '[1,2]', gate: 'soft', judge: 'model', passed: true,
+      evidenceId: DERIV_PERIOD + '#1' }),
+    ev('p#9', 'VERDICT', { jobId: DERIV_PERIOD, status: 'Unmet', checks: 2,
+      reason: 'failed: exec_ok' }),
+  ];
+}
+
+check('the derivation reads the conclusion, its checks and their exhibits',
+  (function () {
+    const d = PT.export.derivation(derivationFixture());
+    if (!d.verdict || d.verdict.status !== 'Unmet') { return false; }
+    if (d.checks.length !== 2) { return false; }
+    // The two citation keys are DERIVED from source#index, not invented.
+    if (!d.exhibits[DERIV_PERIOD + '#0'] || !d.exhibits[DERIV_PERIOD + '#1']) { return false; }
+    return d.resolved.length === 2 && d.dangling.length === 0;
+  })(),
+  'conclusion, judgements and exhibits must come out of the rows already in hand');
+
+check('a check whose evidence is not in the window is DANGING, not passed (control)',
+  (function () {
+    const rows = derivationFixture();
+    // Drop the exhibit for #0 — the very failure a certificate must not hide.
+    const trimmed = rows.filter((r) => r.id !== 'p#5');
+    const d = PT.export.derivation(trimmed);
+    if (d.dangling.length !== 1) { return false; }
+    if (d.resolved.length !== 1) { return false; }
+    return d.dangling[0].check === 'exec_ok' &&
+      d.dangling[0].cites === DERIV_PERIOD + '#0';
+  })(),
+  'a citation that resolves to nothing must surface as dangling with its id named');
+
+check('a check with no citation at all is also dangling, not assumed fine (control)',
+  (function () {
+    const rows = derivationFixture().map((r) => {
+      if (r.id !== 'p#7') { return r; }
+      const p = JSON.parse(r.payload); delete p.evidenceId;
+      return Object.assign({}, r, { payload: JSON.stringify(p) });
+    });
+    const d = PT.export.derivation(rows);
+    return d.dangling.length === 1 && d.resolved.length === 1;
+  })(),
+  'silence is not a passing citation');
+
 process.exit(failures === 0 ? 0 : 1);
+

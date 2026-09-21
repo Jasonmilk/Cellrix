@@ -56,6 +56,53 @@
     return groups;
   }
 
+  /* ---- the derivation: what each conclusion rests on ---------------------
+   *
+   * A timeline says when things happened. A certificate says what supports what.
+   * This is the second half, derived from the rows already in hand — no new field
+   * and nothing re-fetched:
+   *
+   *   verdict  the conclusion (a row whose class is VERDICT)
+   *   checks   each one's judgement, and the evidence it read
+   *   exhibits the evidence rows, carryable by the id a check cites
+   *   dangling a check that cites evidence the window does not contain
+   *
+   * `dangling` is the point. A check saying "the evidence was fine" while the
+   * evidence is not in the same document is the failure this structure exists to
+   * make visible, and it is NOT the same as a check that passed.
+   *
+   * Two naming facts this has to respect, both measured:
+   *   - the row's payload is camelCased by the event-family field table, so the
+   *     citation key is `evidenceId`, not `evidence_id`;
+   *   - the citation's id is `{period}#{index}` and a tool-result row carries the
+   *     `index` in its payload, so the exhibit id is DERIVED here rather than
+   *     stored. Storing it would be a second copy of a fact the row already has.
+   */
+  function derivation(session) {
+    var exhibits = {}, checks = [], verdict = null;
+    (session || []).forEach(function (r) {
+      if (r.kind !== 'ev') { return; }
+      var p = {};
+      try { p = JSON.parse(r.payload || '{}'); } catch (e) { p = {}; }
+      if (r.cls === 'VERDICT' && !verdict) {
+        verdict = { id: r.id, status: p.status || r.status, checks: r.summary };
+      } else if (r.cls === 'CHECK') {
+        checks.push({ id: r.id, check: p.check, passed: p.passed === true,
+          gate: p.gate, judge: p.judge, cites: p.evidenceId || null });
+      } else if (r.cls === 'TOOL') {
+        exhibits[r.source + '#' + p.index] = { id: r.id, tool: p.tool, ts: r.ts,
+          durationMs: p.durationMs };
+      }
+    });
+    var resolved = [], dangling = [];
+    checks.forEach(function (c) {
+      if (!c.cites) { dangling.push(c); return; }
+      if (exhibits[c.cites]) { resolved.push(c); } else { dangling.push(c); }
+    });
+    return { verdict: verdict, checks: checks, exhibits: exhibits,
+      resolved: resolved, dangling: dangling };
+  }
+
   function source(session) {
     var first = null, last = null, seen = {};
     (session || []).forEach(function (r) {
@@ -259,5 +306,6 @@
   }
 
   PT.export = { markdown: markdown, hasArtifact: hasArtifact, source: source, span: span,
-    assertTimeOrdered: assertTimeOrdered, undeclaredKinds: undeclaredKinds };
+    assertTimeOrdered: assertTimeOrdered, undeclaredKinds: undeclaredKinds,
+    derivation: derivation };
 })();
