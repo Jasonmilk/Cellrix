@@ -103,6 +103,44 @@
       resolved: resolved, dangling: dangling };
   }
 
+  /* ---- what the certificate shows by default -----------------------------
+   *
+   * The certificate has one rule, and it is the opposite of the timeline's: a
+   * timeline is complete or it is broken, while a certificate is READ. So the
+   * default is not "everything" — it is exactly two things:
+   *
+   *   always  the conclusion, and every check that does NOT resolve
+   *   folded  each resolving check, and every exhibit
+   *
+   * Because the only thing allowed to interrupt a reader is the thing they must
+   * act on. A dangling citation is a fact about the document; a passing check is
+   * a fact about the work, and the reader came for the conclusion. The opposite
+   * was measured first: expanding everything puts the verdict dozens of rows from
+   * its own evidence, which is how a certificate turns into a log with a heading.
+   *
+   * Pure, so the decision can be asserted without a DOM: the view draws what this
+   * says rather than deciding again, which is the only way "what is folded by
+   * default" can be reviewed as one thing.
+   */
+  function certificateState(d) {
+    var der = d || { checks: [], exhibits: {}, dangling: [], resolved: [], verdict: null };
+    var dangling = der.dangling || [];
+    var open = {};
+    dangling.forEach(function (c) { open[c.id] = { check: true, exhibit: true }; });
+    return {
+      verdict: der.verdict,
+      head: dangling,
+      foldedChecks: (der.resolved || []).length,
+      foldedExhibits: Object.keys(der.exhibits || {}).length,
+      open: open,
+      totals: {
+        checks: (der.checks || []).length,
+        exhibits: Object.keys(der.exhibits || {}).length,
+        dangling: dangling.length
+      }
+    };
+  }
+
   function source(session) {
     var first = null, last = null, seen = {};
     (session || []).forEach(function (r) {
@@ -307,5 +345,5 @@
 
   PT.export = { markdown: markdown, hasArtifact: hasArtifact, source: source, span: span,
     assertTimeOrdered: assertTimeOrdered, undeclaredKinds: undeclaredKinds,
-    derivation: derivation };
+    derivation: derivation, certificateState: certificateState };
 })();

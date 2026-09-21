@@ -733,5 +733,50 @@ check('a check with no citation at all is also dangling, not assumed fine (contr
   })(),
   'silence is not a passing citation');
 
+/* ---- what the certificate shows WITHOUT being asked ---------------------
+ *
+ * The rule is one sentence: the conclusion, plus every check that does not
+ * resolve; everything else folded. The assertions below exist because the
+ * temptation is to make the default "everything", and a certificate that shows
+ * everything has no default at all — the reader pays the same cost as the log
+ * they were trying to avoid.
+ */
+check('the certificate shows the conclusion and the dangling checks, nothing else',
+  (function () {
+    const d = PT.export.derivation(derivationFixture());
+    const st = PT.export.certificateState(d);
+    if (!st.verdict || st.verdict.status !== 'Unmet') { return false; }
+    // Two checks exist, both resolve, so the default head is empty — and that is
+    // the honest answer, not a bug: nothing needs the reader's attention.
+    return st.head.length === 0 && st.foldedChecks === 2 && st.foldedExhibits === 2 &&
+      st.totals.checks === 2 && st.totals.dangling === 0;
+  })(),
+  'a clean chain folds entirely; the conclusion is the whole default');
+
+check('and a broken citation is what gets promoted (control)',
+  (function () {
+    // Same fixture minus one exhibit: now exactly one check is dangling.
+    const rows = derivationFixture().filter((r) => r.id !== 'p#5');
+    const st = PT.export.certificateState(PT.export.derivation(rows));
+    if (st.head.length !== 1) { return false; }
+    if (st.foldedChecks !== 1) { return false; }
+    // The promoted row must carry the citation the reader has to chase.
+    return st.head[0].cites === DERIV_PERIOD + '#0' &&
+      st.open[st.head[0].id] && st.open[st.head[0].id].exhibit === true;
+  })(),
+  'the dangling check is the only one unfolded, and it opens its (missing) exhibit');
+
+check('the default is selective, not "everything" (control)',
+  (function () {
+    const rows = derivationFixture().filter((r) => r.id !== 'p#5');
+    const d = PT.export.derivation(rows);
+    const st = PT.export.certificateState(d);
+    // If the default were "all checks", the head would equal every check and the
+    // fold counts would be zero. Asserting the inequality is what makes the rule
+    // falsifiable rather than decorative.
+    return st.head.length !== d.checks.length && st.foldedChecks > 0;
+  })(),
+  'a default that promotes everything asserts nothing about what matters');
+
 process.exit(failures === 0 ? 0 : 1);
 
