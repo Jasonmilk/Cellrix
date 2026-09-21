@@ -341,9 +341,91 @@
     if (document.hidden && S.replayTimer) stopReplay();
   });
 
+  /* ---------- the certificate: the same rows, read as a derivation ----------
+   *
+   * The trajectory answers "what happened, in order". This answers "what does
+   * the conclusion rest on". Same session, second projection — so it lives here
+   * rather than in a new asset.
+   *
+   * What is drawn is decided by `PT.export.certificateState`, not here: the view
+   * renders the rule instead of re-deciding it. The rule is one sentence — the
+   * conclusion plus every check whose citation does not resolve; everything else
+   * folded — and the reason it is a rule and not a layout is that a default of
+   * "everything" would make the certificate as expensive to read as the log it
+   * exists to replace.
+   *
+   * Rendered as text, not as SVG edges, on purpose: the depth is three
+   * (conclusion → judgement → exhibit) and the width is one line per item, which
+   * an indented list carries for free. A node-link canvas would add an engine to
+   * draw what indentation already says.
+   */
+  function certRow(cls, depth, main, meta) {
+    var row = document.createElement('div');
+    row.className = 'e-cert-row ' + cls;
+    row.setAttribute('data-cert-depth', String(depth));
+    var m = document.createElement('span');
+    m.className = 'e-cert-main';
+    m.textContent = main;
+    row.appendChild(m);
+    if (meta) {
+      var k = document.createElement('span');
+      k.className = 'e-cert-meta';
+      k.textContent = meta;
+      row.appendChild(k);
+    }
+    return row;
+  }
+
+  function renderCertificate(session) {
+    var st = PT.export.certificateState(PT.export.derivation(session));
+    var head = $('eCertHead'), fold = $('eCertFold');
+    if (!head || !fold) { return; }
+    while (head.firstChild) { head.removeChild(head.firstChild); }
+    while (fold.firstChild) { fold.removeChild(fold.firstChild); }
+
+    /* The conclusion first, and by itself. It is the one line a reader came for,
+     * so nothing is allowed to share its row. */
+    var v = st.verdict;
+    head.appendChild(certRow('e-cert-verdict', 0,
+      v ? (v.status || 'verdict') : 'no conclusion in this window',
+      v ? String(v.id) : 'a window with no verdict row is not a verdict'));
+
+    if (!st.totals.checks) {
+      head.appendChild(certRow('e-cert-note', 0,
+        'no judgements in this window', 'nothing to rest on yet'));
+      return;
+    }
+
+    /* What needs the reader: a citation that resolves to nothing. Named, with the
+     * id it cites, because that id is what has to be chased. */
+    st.head.forEach(function (c) {
+      head.appendChild(certRow('e-cert-dangling', 1,
+        'unresolved: ' + (c.check || 'check') + ' cites ' + (c.cites || 'nothing'),
+        (c.gate || '?') + ' gate · judged by ' + (c.judge || '?')));
+    });
+
+    /* What does not: counted, not listed. The count is the honest form of
+     * "something is here" without spending the reader's attention on it. */
+    if (st.foldedChecks || st.foldedExhibits) {
+      fold.appendChild(certRow('e-cert-folded', 1,
+        st.foldedChecks + ' judgement' + (st.foldedChecks === 1 ? '' : 's') +
+        ' resolved · ' + st.foldedExhibits + ' exhibit' + (st.foldedExhibits === 1 ? '' : 's'),
+        'folded — they support the conclusion and ask nothing of you'));
+    }
+    $('eCert').removeAttribute('hidden');
+    $('eTblVp').setAttribute('hidden', '');
+  }
+
+  /* The other half of the switch: restore the timeline exactly as it was. */
+  function showTimeline() {
+    $('eCert').setAttribute('hidden', '');
+    $('eTblVp').removeAttribute('hidden');
+  }
+
   /* ---------- Exports (consumed by the ctrl layer) ---------- */
   PT.S = S; PT.HAS = HAS;
   PT.renderStats = renderStats; PT.renderTable = renderTable; PT.renderLanes = renderLanes;
+  PT.renderCertificate = renderCertificate; PT.showTimeline = showTimeline;
   PT.bindTermEdges = bindTermEdges; PT.isModal = isModal; PT.applyModality = applyModality;
   PT.openInsp = openInsp; PT.closeInsp = closeInsp;
   PT.stopReplay = stopReplay; PT.startReplay = startReplay;

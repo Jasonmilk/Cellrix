@@ -144,6 +144,9 @@
 | `.e-c-st` | prove_track.html |
 | `.e-c-tok` | prove_track.html |
 | `.e-c-ty` | prove_track.html |
+| `.e-cert` | prove_track.html |
+| `.e-cert-fold` | prove_track.html |
+| `.e-cert-head` | prove_track.html |
 | `.e-eg` | prove_track.html |
 | `.e-empty` | prove_track.html |
 | `.e-insp` | prove_track.html |
@@ -166,6 +169,10 @@
 | `.e-vp` | prove_track.html |
 | `.e-wrap` | prove_track.html |
 | `eCallBtn` | prove_track.html |
+| `eCert` | prove_track.html |
+| `eCertBtn` | prove_track.html |
+| `eCertFold` | prove_track.html |
+| `eCertHead` | prove_track.html |
 | `eDurBtn` | prove_track.html |
 | `eDurLbl` | prove_track.html |
 | `eEmpty` | prove_track.html |

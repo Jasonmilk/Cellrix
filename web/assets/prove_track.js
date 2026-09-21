@@ -19,6 +19,7 @@
       buildSession = N.buildSession, computeRepeats = N.computeRepeats,
       derivePeriodUsage = N.derivePeriodUsage,
       renderStats = PT.renderStats, renderTable = PT.renderTable, renderLanes = PT.renderLanes,
+      renderCertificate = PT.renderCertificate, showTimeline = PT.showTimeline,
       openInsp = PT.openInsp, closeInsp = PT.closeInsp, isModal = PT.isModal,
       applyModality = PT.applyModality, stopReplay = PT.stopReplay, startReplay = PT.startReplay;
 
@@ -92,6 +93,20 @@
     if (show) { ov.removeAttribute('hidden'); } else { ov.setAttribute('hidden', ''); }
     this.setAttribute('aria-pressed', String(show));
     this.className = 'e-btn e-btn-sm' + (show ? ' e-btn-primary' : '');
+  });
+  /* 推导 / 流向 的切换。
+   *
+   * 同一批行，两种读法：流向回答"按时间发生了什么"，推导回答"结论站在什么上"。
+   * 默认仍是流向 —— 新增一个视角不该改变已有习惯（这也是它没有做成第二个页签的原因：
+   * 页签会暗示它是另一份文档，而它只是同一份卷宗的目录页）。
+   *
+   * 折叠规则不在这里：`PT.export.certificateState` 决定默认显示什么，这里只负责切换。
+   * 视图重复决定一次折叠，就是第二处会漂移的定义。 */
+  $('eCertBtn').addEventListener('click', function () {
+    var toCert = $('eCert').hasAttribute('hidden');
+    if (toCert) { renderCertificate(S.session); } else { showTimeline(); }
+    this.setAttribute('aria-pressed', String(toCert));
+    this.className = 'e-btn e-btn-sm' + (toCert ? ' e-btn-primary' : '');
   });
   $('eReplayBtn').addEventListener('click', function () {
     (S.replayIdx >= 0 || S.replayTimer) ? stopReplay() : startReplay();
