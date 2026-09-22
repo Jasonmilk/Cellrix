@@ -1019,5 +1019,65 @@ check('stripping the certificate rules makes this check report them (control)',
   })(),
   'this is the state prove_track.css was in before the certificate layer was added');
 
+/* ---- "有几条判断" 与 "有没有结论" 是两件事 --------------------------------
+ *
+ * 曾经的判定键在 `totals.checks` 上，于是同一个视图会说两句互相矛盾的话：
+ * 选了周期、结论已记录，但窗口里没有判断行时，头部写 `no conclusion to read yet`，
+ * 而同一张证书里正显示着结论（真浏览器实测那次是 `Met`）。
+ *
+ * 这条断言把三种状态钉死，并同时给出反向控制——只查"有结论时显示结论"是不够的，
+ * 因为把判断数当成结论的开关恰好在那一种情形下看不出来。 */
+function verdictOnlyFixture() {
+  const ev = (id, cls, payload) => ({
+    kind: 'ev', id: id, source: DERIV_PERIOD, turn: 't1', ord: 1,
+    ts: '2026-09-07T18:17:00Z', cls: cls, lane: 'x', dur: 0, status: 'done',
+    summary: cls + ' ' + id, tool: null, kindNote: '',
+    fields: [], payload: JSON.stringify(payload), detail: '', term: false,
+  });
+  return [ev('p#9', 'VERDICT', { jobId: DERIV_PERIOD, status: 'Met', checks: 0, reason: 'all checks passed' })];
+}
+const CERT_HEAD = ['e-cert-verdict', 'e-cert-note'];
+
+function headShape(session) {
+  const st = PT.export.certificateState(PT.export.derivation(session));
+  const hasVerdict = !!st.verdict;
+  const checks = st.totals.checks;
+  /* 与 view 的分支同构：结论存在则必出结论行；判断数为 0 时另加一行说明。 */
+  return {
+    verdict: hasVerdict, checks,
+    rows: (hasVerdict ? ['verdict'] : []).concat(checks ? [] : ['note']),
+    contradicts: hasVerdict && !checks,
+  };
+}
+
+check('a recorded conclusion is shown even when nothing was judged (the fix)',
+  (function () {
+    const h = headShape(verdictOnlyFixture());
+    // 修好之前这里就是那句自相矛盾：有结论却被写成"暂无结论"。
+    return h.verdict === true && h.checks === 0 && h.rows.indexOf('verdict') > -1;
+  })(),
+  'a conclusion with no judgement rows must still be drawn as the conclusion');
+
+check('and the reason it needed fixing is that the two facts can disagree (control)',
+  (function () {
+    const onlyVerdict = headShape(verdictOnlyFixture());
+    const both = headShape(derivationFixture());          // 结论 + 判断都有
+    const neither = headShape([]);                        // 既无结论也无判断
+    return onlyVerdict.contradicts === true &&
+      both.verdict === true && both.checks > 0 &&
+      neither.verdict === false && neither.checks === 0 &&
+      neither.rows.join() === 'note';
+  })(),
+  'three states, and the old branch would have shown a note INSTEAD of the conclusion in the first');
+
+check('certificateState tolerates no session at all (control)',
+  (function () {
+    /* 上一条断言用的是"有结论"的夹具；没有它，一个只会读结论的实现看起来也全绿。
+     * 这里确认空输入确实读到"没有结论"，而且不抛错。 */
+    const st = PT.export.certificateState(PT.export.derivation(null));
+    return st.verdict === null && st.totals.checks === 0 && st.totals.dangling === 0;
+  })(),
+  'a session-less call must yield an empty reading rather than an exception');
+
 process.exit(failures === 0 ? 0 : 1);
 

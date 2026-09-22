@@ -479,22 +479,30 @@
     while (head.firstChild) { head.removeChild(head.firstChild); }
     while (fold.firstChild) { fold.removeChild(fold.firstChild); }
 
-    /* The conclusion first, and by itself. It is the one line a reader came for,
-     * so nothing shares its row. When there is no conclusion the empty state IS
-     * the conclusion line — saying "no verdict" and then "no session" would be
-     * two sentences for one fact. */
+    /* The conclusion comes first whenever there is one, and the number of
+     * judgements never decides whether it is drawn.
+     *
+     * This branch used to key on `totals.checks`, which made one view say two
+     * contradictory things: with a period chosen and its verdict recorded, but no
+     * judgement rows in the window, the head read `no conclusion to read yet`
+     * WHILE the same certificate held the conclusion — measured live, that verdict
+     * was `Met`. "How many judgements" and "is there a conclusion" are different
+     * facts, and the conclusion is the one the reader came for. So the verdict
+     * leads whenever it exists, and the absence of judgements is said BESIDE it
+     * rather than instead of it. */
     var v = st.verdict;
-    if (!st.totals.checks) {
+    if (v) {
+      head.appendChild(certRow('e-cert-verdict', 0, v.status || 'verdict', String(v.id)));
+      if (!st.totals.checks) {
+        head.appendChild(certRow('e-cert-note', 1,
+          'no judgements in this window',
+          'the conclusion is recorded; nothing here has been judged yet'));
+      }
+    } else if (!st.totals.checks) {
       head.appendChild(certRow('e-cert-note', 0,
-        v ? 'no judgements in this window' : 'no conclusion to read yet',
-        v ? 'nothing rests on anything yet' : 'pick a session on the left; the reading follows its rows'));
-      $('eCert').removeAttribute('hidden');
-      $('eTblVp').setAttribute('hidden', '');
-      return;
+        'no conclusion to read yet',
+        'pick a session on the left; the reading follows its rows'));
     }
-    head.appendChild(certRow('e-cert-verdict', 0,
-      v.status || 'verdict',
-      String(v.id)));
 
     /* What needs the reader: a citation that resolves to nothing. Named, with the
      * id it cites, because that id is what has to be chased. */
