@@ -868,43 +868,26 @@ check('the old claim that `ref` is `source#lineNo` is gone (control)',
   })(),
   'a document may not describe its own column incorrectly');
 
-/* ---- the certificate's styles: are the classes the view emits actually styled?
+/* ---- do the classes this page emits actually have styles?
  *
- * `renderCertificate` emits seven class names, and until this assertion existed
- * NOT ONE of them had a rule in `prove_track.css`: the 推导 view drew as raw
- * unstyled rows, and every check in this file passed anyway, because they all
- * asked about data or DOM and none asked whether the thing had a look. A view
- * whose markup is right and whose styles are absent is a view that renders — as
- * a wall of text. That gap is what this closes.
+ * `renderCertificate` emitted seven class names and not one of them had a rule in
+ * `prove_track.css`: the 推导 view drew as raw unstyled rows, and every check in
+ * this file passed anyway, because they all asked about data or DOM and none
+ * asked whether the thing had a look. A view whose markup is right and whose
+ * styles are absent still renders — as a wall of text.
  *
- * It is deliberately mechanical: class names are harvested from the code that
- * emits them, never hand-listed, because a hand-listed copy is exactly how the
- * two halves drift apart in the first place.
+ * The lesson generalises, so this check does too: it covers EVERY `e-` class the
+ * page emits, from the markup and from the code that builds rows. Class names are
+ * harvested from those sources and never hand-listed, because a hand-written copy
+ * of "which classes exist" is exactly how the two halves drifted apart here.
  */
 const CSS_PATH = path.join(A, 'prove_track.css');
 const CSS_TEXT = fs.readFileSync(CSS_PATH, 'utf8');
 
-function emittedCertClasses() {
-  const src = fs.readFileSync(path.join(A, 'prove_track.view.js'), 'utf8');
-  const out = {};
-  let m;
-  const row = /certRow\('([a-z0-9-]+)'/g;
-  while ((m = row.exec(src))) { out[m[1]] = true; }
-  // Classes assigned to elements the certificate builds (the row itself, its two
-  // cells) — a fixed literal, so a regex is enough and no JS parser is needed.
-  const cn = /className\s*=\s*'([^']+)'/g;
-  while ((m = cn.exec(src))) {
-    m[1].split(/\s+/).forEach(function (c) { if (c.indexOf('e-cert') === 0) { out[c] = true; } });
-  }
-  return Object.keys(out).sort();
-}
-
-/* A class is styled only if it appears in a rule's SELECTOR — not in a
-   declaration, and not inside a comment. Selectors are read from the text
-   between the previous `}`/`{` and this `{`, because this stylesheet wraps a
-   selector across lines (`…,\n  #view-prove-track .e-cert-folded .e-cert-main{`)
-   and a line-at-a-time reader silently reported a styled class as unstyled —
-   which is how a check lies in the safe direction and is never noticed. */
+/* Selectors are read from the text between rules, not line by line: this
+ * stylesheet wraps selectors across lines, and the first version of this check
+ * reported the styled `.e-cert-folded` as unstyled for that reason alone — a
+ * check that lies in the safe direction is a check nobody ever notices. */
 function selectorRules(css) {
   const noComments = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const out = [];
@@ -914,45 +897,127 @@ function selectorRules(css) {
     if (open === -1) { break; }
     const close = noComments.indexOf('}', open);
     if (close === -1) { break; }
-    let start = Math.max(noComments.lastIndexOf('}', open), noComments.lastIndexOf('{', open - 1));
+    const start = Math.max(noComments.lastIndexOf('}', open), noComments.lastIndexOf('{', open - 1));
     out.push(noComments.slice(start + 1, open));
     i = close + 1;
   }
   return out;
 }
 const CSS_RULES = selectorRules(CSS_TEXT);
+/* The stylesheets that are not this file: base/tokens/components carry page-level
+ * e- classes of their own, so a class defined there is styled, not missing. Only
+ * their <style> bodies count — a class name mentioned in markup is not a rule,
+ * and matching it as one is how the first version of this check passed `e-reply`
+ * (which IS styled, in prove_track.css, though only ever as `tr.ev.e-reply`). */
+function styleBlocks(html) {
+  const out = [];
+  const re = /<style[^>]*>([\s\S]*?)<\/style>/g;
+  let m;
+  while ((m = re.exec(html))) { out.push(m[1]); }
+  return out.join('\n');
+}
+const OTHER_CSS = fs.readdirSync(A)
+  .filter(function (n) { return /\.html?$/.test(n); })
+  .map(function (n) { return styleBlocks(fs.readFileSync(path.join(A, n), 'utf8')); })
+  .join('\n');
+const OTHER_RULES = selectorRules(OTHER_CSS);
+/* Everything a rule in this page could come from — the corpus the controls below
+ * strip from and re-read, so they test this check rather than half of it. */
+const ALL_CSS = CSS_TEXT + '\n' + OTHER_CSS;
 
-function isStyledIn(selectors, cls) {
+function isStyledIn(rules, cls) {
   const re = new RegExp('(^|[^a-zA-Z0-9_-])\\.' + cls.replace(/-/g, '\\-') + '([^a-zA-Z0-9_-]|$)');
-  return selectors.some(function (sel) { return re.test(sel); });
+  return rules.some(function (sel) { return re.test(sel); });
+}
+function isStyled(cls, rules) {
+  const rs = rules || CSS_RULES.concat(OTHER_RULES);
+  if (isStyledIn(rs, cls)) { return true; }
+  /* A compound selector — `tr.ev.e-reply` — still styles the class, so look for
+   * the class token anywhere in a selector, not only at its start. */
+  const re = new RegExp('\\.' + cls.replace(/-/g, '\\-') + '(?![a-zA-Z0-9_-])');
+  return isStyledIn(rs, cls) || rs.some(function (sel) { return re.test(sel); });
 }
 
-const CERT_CLASSES = emittedCertClasses();
+/* Every `e-` class the page can put on an element: literal class attributes in
+ * the markup, `className = '…'` assignments (the cert row and its two cells), and
+ * class-looking string literals in the scripts (table rows and turn headers are
+ * built by concatenation, so the name never appears in a className assignment). */
+function emittedClasses() {
+  const out = {};
+  const add = function (text, where) {
+    text.split(/\s+/).forEach(function (c) {
+      if (c.indexOf('e-') === 0 && /^e-[a-z0-9-]+$/.test(c)) {
+        out[c] = out[c] || {};
+        out[c][where] = true;
+      }
+    });
+  };
+  fs.readdirSync(A).forEach(function (n) {
+    const full = path.join(A, n);
+    const text = fs.readFileSync(full, 'utf8');
+    let m;
+    if (/\.html?$/.test(n)) {
+      const re = /class="([^"]+)"/g;
+      while ((m = re.exec(text))) { add(m[1], n); }
+    } else if (/\.js$/.test(n)) {
+      const re1 = /className\s*=\s*'([^']+)'/g;
+      while ((m = re1.exec(text))) { add(m[1], n); }
+      const re2 = /'((?:e-)[a-z0-9-]+)'/g;
+      while ((m = re2.exec(text))) { add(m[1], n); }
+    }
+  });
+  return out;
+}
 
-check('the certificate view emits class names this check actually reads (control)',
-  CERT_CLASSES.length >= 5 && CERT_CLASSES.indexOf('e-cert-row') !== -1 &&
-    CERT_CLASSES.indexOf('e-cert-dangling') !== -1,
-  'harvested: ' + CERT_CLASSES.join(', '));
+const EMITTED = emittedClasses();
+const EMITTED_NAMES = Object.keys(EMITTED).sort();
 
-check('every class the certificate emits has a rule in prove_track.css',
-  CERT_CLASSES.every(function (c) { return isStyledIn(CSS_RULES, c); }),
-  'unstyled: ' + CERT_CLASSES.filter(function (c) { return !isStyledIn(CSS_RULES, c); }).join(', '));
+/* Classes that intentionally carry no rule of their own. The bar for entry is
+ * named in the reason: a plain grouping container whose children are the styled
+ * ones, or an element styled inline in the markup it is declared in. "Nobody got
+ * round to it" is not a reason, and the certificate's seven would all fail it. */
+const STYLELESS_BY_DESIGN = [
+  { cls: 'e-sr', why: 'visually-hidden caption, styled inline where it is declared (clip-rect pattern)' }
+].reduce(function (a, e) { a[e.cls] = e.why; return a; }, {});
 
-/* The control: the assertion above must be able to fail. Stripping the rule a
-   class depends on has to make this check red, otherwise it is decoration. */
-check('removing a class\'s rule would be caught (control)',
-  isStyledIn(CSS_RULES, 'e-cert-dangling') &&
-    !isStyledIn(selectorRules(CSS_TEXT.replace(/\.e-cert-dangling/g, '.gone')), 'e-cert-dangling'),
-  'the check cannot distinguish a styled class from an unstyled one');
+check('every e- class the page emits was found by this check (control)',
+  EMITTED_NAMES.length >= 40 && EMITTED_NAMES.indexOf('e-cert-row') !== -1 &&
+    EMITTED_NAMES.indexOf('e-trk') !== -1,
+  'harvested ' + EMITTED_NAMES.length + ' classes; a harvest that finds nothing passes everything');
 
-/* And the same control for the state the file was actually in: with the whole
-   certificate layer deleted, the check must report every class as unstyled. */
-check('and the pre-fix stylesheet fails it (control)',
+check('every e- class the page emits has a rule, or is styleless by design',
+  EMITTED_NAMES.every(function (c) {
+    return isStyled(c) || Object.prototype.hasOwnProperty.call(STYLELESS_BY_DESIGN, c);
+  }),
+  'unstyled and not declared: ' + EMITTED_NAMES.filter(function (c) {
+    return !isStyled(c) && !Object.prototype.hasOwnProperty.call(STYLELESS_BY_DESIGN, c);
+  }).join(', '));
+
+/* The certificate is the reason this check exists, so it gets the strict form:
+ * no allowance, since every one of its classes carries meaning a reader needs. */
+const CERT_CLASSES = EMITTED_NAMES.filter(function (c) { return c.indexOf('e-cert') === 0; });
+check('the certificate gets no styleless allowance at all',
+  CERT_CLASSES.length >= 5 && CERT_CLASSES.every(function (c) { return isStyled(c); }),
+  'unstyled certificate classes: ' + CERT_CLASSES.filter(function (c) { return !isStyled(c); }).join(', '));
+
+/* And the whole thing must be able to fail: with every certificate rule stripped
+ * the check has to report them unstyled, which is the exact state the file was in
+ * before this layer existed. */
+check('stripping the certificate rules makes this check report them (control)',
   (function () {
-    const stripped = selectorRules(CSS_TEXT.replace(/\.e-cert[a-z-]+/g, '.gone'));
-    return CERT_CLASSES.every(function (c) { return !isStyledIn(stripped, c); });
+    /* Strip from the corpus AND re-run the whole reader over it, exactly as the
+       assertion above does — otherwise this control tests a variable, not the
+       check, and passes while the real check has stopped reading anything. */
+    /* `\b`, not `[a-z-]+`: the bare class `.e-cert` has no letter after the
+       hyphen, so the first version of this strip left its rule in place and the
+       control passed while one certificate class was still styled. The regex now
+       covers every `.e-cert…` form, next to a boundary or not. */
+    const strippedRules = selectorRules(ALL_CSS.replace(/\.e-cert\b/g, '.gone'));
+    return CERT_CLASSES.length >= 5 && CERT_CLASSES.every(function (c) {
+      return !isStyled(c, strippedRules);
+    });
   })(),
-  'this is the exact state prove_track.css was in before the layer was added');
+  'this is the state prove_track.css was in before the certificate layer was added');
 
 process.exit(failures === 0 ? 0 : 1);
 

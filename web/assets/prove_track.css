@@ -240,6 +240,14 @@
   #view-prove-track .e-cert-dangling .e-cert-main{color:var(--e-risk);font-weight:600}
   #view-prove-track .e-cert-folded .e-cert-main,
   #view-prove-track .e-cert-note .e-cert-main{color:var(--e-dim)}
+  /* The two section containers carry the only spacing between groups that rows
+     must not: the folded count belongs to everything above it, so the fold is
+     separated by a line, not by a gap [PHYS:P-012 — group gap > row gap]. They
+     are named and given the job rather than left styleless, because "container"
+     is a description, not a reason for a class to exist. */
+  #view-prove-track .e-cert-head{margin-bottom:var(--sp-3)}
+  #view-prove-track .e-cert-fold{margin-top:var(--sp-3);padding-top:var(--sp-2);
+    border-top:1px solid var(--e-line)}
   #view-prove-track .e-cert .e-cert-row:last-child{border-bottom:0}
   @media (forced-colors:active){
     #view-prove-track .e-cert-dangling{border-left-color:CanvasText;background:transparent}
