@@ -48,6 +48,13 @@
       var id = tg.dataset.eTurntoggle;
       S.openTurns[id] = !S.openTurns[id];
       renderTable(); syncTurnBtn();
+      return;
+    }
+    var ct = e.target.closest && e.target.closest('[data-e-compacttoggle]');
+    if (ct) {
+      var cid = ct.dataset.eCompacttoggle;
+      S.foldedTurns[cid] = !S.foldedTurns[cid];
+      renderTable();
     }
   });
   document.addEventListener('keydown', function (e) {
@@ -65,6 +72,17 @@
     $('eTurnBtn').setAttribute('aria-pressed', String(allOpen));
     $('eTurnBtn').textContent = allOpen ? 'Collapse all turns' : 'Expand all turns';
   }
+  /* 紧凑开关的同步。默认按下（折叠），所以 aria-pressed=true 时它做的是"放开"。 */
+  function syncCompactBtn() {
+    var b = $('eCompactBtn'); if (!b) { return; }
+    b.setAttribute('aria-pressed', String(S.compact));
+    b.textContent = S.compact ? '紧凑' : '完整';
+  }
+  $('eCompactBtn').addEventListener('click', function () {
+    S.compact = !S.compact;
+    syncCompactBtn();
+    renderTable();
+  });
   $('eInspX').addEventListener('click', closeInsp);
   $('eScrim').addEventListener('click', function () { if (isModal()) closeInsp(); });
   $('eDurBtn').addEventListener('click', function () {

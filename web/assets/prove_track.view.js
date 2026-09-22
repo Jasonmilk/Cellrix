@@ -36,7 +36,14 @@
     durMode: 'equal', openTurns: {}, callsOpen: true, q: '',
     sel: null, replayIdx: -1, replayTimer: null,
     lastFocusEv: null, lastFocusEl: null, meta: null,
-    usage: null
+    usage: null,
+    /* Compact view. Borrowed from DSH's transcript policy, which calls it
+     * Compact and makes it the default: a COMPLETED turn does not have to keep
+     * justifying itself line by line, so its internal steps fold into one row
+     * that says how many there were and what they cost. `foldedTurns` is the
+     * per-turn exception, and `compactGroups` is derived on every render (see
+     * compactGroupsOf) rather than stored, so it cannot go stale. */
+    compact: true, foldedTurns: {}, compactGroups: {}
   };
 
   var HAS = {
@@ -84,8 +91,61 @@
   }
 
   /* ---------- Table ---------- */
+  /* What compact mode folds, decided by one rule and stated here rather than
+   * sprinkled through the renderer:
+   *
+   *   a step folds when it is DONE and it is not the answer.
+   *
+   * Everything that asks something of the reader stays: an answer, a judgement,
+   * a verdict, a failure, anything still running, and — while a search is on —
+   * everything, because a filter that hides its own matches is worse than no
+   * filter. Folding that dropped a failure would be the same fault as a status
+   * column that only ever says "done". */
+  function compactGroupsOf() {
+    var out = {};
+    if (!S.compact) { return out; }
+    for (var i = 0; i < S.session.length; i++) {
+      var it = S.session[i];
+      if (it.kind !== 'turn') { continue; }
+      var ids = [], tok = 0, dur = 0, failed = 0, anyShown = false;
+      for (var k = i + 1; k < S.session.length && S.session[k].kind !== 'turn'; k++) {
+        var e = S.session[k];
+        /* A failure is never folded: it is the one thing a reader must not have
+         * to open a disclosure to find.
+         *
+         * The status vocabulary here is `ok` / `fail` / `pending`, plus `done` —
+         * and the two are NOT interchangeable, which cost a rebuild to learn:
+         * `render.statusOf` returns `ok` for the kinds it judges (tool, check,
+         * verdict) and `done` for every other kind, and `done` is what the rows
+         * actually carry. Reading only `ok` therefore found no completed step at
+         * all and folded nothing.
+         *
+         * Folding is about the steps that are neither the answer nor a request
+         * for one. A REPLY does not block folding — it is always drawn, so it
+         * cannot be inside the disclosure either way; blocking on it was the
+         * second reason nothing folded (`why: ["REPLY"]` on every turn, measured
+         * in Chrome). A tool CALL does block, because the reader asked to see
+         * requests and the fold must not overrule that. Anything unsettled or
+         * unrecognised blocks too: assuming foldability is the direction that
+         * hides work. */
+        if (e.status === 'fail') { anyShown = true; failed++; }
+        else if (e.status === 'pending') { anyShown = true; }
+        else if (e.status === 'ok' || e.status === 'done') {
+          /* A tool row with status `ok` is the RESPONSE side; the call itself is
+           * the `pending` row and is already reserved above, so the requests stay
+           * visible whichever way the reader set "Expand all calls". */
+          if (e.cls === TOOL_CLS) { anyShown = true; }
+          else { ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; } tok += (e.tok || 0); }
+        } else { anyShown = true; }
+      }
+      if (ids.length && !anyShown) { out[it.id] = { ids: ids, tok: tok, dur: dur, failed: failed, turn: it }; }
+    }
+    return out;
+  }
+
   function renderTable() {
     var h = '', COLS = 5;
+    S.compactGroups = compactGroupsOf();
     for (var i = 0; i < S.session.length; i++) {
       var it = S.session[i];
       if (it.kind === 'turn') {
@@ -98,9 +158,40 @@
           '<span>Turn ' + it.index + ' · ' + esc(it.note) + '</span>' +
           '<span class="cnt"> · ' + cnt + ' events · ' + fmtDur(tl) + '</span>' +
           '</button></td></tr>';
+        /* The folded row, drawn where the steps it stands for would have been —
+         * directly under its turn header. It borrows the turn header's own
+         * control and its `cnt` shoulder so the count is not a second verb to
+         * learn, and it never becomes the only way to reach the rows: the
+         * disclosure is the same affordance as expanding the turn.
+         *
+         * It does NOT depend on whether the turn is open. Turns arrive open by
+         * default (`openTurns` is true for all of them on load), so gating this
+         * on a closed turn meant compact mode folded nothing at all — measured in
+         * Chrome, 59 rows with 0 folded. Compact is the presentation of a
+         * completed turn, not a state of its disclosure. */
+        var g = S.compactGroups[it.id];
+        if (g && !S.foldedTurns[it.id] && !S.q) {
+          var open = !!S.foldedTurns[it.id];
+          h += '<tr class="e-compact-hd"><td colspan="' + COLS + '">' +
+            '<button type="button" class="e-turn-btn e-compact-btn" data-e-compacttoggle="' + it.id + '" ' +
+            'aria-expanded="' + open + '">' +
+            '<span style="display:inline-block;width:14px" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>' +
+            '<span>内部步骤已折叠</span>' +
+            '<span class="cnt"> · ' + g.ids.length + ' internal steps · ' + fmtDur(g.dur) +
+            (g.tok ? ' · ' + fmtTok(g.tok) + ' tok' : '') +
+            (g.failed ? ' · ⚠ ' + g.failed + ' failed' : '') + '</span>' +
+            '</button></td></tr>';
+        }
         continue;
       }
       if (!S.openTurns[it.turn]) continue;
+      var grp = S.compactGroups[it.turn];
+      /* Folded means folded: the step stays inside the disclosure even when the
+       * turn itself is open, because compact mode is what the reader asked for.
+       * Expanding a single turn (the turn header) is the per-turn exception and
+       * it re-reveals these steps through `foldedTurns` — set by clicking the
+       * folded row. Two independent disclosures, neither hidden by the other. */
+      if (grp && !S.q && !S.foldedTurns[it.turn] && grp.ids.indexOf(it.id) > -1) continue;
       if (it.cls === TOOL_CLS && !S.callsOpen) continue;
 
       var st = STATUS[it.status] || STATUS.done;

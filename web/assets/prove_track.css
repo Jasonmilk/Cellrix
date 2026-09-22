@@ -168,6 +168,13 @@
   #view-prove-track .e-scroll tr.ev:focus-visible{outline:2px solid var(--e-accent);outline-offset:-2px}
   #view-prove-track .e-scroll tr.e-turn-hd td{background:var(--e-sunk);height:32px;padding:0 9px}
   #view-prove-track .e-scroll tr.e-turn-hd:hover td{background:var(--e-hover)}
+  /* 紧凑型视图的折叠行（参照 DSH 的 Compact transcript：已完成回合的内部步骤折成一行）。
+     它借用回合头自己的按钮与 `.cnt` 肩部文案，所以"有几条"不需要再学第二种读法；
+     折起来的东西仍然点得到——点这行就地展开，与展开回合是同一个动作。 */
+  #view-prove-track .e-scroll tr.e-compact-hd td{background:var(--e-sunk);height:30px;padding:0 9px}
+  #view-prove-track .e-scroll tr.e-compact-hd:hover td{background:var(--e-hover)}
+  #view-prove-track .e-compact-btn{color:var(--e-dim);font-weight:400}
+  #view-prove-track .e-compact-btn .cnt{color:var(--e-pend)}
   #view-prove-track .e-turn-btn{appearance:none;border:0;background:transparent;color:var(--e-dim);
     display:flex;align-items:center;gap:6px;width:100%;min-height:32px;padding:0;
     text-align:left;font:inherit;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer;

@@ -308,6 +308,41 @@ function skip(label, why) {
       "table display=" + shown("eTblVp") + " cert display=" + shown("eCert"));
   }
 
+  /* ---- 紧凑型视图（参照 DSH 的 Compact transcript）-------------------------
+   *
+   * 已完成回合的内部步骤折成一行；交付物、判断、结论、失败、请求永不折。
+   * 这条断言必须证明两件事同时成立，否则它会变成"数字变了就算过"的空转：
+   *   ① 紧凑态确实折了（行数减少且出现折叠行）；
+   *   ② 折掉的**不是**交付物/判断——REPLY 与 CHECK 在紧凑态下必须还在。
+   * 关掉再开必须回到完全相同的行数，否则"折叠"只是把行弄丢了。 */
+  {
+    const cbtn = doc.getElementById("eCompactBtn");
+    const evRows = () => doc.querySelectorAll("#eTbody tr.ev").length;
+    const foldRows = () => doc.querySelectorAll("#eTbody tr.e-compact-hd").length;
+    const kinds = () => Array.from(doc.querySelectorAll("#eTbody tr.ev .e-ty")).map((e) => e.textContent);
+    const wasOn = cbtn.getAttribute("aria-pressed") === "true";
+    if (!wasOn) { cbtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); await sleep(300); }
+    const onRows = evRows(), onFold = foldRows(), onKinds = kinds();
+    cbtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    const offRows = evRows(), offFold = foldRows();
+    cbtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    const backRows = evRows(), backFold = foldRows();
+    check("compact folds the completed internal steps",
+      onFold > 0 && onRows < offRows,
+      "compact=" + onRows + " rows / " + onFold + " folded vs full=" + offRows + " rows");
+    check("compact keeps the deliverable and the judgements",
+      onKinds.indexOf("REPLY") > -1 && (onKinds.indexOf("CHECK") > -1 || onKinds.indexOf("VERDICT") > -1),
+      "kinds under compact: " + JSON.stringify(Array.from(new Set(onKinds))));
+    check("and turning it off restores every row it folded",
+      backRows === onRows && backFold === onFold && offRows > onRows,
+      "on=" + onRows + "+" + onFold + " full=" + offRows + "+" + offFold + " back=" + backRows + "+" + backFold);
+    check("the compact control states which presentation is on",
+      cbtn.getAttribute("aria-pressed") === String(true) && cbtn.textContent.trim().length > 0,
+      "aria-pressed=" + cbtn.getAttribute("aria-pressed") + " label=" + JSON.stringify(cbtn.textContent.trim()));
+  }
+
   /* ---- 热区尺寸取自令牌，而不是各处各自的常数 -----------------------------
    *
    * P-010 的下界来自 8–10mm 指尖：`constraints.md` 写"热区最小尺寸 ≥ 44px"，令牌集

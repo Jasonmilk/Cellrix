@@ -88,6 +88,7 @@
 | `.e-trk-nm` | prove_track.html |
 | `eCert` | prove_track.html |
 | `eCertBtn` | prove_track.html |
+| `eCompactBtn` | prove_track.html |
 | `eHint` | prove_track.html |
 | `eInsp` | prove_track.html |
 | `eInspX` | prove_track.html |
