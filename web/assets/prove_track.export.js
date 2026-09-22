@@ -231,6 +231,24 @@
       '` · ' + src.count + ' period' + (src.count === 1 ? '' : 's') : 'no periods'));
     out.push('- rows: ' + rowCount + ' over ' + groups.length + ' turn' +
       (groups.length === 1 ? '' : 's'));
+    /* Whether anything JUDGED this window, stated either way (K-114).
+     *
+     * A `Met` verdict with no judgement behind it is not a finding, it is the
+     * absence of one — and an exhibit that prints only `Met` reads as "verified".
+     * Measured in this workspace: 5 of the 6 most recent periods carry no
+     * check/status row at all, and a wrong answer was stamped `success` in a
+     * window that says so in every other line.
+     *
+     * Both cases are printed, not just the bad one, because a line that appears
+     * only when something is wrong is itself a shape: "verified" and "unverified"
+     * have to look different at a glance, which they only do if the good case also
+     * carries a line. The count is the criterion — zero checks cannot support any
+     * conclusion, whatever the verdict row says. */
+    var judged = derivation(session);
+    out.push(judged.checks.length
+      ? '- judged by: ' + judged.checks.length + ' check' + (judged.checks.length === 1 ? '' : 's')
+      : '- judged by: NOTHING — no check row in this window, so its verdict is ' +
+        'UNVERIFIED and must not be read as "checked and passed"');
     if (sp.from) {
       /* Wall-clock in the window is a fact; so is the part of it the rows
        * account for. Reporting only the span let a reviewer assume the waits add

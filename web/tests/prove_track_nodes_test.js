@@ -778,5 +778,53 @@ check('the default is selective, not "everything" (control)',
   })(),
   'a default that promotes everything asserts nothing about what matters');
 
+/* ---- a window with no judgement says so (K-114) -------------------------
+ *
+ * A `Met` verdict with no check row behind it is the ABSENCE of a finding, not a
+ * finding — and an exhibit that prints only `Met` reads as "verified". Measured
+ * in this workspace: 5 of the 6 most recent periods carry no check row, and a
+ * wrong answer was stamped `success` in a window nothing had judged.
+ *
+ * The good case is asserted too, on purpose: a line that appears only when
+ * something is wrong is itself a shape, and "verified" and "unverified" have to
+ * look different at a glance. The criterion is the CHECK COUNT, not the verdict
+ * string — no check row can support any conclusion.
+ */
+check('a window with no check row states that it is UNVERIFIED',
+  (function () {
+    const P = 'run-nc';
+    const ev = (id, cls, pl) => ({
+      kind: 'ev', id: id, source: P, cls: cls, ts: '2026-01-01T00:00:00Z',
+      payload: JSON.stringify(pl), summary: '', status: '', dur: 0,
+    });
+    // A verdict and a tool result, and nothing that judged them.
+    const md = PT.export.markdown([
+      ev('p#1', 'TOOL', { stage: 'result', tool: 'calc', index: 0, ok: true, durationMs: 1 }),
+      ev('p#9', 'VERDICT', { jobId: P, status: 'Met', checks: 0 }),
+    ], null);
+    const line = md.split('\n').find((l) => l.startsWith('- judged by:'));
+    // Both the absence and the consequence have to be on the line.
+    return !!line && /NOTHING/.test(line) && /UNVERIFIED/.test(line);
+  })(),
+  'the export must not print a conclusion without saying nothing judged it');
+
+check('and a window that WAS judged states the count instead (control)',
+  (function () {
+    const md = PT.export.markdown(derivationFixture(), null);
+    const line = md.split('\n').find((l) => l.startsWith('- judged by:'));
+    // The fixture has exactly two check rows; anything else means the count is
+    // being derived from something other than the checks themselves.
+    return !!line && /judged by: 2 checks/.test(line) && !/NOTHING/.test(line);
+  })(),
+  'a judged window and an unjudged one must not read the same');
+
+check('the distinction is not vacuous: both lines cannot appear (control)',
+  (function () {
+    const withTwo = PT.export.markdown(derivationFixture(), null)
+      .split('\n').filter((l) => l.startsWith('- judged by:'));
+    return withTwo.length === 1 && /UNVERIFIED/.test(withTwo[0]) === false;
+  })(),
+  'if both forms could appear the reader could not tell which applies');
+
 process.exit(failures === 0 ? 0 : 1);
 
