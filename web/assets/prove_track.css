@@ -205,6 +205,47 @@
   #view-prove-track .e-stat b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
   #view-prove-track .e-stat span{font-size:11px;color:var(--e-dim);letter-spacing:.3px}
 
+  /* ---------- Certificate (推导): the same session, read as an argument ----
+     The other projection of this page. `prove_track.view.js` had emitted these
+     seven class names and `prove_track.html` had carried the container since the
+     certificate landed, but NOTHING styled any of them — the view rendered as
+     raw unstyled rows. Below is the missing layer, and it stays inside the
+     reach of the tokens above rather than introducing a second visual system.
+     It is a reading column, so the only interaction is scrolling: no control
+     lives here, and `.e-cert` must never grow the page — P-004/P-005 (motion
+     windows) do not apply to a surface with no motion, and P-019 (no flicker)
+     applies to the one animation the page does have (`eGleam`, 1.4s = 0.71Hz). */
+  #view-prove-track .e-cert{flex:1 1 auto;min-height:0;overflow:auto;background:var(--e-surface);
+    border-top:1px solid var(--e-line);padding:12px 14px 16px}
+  #view-prove-track .e-cert[hidden]{display:none}
+  #view-prove-track .e-cert-row{display:flex;align-items:baseline;gap:var(--sp-3);min-height:28px;
+    padding:5px 0;border-bottom:1px solid var(--e-line)}
+  #view-prove-track .e-cert-main{min-width:0;overflow-wrap:anywhere}
+  #view-prove-track .e-cert-meta{flex:0 0 auto;margin-left:auto;font-size:11.5px;color:var(--e-dim);
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  /* Depth as indentation, not decoration: 0 = the conclusion, 1 = what rests on
+     it. The guide is one hairline that goes away in forced colors [PHYS:L-001]. */
+  #view-prove-track .e-cert-row[data-cert-depth="1"]{margin-left:var(--sp-5);
+    border-left:2px solid var(--e-line2);padding-left:10px}
+  /* The conclusion is the one line a reader came for, so it is the one line that
+     is emphasised. Everything else stays quiet on purpose [PHYS:P-016]: if every
+     row shouted, the reader would have to read all of them to find the answer. */
+  #view-prove-track .e-cert-verdict .e-cert-main{font-size:15px;font-weight:600}
+  /* What asks something of the reader: a citation with nothing on the other end.
+     Two channels — colour AND a bar — never colour alone. Marking this row with a
+     bar REPLACES the depth guide, so it is declared after it and inherits the
+     same 20px indent; a second indent would read as a third level of the tree. */
+  #view-prove-track .e-cert-dangling{margin-left:var(--sp-5);padding-left:10px;
+    border-left:3px solid var(--e-risk);background:var(--e-soft)}
+  #view-prove-track .e-cert-dangling .e-cert-main{color:var(--e-risk);font-weight:600}
+  #view-prove-track .e-cert-folded .e-cert-main,
+  #view-prove-track .e-cert-note .e-cert-main{color:var(--e-dim)}
+  #view-prove-track .e-cert .e-cert-row:last-child{border-bottom:0}
+  @media (forced-colors:active){
+    #view-prove-track .e-cert-dangling{border-left-color:CanvasText;background:transparent}
+    #view-prove-track .e-cert-row[data-cert-depth="1"]{border-left-color:CanvasText}
+  }
+
   /* ---------- Inspector (right drawer; user decision 2026-09-16: TWO columns
      only — the inspector is a POPUP drawer again, not a resident third column.
      The drawer leaves part of the main area visible; scrim / ✕ hide it.) ---- */

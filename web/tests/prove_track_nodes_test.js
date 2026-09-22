@@ -868,5 +868,91 @@ check('the old claim that `ref` is `source#lineNo` is gone (control)',
   })(),
   'a document may not describe its own column incorrectly');
 
+/* ---- the certificate's styles: are the classes the view emits actually styled?
+ *
+ * `renderCertificate` emits seven class names, and until this assertion existed
+ * NOT ONE of them had a rule in `prove_track.css`: the 推导 view drew as raw
+ * unstyled rows, and every check in this file passed anyway, because they all
+ * asked about data or DOM and none asked whether the thing had a look. A view
+ * whose markup is right and whose styles are absent is a view that renders — as
+ * a wall of text. That gap is what this closes.
+ *
+ * It is deliberately mechanical: class names are harvested from the code that
+ * emits them, never hand-listed, because a hand-listed copy is exactly how the
+ * two halves drift apart in the first place.
+ */
+const CSS_PATH = path.join(A, 'prove_track.css');
+const CSS_TEXT = fs.readFileSync(CSS_PATH, 'utf8');
+
+function emittedCertClasses() {
+  const src = fs.readFileSync(path.join(A, 'prove_track.view.js'), 'utf8');
+  const out = {};
+  let m;
+  const row = /certRow\('([a-z0-9-]+)'/g;
+  while ((m = row.exec(src))) { out[m[1]] = true; }
+  // Classes assigned to elements the certificate builds (the row itself, its two
+  // cells) — a fixed literal, so a regex is enough and no JS parser is needed.
+  const cn = /className\s*=\s*'([^']+)'/g;
+  while ((m = cn.exec(src))) {
+    m[1].split(/\s+/).forEach(function (c) { if (c.indexOf('e-cert') === 0) { out[c] = true; } });
+  }
+  return Object.keys(out).sort();
+}
+
+/* A class is styled only if it appears in a rule's SELECTOR — not in a
+   declaration, and not inside a comment. Selectors are read from the text
+   between the previous `}`/`{` and this `{`, because this stylesheet wraps a
+   selector across lines (`…,\n  #view-prove-track .e-cert-folded .e-cert-main{`)
+   and a line-at-a-time reader silently reported a styled class as unstyled —
+   which is how a check lies in the safe direction and is never noticed. */
+function selectorRules(css) {
+  const noComments = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const out = [];
+  let i = 0;
+  while (i < noComments.length) {
+    const open = noComments.indexOf('{', i);
+    if (open === -1) { break; }
+    const close = noComments.indexOf('}', open);
+    if (close === -1) { break; }
+    let start = Math.max(noComments.lastIndexOf('}', open), noComments.lastIndexOf('{', open - 1));
+    out.push(noComments.slice(start + 1, open));
+    i = close + 1;
+  }
+  return out;
+}
+const CSS_RULES = selectorRules(CSS_TEXT);
+
+function isStyledIn(selectors, cls) {
+  const re = new RegExp('(^|[^a-zA-Z0-9_-])\\.' + cls.replace(/-/g, '\\-') + '([^a-zA-Z0-9_-]|$)');
+  return selectors.some(function (sel) { return re.test(sel); });
+}
+
+const CERT_CLASSES = emittedCertClasses();
+
+check('the certificate view emits class names this check actually reads (control)',
+  CERT_CLASSES.length >= 5 && CERT_CLASSES.indexOf('e-cert-row') !== -1 &&
+    CERT_CLASSES.indexOf('e-cert-dangling') !== -1,
+  'harvested: ' + CERT_CLASSES.join(', '));
+
+check('every class the certificate emits has a rule in prove_track.css',
+  CERT_CLASSES.every(function (c) { return isStyledIn(CSS_RULES, c); }),
+  'unstyled: ' + CERT_CLASSES.filter(function (c) { return !isStyledIn(CSS_RULES, c); }).join(', '));
+
+/* The control: the assertion above must be able to fail. Stripping the rule a
+   class depends on has to make this check red, otherwise it is decoration. */
+check('removing a class\'s rule would be caught (control)',
+  isStyledIn(CSS_RULES, 'e-cert-dangling') &&
+    !isStyledIn(selectorRules(CSS_TEXT.replace(/\.e-cert-dangling/g, '.gone')), 'e-cert-dangling'),
+  'the check cannot distinguish a styled class from an unstyled one');
+
+/* And the same control for the state the file was actually in: with the whole
+   certificate layer deleted, the check must report every class as unstyled. */
+check('and the pre-fix stylesheet fails it (control)',
+  (function () {
+    const stripped = selectorRules(CSS_TEXT.replace(/\.e-cert[a-z-]+/g, '.gone'));
+    return CERT_CLASSES.every(function (c) { return !isStyledIn(stripped, c); });
+  })(),
+  'this is the exact state prove_track.css was in before the layer was added');
+
 process.exit(failures === 0 ? 0 : 1);
 
