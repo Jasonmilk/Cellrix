@@ -96,6 +96,7 @@
 | `eStats` | prove_track.html |
 | `eTblVp` | prove_track.html |
 | `eTraj` | prove_track.html |
+| `eTurnBtn` | prove_track.html |
 | `.foot` | base.html |
 | `p-` | — |
 | `p-prove-track` | base.html |
@@ -191,7 +192,6 @@
 | `eReplayBtn` | prove_track.html |
 | `eScrim` | prove_track.html |
 | `eTblScroll` | prove_track.html |
-| `eTurnBtn` | prove_track.html |
 | `eWrap` | prove_track.html |
 | `.eg` | base.html |
 | `.esc(c.state)` | script.html |

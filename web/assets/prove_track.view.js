@@ -164,13 +164,18 @@
          * learn, and it never becomes the only way to reach the rows: the
          * disclosure is the same affordance as expanding the turn.
          *
-         * It does NOT depend on whether the turn is open. Turns arrive open by
-         * default (`openTurns` is true for all of them on load), so gating this
-         * on a closed turn meant compact mode folded nothing at all — measured in
-         * Chrome, 59 rows with 0 folded. Compact is the presentation of a
-         * completed turn, not a state of its disclosure. */
+         * It does NOT depend on whether the turn is open — turns arrive open by
+         * default (`openTurns` is true for all seven on load), and gating on a
+         * closed turn meant compact folded nothing at all (measured: 59 rows,
+         * 0 folded). Compact is the presentation of a completed turn, not a state
+         * of its disclosure.
+         *
+         * It DOES follow the turn being CLOSED, because a folded row stands in for
+         * rows that are not drawn: with the turn collapsed its stand-in has to go
+         * too. Measured: collapsing all turns left 0 event rows and 5 fold rows
+         * still on screen — the disclosure was bypassed. */
         var g = S.compactGroups[it.id];
-        if (g && !S.foldedTurns[it.id] && !S.q) {
+        if (g && isOpen && !S.foldedTurns[it.id] && !S.q) {
           var open = !!S.foldedTurns[it.id];
           h += '<tr class="e-compact-hd"><td colspan="' + COLS + '">' +
             '<button type="button" class="e-turn-btn e-compact-btn" data-e-compacttoggle="' + it.id + '" ' +

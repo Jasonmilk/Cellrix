@@ -341,6 +341,18 @@ function skip(label, why) {
     check("the compact control states which presentation is on",
       cbtn.getAttribute("aria-pressed") === String(true) && cbtn.textContent.trim().length > 0,
       "aria-pressed=" + cbtn.getAttribute("aria-pressed") + " label=" + JSON.stringify(cbtn.textContent.trim()));
+
+    /* 折叠行是"没被画出来的行"的替身，所以回合一收起，替身也必须走。
+     * 实测过的反例：收起全部回合后事件行 0、折叠行仍有 5——收起的本意被绕过。 */
+    const turnBtn = doc.getElementById("eTurnBtn");
+    turnBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));   /* 先收起 */
+    await sleep(300);
+    const collapsed = { ev: evRows(), fold: foldRows() };
+    turnBtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));   /* 恢复展开 */
+    await sleep(300);
+    check("a collapsed turn takes its folded stand-in with it",
+      collapsed.fold === 0 && collapsed.ev === 0,
+      "collapsed: " + collapsed.ev + " rows + " + collapsed.fold + " folded (both must be 0)");
   }
 
   /* ---- 热区尺寸取自令牌，而不是各处各自的常数 -----------------------------
