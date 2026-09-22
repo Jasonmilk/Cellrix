@@ -308,6 +308,24 @@ function skip(label, why) {
       "table display=" + shown("eTblVp") + " cert display=" + shown("eCert"));
   }
 
+  /* ---- 热区尺寸取自令牌，而不是各处各自的常数 -----------------------------
+   *
+   * P-010 的下界来自 8–10mm 指尖：`constraints.md` 写"热区最小尺寸 ≥ 44px"，令牌集
+   * 里就是 `--hit-min:44px`。此前证轨的按钮与搜索框各自写着 36px，而同一份样式表下方
+   * 的粗指针媒体查询又给 44px——同一个控件因触达方式不同而两种尺寸，且桌面那档更小。
+   * 这条断言钉住"按令牌取"，而不是钉住某个数字：令牌改了，这里跟着改，不会有人偷偷
+   * 把 36 写回来。 */
+  {
+    const btn = doc.querySelector("#view-prove-track .e-btn");
+    const inp = doc.querySelector("#view-prove-track .e-search input");
+    const minH = (el) => (el ? window.getComputedStyle(el).minHeight : "");
+    const oneOf = (v) => v === "44px" || v === "var(--hit-min)";
+    check("the toolbar's hit targets are sized by the design token, not by a local constant",
+      !!btn && !!inp && oneOf(minH(btn)) && oneOf(minH(inp)),
+      "button=" + minH(btn) + " input=" + minH(inp) +
+      "（期望 44px 或 var(--hit-min)；写死 36px 时这里会报出来）");
+  }
+
   console.log("-- prove-track: drive the real period-row path --");
   const items = Array.from(doc.querySelectorAll("#s-side .ses-item"));
   if (items.length && JOB) {

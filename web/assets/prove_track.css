@@ -57,8 +57,18 @@
   #view-prove-track .e-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;
     background:var(--e-surface);border-bottom:1px solid var(--e-line)}
   #view-prove-track .e-tools .sp{flex:1 1 auto;min-width:0}
+  /* Hit targets are sized by the design system's own token, not by a local
+     constant: `--hit-min` is 44px, and constraints.md derives P-010's floor from
+     the 8–10mm fingertip ("热区最小尺寸 ≥ 44px"). Measured in Chrome at 1440
+     before this: the toolbar buttons 36px and the search field 36px, while the
+     coarse-pointer block below already gave 44px — the same control was two
+     different sizes depending on how it was reached, and the desktop one was the
+     smaller. Effect of naming the token: toolbar 51 → 59px, the trajectory box and
+     its row count unchanged (606px / 7 rows), and the table pane gives up 8px. No
+     wrap at 1440 (toolbar scrollWidth == clientWidth). Screenshotted in both
+     projections before committing. */
   #view-prove-track .e-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;
-    gap:7px;min-height:36px;padding:0 13px;border:1px solid transparent;border-radius:var(--e-r-m);
+    gap:7px;min-height:var(--hit-min);padding:0 13px;border:1px solid transparent;border-radius:var(--e-r-m);
     font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;user-select:none;
     background:var(--e-sunk);color:var(--e-text);
     transition:background var(--e-dur) var(--e-ease),transform 90ms var(--e-ease)}
@@ -66,9 +76,9 @@
   #view-prove-track .e-btn:active{background:var(--e-press);transform:scale(.985)}
   #view-prove-track .e-btn-primary{background:var(--e-accent);color:var(--e-onacc)}
   #view-prove-track .e-btn-primary:hover{background:var(--e-accent-h)}
-  #view-prove-track .e-btn-sm{min-height:36px;padding:0 11px;font-size:12.5px}
+  #view-prove-track .e-btn-sm{min-height:var(--hit-min);padding:0 11px;font-size:12.5px}
   #view-prove-track .e-search{position:relative;flex:0 1 250px;min-width:150px}
-  #view-prove-track .e-search input{width:100%;min-height:36px;padding:0 32px;border:1px solid var(--e-line2);
+  #view-prove-track .e-search input{width:100%;min-height:var(--hit-min);padding:0 32px;border:1px solid var(--e-line2);
     border-radius:var(--e-r-m);background:var(--e-sunk);color:var(--e-text);font:inherit;font-size:13px}
   #view-prove-track .e-search input:focus{outline:0;border-color:var(--e-accent);box-shadow:0 0 0 3px var(--e-soft)}
   #view-prove-track .e-search .ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--e-dim);pointer-events:none}
