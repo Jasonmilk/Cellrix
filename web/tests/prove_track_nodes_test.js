@@ -826,5 +826,47 @@ check('the distinction is not vacuous: both lines cannot appear (control)',
   })(),
   'if both forms could appear the reader could not tell which applies');
 
+/* ---- two indexes share one sign, and the document must say so -----------
+ *
+ * The `ref` column and an evidence citation both use `#`, for different keys:
+ * `run#0` is the row's short id and points at a position in this document, while
+ * `run-0212da5381eee6a3#0` is a job id and points at a tool result. A reader who
+ * assumes one namespace points at the wrong line — which is exactly what an audit
+ * cannot afford.
+ *
+ * The first assertion is the one that can go red: it fails if any row id is
+ * shaped like an evidence citation (a `#` whose left side is a full job id), i.e.
+ * if the two namespaces ever actually merge rather than merely sharing a sign.
+ */
+check('no row id is shaped like an evidence citation (namespaces stay separate)',
+  (function () {
+    const rows = derivationFixture().filter((r) => r.kind === 'ev');
+    // Row ids in the fixture look like `p#5`; an evidence citation looks like
+    // `<job id>#<n>`. The predicate is about SHAPE, so it also catches a future
+    // change that starts emitting job-id-shaped row ids.
+    return rows.every(function (r) {
+      const left = String(r.id).split('#')[0];
+      return !/^run-[0-9a-f]{6,}/.test(left);
+    });
+  })(),
+  'a row id that starts with a job id cannot be told from a citation');
+
+check('and the document states which namespace each sign belongs to (assertion)',
+  (function () {
+    const md = PT.export.markdown(derivationFixture(), null);
+    return md.indexOf('`ref` is the row id') !== -1 &&
+      md.indexOf('an evidence citation is a DIFFERENT key') !== -1;
+  })(),
+  'the reader must be told the two ids differ, since the document prints both');
+
+check('the old claim that `ref` is `source#lineNo` is gone (control)',
+  (function () {
+    const md = PT.export.markdown(derivationFixture(), null);
+    // That wording described a column this export does not emit; leaving it in
+    // would be the declared-vs-actual slip the same file keeps recording.
+    return md.indexOf('`source#lineNo`') === -1;
+  })(),
+  'a document may not describe its own column incorrectly');
+
 process.exit(failures === 0 ? 0 : 1);
 

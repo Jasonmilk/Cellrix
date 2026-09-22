@@ -307,7 +307,19 @@
      * report a certainty nobody measured. */
     out.push('- `wait` is the interval that ended at that row; for a model row it is the');
     out.push('  whole call (thinking and answer come from one call, so neither has its own)');
-    out.push('- every row carries `ref` — `source#lineNo` — so it can be checked against its record');
+    /* Two different indexes share the `#` sign, and a reader who assumes they are
+     * one namespace points at the wrong line. Measured: the `ref` column carries
+     * the row's SHORT id (`run#0` — the SYSTEM row) while a check cites its
+     * evidence as `<job id>#<call index>` (`run-0212da5381eee6a3#0` — the first
+     * tool result). Same separator, different key, different thing.
+     *
+     * The line below used to say every row carries `source#lineNo`, which is not
+     * what the column holds — the same declared-vs-actual slip this file has now
+     * recorded several times. It now says what is there, and says which namespace
+     * the other one is. */
+    out.push('- `ref` is the row id: `<short source>#<row index>` — a position in this document');
+    out.push('- an evidence citation is a DIFFERENT key: `<job id>#<call index>` — a result to open.');
+    out.push('  The `#` is shared; the two ids never are. Do not read one as the other.');
     out.push('');
     var n = 0;
     groups.forEach(function (g) {
