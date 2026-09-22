@@ -264,6 +264,50 @@ function skip(label, why) {
     }
   }
 
+  /* ---- `hidden` 必须真的藏起来 -------------------------------------------
+   *
+   * 这一条是真 Chrome 抓出来的：证书打开时 `#eTblVp` 带着 `hidden` 仍在渲染
+   * ——`display:flex` 是作者样式，静静压过浏览器默认的 `[hidden]{display:none}`
+   * ——于是表格继续占着 424px，把证书挤成 66px 加一条内部滚动条。那是把"结论 +
+   * 悬空引用一眼可读"的视图变成只能看见三行。
+   *
+   * jsdom 没有布局，但它算得出 `display`，这足以区分"藏了"和"还在占位"。
+   * 三个判据必须一起成立，否则任何一条都能空转：切换真的发生了（两个元素的
+   * display 互换）、带 `hidden` 的元素是 none、不带 `hidden` 的元素不是 none。 */
+  {
+    /* 先选一个真实 period：`renderCertificate(null)` 走的是空态分支，那样这条断言
+     * 测的就只是空盒子，而不是证书真正占的那块地方。 */
+    const first = doc.querySelector("#s-side .ses-item");
+    if (first) { first.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); await sleep(1200); }
+    const tgl = doc.getElementById("eCertBtn");
+    const shown = (id) => window.getComputedStyle(doc.getElementById(id)).display;
+    const tblOn = () => doc.getElementById("eTblVp").hasAttribute("hidden");
+    const tglOn = () => tgl.getAttribute("aria-pressed") === "true";
+    /* 按钮是 toggle，所以从当前真实状态出发，不预设它在哪一边。 */
+    if (tblOn()) { tgl.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); await sleep(300); }
+    const wasPressed = tglOn();
+    tgl.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    const tblCert = { has: tblOn(), disp: shown("eTblVp") };
+    const certCert = { has: doc.getElementById("eCert").hasAttribute("hidden"), disp: shown("eCert") };
+    check("opening the certificate really trades one pane for the other",
+      tblCert.has && tblCert.disp === "none" && !certCert.has && certCert.disp !== "none",
+      "table hidden=" + tblCert.has + " display=" + tblCert.disp +
+      " | cert hidden=" + certCert.has + " display=" + certCert.disp);
+    check("a pane carrying `hidden` is hidden, not merely covered",
+      tblCert.has && tblCert.disp === "none",
+      "table display=" + tblCert.disp + " (作者 display 压过 [hidden] 时这里会是 flex)");
+    check("and the toggle says which projection is on",
+      tglOn() !== wasPressed && tglOn(),
+      "aria-pressed " + wasPressed + " -> " + tglOn());
+    tgl.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    check("and switching back restores the timeline with both panes named correctly",
+      !tblOn() && shown("eTblVp") !== "none" && doc.getElementById("eCert").hasAttribute("hidden") &&
+        shown("eCert") === "none",
+      "table display=" + shown("eTblVp") + " cert display=" + shown("eCert"));
+  }
+
   console.log("-- prove-track: drive the real period-row path --");
   const items = Array.from(doc.querySelectorAll("#s-side .ses-item"));
   if (items.length && JOB) {

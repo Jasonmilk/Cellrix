@@ -86,6 +86,8 @@
 | 名字 | 声明处 |
 |---|---|
 | `.e-trk-nm` | prove_track.html |
+| `eCert` | prove_track.html |
+| `eCertBtn` | prove_track.html |
 | `eHint` | prove_track.html |
 | `eInsp` | prove_track.html |
 | `eInspX` | prove_track.html |
@@ -169,8 +171,6 @@
 | `.e-vp` | prove_track.html |
 | `.e-wrap` | prove_track.html |
 | `eCallBtn` | prove_track.html |
-| `eCert` | prove_track.html |
-| `eCertBtn` | prove_track.html |
 | `eCertFold` | prove_track.html |
 | `eCertHead` | prove_track.html |
 | `eDurBtn` | prove_track.html |

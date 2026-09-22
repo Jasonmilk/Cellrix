@@ -130,6 +130,17 @@
      cropped content independently of the viewport). */
   #view-prove-track .e-scroll{overflow:auto;overscroll-behavior:contain;background:var(--e-surface);min-height:0}
   #view-prove-track .e-vp{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  /* `hidden` must actually hide, and an author `display:flex` silently beats the
+     UA sheet's `[hidden]{display:none}`. Measured in Chrome at 1440×813 with the
+     certificate open: `#eTblVp` carried `hidden` and still rendered — flex 1/1,
+     424px of the 490px free space, with its rows still painted — so `#eCert` was
+     squeezed to 66px against 249px of content and grew an inner scrollbar. That
+     is not a styling detail: the certificate exists so the conclusion and the
+     dangling citations are readable at a glance, and 66px shows three rows.
+     `!important` because the broken declaration is `display:flex` at the same
+     specificity, and because a hidden element losing to layout is exactly the
+     case the keyword is for. */
+  #view-prove-track [hidden]{display:none!important}
   #view-prove-track .e-traj{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
   #view-prove-track .e-scroll{flex:1 1 auto}
   #view-prove-track .e-scroll table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
@@ -221,8 +232,14 @@
   #view-prove-track .e-cert-row{display:flex;align-items:baseline;gap:var(--sp-3);min-height:28px;
     padding:5px 0;border-bottom:1px solid var(--e-line)}
   #view-prove-track .e-cert-main{min-width:0;overflow-wrap:anywhere}
-  #view-prove-track .e-cert-meta{flex:0 0 auto;margin-left:auto;font-size:11.5px;color:var(--e-dim);
-    white-space:nowrap;font-variant-numeric:tabular-nums}
+  /* The right-hand label must not be squeezed. `flex:0 0 auto` still bottoms out
+     at the label's MIN-content width, so a long main text compressed
+     "hard gate · judged by rule" onto two lines inside a 20px line box while the
+     main text stayed on one. Measured in Chrome at 1440: label box 140px when it
+     has room, 116px when squeezed. `min-width:max-content` keeps the label on one
+     line and pushes any overflow onto the main text, where wrapping belongs. */
+  #view-prove-track .e-cert-meta{flex:0 0 auto;min-width:max-content;margin-left:auto;
+    font-size:11.5px;color:var(--e-dim);white-space:nowrap;font-variant-numeric:tabular-nums}
   /* Depth as indentation, not decoration: 0 = the conclusion, 1 = what rests on
      it. The guide is one hairline that goes away in forced colors [PHYS:L-001]. */
   #view-prove-track .e-cert-row[data-cert-depth="1"]{margin-left:var(--sp-5);
@@ -232,11 +249,16 @@
      row shouted, the reader would have to read all of them to find the answer. */
   #view-prove-track .e-cert-verdict .e-cert-main{font-size:15px;font-weight:600}
   /* What asks something of the reader: a citation with nothing on the other end.
-     Two channels — colour AND a bar — never colour alone. Marking this row with a
-     bar REPLACES the depth guide, so it is declared after it and inherits the
-     same 20px indent; a second indent would read as a third level of the tree. */
-  #view-prove-track .e-cert-dangling{margin-left:var(--sp-5);padding-left:10px;
-    border-left:3px solid var(--e-risk);background:var(--e-soft)}
+     Two channels — colour AND a bar — never colour alone [PHYS:L-001]. The bar
+     REPLACES the depth guide at the same 20px indent: a second indent would read
+     as a third level of the tree.
+     It is written INSIDE the depth-1 selector on purpose. As `.e-cert-dangling`
+     it scored (0,2,1) against the guide's (0,3,1), so the grey hairline beat the
+     danger bar no matter which came last in the file — measured in Chrome, the
+     bar was 2px rgb(61,61,61) while the comment claimed red. Same selector, later
+     rule, declared order decides: no `!important`, no specificity arms race. */
+  #view-prove-track .e-cert-row[data-cert-depth="1"].e-cert-dangling{
+    background:var(--e-soft);border-left:3px solid var(--e-risk)}
   #view-prove-track .e-cert-dangling .e-cert-main{color:var(--e-risk);font-weight:600}
   #view-prove-track .e-cert-folded .e-cert-main,
   #view-prove-track .e-cert-note .e-cert-main{color:var(--e-dim)}
@@ -250,7 +272,7 @@
     border-top:1px solid var(--e-line)}
   #view-prove-track .e-cert .e-cert-row:last-child{border-bottom:0}
   @media (forced-colors:active){
-    #view-prove-track .e-cert-dangling{border-left-color:CanvasText;background:transparent}
+    #view-prove-track .e-cert-row[data-cert-depth="1"].e-cert-dangling{border-left-color:CanvasText;background:transparent}
     #view-prove-track .e-cert-row[data-cert-depth="1"]{border-left-color:CanvasText}
   }
 
