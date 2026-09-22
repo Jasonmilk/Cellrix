@@ -112,7 +112,13 @@
     'user/message': { text: ['text'] },
     'context/inject': {
       chars: ['chars'], nodes: ['nodes'], choice: ['choice', 'maybe'],
-      resumeFrom: ['resume_from', 'snake', 'maybe']
+      resumeFrom: ['resume_from', 'snake', 'maybe'],
+      /* The FACT beside the budget: `chars` is what injection was ALLOWED, this
+       * is what it contributed. Measured: `nodes` varied 0/6/12/20 while `chars`
+       * stayed 800, so the budget was the only number the stream carried. Optional
+       * because events written before it exist; absent means unmeasured, which is
+       * not the same as zero. */
+      injectedChars: ['injected_chars', 'snake', 'maybe']
     },
     'assistant/think': { text: ['text'] },
     'assistant/attempt': { text: ['text'], empty: ['empty', 'maybe'] },
