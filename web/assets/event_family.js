@@ -255,7 +255,12 @@
     'user/message': { required: { text: ['string'] }, optional: {} },
     'context/inject': {
       required: { chars: ['number'], nodes: ['number'] },
-      optional: { choice: ['object'], resume_from: ['string', 'null'] }
+      optional: {
+        choice: ['object'], resume_from: ['string', 'null'],
+        // The measured injection beside the configured budget (K-115). Optional
+        // because events written before it exist; absent means unmeasured.
+        injected_chars: ['number'],
+      }
     },
     'assistant/think': { required: { text: ['string'] }, optional: {} },
     'assistant/attempt': {
