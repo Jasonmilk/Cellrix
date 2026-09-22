@@ -13,7 +13,7 @@
 | 对话两栏 `240px + 1fr`                                      | `components.chat.html` `.chat-grid`                      |
 | 两个面板的**窗口**上限是 `--pane-h: min(70vh,720px)`              | 本轮临时收敛（原为 `420px` / `480px` 两个常数，各自裁掉 581px / 6254px 内容） |
 | 证轨：侧栏 `240px` + 主区；三轨条高 `24px`，标签列固定 `58px`             | `prove_track.css`                                        |
-| 检查器：`min(430px,100vw)` `position:fixed`；**<1180px 转模态** | `prove_track.css`，`all_views_test.js` 断言 `aria-modal`    |
+| 检查器：`min(360px,24vw)` `position:fixed`；**<1180px 转模态**（此格原写 `430px`，被下文 §裁决 的数值推翻，`prove_track.css` 亦已删去那条被后一声明覆盖的常量；现三处一致） | `prove_track.css`，`all_views_test.js` 断言 `aria-modal`    |
 | 实测视口                                                    | 1440×813（Chrome headless，本轮所有几何数字都在此取得）                  |
 
 **一句话**：现在没有"几何契约"，只有**各处各自的常数**。用户原话「布局比较差」；  

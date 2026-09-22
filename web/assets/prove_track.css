@@ -257,8 +257,13 @@
   /* ---------- Inspector (right drawer; user decision 2026-09-16: TWO columns
      only — the inspector is a POPUP drawer again, not a resident third column.
      The drawer leaves part of the main area visible; scrim / ✕ hide it.) ---- */
-  #view-prove-track .e-insp{position:fixed;top:0;right:0;bottom:0;width:430px;max-width:100vw;
-    width:min(360px,24vw);z-index:70;
+  /* One width, declared once. A superseded constant used to sit on the line
+     above it, dead on arrival because the later declaration wins — but it read
+     as the contract, and the geometry doc still quoted it. The decided value is
+     this one: finite, so the main area stays visible while the drawer is open
+     (判据 A: ≥200px visible, measured 782px at 1440). */
+  #view-prove-track .e-insp{position:fixed;top:0;right:0;bottom:0;width:min(360px,24vw);
+    max-width:100vw;z-index:70;
     background:var(--e-surface);border-left:1px solid var(--e-line2);box-shadow:var(--e-sh2);
     display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;
     transition:transform 220ms var(--e-ease),visibility 0s linear 220ms;
