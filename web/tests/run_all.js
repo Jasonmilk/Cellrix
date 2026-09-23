@@ -112,6 +112,8 @@ if (!(PANEL_UP && CDP_UP)) {
 if (!(PANEL_UP && CDP_UP)) {
   NEEDS_INPUT.push(['perf_measure.js',
     'needs the panel + a browser on ' + CDP + ': node perf_measure.js ' + PANEL + ' ' + CDP + ' (see README)']);
+  NEEDS_INPUT.push(['hit_targets_test.js',
+    'needs the panel + a browser on ' + CDP + ': node hit_targets_test.js ' + PANEL + ' ' + CDP + ' (see README)']);
 }
 
 if (PANEL_UP) {
@@ -121,6 +123,8 @@ if (PANEL_UP && CDP_UP) {
   SELF_CONTAINED.push(['layout_test.js', 'geometry in a real browser — ' + CDP]);
   SELF_CONTAINED.push(['perf_measure.js',
     'on-demand render: nothing off-stage is rebuilt — ' + PANEL + ' + ' + CDP]);
+  SELF_CONTAINED.push(['hit_targets_test.js',
+    'touch targets ≥ 44px on iPhone-class viewports — ' + PANEL + ' + ' + CDP]);
 }
 
 /* The concrete instance ADR-0022 §2.5 guards: the panel's own navigation shape.

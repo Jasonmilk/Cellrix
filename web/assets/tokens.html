@@ -18,8 +18,7 @@
     --danger-fg:#FF8A80; --danger-tint:#352726;
     --success-fg:#6FDCA0; --success-tint:#0F2A1D;
     --warn-fg:#F5B944;    --warn-tint:#33240A;
-    --on-brand:#06131A;
-    --btn-sec:#232323; --btn-sec-hover:#2B2B2B; --btn-sec-active:#1A1A1A; --btn-sec-border:#3D3D3D;
+    --on-brand:#06131A;    --btn-sec:#232323; --btn-sec-hover:#2B2B2B; --btn-sec-active:#1A1A1A; --btn-sec-border:#3D3D3D;
     --row-zebra:rgba(255,255,255,.026);
     --row-hover:rgba(255,255,255,.057);
     --row-sel:  rgba(255,255,255,.099);
@@ -222,7 +221,7 @@
   .theme-switch { display:flex; gap:2px; margin-left:auto; border:1px solid var(--line-strong);
     border-radius:999px; padding:2px; background:var(--btn-sec); }
   .theme-switch button { appearance:none; background:transparent; border:0; color:var(--text-dim);
-    font-size:11px; padding:0 10px; min-height:28px; cursor:pointer; border-radius:999px; font-family:inherit;
+    font-size:11px; padding:0 10px; min-height:var(--hit-min); cursor:pointer; border-radius:999px; font-family:inherit;
     transition:background var(--dur) var(--ease), color var(--dur) var(--ease); }
   .theme-switch button:hover { color:var(--text-1); }
   .theme-switch button.on { background:var(--brand-tint); color:var(--brand-fg); }
@@ -241,7 +240,12 @@
     border-top:1px solid var(--line); white-space:nowrap; overflow:hidden; font-family:var(--mono); }
   .foot .seg { flex:0 0 auto; overflow:hidden; text-overflow:ellipsis; }
   .foot .sp { flex:1 1 auto; min-width:0; }
-  .foot a { color:var(--brand-fg); }
+  /* 实际可点区必须 ≥ `--hit-min`（本仓既有的单一来源）。
+   * 实测（iPhone 393×852, pointer:coarse）：`.foot a` 只有 12px ⇒ 触不到；
+   * `.theme-switch button` 只有 28px。两处都是**硬值没接上令牌**，不是设计意图
+   * —— 顶栏键与 `.btn-icon` 本就走 `::after` 扩展达到 44px，是这两处漏了。
+   * 判据：`web/tests/perf_measure.js` 同款 CDP 量法，改后应为 0 个 < 44px。 */
+  .foot a { color:var(--brand-fg); display:inline-flex; align-items:center; min-height:var(--hit-min); }
   .foot .tag.ok { color:var(--success-fg); }
   .view-head { font-size:12px; color:var(--text-dim); margin-bottom:12px;
     display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -278,8 +282,11 @@
     stroke-linecap:round; stroke-linejoin:round; flex:none; vertical-align:-3px; }
   /* 降级：粗指针热区抬升 [PHYS:P-010] */
   @media (pointer:coarse){
-    .topbar .btn, .topbar [data-view], .topbar [data-panel], .theme-switch button { min-height:40px; }
-    .btn, .btn-icon, .ses-item { min-height:44px; }
+    /* 粗指针（触摸屏）⇒ 一切可点目标至少 `--hit-min`。
+     * 这里此前是硬值 40px：既不是 `--hit-min`(44)，也不是 `--btn-h-sm`(36)，
+     * 是全仓第三个值 —— 正是"多点定义"的形状。改用既有令牌，值不变语义变明确。 */
+    .topbar .btn, .topbar [data-view], .topbar [data-panel], .theme-switch button { min-height:var(--hit-min); }
+    .btn, .btn-icon, .ses-item { min-height:var(--hit-min); }
   }
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important;
@@ -315,8 +322,14 @@
     .topbar .btn { width:36px; padding:0; }      /* 36px 图标按钮 */
     .brand .logo { width:24px; height:24px; font-size:12px; }
     .brand small { display:none; }
-    /* 主题三段 → 图标（文字退场，图标按 data-t 显义） */
-    .theme-switch button { width:30px; padding:0; font-size:0; min-height:28px; position:relative; }
+    /* 主题三段 → 图标（文字退场，图标按 data-t 显义）
+     *
+     * ⚠️ `min-height` **必须**走 `--hit-min`（本仓单一来源）。此前这里是硬值 28px：
+     * 顶栏键虽被压到 36px 宽，但那条 `.topbar .btn::after{height:44px}` 扩展仍覆盖
+     * 它们 ⇒ 实际可点区 44px；而主题段**不在那条选择器内**（`button` 无 `.btn` 类），
+     * 于是手机上只剩 28px ⇒ 触不到。
+     * 实测（iPhone 393×852, pointer:coarse）：这是全页**唯一**剩下 < 44px 的一组。 */
+    .theme-switch button { width:var(--hit-min); padding:0; font-size:0; min-height:var(--hit-min); position:relative; }
     .theme-switch button::after { font-size:13px; line-height:1; }
     .theme-switch button[data-t="auto"]::after  { content:'◐'; }
     .theme-switch button[data-t="light"]::after { content:'☀'; }
