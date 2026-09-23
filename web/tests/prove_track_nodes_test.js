@@ -1152,5 +1152,41 @@ check('certificateState tolerates no session at all (control)',
       JSON.stringify(line({ chars: 800, nodes: 0, injected_chars: 0 })));
 }
 
+/* ---- span 必须把"窗外的时间"与"没在跑的时间"分开 --------------------------
+ *
+ * 实测（用户那份 12 周期导出）：span 98403.0s，其中 98222.5s 被写成
+ * "not attributed to any row" —— 绝大部分是两次会话之间 27 小时的人类缺席。
+ * 把它读成算力缺口，与"预算和实际贡献共用一个数"是同一形状的错。
+ */
+{
+  const ev = (ts, src, id) => ({
+    kind: 'ev', id: id, source: src, turn: 't1', ord: 1, ts: ts, cls: 'USER',
+    lane: 'x', dur: 0, status: 'done', summary: 's', tool: null, kindNote: '',
+    fields: [], payload: '{}', detail: '', term: false,
+  });
+  const twoSessions = [
+    ev('2026-09-22T02:09:45Z', 'run-A', 'a1'), ev('2026-09-22T02:09:46Z', 'run-A', 'a2'),
+    ev('2026-09-23T04:45:37Z', 'run-B', 'b1'), ev('2026-09-23T04:45:38Z', 'run-B', 'b2'),
+  ];
+  const oneSession = [
+    ev('2026-09-22T02:09:45Z', 'run-A', 'a1'), ev('2026-09-22T02:09:46Z', 'run-A', 'a2'),
+  ];
+  const two = PT.export.span(twoSessions);
+  const one = PT.export.span(oneSession);
+
+  check('a gap between sessions is measured as idle, not as work',
+    two.periods === 2 && two.idleMs === 95751000,
+    'periods=' + two.periods + ' idleMs=' + two.idleMs);
+
+  check('and it is actually printed, so the reader does not have to infer it',
+    PT.export.markdown(twoSessions, null, null).indexOf('idle between sessions') > -1,
+    'the number exists only if the document says it');
+
+  check('a single-session window says nothing about idle (control)',
+    one.idleMs === 0 && PT.export.markdown(oneSession, null, null).indexOf('idle') === -1,
+    'an idle clause that can never be non-zero is an advisory that cannot fire: ' +
+      'idleMs=' + one.idleMs);
+}
+
 process.exit(failures === 0 ? 0 : 1);
 

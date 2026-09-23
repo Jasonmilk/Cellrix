@@ -167,7 +167,35 @@
       if (hiTs === null || r.ts > hiTs) { hiTs = r.ts; hi = r.ts; }
     });
     var ms = (lo !== null && hi !== null) ? Date.parse(hi) - Date.parse(lo) : NaN;
-    return { from: lo, to: hi, ms: isFinite(ms) ? ms : null };
+    /* How much of that span the agent was not running at all.
+     *
+     * Measured on a real 12-period export: span 98403.0s of which 98222.5s was
+     * "not attributed to any row". Almost all of it is a 27-hour gap between two
+     * periods — human absence. Reporting that as unattributed work makes a window
+     * spanning two days read as a compute gap, which is the same "one number
+     * where there are two facts" shape as the budget-versus-contribution defect.
+     *
+     * A gap between the last row of one period and the first row of the next is
+     * idle by construction: no request was in flight across it. The threshold
+     * keeps a chain's normal sub-second period boundaries out of it. */
+    var IDLE_MS = 5 * 60 * 1000;
+    var periods = [], gaps = [], idle = 0;
+    var cur = null;
+    (session || []).forEach(function (r) {
+      if (r.kind !== 'ev' || !r.ts || !r.source) { return; }
+      if (cur && cur.source !== r.source) {
+        var g = Date.parse(r.ts) - cur.ms;
+        if (isFinite(g) && g > 0) {
+          gaps.push(g);
+          if (g > IDLE_MS) { idle += g; }
+        }
+        periods.push(cur.source);
+      }
+      cur = { source: r.source, ms: Date.parse(r.ts) };
+    });
+    if (cur) { periods.push(cur.source); }
+    return { from: lo, to: hi, ms: isFinite(ms) ? ms : null,
+             periods: periods.length, idleMs: idle, gaps: gaps.length };
   }
 
   /* The session vocabulary: kinds the REDUCER emits as carriers, which the
@@ -261,7 +289,14 @@
         (sp.ms == null ? '' : ' (' + (sp.ms / 1000).toFixed(1) + 's)') +
         ' · waits on rows: ' + D.fmtDur(waits) +
         (sp.ms == null ? '' :
-          ' · **not attributed to any row: ' + ((sp.ms - waits) / 1000).toFixed(1) + 's**'));
+          ' · **not attributed to any row: ' + ((sp.ms - waits) / 1000).toFixed(1) + 's**') +
+        // Named only when it happened: an idle clause on a single-session window
+        // would be a number that can never be non-zero, which is the advisory
+        // this project has retired four times.
+        (sp.idleMs > 0
+          ? ' · of which **' + (sp.idleMs / 1000).toFixed(1) + 's is idle between sessions** (' +
+            sp.periods + ' sessions; nothing in flight across it)'
+          : ''));
     }
     if (usage) {
       out.push('- tokens: ' + D.fmtTok(usage.total) + ' over ' + usage.calls + ' call' +
