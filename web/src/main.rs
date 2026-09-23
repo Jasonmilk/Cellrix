@@ -261,7 +261,26 @@ mod tests {
         // ProveTrack v3: experience sidebar + trajectory skeleton (v11.2.0).
         assert!(html.contains("id=\"s-side\""));
         assert!(html.contains("id=\"s-main\""));
-        assert!(html.contains("id=\"chat-side\""));
+        // ADR-0022 N3「合并两处重复侧栏为一个」的**回归网**。
+        //
+        // 这里此前断言 `id="chat-side"` —— 即在要求一个**依 ADR-0022 §1.2 缺陷 #1
+        // 被有意删除**的元素。那份重复侧栏（`session.html` 对 `'s-side'` 与
+        // `'chat-side'` 各调一次 `renderSide()`，靠 `chatMode` 分支决定点击语义）
+        // 已由 `d22b4a2` 合并为一份；断言却留在原地，于是它测的是一个**被删除的
+        // 缺陷**，而不是那份"唯一性"本身。
+        //
+        // 故改为钉住 N3 的实际不变量：**宿主清单恰好一个**。若有人把第二份侧栏
+        // 加回来，宿主数组会重新出现两个元素，断言即刻为红。
+        assert!(
+            html.contains("renderSides(['s-side']"),
+            "ADR-0022 N3：侧栏宿主清单必须恰好一个 's-side'。\
+             重新出现第二个宿主（曾为 'chat-side'）即是缺陷 #1 复发。"
+        );
+        assert!(
+            html.contains("/* 唯一的一份列表 */"),
+            "ADR-0022 N3 的意图标记必须留在宿主调用点上 —— \
+             它把「为什么只有一个宿主」写在代码旁边，删掉它下一个人就只能靠猜。"
+        );
         assert!(html.contains("__proveTrackLoad"));
         assert!(html.contains("id=\"eTblVp\""));
         assert!(html.contains("id=\"eLaneInput\""));
@@ -313,7 +332,20 @@ mod tests {
         assert!(html.contains("window.CxCockpit")); // cockpit.js
         assert!(html.contains("window.sendChat")); // chat.js
         assert!(html.contains("Cx.onEnter")); // view-registration seam
-        assert!(html.contains("data-view=\"cockpit\"")); // base.html nav
+        // ADR-0022 N-001（钻石级）：「存在唯一主视图；其余为辅助，**不得与主视图平级**」。
+        //
+        // 这里此前断言 `data-view="cockpit"` —— 但按 N-001，cockpit **不是**主视图，
+        // 而是辅助面板。它今天的标记是 `data-panel="cockpit"`（`base.html:56`）；
+        // `data-view` 只留给那**唯一**的一个主视图（`data-view="chat"`，`:52`）。
+        // 旧断言等于把"辅助"误判成"平级"，与它引用的那条 ADR 正好相反。
+        //
+        // 故改为钉住 N-001 本身：主/辅两种角色的标记不得互换。
+        // 依据逐字见 `docs/decisions/ADR-0022-panel-navigation-constraints.md:86`。
+        assert!(html.contains("data-view=\"chat\"")); // 唯一主视图
+        assert!(!html.contains("data-view=\"cockpit\"")); // N-001：辅助不得平级
+        assert!(html.contains("data-panel=\"cockpit\"")); // 辅助面板，标记为 panel
+        assert!(html.contains("data-panel=\"prove-track\""));
+        assert!(html.contains("data-panel=\"flows\""));
         assert!(!html.contains("onclick=\"showView(")); // nav no longer inlines it
         assert!(html.contains("__CHAT_JS__") == false); // and it was substituted
     }
