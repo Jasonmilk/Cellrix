@@ -1119,5 +1119,38 @@ check('certificateState tolerates no session at all (control)',
     JSON.stringify(summarize('这是一段没有计划的直接回答')));
 }
 
+/* ---- 预算与实测并列，且"没测"不等于"测到 0"（K-115 在导出侧的收尾）---- */
+{
+  /* 经**真实路径**：原始事件 data → `CxEventFamily.interpret`（槽名转换的唯一发生地）
+   * → `payloadOf` 投影 → `summarize` 摘要。
+   *
+   * 早先的版本手搓 `{injected_chars: 412}` 直接当载荷，绕过了 interpret —— 于是
+   * `p.injected_chars` 与 `p.injectedChars` 两种读法**都能通过**，这条测试因此什么
+   * 都没测。事件 data 里是 snake_case，载荷槽名是 camelCase，而转换只在 interpret 里
+   * 发生，所以夹具必须从这里进。 */
+  const line = (raw) => {
+    const r = window.CxEventFamily.interpret('context/inject', raw, []);
+    const node = { kind: r.kind, payload: r.payload, source: 'run-x', node: 'run-x#2',
+      turn: 't1', ord: 2, ts: '2026-09-22T01:29:19Z' };
+    const proj = JSON.parse(PT.node.payloadOf(node));
+    return PT.render.summarize({ ...node, payload: proj });
+  };
+
+  check('the context line shows the measured injection beside the budget',
+    line({ chars: 800, nodes: 20, injected_chars: 412 })
+      === 'context inject · SA-Core selection · nodes=20 chars=800 injected=412',
+    JSON.stringify(line({ chars: 800, nodes: 20, injected_chars: 412 })));
+
+  check('an event written before K-115 says nothing about it (control)',
+    line({ chars: 800, nodes: 20 }).indexOf('injected') === -1,
+    'a missing measurement must not render as a number: ' +
+      JSON.stringify(line({ chars: 800, nodes: 20 })));
+
+  check('but a measured zero IS a measurement and must show (control)',
+    line({ chars: 800, nodes: 0, injected_chars: 0 }).indexOf('injected=0') > -1,
+    'the whole reason the field is optional is to keep 0 and absent distinct: ' +
+      JSON.stringify(line({ chars: 800, nodes: 0, injected_chars: 0 })));
+}
+
 process.exit(failures === 0 ? 0 : 1);
 

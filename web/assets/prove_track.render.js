@@ -103,8 +103,17 @@
     ],
     message: { tpl: '{text}', fmt: { text: function (p) { return short(p.text, 140); } } },
     context: {
-      tpl: 'context inject · SA-Core selection{tiers} · nodes={nodes} chars={chars}',
+      tpl: 'context inject · SA-Core selection{tiers} · nodes={nodes} chars={chars}{injected}',
       fmt: {
+        /* K-115 measured the injection BESIDE the budget instead of redefining
+         * `chars`, and this line had not followed: it showed the ceiling (800)
+         * and nothing about what injection actually contributed. Shown only when
+         * the event carries it — events written before K-115 have the field
+         * absent, and "absent" must not render as "zero contributed", which is
+         * the same distinction the field was added to preserve. */
+        injected: function (p) {
+          return p.injectedChars == null ? '' : ' injected=' + p.injectedChars;
+        },
         tiers: function (p) {
           if (!hasTiers(p)) { return ''; }
           var tiers = (p.choice && p.choice.tiers) || {};
