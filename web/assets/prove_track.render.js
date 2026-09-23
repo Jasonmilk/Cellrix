@@ -133,6 +133,21 @@
         text: function (p) {
           if (isEmptyReply(p)) { return '(empty reply — honest marker, nothing invented)'; }
           var txt = String(p.text || '');
+          /* Two vocabularies live in this field, and both must read correctly.
+           *
+           * Events written BEFORE K-116 carried the model's raw output, so the
+           * tool names had to be parsed out of it. Events written AFTER carry the
+           * attempt itself (`planned calls: a/b`, `no calls planned — answered
+           * directly`, `unparseable plan`) and the raw output stays in the trace.
+           * The old code only knew the first form, so the moment the runtime
+           * changed, every tool round would have been mislabelled `reply:
+           * planned calls: weather` — the tool names still there, but filed under
+           * the wrong word. Recognising both is the point: the export reads files
+           * written either side of the change, and the older ones are not wrong,
+           * just older. */
+          var planned = /^planned calls: /.test(txt);
+          var toolless = /^no calls planned/.test(txt) || /^unparseable plan$/.test(txt);
+          if (planned || toolless) { return txt; }
           var calls = null;
           try { var o = JSON.parse(txt); if (o && o.calls) { calls = o.calls; } } catch (err) {}
           if (calls) { return 'planned calls: ' + calls.map(function (c) { return c.tool; }).join(', '); }

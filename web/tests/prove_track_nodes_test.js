@@ -1079,5 +1079,45 @@ check('certificateState tolerates no session at all (control)',
   })(),
   'a session-less call must yield an empty reading rather than an exception');
 
+/* ---- 一个字段，两套词汇：attempt 的文本改变后，消费者必须同时读懂两边 -------
+ *
+ * K-116 把 `assistant/attempt` 的 text 从"模型原始输出"改成"尝试了什么"
+ * （`planned calls: a/b` / `no calls planned — answered directly`）。摘要模板原本
+ * 只会解析原始 JSON 取工具名，于是新语义一来就会被印成
+ * `reply: planned calls: weather` —— 工具名还在，却被归到了错的那个词下面。
+ * 导出读的是**改动两侧**写下的文件，旧的那批并不错，只是更旧。
+ */
+{
+  /* 走真实路径：事件载荷 → `payloadOf` 投影 → `summarize` 摘要。
+   * 直接手搓一个会话行会在 kind 上失配而回退成 "ev"，那是夹具的错、不是被测物的错。 */
+  const PLAN = window.CxEventFamily.KINDS.PLAN;
+  const summarize = (text) => {
+    const node = { kind: PLAN, payload: { text: text, empty: false },
+      source: 'run-x', node: 'run-x#5', turn: 't1', ord: 5, ts: '2026-09-22T02:09:51Z' };
+    const projected = JSON.parse(PT.node.payloadOf(node));
+    return PT.render.summarize({ ...node, payload: projected });
+  };
+
+  check('a new-vocabulary attempt keeps its own words (planned call)',
+    summarize('planned calls: weather') === 'planned calls: weather',
+    JSON.stringify(summarize('planned calls: weather')));
+
+  check('and a tool-free attempt is not relabelled as a reply (control)',
+    summarize('no calls planned — answered directly') === 'no calls planned — answered directly',
+    'the old formatter printed "reply: no calls planned — answered directly"');
+
+  check('an unreadable plan is passed through, not dressed up',
+    summarize('unparseable plan') === 'unparseable plan',
+    JSON.stringify(summarize('unparseable plan')));
+
+  check('an OLD raw-output attempt still yields its tool names',
+    summarize('{"calls":[{"tool":"calc"},{"tool":"weather"}]}') === 'planned calls: calc, weather',
+    'older events are not wrong, just older; both vocabularies must read correctly');
+
+  check('free prose still reads as a reply, which is what it is (control)',
+    summarize('这是一段没有计划的直接回答') === 'reply: 这是一段没有计划的直接回答',
+    JSON.stringify(summarize('这是一段没有计划的直接回答')));
+}
+
 process.exit(failures === 0 ? 0 : 1);
 
