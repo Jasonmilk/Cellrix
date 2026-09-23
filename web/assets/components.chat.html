@@ -44,7 +44,7 @@
      The division is: the WINDOW scrolls, an ITEM keeps the size its content gives
      it. One declaration, and it is the same declaration at both scrollers. */
   .chat-msgs > * { flex-shrink:0; }
-  .msg { max-width:85%; padding:8px 12px; border-radius:var(--r-md); font-size:12.5px;
+  .msg { max-width:var(--msg-w); padding:8px 12px; border-radius:var(--r-md); font-size:12.5px;
     line-height:1.65; white-space:pre-wrap; word-break:break-word; }
   .msg.user { align-self:flex-end; background:var(--accent-soft); color:var(--text); }
   .msg.helix { align-self:flex-start; background:var(--surface); border:1px solid var(--line); }

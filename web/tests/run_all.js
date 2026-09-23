@@ -103,6 +103,8 @@ const NEEDS_INPUT = [];
 if (!(PANEL_UP && CDP_UP)) {
   NEEDS_INPUT.push(['layout_test.js',
     'needs the panel + a browser on ' + CDP + ': node layout_test.js ' + PANEL + ' ' + CDP + ' (see README)']);
+  NEEDS_INPUT.push(['measure_test.js',
+    'needs the panel + a browser on ' + CDP + ': node measure_test.js ' + PANEL + ' ' + CDP + ' (see README)']);
 }
 
 /* 按需渲染的**仪器**（量请求数、字节数与 DOM 重建次数）。
@@ -122,6 +124,8 @@ if (PANEL_UP) {
 }
 if (PANEL_UP && CDP_UP) {
   SELF_CONTAINED.push(['layout_test.js', 'geometry in a real browser — ' + CDP]);
+  SELF_CONTAINED.push(['measure_test.js',
+    'reading measure — text lines stay inside the token, no overflow — ' + PANEL + ' + ' + CDP]);
   SELF_CONTAINED.push(['perf_measure.js',
     'on-demand render: nothing off-stage is rebuilt — ' + PANEL + ' + ' + CDP]);
   SELF_CONTAINED.push(['hit_targets_test.js',
@@ -219,7 +223,7 @@ for (const [file, what] of SELF_CONTAINED) {
   const target = path.join(__dirname, file);
   try {
     const extra = file === 'all_views_test.js' ? [PANEL]
-      : file === 'layout_test.js' ? [PANEL, CDP] : [];
+      : (file === 'layout_test.js' || file === 'measure_test.js') ? [PANEL, CDP] : [];
     execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' });
     results.push(['PASS', file, what]);
   } catch (e) {

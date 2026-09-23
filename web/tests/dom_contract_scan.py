@@ -20,9 +20,13 @@ import io
 import os
 import re
 
-WEB = "/Users/jason/Doubao/chats/Jasonmilk/Cellrix/web"
-OUT = "/Users/jason/Doubao/chats/Jasonmilk/Cellrix/docs/dom-contract.md"
-SCAN = "/Users/jason/Doubao/chats/Jasonmilk/Cellrix/web/tests/dom_contract_scan.py"
+# 路径全部从 __file__ 派生：脚本搬到哪里，WEB/OUT 就指到哪里。
+# 此前是三处硬编码绝对路径（旧工作区 /Users/jason/Doubao/chats/Jasonmilk/...），
+# 工作区迁移后扫描器静默指向不存在的位置 —— 它连资产都读不到，却报告"干净"。
+# 相对派生 = 可搬移 = 单一来源（本仓 0 硬编码原则）。
+SCAN = os.path.abspath(__file__)                       # .../Cellrix/web/tests/dom_contract_scan.py
+WEB = os.path.dirname(os.path.dirname(SCAN))           # .../Cellrix/web
+OUT = os.path.join(os.path.dirname(WEB), "docs", "dom-contract.md")  # .../Cellrix/docs/...
 
 assets = sorted(os.listdir(WEB + "/assets"))
 html_files = [f for f in assets if f.endswith(".html")]

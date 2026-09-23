@@ -56,6 +56,10 @@
     --r-sm:6px; --r-md:8px; --r-lg:14px;
     --dur:200ms; --dur-press:120ms; --dur-enter:260ms; --ease:var(--ease-out);
     --tb-h:52px; --side-w:clamp(200px,18vw,300px); --read-w:940px;
+    /* 消息阅读度量：正文行宽的上限。灵感自成熟阅读尺度实践（消息约为内容宽
+       七成、且 ≤ 容器的 82%，二者取小），但**不照抄其专名**——本仓用自己的
+       token：由 --read-w 派生，改 --read-w 即全链生效（单一来源，0 硬编码）。 */
+    --msg-w:min(calc(var(--read-w) * 0.702), 82%);
     --bg-rgb:18,18,18;
     --shim:rgba(255,255,255,.07);
     --fade-w:26px;
