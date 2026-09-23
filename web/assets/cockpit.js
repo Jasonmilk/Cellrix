@@ -7,6 +7,13 @@
 (function () {
   var Cx = window.Cx;
 
+  /* 已渲染的行：key → 节点数组（`<tr>` + 展开用的 `<tr class="lt-exp">`）。
+   * 与 `chat.js` 同一思路（逐条创建、不整块重建），只是这里要按 key 记住，
+   * 才能在数据到达时判断"这一行变了没有"。 */
+  var ROW_NODES = {};
+  var ROW_HTML = {};
+  var EMPTY_SHOWN = false;
+
   /* 已知判定词表 —— **唯一来源**是 CI-144 码注册表 `E-*`/`W-*` 与
    * Tuck `Decision`；此处只做"渲染分类"，不重新定义语义。
    *
@@ -139,6 +146,12 @@
       /* Through the exit layer (ADR-0044): the sentence and the way out come
        * from one place, and `.empty` is kept because it is already this
        * cockpit's block. */
+      if (EMPTY_SHOWN) { return; }              /* 已经是空态：不重建占位行 */
+      /* 从"有"变"无"：先撤掉已渲染的行与缓存，否则数据回来时两者会同时存在。 */
+      Object.keys(ROW_NODES).forEach(function (k) {
+        (ROW_NODES[k] || []).forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+      });
+      ROW_NODES = {}; ROW_HTML = {};
       var td = document.createElement('td');
       td.colSpan = 5;
       td.appendChild(window.CxWayout.build('ledger-empty'));
@@ -146,13 +159,30 @@
       tr.appendChild(td);
       box.innerHTML = '';
       box.appendChild(tr);
+      EMPTY_SHOWN = true;
       return;
     }
-    // 水之波光 Ledger 表格：状态/时间/trace_id/调用/说明 五列 + 点击展开 payload。
-    // 与证轨事件表同构（碳硅同看同一账本），但数据源是 Tuck 审计链。
-    // ≤620px 降级为纵向卡片堆叠（td data-label 标签在上/值在下，首列自明）。
-    var rows = '';
-    ledger.slice().reverse().forEach(function (e) {
+    /* 有数据 ⇒ 若之前是空态，占位行必须先撤掉（否则它会留在表头下面）。 */
+    if (EMPTY_SHOWN) { box.innerHTML = ''; EMPTY_SHOWN = false; }
+    /* ── 局部渲染：按 key 复用行，不整表重建 ────────────────────────────────
+     *
+     * 此前是 `box.innerHTML = rows` —— 每次清空重造**全部**行。代价不只是 CPU：
+     * **它抹掉 DOM 状态** —— 展开的 `<tr class="lt-open">`、滚动位置、焦点都会丢。
+     * 数据每 2 秒到一次，于是用户展开一行后很难读下去。
+     *
+     * 本仓早有正确范式：`chat.js` 逐条 `createElement` + `appendChild`，
+     * 流式回复只追加文本、失败行只替换那一条 —— **从不整块重建**。
+     * 这里照它做，差别只在账本是**最新在前**，所以新行用 `insertBefore` 前置：
+     * 既有节点不被移动，浏览器因此保持滚动锚点。
+     *
+     * 键取 `entry_id || id || trace_id`；都没有时退回 `ts#序号`（仍确定）。
+     * 键相同而**内容变了**（同一记录的判定被改写）⇒ 重建那一行，不影响其余。
+     */
+    function keyOf(e, i) {
+      return String(e.entry_id || e.id || (e.payload && e.payload.trace_id) ||
+        e.trace_id || '') || ('#' + i);
+    }
+    function rowHtml(e) {
       var status = statusOf(e);
       var kind = classifyStatus(status);
       // 取不到任何显式判定时，如实写出「未知」，而不是让空串冒充一个判定。
@@ -162,15 +192,72 @@
       var call = e.tool || e.args || '';
       var note = e.summary || e.verdict || e.reason || '';
       var payload = JSON.stringify(e.data || e.payload || e, null, 1);
-      rows += '<tr class="lt-row" tabindex="0" role="button" aria-expanded="false" onclick="var t=this;t.classList.toggle(\'lt-open\');var ex=t.nextElementSibling;if(ex&&ex.classList.contains(\'lt-exp\')){ex.hidden=!ex.hidden;}">' +
+      return '<tr class="lt-row" tabindex="0" role="button" aria-expanded="false" onclick="var t=this;t.classList.toggle(\'lt-open\');var ex=t.nextElementSibling;if(ex&&ex.classList.contains(\'lt-exp\')){ex.hidden=!ex.hidden;}">' +
         '<td data-label="状态"><span class="chip ' + cls + '" title="' + Cx.esc(kind) + '">' + Cx.esc(label) + '</span></td>' +
         '<td class="lt-c-ts" data-label="时间">' + Cx.esc(String(e.ts || e.created_at || '').slice(0, 19)) + '</td>' +
         '<td class="lt-c-tid" data-label="trace_id">' + Cx.esc(tid) + '</td>' +
         '<td class="lt-c-call" data-label="调用">' + Cx.esc(call) + '</td>' +
         '<td class="lt-c-note" data-label="说明">' + Cx.esc(note) + '</td></tr>' +
         '<tr class="lt-exp" hidden><td colspan="5"><pre>' + Cx.esc(payload) + '</pre></td></tr>';
+    }
+
+    /* 这次要显示的顺序：最新在前（与既有行为一致）。 */
+    var ordered = ledger.slice().reverse();
+    var want = {}, seen = {}, i, k;
+    for (i = 0; i < ordered.length; i++) {
+      /* ⚠️ key **不含数组下标**。曾把 `#' + i` 拼进去，结果**追加一条**会让每行的
+       * key 整体平移 ⇒ 全部被当作新行重建 —— 恰恰摧毁了局部渲染的目的。
+       * 现在只对**同键重复**（同一 trace 多条）用出现序号区分，与位置无关。 */
+      var base = keyOf(ordered[i], 0);
+      seen[base] = (seen[base] || 0) + 1;
+      k = base + (seen[base] > 1 ? '#' + seen[base] : '');
+      want[k] = ordered[i];
+    }
+
+    /* 移除已不在数据里的行（并清掉缓存） */
+    Object.keys(ROW_NODES).forEach(function (old) {
+      if (want[old]) { return; }
+      (ROW_NODES[old] || []).forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+      delete ROW_NODES[old];
+      delete ROW_HTML[old];
     });
-    box.innerHTML = rows;
+
+    /* 从**最新到最旧**逐个确保存在，每个都插到**当前首位之前** —— 倒序 + 前插，
+     * 最终顺序即「最新在前」。
+     *
+     * ⚠️ 这一处改了两次，两次的病根不同，都值得记：
+     *  ① 初版是「逆序 + insertBefore」但误写成从旧到新，顺序插成了 旧→新；
+     *  ② 第二版改成「从旧到新 + appendChild」，**新行排到了末尾** —— 因为
+     *     **已挂载的旧节点不会跟着重排**，只 append 新行，旧行还留在原位。
+     * ⇒ 正解是**倒序 + insertBefore(首)**：`insertBefore` 对**已挂载**节点是
+     *   **移动**而非复制，于是重排顺带完成。
+     *
+     * ⇒ 教训：**"节点有没有被重建"与"它排在哪里"是两件独立的事。**
+     *   只断言前者，顺序反了也照样绿（本轮就是这么漏过去的）。 */
+    seen = {};
+    for (i = ordered.length - 1; i >= 0; i--) {
+      var base2 = keyOf(ordered[i], 0);
+      seen[base2] = (seen[base2] || 0) + 1;
+      k = base2 + (seen[base2] > 1 ? '#' + seen[base2] : '');
+      var html = rowHtml(ordered[i]);
+      var anchorEl = box.firstChild;
+      if (ROW_NODES[k] && ROW_HTML[k] === html) {
+        /* 内容没变，但**位置可能要变** ⇒ 仍把已挂载节点移到首位（移动，不是重建）。 */
+        var ex = ROW_NODES[k];
+        for (var q = ex.length - 1; q >= 0; q--) { box.insertBefore(ex[q], anchorEl); anchorEl = ex[q]; }
+        continue;
+      }
+      if (ROW_NODES[k]) {                                        /* 内容变了：只重建这一行 */
+        ROW_NODES[k].forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+      }
+      var tpl = document.createElement('tbody');
+      tpl.innerHTML = html;
+      var nodes = [];
+      while (tpl.firstChild) { nodes.push(tpl.firstChild); tpl.removeChild(tpl.firstChild); }
+      for (var j = nodes.length - 1; j >= 0; j--) { box.insertBefore(nodes[j], anchorEl); anchorEl = nodes[j]; }
+      ROW_NODES[k] = nodes;
+      ROW_HTML[k] = html;
+    }
     if (window.syncFades) window.syncFades();
   }
 

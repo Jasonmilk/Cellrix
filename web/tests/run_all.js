@@ -50,6 +50,7 @@ const SELF_CONTAINED = [
    * 必须是 JS 侧套件 —— `cockpit.js` 经 `include_str!` 烧进二进制，`cargo test`
    * 只能做子串断言，证明不了这段逻辑对不对。见该文件头。 */
   ['cockpit_status_test.js', 'ledger status — unknown is never a pass and never a failure (K-088)'],
+  ['ledger_rows_test.js', 'ledger rows — keyed reuse, not a whole-table rebuild'],
   /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
    * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
    * the one entry point that actually gets run — a criterion nobody runs is a
