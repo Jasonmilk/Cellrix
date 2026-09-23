@@ -413,21 +413,26 @@
    * 反过来。而且同一原则用在 `#eco`（整块 innerHTML）上时代价不小。
    *
    * 判据用"上一条写入的值"而不是再次读 DOM：读回 DOM 会把**渲染器的产物**当成
-   * 事实来源，而真相是刚到的数据。 */
-  var LAST_TEXT = {};
-  function setText(id, text) {
-    if (LAST_TEXT[id] === text) { return false; }
-    LAST_TEXT[id] = text;
-    var el = document.getElementById(id);
-    if (el) el.textContent = text;
+   * 事实来源，而真相是刚到的数据。
+   *
+   * ⚠️ **必须传元素本身，不能传 id 字符串**：`docs/dom-contract.md` 由
+   * `dom_contract_scan.py` 静态扫描生成，它只识别**字面量**的取元素写法。
+   * 若把 id 当参数传，扫描器会认为这些 id **没人读**，把它们从"跨资产"降级为
+   * "纯样式" —— 那份清单会**说假话**。（本人犯过一次，被 `dom_contract_test.js`
+   * 当场抓住：`conn`/`mode` 掉了）
+   *
+   * ⚠️ 另：**注释里也不要写出那种字面量**（哪怕只是举例）。扫描器读的是源码文本，
+   * 会把注释里的例子当成真实读取，于是清单凭空多一条 —— 同类错误犯过第二次。 */
+  function setText(el, text) {
+    if (!el || el.__v === text) { return false; }
+    el.__v = text;
+    el.textContent = text;
     return true;
   }
-  var LAST_CLASS = {};
-  function setClass(id, cls) {
-    if (LAST_CLASS[id] === cls) { return false; }
-    LAST_CLASS[id] = cls;
-    var el = document.getElementById(id);
-    if (el) el.className = cls;
+  function setClass(el, cls) {
+    if (!el || el.__c === cls) { return false; }
+    el.__c = cls;
+    el.className = cls;
     return true;
   }
 
@@ -441,30 +446,35 @@
       return r.json();
     }).then(function (j) {
       var snap = j.snapshot || null;
+      /* 字面量取元素：扫描器才看得见这些 id 被读（见 setText 上的注释）。 */
+      var elMode = document.getElementById('mode');
+      var elState = document.getElementById('state');
+      var elConn = document.getElementById('conn');
+      var elSub = document.getElementById('sub');
       if (!snap) {
-        setText('mode', 'NO SNAPSHOT');
-        setText('state', j.status || '?');
-        setText('conn', '✗ 未就绪');
-        setClass('conn', 'badge');
-        setText('sub', 'Anaphase 未提供快照（' + (j.error || j.status || '未知') + '）——检查 up 是否在运行');
+        setText(elMode, 'NO SNAPSHOT');
+        setText(elState, j.status || '?');
+        setText(elConn, '✗ 未就绪');
+        setClass(elConn, 'badge');
+        setText(elSub, 'Anaphase 未提供快照（' + (j.error || j.status || '未知') + '）——检查 up 是否在运行');
         return;
       }
       var m = snap.mode || '?';
       // Honest status line: success path must leave the "连接中…" placeholder.
-      setText('sub', 'Anaphase 在线 · ' + m.toUpperCase() + ' · ' + (snap.episode || '暂无经历'));
-      setText('mode', m.toUpperCase());
-      setClass('mode', 'badge ' + m);
-      setText('state', 'state: ' + (snap.state || '?'));
-      setText('conn', '● 在线');
-      setClass('conn', 'badge live');
+      setText(elSub, 'Anaphase 在线 · ' + m.toUpperCase() + ' · ' + (snap.episode || '暂无经历'));
+      setText(elMode, m.toUpperCase());
+      setClass(elMode, 'badge ' + m);
+      setText(elState, 'state: ' + (snap.state || '?'));
+      setText(elConn, '● 在线');
+      setClass(elConn, 'badge live');
       // The situation view renders its own content; the shell only decides
       // **when** it is worth rendering (按需渲染：只有台上的视图才渲染).
       // 这条此前无条件执行 —— 驾驶舱不在台上也每 2 秒整块重建一次（实测见
       // perf_measure.js）。现在由 offerSnapshot 判断"在不在台上"。
       offerSnapshot(snap);
     }).catch(function (e) {
-      setText('conn', '✗ 断开');
-      setClass('conn', 'badge');
+      setText(document.getElementById('conn'), '✗ 断开');
+      setClass(document.getElementById('conn'), 'badge');
       /* 出路是时间：本函数由 setInterval 反复调用，面板自己在重试。所以这里渲染
        * 成说明而不是按钮——状态行的职责只是报告状态（ADR-0044 D5）。 */
       window.CxWayout.renderInline(document.getElementById('sub'),
