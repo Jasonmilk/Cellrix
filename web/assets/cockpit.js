@@ -37,6 +37,24 @@
   var BAD_PREFIX = ['E-'];
   var WARN_PREFIX = ['W-'];
 
+  /* HTTP 状态码的**独立**分类。
+   *
+   * 为什么必须与上面的词表分开：Tuck 的审计链里，`request` 记录的判定是
+   * `data.messages[].action`（`forward`/`pass` 这类**词**），而 `response` 记录的判定是
+   * `data.status` —— 它是 **HTTP 码**（`200`/`400`/`502` 这类**数**）。
+   * 两者是不同的取值空间，混进同一张词表会让"数字前缀"与"字母前缀"互相污染。
+   *
+   * 实测（`Tuck/gateway-audit.jsonl` 815 条 response）：`200`×312、`"ok"`×500、`400`×3。
+   * ⇒ 这正是"坏"的真实样本来源（此前我报告"真实链里无坏值"，是因为我根本没读到这一层）。
+   */
+  function classifyHttpStatus(s) {
+    if (!/^[1-5][0-9]{2}$/.test(s)) return null;
+    var d = s.charAt(0);
+    if (d === '2' || d === '3') return 'ok';
+    if (d === '4' || d === '5') return 'bad';
+    return null;   // 1xx 信息类：既非成功也非失败 ⇒ 交回上层判 unknown
+  }
+
   /* 判定 → 渲染分类。返回 'ok' | 'warn' | 'bad' | 'unknown'。
    *
    * **只做边界匹配**：整个串精确相等 ⇒ 命中；或串**以**某条词开头 ⇒ 命中。
@@ -50,6 +68,9 @@
   function classifyStatus(status) {
     if (!status) return 'unknown';
     var s = String(status).toUpperCase();
+    if (s === '0') return 'unknown';   // `0` = 未开始/无状态，不是"好"
+    var http = classifyHttpStatus(s);
+    if (http) return http;
     function hit(list) {
       for (var i = 0; i < list.length; i++) {
         if (s === list[i] || s.indexOf(list[i]) === 0) return true;
@@ -87,6 +108,11 @@
     if (e.record_type != null && e.record_type !== '') return e.record_type;
     var p = e.payload || {};
     var d = p.data || {};
+    /* `d.status` 是 **response 记录**的判定槽位：HTTP 码（`200`/`400`/`502`）或
+     * 流式的 `"ok"`。实测 815 条 response **全部**带它 —— 此前漏读这一层，
+     * 导致整批 response 都被判 `unknown`。它与 request 的 `messages[].action`
+     * 是**两个不同的槽位**，故都列出、互不遮挡。 */
+    if (d.status != null && d.status !== '') return d.status;
     if (d.action != null && d.action !== '') return d.action;
     if (Array.isArray(d.messages)) {
       for (var i = 0; i < d.messages.length; i++) {

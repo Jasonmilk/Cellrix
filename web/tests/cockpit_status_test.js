@@ -115,6 +115,40 @@ check('空记录 ⇒ 空串，不猜', C.statusOf({}) === '', 'got ' + JSON.stri
 check('顶层 status 优先', C.statusOf({ status: 'Reject' }) === 'Reject');
 check('顶层 decision 亦被接受', C.statusOf({ decision: 'Pass' }) === 'Pass');
 
+/* ── 6. **response 记录**的判定槽位：`payload.data.status` ────────────────────
+ *
+ * 这一段是本套件存在理由的最强案例。实测 `Tuck/gateway-audit.jsonl` 的 815 条
+ * response **全部**把判定放在 `payload.data.status`，而原实现只读顶层
+ * `e.status` ⇒ **整整一半的记录连读都没读到**，一律显绿。
+ *
+ * 取值是**两个不同的取值空间**（词 vs HTTP 码），故分别断言：
+ */
+const REAL_RESP = {
+  seq: 1, ts: '2026-09-07T05:28:01Z',
+  payload: { kind: 'response', data: { status: 200, demap_miss: 0, session: 'default' }, trace_id: 'live#1' }
+};
+check('真实响应记录 ⇒ 取到 data.status 而非 kind',
+  C.statusOf(REAL_RESP) === 200, 'got ' + JSON.stringify(C.statusOf(REAL_RESP)));
+check('响应 200 ⇒ ok', C.classifyStatus(C.statusOf(REAL_RESP)) === 'ok');
+check('响应 400 ⇒ bad（真实链里有 3 条）', C.classifyStatus('400') === 'bad');
+check('响应 502 ⇒ bad', C.classifyStatus('502') === 'bad');
+check('响应 500 ⇒ bad', C.classifyStatus('500') === 'bad');
+check('响应 201 ⇒ ok', C.classifyStatus('201') === 'ok');
+check('流式 response 的 "ok" ⇒ ok', C.classifyStatus(C.statusOf({
+  payload: { kind: 'response', data: { status: 'ok', demap_miss: 0 } }
+})) === 'ok');
+/* 边界：既非成功也非失败、以及"无状态" */
+check("HTTP '0' ⇒ unknown（未开始/无状态，不是好）", C.classifyStatus('0') === 'unknown');
+check("HTTP '100' ⇒ unknown（信息类，不硬猜）", C.classifyStatus('100') === 'unknown');
+check("非 HTTP 数字 '42' ⇒ unknown（不硬套数字）", C.classifyStatus('42') === 'unknown');
+
+/* ── 7. 回归：`data.status` 不得遮住 request 的 `messages[].action` ───────── */
+const REQ_WITH_STATUS = {
+  payload: { kind: 'request', data: { action: 'forward', status: '', messages: [{ action: 'pass' }] } }
+};
+check('request：data.status 为空时不遮挡 messages[].action',
+  C.statusOf(REQ_WITH_STATUS) === 'forward', 'got ' + JSON.stringify(C.statusOf(REQ_WITH_STATUS)));
+
 console.log('');
 console.log((fail ? 'FAILED' : 'OK') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
