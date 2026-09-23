@@ -59,6 +59,14 @@
    * （证轨在 shell 的 onPeriod 上登记了自己）。 */
   var HOSTS = [], LAST = null;
 
+  /* ── 局部渲染：列表按 period_id 复用卡片，不整块重建 ────────────────────
+   * 此前 renderOne 每次 `box.innerHTML = head` 再重造全部卡片 —— 数据一刷新
+   * 整个侧栏重排，滚动位置/焦点/正在进行的改名全丢（setNav 注释里的旧 bug：
+   * "每点一次卡就重建整个侧栏"）。卡片键 = period_id（行自带 data-job，本就是
+   * 稳定身份）；头部是独立键，只在其 HTML（计数）变化时重建。教训同账本：
+   * 键不含下标；"节点有没有被重建"与"它排在哪里"是两件事，两条都要断言。 */
+  var SIDES = {}; // hostId -> { empty: bool, headHtml: str, rows: { key: {node, html} } }
+
   function renderSides(ids, periods, empty) {
     HOSTS = (ids || []).filter(function (id) { return !!document.getElementById(id); });
     LAST = { periods: periods, empty: empty };
@@ -100,13 +108,64 @@
     });
   }
 
+  /* 行结构恒定（铁轨）：标题 .nm + 时间 .t + 正文 .p，重命名只换标题文本 */
+  function rowHtml(p) {
+    /* `st` is this asset's module state object (st.sesSeq / st.histSeq) —
+     * shadowing it here with a timestamp broke every later read in this
+     * function. Measured: the sidebar rendered zero rows and the panel
+     * reported "经历列表拉取失败". Name the local after what it is. */
+    var when = stamp(p.first_ts);
+    var disp = when.date + ' ' + when.time;
+    var nm = autoName(p);
+    var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
+    // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
+    var reply = p.reply ? '<div class="p rp">' + esc(p.reply) + '</div>' : '';
+    var mdl = p.model ? '<span class="mdl">' + esc(p.model) + '</span>' : '';
+    /* No continuation marker: there is no continuation tier. */
+    var tag = '';
+    return '<div class="nm">' + tag + esc(nm) + '</div>' +
+      '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.period_id.slice(0, 12)) + '</span>' + mdl +
+      '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.period_id) + '" title="重命名">✎</button></span></div>' +
+      preview + reply;
+  }
+
+  function bindRow(div, p) {
+    div.onclick = function () {
+      /* 一种语义（N-001）：把这段载进对话。证轨侧板若开着，它跟着 period 走——
+       * 那是 shell 的 period 通知在做的事，不是这里的分支。 */
+      Cx.setNav({ period: p.period_id, meta: { job_id: p.job_id, period_id: p.period_id, name: p.name, preview: p.preview } });
+      moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
+      loadPeriodToChat(p.period_id);
+      setBanner('续接经历 <span class="tid">' + esc(p.period_id) + '</span> —— 下一句话延续这段对话');
+      document.getElementById('chat-text').focus();
+    };
+    var rn = div.querySelector('[data-ren]');
+    if (rn) rn.onclick = function (ev) {
+      ev.stopPropagation();
+      beginRename(div, p.period_id, p.name || '');
+    };
+  }
+
   function renderOne(id, periods, empty) {
     var box = document.getElementById(id);
+    var cache = SIDES[id] || (SIDES[id] = { empty: false, headHtml: null, rows: {} });
     /* `empty` is an exit-layer STATE, not an HTML string: the sentence and the
      * action come from one place (ADR-0044). It used to be markup assembled at
      * the call site, which is how the same zero state came to have two
-     * derivations (here and chat.html's static markup). */
-    if (!periods.length) { window.CxWayout.render(box, empty); return; }
+     * derivations (here and chat.html's static markup). 只在该状态**变化**时渲染
+     * 一次：轮询不重建一个没变的空态。 */
+    if (!periods.length) {
+      if (cache.empty) return;
+      cache.empty = true;
+      cache.headHtml = null; cache.rows = {};
+      window.CxWayout.render(box, empty);
+      return;
+    }
+    if (cache.empty) {
+      cache.empty = false;
+      cache.headHtml = null; cache.rows = {};
+      box.innerHTML = '';
+    }
     /* HISTORY, REVISED 2026-09-17. A previous revision removed grouping and
      * concluded "The model was wrong, not the code." That diagnosis was WRONG,
      * and it is recorded here rather than silently deleted.
@@ -129,58 +188,48 @@
      * one card, and clicking it continues from there. The next step turns cards
      * into threads, reusing the existing `chainJobIds` traversal. */
     /* Flat, newest first — no grouping, no traversal yet. */
-    var chain = periods.slice();
+    /* 头部：计数变化才重建（按钮随之重绑），同数据轮询不碰 DOM */
     var rootCount = periods.length;
-    var head = '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
+    var headHtml = '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
       '<button type="button" class="btn btn-sm btn-ghost">+ 新对话</button>' +
       '</div>';
-    box.innerHTML = head;
-    var nb = box.querySelector('.ses-head button');
-    if (nb) nb.onclick = function (ev) { ev.stopPropagation(); newChat(); };
-    chain.forEach(function (p) {
+    if (cache.headHtml !== headHtml) {
+      cache.headHtml = headHtml;
+      box.innerHTML = headHtml;
+      var nb = box.querySelector('.ses-head button');
+      if (nb) nb.onclick = function (ev) { ev.stopPropagation(); newChat(); };
+    }
+    /* 列表：按 period_id 复用卡片，不整块重建（键不含下标；新行落位末尾） */
+    var want = {};
+    periods.forEach(function (p) { want[p.period_id] = true; });
+    Object.keys(cache.rows).forEach(function (k) {
+      if (want[k]) return;
+      var row = cache.rows[k];
+      if (row.node && row.node.parentNode) row.node.parentNode.removeChild(row.node);
+      delete cache.rows[k];
+    });
+    periods.forEach(function (p) {
+      var k = p.period_id;
+      var html = rowHtml(p);
+      var row = cache.rows[k];
+      if (row) {
+        /* 键在 ⇒ 复用节点：HTML 变了才重写 + 重绑，否则只移动到位 */
+        if (row.html !== html) { row.node.innerHTML = html; row.html = html; bindRow(row.node, p); }
+        box.appendChild(row.node);
+        return;
+      }
       var div = document.createElement('div');
       /* N-004（钻石）：当前 period 在两个容器里都要可见地标示。旧式写法在证轨模式下恒假。 */
-      var sel = nav().period === p.period_id;
-      div.className = 'ses-item' + (sel ? ' sel' : '');
+      div.className = 'ses-item';
       div.setAttribute('data-ts', p.first_ts || '');
       /* 行要自带身份，选中态才搬得动——否则只能重建整个列表来换高亮。 */
       div.setAttribute('data-job', p.period_id);
-      if (sel) div.setAttribute('aria-current', 'true');
-      /* `st` is this asset's module state object (st.sesSeq / st.histSeq) —
-       * shadowing it here with a timestamp broke every later read in this
-       * function. Measured: the sidebar rendered zero rows and the panel
-       * reported "经历列表拉取失败". Name the local after what it is. */
-      var when = stamp(p.first_ts);
-      var disp = when.date + ' ' + when.time;
-      // 行结构恒定（铁轨）：标题 .nm + 时间 .t + 正文 .p，重命名只换标题文本
-      var nm = autoName(p);
-      var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
-      // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
-      var reply = p.reply ? '<div class="p rp">' + esc(p.reply) + '</div>' : '';
-      var mdl = p.model ? '<span class="mdl">' + esc(p.model) + '</span>' : '';
-      /* No continuation marker: there is no continuation tier. */
-      var tag = '';
-      div.innerHTML =
-        '<div class="nm">' + tag + esc(nm) + '</div>' +
-        '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.period_id.slice(0, 12)) + '</span>' + mdl +
-        '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.period_id) + '" title="重命名">✎</button></span></div>' +
-        preview + reply;
-      div.onclick = function () {
-        /* 一种语义（N-001）：把这段载进对话。证轨侧板若开着，它跟着 period 走——
-         * 那是 shell 的 period 通知在做的事，不是这里的分支。 */
-        Cx.setNav({ period: p.period_id, meta: { job_id: p.job_id, period_id: p.period_id, name: p.name, preview: p.preview } });
-        moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
-        loadPeriodToChat(p.period_id);
-        setBanner('续接经历 <span class="tid">' + esc(p.period_id) + '</span> —— 下一句话延续这段对话');
-        document.getElementById('chat-text').focus();
-      };
-      var rn = div.querySelector('[data-ren]');
-      if (rn) rn.onclick = function (ev) {
-        ev.stopPropagation();
-        beginRename(div, p.period_id, p.name || '');
-      };
+      div.innerHTML = html;
+      bindRow(div, p);
+      cache.rows[k] = { node: div, html: html };
       box.appendChild(div);
     });
+    moveSelection();   /* 选中态就地搬：列表不动，位置不丢 */
   }
 
   // Inline rename — 零跳变（水之波光：行结构铁轨，编辑只换标题文本）：

@@ -79,7 +79,7 @@
     // (computed by the control layer at load time). No data means em dash —
     // never an estimate (ADR-0038 D11).
     var u = S.usage;
-    $('eStats').innerHTML =
+    var html =
       '<div class="e-stat"><b>' + turns + '</b><span>TURNS</span></div>' +
       '<div class="e-stat"><b>' + evs.length + '</b><span>STEPS</span></div>' +
       '<div class="e-stat"><b>' + calls + '</b><span>TOOL CALLS</span></div>' +
@@ -88,6 +88,12 @@
       '<div class="e-stat"><b>' + fmtTok(u && u.total) + '</b><span>TOKENS</span></div>' +
       '<div class="e-stat"><b>' + fmtTok(u && u.cached) + '</b><span>CACHE HIT</span></div>' +
       '<div class="e-stat"><b>' + fmtTok(u && u.input) + '</b><span>INPUT TOK</span></div>';
+    /* 变化才写：同数据轮询不碰 DOM（8 个静态单元无需整块重写） */
+    var el = $('eStats');
+    if (!el) return;
+    if (STATS_HTML === html) return;
+    STATS_HTML = html;
+    el.innerHTML = html;
   }
 
   /* ---------- Table ---------- */
@@ -143,8 +149,15 @@
     return out;
   }
 
+  /* ── 局部渲染：轨迹表按 key 复用行，不整表重建 ──────────────────────────
+   * 此前 `$('eTbody').innerHTML = h` —— 数据每 2 秒到一次，每次清空重造全部行，
+   * 展开态/滚动位置/焦点全丢（与账本同病）。照 cockpit.js 账本范式做 keyed 复用。
+   * ⚠️ 键不含数组下标（教训：下标随追加平移 ⇒ 全部被当新行重建）；
+   * ⚠️ "节点有没有被重建"与"它排在哪里"是两件独立的事 —— 两条都要断言。 */
+  var TBL_NODES = {}, TBL_HTML = {}, TBL_EMPTY = false, LANE_HTML = {}, STATS_HTML = '';
+
   function renderTable() {
-    var h = '', COLS = 5;
+    var rows = [], COLS = 5;
     S.compactGroups = compactGroupsOf();
     for (var i = 0; i < S.session.length; i++) {
       var it = S.session[i];
@@ -152,12 +165,12 @@
         var cnt = 0, tl = 0;
         for (var k = i + 1; k < S.session.length && S.session[k].kind !== 'turn'; k++) { cnt++; tl += S.session[k].dur; }
         var isOpen = !!S.openTurns[it.id];
-        h += '<tr class="e-turn-hd"><td colspan="' + COLS + '">' +
+        rows.push({ key: 't:' + it.id, html: '<tr class="e-turn-hd"><td colspan="' + COLS + '">' +
           '<button type="button" class="e-turn-btn" data-e-turntoggle="' + it.id + '" aria-expanded="' + isOpen + '">' +
           '<span style="display:inline-block;width:14px" aria-hidden="true">' + (isOpen ? '▾' : '▸') + '</span>' +
           '<span>Turn ' + it.index + ' · ' + esc(it.note) + '</span>' +
           '<span class="cnt"> · ' + cnt + ' events · ' + fmtDur(tl) + '</span>' +
-          '</button></td></tr>';
+          '</button></td></tr>' });
         /* The folded row, drawn where the steps it stands for would have been —
          * directly under its turn header. It borrows the turn header's own
          * control and its `cnt` shoulder so the count is not a second verb to
@@ -177,7 +190,7 @@
         var g = S.compactGroups[it.id];
         if (g && isOpen && !S.foldedTurns[it.id] && !S.q) {
           var open = !!S.foldedTurns[it.id];
-          h += '<tr class="e-compact-hd"><td colspan="' + COLS + '">' +
+          rows.push({ key: 'c:' + it.id, html: '<tr class="e-compact-hd"><td colspan="' + COLS + '">' +
             '<button type="button" class="e-turn-btn e-compact-btn" data-e-compacttoggle="' + it.id + '" ' +
             'aria-expanded="' + open + '">' +
             '<span style="display:inline-block;width:14px" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>' +
@@ -185,7 +198,7 @@
             '<span class="cnt"> · ' + g.ids.length + ' internal steps · ' + fmtDur(g.dur) +
             (g.tok ? ' · ' + fmtTok(g.tok) + ' tok' : '') +
             (g.failed ? ' · ⚠ ' + g.failed + ' failed' : '') + '</span>' +
-            '</button></td></tr>';
+            '</button></td></tr>' });
         }
         continue;
       }
@@ -204,7 +217,7 @@
       var isRunning = (S.replayIdx >= 0 && i === S.replayIdx);
       var rowCls = 'ev' + (isRunning ? ' e-running' : '') + (it.cls === REPLY_CLS ? ' e-reply' : '');
       var isHit = S.q && (it.summary + ' ' + (it.tool || '') + ' ' + it.cls).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
-      h += '<tr class="' + rowCls + (isHit ? ' e-row-hit' : '') + '" data-e-ev="' + it.id + '" tabindex="0"' +
+      rows.push({ key: 'e:' + it.id, html: '<tr class="' + rowCls + (isHit ? ' e-row-hit' : '') + '" data-e-ev="' + it.id + '" tabindex="0"' +
         (isSel ? ' aria-current="true"' : '') + '>' +
         '<td><span class="e-ty ' + it.cls + '">' + it.cls + '</span></td>' +
         '<td class="e-summ"' + (it.cls === REPLY_CLS && it.payload ? ' title="' + esc(String(it.payload).slice(0, 300)) + '"' : '') + '>' +
@@ -214,31 +227,68 @@
         (it.repeat ? '<span class="e-rep">stuck ×' + it.repeat + '</span>' : '') + '</td>' +
         '<td><span class="e-st ' + st.c + '"><span class="d"></span>' + st.t + '</span></td>' +
         '<td class="e-dur">' + fmtDur(it.dur) + '</td>' +
-        '<td class="e-tok">' + fmtTok(it.tok) + '</td></tr>';
+        '<td class="e-tok">' + fmtTok(it.tok) + '</td></tr>' });
     }
     /* Nothing to draw. Before this the table simply went blank, which is
      * indistinguishable from "still loading" and gives no way forward
      * (ADR-0044 §1.2 listed it as the missing zero state). Which of the two it
      * is depends on whether a filter is on, and the exit layer says so. */
-    if (!h) {
-      var code = S.q ? 'trajectory-no-match' : 'trajectory-no-rows';
-      var act = S.q
-        ? { run: function () { S.q = ''; $('eQ').value = ''; renderTable(); } }
-        : { label: '看左边的经历列表', run: function () {
-              var side = document.getElementById('s-side');
-              if (side && side.scrollIntoView) { side.scrollIntoView({ block: 'nearest' }); }
-            } };
-      var tr = document.createElement('tr');
-      var td = document.createElement('td');
-      td.colSpan = COLS;
-      td.appendChild(window.CxWayout.build({ code: code, action: act }));
-      tr.appendChild(td);
-      $('eTbody').innerHTML = '';
-      $('eTbody').appendChild(tr);
+    var box = $('eTbody');
+    if (!rows.length) {
+      /* 空态只建一次：此前每次轮询都清空重造同一个占位行（同数据不该重建） */
+      if (!TBL_EMPTY) {
+        Object.keys(TBL_NODES).forEach(function (old) {
+          (TBL_NODES[old] || []).forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+          delete TBL_NODES[old]; delete TBL_HTML[old];
+        });
+        var code = S.q ? 'trajectory-no-match' : 'trajectory-no-rows';
+        var act = S.q
+          ? { run: function () { S.q = ''; $('eQ').value = ''; renderTable(); } }
+          : { label: '看左边的经历列表', run: function () {
+                var side = document.getElementById('s-side');
+                if (side && side.scrollIntoView) { side.scrollIntoView({ block: 'nearest' }); }
+              } };
+        var tr = document.createElement('tr');
+        var td = document.createElement('td');
+        td.colSpan = COLS;
+        td.appendChild(window.CxWayout.build({ code: code, action: act }));
+        tr.appendChild(td);
+        box.innerHTML = '';
+        box.appendChild(tr);
+        TBL_EMPTY = true;
+      }
       updTbl();
       return;
     }
-    $('eTbody').innerHTML = h;
+    if (TBL_EMPTY) { box.innerHTML = ''; TBL_EMPTY = false; }
+    /* ── 局部渲染：按 key 复用行，不整表重建 ──────────────────────────────
+     * 键：ev 行取事件 id，turn 头与折叠头取 turn id，前缀防撞键；键不含下标。
+     * 顺序自顶向下（旧在前）⇒ 逐个 appendChild（对已挂载节点是**移动**），
+     * 新行自然落位末尾；键相同而 HTML 变了 ⇒ 只重建那一行。 */
+    var want = {};
+    rows.forEach(function (r) { want[r.key] = true; });
+    Object.keys(TBL_NODES).forEach(function (old) {
+      if (want[old]) return;
+      (TBL_NODES[old] || []).forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+      delete TBL_NODES[old]; delete TBL_HTML[old];
+    });
+    for (var ri = 0; ri < rows.length; ri++) {
+      var r = rows[ri], k = r.key;
+      if (TBL_NODES[k] && TBL_HTML[k] === r.html) {
+        TBL_NODES[k].forEach(function (n) { box.appendChild(n); });
+        continue;
+      }
+      if (TBL_NODES[k]) {
+        TBL_NODES[k].forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+      }
+      var tpl = document.createElement('tbody');
+      tpl.innerHTML = r.html;
+      var nodes = [];
+      while (tpl.firstChild) { nodes.push(tpl.firstChild); tpl.removeChild(tpl.firstChild); }
+      nodes.forEach(function (n) { box.appendChild(n); });
+      TBL_NODES[k] = nodes;
+      TBL_HTML[k] = r.html;
+    }
     updTbl();
   }
 
@@ -284,9 +334,14 @@
         }
       });
     });
+    /* 变化才写：同数据轮询时一个节点都不碰（与 eStats 同一策略） */
     LANES.forEach(function (k) {
       var el = laneEl(k);
-      if (el) { el.innerHTML = lanes[k].join(''); }
+      if (!el) return;
+      var html = lanes[k].join('');
+      if (LANE_HTML[k] === html) return;
+      LANE_HTML[k] = html;
+      el.innerHTML = html;
     });
     $('eOvNote').textContent = S.durMode === 'actual'
       ? 'actual time: see which is slowest (widest = longest)' : 'equal width: see what happened (duration ignored)';
