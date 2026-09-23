@@ -26,6 +26,7 @@ the assembled page served by a running panel.
 | `snapshot_selftest.js <file>` | The snapshot is actually self-contained | no |
 | `probe_bug.js` | Minimal reproduction of a reported defect | no |
 | `start-panel.sh [port]` / `--stop` | Brings the six-component stack up in dependency order and stops it by PID | — |
+| `cockpit_status_test.js` | The ledger's status column classifies **known** verdicts and marks **unknown/absent** as neither pass nor failure. Loads `../assets/cockpit.js` from disk and executes it under a stubbed `window`. **This has to be a JS suite**: `cockpit.js` is burnt in via `include_str!`, so `cargo test` can only substring-match its text and cannot execute the logic (K-088 family / Q7) | no |
 | `ab_verify.sh` / `--check` | The binary is newer than every burnt-in asset, and runs the e2e only if it is — a stale binary's result is a result about different code | yes (`--check`: no) |
 
 ## Running

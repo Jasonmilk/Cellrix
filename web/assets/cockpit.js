@@ -24,7 +24,12 @@
    * `HARDOVERRIDEPASS` **必须显式列出**：它以 `HARDOVERRIDE` 开头、不以 `PASS`
    * 开头，边界匹配抓不到它 —— 靠"看起来像 pass"去找正是子串匹配的老毛病。 */
   var OK_STATUS = ['PASS', 'OK', 'MET', 'ALLOW', 'FORWARD', 'HARDOVERRIDEPASS'];
-  var WARN_STATUS = ['WARN'];
+  /* `WARN`：警告级注册码（`W-*`）与**需要人看**的判定。
+   * `NEEDHUMANCONFIRM` 是 Tuck 的一个**真实判定**，不是"判不出" —— 它的意思是
+   * "需要人来定"。若把它渲染成中性灰的 `unknown`，"在等人"与"没有数据"就看起来
+   * 一样，而两者处置完全不同（一个要通知人，一个要查为什么没数据）。
+   * ⇒ 它是 `warn`：一个**值得人注意的已知判定**。 */
+  var WARN_STATUS = ['WARN', 'NEEDHUMANCONFIRM'];
   var BAD_STATUS = ['REJECT', 'FAIL', 'BLOCK', 'DENY', 'ERR'];
   /* 码注册表（`commonintents/.github/CI-144_码注册表.md`）的**严重度前缀**：
    * `E-*` 错误、`W-*` 警告。必须单独列，因为 `E-RISK-MISSING` / `W-RISK-UNKNOWN`
