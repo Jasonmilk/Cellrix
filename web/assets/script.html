@@ -405,41 +405,66 @@
   }
 
   /* ---- status line (shell scope: shown in every view) ------------------- */
+
+  /* 只在**真的变了**才写 DOM。
+   *
+   * 为什么值得：这些是文本节点（重建代价小），但"每 2 秒无条件写一遍"意味着
+   * **界面的状态由时钟决定，而不是由数据决定** —— 你十条里的「按需驱动」要求
+   * 反过来。而且同一原则用在 `#eco`（整块 innerHTML）上时代价不小。
+   *
+   * 判据用"上一条写入的值"而不是再次读 DOM：读回 DOM 会把**渲染器的产物**当成
+   * 事实来源，而真相是刚到的数据。 */
+  var LAST_TEXT = {};
+  function setText(id, text) {
+    if (LAST_TEXT[id] === text) { return false; }
+    LAST_TEXT[id] = text;
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+    return true;
+  }
+  var LAST_CLASS = {};
+  function setClass(id, cls) {
+    if (LAST_CLASS[id] === cls) { return false; }
+    LAST_CLASS[id] = cls;
+    var el = document.getElementById(id);
+    if (el) el.className = cls;
+    return true;
+  }
+
+  /* `#eco` 上一次渲染出的 html（见 loadEcosystem）。与上面两个同族：
+   * 只在产物变化时写 DOM。 */
+  var LAST_ECO_HTML = null;
+
   function tick() {
     fetch('/api/snapshot').then(function (r) {
       if (!r.ok) { throw new Error('proxy ' + r.status); }
       return r.json();
     }).then(function (j) {
       var snap = j.snapshot || null;
-      var mode = document.getElementById('mode');
-      var st = document.getElementById('state');
-      var conn = document.getElementById('conn');
-      var sub = document.getElementById('sub');
       if (!snap) {
-        mode.textContent = 'NO SNAPSHOT';
-        st.textContent = j.status || '?';
-        conn.textContent = '✗ 未就绪';
-        conn.className = 'badge';
-        sub.textContent = 'Anaphase 未提供快照（' + (j.error || j.status || '未知') + '）——检查 up 是否在运行';
+        setText('mode', 'NO SNAPSHOT');
+        setText('state', j.status || '?');
+        setText('conn', '✗ 未就绪');
+        setClass('conn', 'badge');
+        setText('sub', 'Anaphase 未提供快照（' + (j.error || j.status || '未知') + '）——检查 up 是否在运行');
         return;
       }
       var m = snap.mode || '?';
       // Honest status line: success path must leave the "连接中…" placeholder.
-      sub.textContent = 'Anaphase 在线 · ' + m.toUpperCase() + ' · ' + (snap.episode || '暂无经历');
-      mode.textContent = m.toUpperCase();
-      mode.className = 'badge ' + m;
-      st.textContent = 'state: ' + (snap.state || '?');
-      conn.textContent = '● 在线';
-      conn.className = 'badge live';
+      setText('sub', 'Anaphase 在线 · ' + m.toUpperCase() + ' · ' + (snap.episode || '暂无经历'));
+      setText('mode', m.toUpperCase());
+      setClass('mode', 'badge ' + m);
+      setText('state', 'state: ' + (snap.state || '?'));
+      setText('conn', '● 在线');
+      setClass('conn', 'badge live');
       // The situation view renders its own content; the shell only decides
       // **when** it is worth rendering (按需渲染：只有台上的视图才渲染).
       // 这条此前无条件执行 —— 驾驶舱不在台上也每 2 秒整块重建一次（实测见
       // perf_measure.js）。现在由 offerSnapshot 判断"在不在台上"。
       offerSnapshot(snap);
     }).catch(function (e) {
-      var conn = document.getElementById('conn');
-      conn.textContent = '✗ 断开';
-      conn.className = 'badge';
+      setText('conn', '✗ 断开');
+      setClass('conn', 'badge');
       /* 出路是时间：本函数由 setInterval 反复调用，面板自己在重试。所以这里渲染
        * 成说明而不是按钮——状态行的职责只是报告状态（ADR-0044 D5）。 */
       window.CxWayout.renderInline(document.getElementById('sub'),
@@ -457,6 +482,12 @@
       (j.components || []).forEach(function (c) {
         html += '<span class="c"><span class="dot ' + esc(c.state) + '"></span>' + esc(c.name) + '</span>';
       });
+      /* 只在**产物变了**才重建。`#eco` 是整块 innerHTML 重建，而它每 2 秒被调一次
+       * —— 实测（perf_measure.js）它在 6 秒窗口里重建 3 次，即使生态状态一个字节都没变。
+       * 判据用**生成的 html**（渲染器的产物）而不是再次读 DOM：
+       * 读回 DOM 会把产物当事实来源，而真相是刚到的数据。 */
+      if (LAST_ECO_HTML === html) { return; }
+      LAST_ECO_HTML = html;
       box.innerHTML = html;
     }).catch(function () {
       var box = document.getElementById('eco');
