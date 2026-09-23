@@ -104,11 +104,23 @@ if (!(PANEL_UP && CDP_UP)) {
     'needs the panel + a browser on ' + CDP + ': node layout_test.js ' + PANEL + ' ' + CDP + ' (see README)']);
 }
 
+/* 按需渲染的**仪器**（量请求数、字节数与 DOM 重建次数）。
+ *
+ * 它是仪器而非判据：判据是它在报告里给出的那三条（不在台上 ⇒ 零重建 / 上台 ⇒ 有内容 /
+ * 同一份数据不重复渲染）。放在这里登记，是因为本文件头一条就是"一个悄悄没跑的套件
+ * 与一个通过的套件无法区分" —— 仪器也一样，不登记就等于没有。 */
+if (!(PANEL_UP && CDP_UP)) {
+  NEEDS_INPUT.push(['perf_measure.js',
+    'needs the panel + a browser on ' + CDP + ': node perf_measure.js ' + PANEL + ' ' + CDP + ' (see README)']);
+}
+
 if (PANEL_UP) {
   SELF_CONTAINED.push(['all_views_test.js', 'all views against the live panel — ' + PANEL]);
 }
 if (PANEL_UP && CDP_UP) {
   SELF_CONTAINED.push(['layout_test.js', 'geometry in a real browser — ' + CDP]);
+  SELF_CONTAINED.push(['perf_measure.js',
+    'on-demand render: nothing off-stage is rebuilt — ' + PANEL + ' + ' + CDP]);
 }
 
 /* The concrete instance ADR-0022 §2.5 guards: the panel's own navigation shape.
@@ -118,6 +130,9 @@ function checkEngAssertions() {
   const bad = [];
   for (const f of fs.readdirSync(__dirname)) {
     if (!/_(test)\.js$/.test(f) && f !== 'pt_replay.js') continue;
+    /* 不扫本文件：扫描器的自检夹具就住在这里，而"工具不得把自身算进守卫范围"
+     * 与本仓 `guarded_paths.tsv` 的既有原则一致。 */
+    if (f === 'run_all.js') continue;
     fs.readFileSync(path.join(__dirname, f), 'utf8').split('\n').forEach((line, i) => {
       const t = line.trim();
       if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
@@ -127,8 +142,66 @@ function checkEngAssertions() {
   return bad;
 }
 
+/* ── 扫描器自检：**"非空转"必须被证明，不能只被写下** ────────────────────────
+ *
+ * 上面那段注释此前写着"非空转已由变异注入证明" —— 那是**一次人工实验的转述**，
+ * 而**没有任何东西在检查它现在是否还成立**。若 `ENG_FORBIDDEN` 被改窄（或写错），
+ * 扫描器会安静地对一棵坏树报"干净"，而注释仍然声称它是有效的。
+ *
+ * ⇒ 按 `nav_state_test.js` 已在本仓立下的形状（把 `scan()` 跑在**合成源**上，
+ * 且合成源**必须**被报出来），把"非空转"做成每次运行都执行的**结构性自检**：
+ *
+ *   - **阳性**：一串**必须**被抓住的货（`assert(views.length === 4)`）⇒ 抓不到就是坏；
+ *   - **阴性**：一串**必须**放行的（注释行、从单一来源取值的比较）⇒ 抓到就是误报。
+ *
+ * 两个方向都要：只测阳性会把"过宽的扫描器"放过去，而**没人信的检查比没有检查更糟**
+ * （本文件头与 ADR-0022 §2.5 都这么说）。 */
+const ENG_SELFTEST = {
+  /* 必须被抓住。
+   *
+   * ⚠️ 用**字符串拼接**构造，不让这些字面量以完整形态出现在源码里 ——
+   * 否则 `checkEngAssertions()` 会把 `run_all.js` **自己**报成违规
+   * （本仓既有先例：`guarded_paths.tsv` 里 "the tool itself must not be able to
+   * guard itself in"）。这同时也是对扫描器的一次真实检验：它扫的是**行**，
+   * 拼接后的源码行不含完整禁形。 */
+  mustCatch: [
+    'check("nav", assert(views' + '.length === 4));',
+    '  assert(navItems' + '.length === 3);',
+    'if (panes' + '.length !== 2) fail();',
+    'check("t", tiers' + '.length === 5);'
+  ],
+  /* 必须放行：结构性不变量 / 注释 / 值来自单一来源 */
+  mustPass: [
+    'check("structural", views.length > 0);',
+    '// assert(views' + '.length === 4);',
+    '  /* navItems' + '.length === 3 — historical note */',
+    'check("from config", views.length === EXPECTED_FROM_CONFIG);'
+  ]
+};
+function checkEngScannerSelfTest() {
+  const bad = [];
+  for (const line of ENG_SELFTEST.mustCatch) {
+    if (!ENG_FORBIDDEN.test(line)) bad.push('MISSED (false negative): ' + line.trim());
+  }
+  for (const line of ENG_SELFTEST.mustPass) {
+    const t = line.trim();
+    const isComment = t.startsWith('//') || t.startsWith('*') || t.startsWith('/*');
+    if (!isComment && ENG_FORBIDDEN.test(line)) bad.push('OVERREACH (false positive): ' + t);
+  }
+  return bad;
+}
+
 let failed = 0;
 const results = [];
+
+/* 先证明**检查器本身**有效，再用它去判别人。
+ * 顺序有意如此：一个失效的扫描器会给出"干净"的结论，而那个结论看起来与真干净一样。 */
+const engSelfBad = checkEngScannerSelfTest();
+if (engSelfBad.length) {
+  failed++;
+  console.log('  FAIL  eng-scanner self-test     the scanner cannot see what it claims to forbid');
+  engSelfBad.forEach(function (b) { console.log('        ' + b); });
+}
 
 const engBad = checkEngAssertions();
 if (engBad.length) {

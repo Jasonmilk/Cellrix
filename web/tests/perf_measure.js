@@ -185,6 +185,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
    * 要判的是**视图容器内部**的元素在视图不可见时是否仍被重建。 */
   const VIEW_CONTAINERS = { cockpit: ['entries', 'cockpit-stats', 'ltShell'], proveTrack: ['s-main'] };
   const hiddenWrites = [];
+  let critFailed = 0;
   for (const [view, els] of Object.entries(VIEW_CONTAINERS)) {
     if (v[view] !== 'hidden') continue;
     for (const id of els) {
@@ -195,6 +196,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('  驾驶舱可见: ' + (v.cockpit === 'visible'));
   if (hiddenWrites.length) {
     console.log('  ⚠️  不在台上的视图其容器仍被重建：' + hiddenWrites.join(', ') + ' —— 违反「按需渲染」');
+    critFailed++;
   } else if (hiddenView) {
     console.log('  ✓ 不在台上的视图，其容器**零重建**（`#eco` 常驻可见，不计入）');
   }
@@ -233,6 +235,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('  切到驾驶舱后：#entries 内元素 ' + rowsAfterEnter + ' 个，容器重建 ' + (pe.byEl.entries || 0) + ' 次');
   if (rowsAfterEnter === 0) {
     console.log('  ✗ 驾驶舱上台后**没有内容** —— 按需渲染退化成了不渲染');
+    critFailed++;
   } else {
     console.log('  ✓ 驾驶舱上台后被渲染（有内容）');
   }
@@ -241,9 +244,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     console.log('  ✓ 同一份数据不重复渲染（变化检测生效）');
   } else {
     console.log('  ⚠️  同一份数据被重复渲染 ' + pr.byEl.entries + ' 次 —— 变化检测未生效');
+    critFailed++;
   }
+  console.log('');
+  console.log(critFailed === 0
+    ? 'OK — 按需渲染 3 条判据全过'
+    : 'FAILED — ' + critFailed + ' 条判据未过');
   console.log('');
 
   cdp.close();
-  process.exit(0);
+  /* 退出码 = 判据结果。本文件同时是**仪器**（上面的数字）与**判据**（这三条），
+   * 故必须能被 run_all.js 判红；否则登记进网只增加"看起来有覆盖"。 */
+  process.exit(critFailed === 0 ? 0 : 1);
 })().catch((e) => { console.log('  测量失败: ' + (e && e.message || e)); process.exit(1); });
