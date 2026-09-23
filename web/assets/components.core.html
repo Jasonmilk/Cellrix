@@ -83,6 +83,11 @@
   .chip.e-ok { color:var(--ok); background:rgba(30,122,69,.10); border-color:transparent; }
   .chip.e-warn { color:var(--warn); background:rgba(138,90,0,.10); border-color:transparent; }
   .chip.e-bad { color:var(--risk); background:var(--danger-soft); border-color:transparent; }
+  /* 未知/未在词表内 —— **中性灰，绝不落绿**。
+     存在的理由：账本里取不到判定时，把它显示成"没问题"正是 K-088 的形状。
+     未测量 ≠ 通过（DNA 原则 4 工程映射 / 通则 A）。样式与 `.chip.tier-L0`
+     一致，复用既有 token，不新造配色。 */
+  .chip.e-unknown { color:var(--text-dim); background:transparent; border-color:var(--text-dim); }
 
   /* ---------- 表格体系 ----------
      [PHYS:P-014] 裁切可见（滚动指示）· [PHYS:D-003] 表头线 2px

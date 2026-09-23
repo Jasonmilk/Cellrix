@@ -331,9 +331,16 @@
           // One timeline row per criterion: label carries the verdict so the
           // flow reads "exec_ok PASS" / "answer.delivered PASS" at a glance;
           // the reason opens on click.
+          //
+          // **三态，不是两态**：此前写作 `c.passed === false ? 'FAIL' : 'PASS'`
+          // ⇒ 字段**缺席**时落到 `PASS`。那是"没测量"被渲染成"通过"，
+          // 与 K-088（未知码渲绿）同形，只是搬到证轨这一侧。
+          // `passed` 为真 ⇒ PASS；为假 ⇒ FAIL；**缺席 ⇒ 未测**。
           var c = e.data || {};
-          var tag = '检查 · ' + (c.check || '?') + ' · ' + (c.passed === false ? 'FAIL' : 'PASS');
-          Cx.foldRow(tag, (c.reason || '') + (c.actual ? '\nactual=' + c.actual : ''), c.passed === false ? 'chk-fail' : 'chk-pass');
+          var pass = c.passed === true ? 'PASS' : (c.passed === false ? 'FAIL' : '未测');
+          var tag = '检查 · ' + (c.check || '?') + ' · ' + pass;
+          var rowCls = c.passed === true ? 'chk-pass' : (c.passed === false ? 'chk-fail' : 'chk-unknown');
+          Cx.foldRow(tag, (c.reason || '') + (c.actual ? '\nactual=' + c.actual : ''), rowCls);
         }
         else if (e.type === 'verdict/status') {
           var v = e.data || {};

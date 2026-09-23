@@ -36,11 +36,18 @@
     return '';
   }
 
-  /* The status vocabulary the view renders. A closed set: the four words a row
-   * can be in, each with its colour class. */
+  /* The status vocabulary the view renders. A closed set: the words a row can be
+   * in, each with its colour class.
+   *
+   * `unmeasured`（第五个）存在的理由：`passed` / `ok` / `status` 这类字段**缺席**
+   * 时，此前被 `!!` 与 `=== ` 压成 `false` ⇒ 折成 `fail` ⇒ 界面把"从没测量过"
+   * 显示成"失败"。两者不是一回事（`prove_track.data.js` 自己对 `fmtTok` 就写明
+   * "null/undefined = 事实不存在；0 = 事实就是 0"）。故缺席单独成态。
+   * 颜色类复用 `done`（`--e-dim` 中性灰）—— **不新造配色**，也不落绿。 */
   var STATUS = {
     ok: { t: 'success', c: 'ok' }, fail: { t: 'failure', c: 'fail' },
-    pending: { t: 'pending', c: 'pending' }, done: { t: 'done', c: 'done' }
+    pending: { t: 'pending', c: 'pending' }, done: { t: 'done', c: 'done' },
+    unmeasured: { t: 'unmeasured', c: 'done' }
   };
 
   /* The glyph for "there is no such fact". It has exactly one source, because

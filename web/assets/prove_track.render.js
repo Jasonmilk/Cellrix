@@ -25,7 +25,14 @@
   if (!D) {
     throw new Error('prove_track.render.js requires prove_track.data.js to load first');
   }
-  var short = D.short, firstLine = D.firstLine;
+  var short = D.short, firstLine = D.firstLine, ABSENT = D.ABSENT;
+
+  /* 三态 → 给**人看**的短标签。入参必须是 `triStatus` 的结果串
+   * （`'ok'`/`'fail'`/`'unmeasured'`）—— **不要**写成 `triLabel(pred === true)`：
+   * 那会把 `undefined` 先压成 `false`，三态又塌回两态（本文件里犯过一次，记此）。 */
+  function triLabel(status) {
+    return status === 'ok' ? 'PASS' : (status === 'fail' ? 'FAIL' : ABSENT);
+  }
 
   /* Which lane a row is drawn in. Complete over the contract's kinds — the
    * guard requires key-for-key equality, so a new kind cannot be silently
@@ -57,8 +64,21 @@
    * and they stay as code: readable, unit-testable, and changeable without
    * touching a table.
    */
+  /* 三态：真 / 假 / **缺席** —— 只给"**真值谓词**"用。
+   *
+   * `!!p.ok` 本身已经正确：它把 `undefined` 留在 `undefined`，只在真有值时
+   * 才给布尔。**真正错的是 `!!p.passed`** —— 比较运算把"缺席"压成 `false`，
+   * 于是一个从没测量过的判据被渲染成 `FAIL`，`statusOf` 再把它折成 `'fail'`。
+   * 这是"缺失被当成一个值"，与 K-088（未知码渲绿）同形、方向相反：
+   * 那边把未知渲染成"通过"，这边把未知渲染成"失败"。
+   *
+   * 故只改 `isCheckPassed` 为 `=== true` 形式（absent ⇒ `undefined`）。
+   * **不碰** `isEmptyReply` / `hasModel` / `hasReason` / `hasSha` 这类
+   * **存在性谓词**：它们回答的是"这个字段在不在"，`false` 是它们的正确返回值，
+   * 不是"缺席"。（改它们会把语义弄反 —— 记此以免下一人重犯。）
+   */
   function isToolOk(p) { return !!p.ok; }
-  function isCheckPassed(p) { return !!p.passed; }
+  function isCheckPassed(p) { return p.passed === true; }
   function isVerdictMet(p) { return p.status === 'Met'; }
   function isEmptyReply(p) { return !!p.empty; }
   function hasModel(p) { return !!p.model; }
@@ -171,7 +191,10 @@
         tpl: '{tool} · {ok} · {durationMs}',
         dur: 'durationMs',
         fmt: {
-          ok: function (p) { return isToolOk(p) ? 'ok' : 'fail'; },
+          /* 这里要的是词表里的短词（`ok`/`fail`/`unmeasured`），不是给人看的
+             `PASS`/`FAIL` ⇒ 直接用 `triStatus`，**不要**套 `triLabel` 再转小写
+             （那会得到 `pass`，而本行词表是 `ok`）。 */
+          ok: function (p) { return triStatus(isToolOk(p)); },
           durationMs: function (p) { return hasDuration(p) ? p.durationMs + 'ms' : '—'; }
         },
         opt: { sha: function (p) { return hasSha(p) ? ' · sha ' + p.outcomeSha : ''; } }
@@ -179,7 +202,7 @@
     ],
     check: {
       tpl: '{gate} · {check} · {passed} · expect={expect}',
-      fmt: { passed: function (p) { return isCheckPassed(p) ? 'PASS' : 'FAIL'; } }
+      fmt: { passed: function (p) { return triLabel(triStatus(isCheckPassed(p))); } }
     },
     verdict: {
       tpl: '{status}',
@@ -227,14 +250,22 @@
     reply: 'the model answering; the deliverable of this cycle'
   };
 
+  /* 三态 → 状态串。`undefined`（缺席）必须与 `false`（判为否）分开：
+   * 此前两者都被折成 `'fail'`，于是"没测过"和"测了没过"在界面上无法区分。 */
+  function triStatus(v) { return v === true ? 'ok' : (v === false ? 'fail' : 'unmeasured'); }
+
   /* A kind's default status. Kinds absent from this table are done. */
   var STATUS_OF = {
     tool: function (p) {
       if (p.stage === 'call') { return 'pending'; }
-      return isToolOk(p) ? 'ok' : 'fail';
+      /* `isToolOk` 保留 `!!`：`p.ok` 缺席时它返回 `undefined`，
+         与 `false`（真的失败）不同 ⇒ 落到 `unmeasured`。 */
+      return triStatus(isToolOk(p));
     },
-    check: function (p) { return isCheckPassed(p) ? 'ok' : 'fail'; },
-    verdict: function (p) { return isVerdictMet(p) ? 'ok' : 'fail'; }
+    check: function (p) { return triStatus(isCheckPassed(p)); },
+    /* `isVerdictMet` 是 `status === 'Met'` 的比较 —— 缺席时同样得 `false`。
+       与 check 同一形状，故同样按三态处理。 */
+    verdict: function (p) { return triStatus(isVerdictMet(p)); }
   };
 
   function statusOf(node) {
