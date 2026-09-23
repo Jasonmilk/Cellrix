@@ -13,8 +13,8 @@ use std::net::TcpStream;
 
 use crate::config::PanelConfig;
 use crate::routes::{
-    route_audit, route_chat, route_ecosystem, route_events, route_flows, route_index,
-    route_sessions, route_sessions_rename, route_snapshot, route_trace,
+    route_audit, route_chat, route_ecosystem, route_events, route_flows, route_flows_suppliers,
+    route_index, route_sessions, route_sessions_rename, route_snapshot, route_trace,
 };
 
 /// Route table: the panel's own surface. Everything else proxies upstream.
@@ -29,6 +29,7 @@ pub enum Route {
     Events,
     Ecosystem,
     Flows,
+    FlowsSuppliers,
     Chat,
     NotFound,
 }
@@ -47,6 +48,7 @@ pub fn route(path: &str) -> Route {
         "/api/events" => Route::Events,
         "/api/ecosystem" => Route::Ecosystem,
         "/api/flows" => Route::Flows,
+        "/api/flowmodus/suppliers" => Route::FlowsSuppliers,
         "/api/chat" => Route::Chat,
         _ => Route::NotFound,
     }
@@ -89,6 +91,7 @@ pub fn handle(
         Route::SessionsRename => route_sessions_rename(&mut stream, cfg, &text)?,
         Route::Events => route_events(&mut stream, cfg, &text)?,
         Route::Flows => route_flows(&mut stream, cfg, &text)?,
+        Route::FlowsSuppliers => route_flows_suppliers(&mut stream, cfg, &text)?,
         Route::Ecosystem => route_ecosystem(&mut stream, cfg, &text)?,
         Route::Chat => route_chat(&mut stream, cfg, &text)?,
         Route::NotFound => {

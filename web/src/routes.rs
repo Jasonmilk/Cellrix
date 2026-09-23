@@ -245,6 +245,56 @@ pub fn route_flows(
     Ok(())
 }
 
+/// `Flows — supplier configuration` (panel ↔ flowmodus management proxy).
+///
+/// GET    /api/flowmodus/suppliers          → list (key masked, only `api_key_set`)
+/// POST   /api/flowmodus/suppliers          → add/update (body carries api_key)
+/// DELETE /api/flowmodus/suppliers?tier=&id= → remove declaration + secret
+///
+/// Same transport contract as the other proxies: the browser never holds
+/// credentials — the panel relays the raw body upstream, and FlowModus is the
+/// one fact source for suppliers/secrets (唯一事实来源).
+pub fn route_flows_suppliers(
+    stream: &mut TcpStream,
+    cfg: &PanelConfig,
+    text: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let method = text
+        .lines()
+        .next()
+        .and_then(|l| l.split_whitespace().next())
+        .unwrap_or("");
+    let fm = cfg
+        .flowmodus_url
+        .as_deref()
+        .unwrap_or("http://127.0.0.1:60053");
+    let resp = match method {
+        "GET" => cellrix_web::fetch_json(fm, "/api/suppliers", None),
+        "POST" => {
+            let body = text.split("\r\n\r\n").nth(1).unwrap_or("{}");
+            cellrix_web::post_json(fm, "/api/suppliers", body, None)
+        }
+        "DELETE" => {
+            let query = text
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|p| p.split('?').nth(1))
+                .unwrap_or("");
+            cellrix_web::delete_json(fm, &format!("/api/suppliers?{query}"), None)
+        }
+        _ => Err(format!("unsupported method {method:?}")),
+    };
+    match resp {
+        Ok(body) => respond(stream, 200, "application/json", body.as_bytes())?,
+        Err(e) => {
+            let msg = format!("{{\"error\":\"{e}\"}}");
+            respond(stream, 502, "application/json", msg.as_bytes())?;
+        }
+    }
+    Ok(())
+}
+
 /// `Ecosystem`.
 pub fn route_ecosystem(
     stream: &mut TcpStream,

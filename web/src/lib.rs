@@ -6,5 +6,5 @@
 pub mod http;
 pub mod identity;
 
-pub use http::{fetch_json, post_json, post_stream, probe, unhealthy_names};
+pub use http::{delete_json, fetch_json, post_json, post_stream, probe, unhealthy_names};
 pub use identity::{client_bearer, extract_json_str, load_client_identity, sign_bearer};

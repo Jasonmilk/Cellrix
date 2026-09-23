@@ -53,6 +53,7 @@ const SELF_CONTAINED = [
   ['ledger_rows_test.js', 'ledger rows — keyed reuse, not a whole-table rebuild'],
   ['prove_track_rows_test.js', 'trajectory rows — keyed reuse, not a whole-table rebuild (PANEL-PLAN §2)'],
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
+  ['flows_suppliers_test.js', 'flows supplier config — panel proxy contract, key never echoed (PANEL-PLAN §3)'],
   /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
    * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
    * the one entry point that actually gets run — a criterion nobody runs is a

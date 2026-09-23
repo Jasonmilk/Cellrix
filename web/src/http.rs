@@ -16,6 +16,21 @@ const READ_TIMEOUT_SECS: u64 = 180;
 /// Hand-rolled HTTP GET: read the body after the blank line.
 /// `bearer` is an optional identity credential (never sent to the browser).
 pub fn fetch_json(base: &str, path: &str, bearer: Option<&str>) -> Result<String, String> {
+    plain_request("GET", base, path, bearer)
+}
+
+/// Hand-rolled HTTP DELETE: same transport, no body (query carries the
+/// target). One implementation for both verb-only methods (极致复用).
+pub fn delete_json(base: &str, path: &str, bearer: Option<&str>) -> Result<String, String> {
+    plain_request("DELETE", base, path, bearer)
+}
+
+fn plain_request(
+    method: &str,
+    base: &str,
+    path: &str,
+    bearer: Option<&str>,
+) -> Result<String, String> {
     let base = base.trim_start_matches("http://").trim_end_matches('/');
     let (host, port) = match base.rsplit_once(':') {
         Some((h, p)) => (h.to_string(), p.parse::<u16>().map_err(|e| e.to_string())?),
@@ -29,7 +44,7 @@ pub fn fetch_json(base: &str, path: &str, bearer: Option<&str>) -> Result<String
         Some(k) if !k.is_empty() => format!("Authorization: Bearer {k}\r\n"),
         _ => String::new(),
     };
-    let req = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\n{auth}Connection: close\r\n\r\n");
+    let req = format!("{method} {path} HTTP/1.1\r\nHost: {host}\r\n{auth}Connection: close\r\n\r\n");
     stream.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
     let mut buf = String::new();
     stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;

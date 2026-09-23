@@ -2,10 +2,11 @@
  * exist because the panel must never lose the ability to render: a hash it did not
  * write, or a hand-edited one, has to degrade to an empty state rather than throw.
  *
- * The state has three keys since N-001 landed: `view` (the one main surface),
- * `period` (which experience), and `panel` (which auxiliary surface is open beside
- * it). `panel` was added as pure addition — an unknown key is still ignored and a
- * malformed hash still yields an empty state. */
+ * The state has four keys: `view` (the one main surface), `period` (which
+ * experience), `panel` (which auxiliary surface is open beside it), and `sup`
+ * (which supplier is selected on the Flows desk). `panel` and `sup` were added as
+ * pure additions — an unknown key is still ignored and a malformed hash still
+ * yields an empty state. */
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -21,16 +22,16 @@ const N = global.window.CxNormalize;
 
 let n = 0;
 function ok(name, fn) { fn(); n++; console.log('  PASS  ' + name); }
-const EMPTY = { view: null, period: null, panel: null };
+const EMPTY = { view: null, period: null, panel: null, sup: null };
 
-ok('round-trips view + period + panel', () => {
-  const s = { view: 'chat', period: 'run-abc123', panel: 'prove-track' };
+ok('round-trips view + period + panel + sup', () => {
+  const s = { view: 'chat', period: 'run-abc123', panel: 'prove-track', sup: 'deepseek' };
   assert.deepStrictEqual(N.parseHash(N.buildHash(s)), s);
 });
 
 ok('omits a missing period instead of emitting an empty one', () => {
   assert.strictEqual(N.buildHash({ view: 'chat' }), '#view=chat');
-  assert.deepStrictEqual(N.parseHash('#view=chat'), { view: 'chat', period: null, panel: null });
+  assert.deepStrictEqual(N.parseHash('#view=chat'), { view: 'chat', period: null, panel: null, sup: null });
 });
 
 ok('a fully empty state is absent, not a bare hash', () => {
@@ -43,19 +44,19 @@ ok('tolerates a hash it did not write', () => {
   assert.deepStrictEqual(N.parseHash(''), EMPTY);
   assert.deepStrictEqual(N.parseHash(undefined), EMPTY);
   assert.deepStrictEqual(N.parseHash('#someones-anchor'), EMPTY);
-  assert.deepStrictEqual(N.parseHash('#view&period=x'), { view: null, period: 'x', panel: null });
-  assert.deepStrictEqual(N.parseHash('#unknown=1&view=chat'), { view: 'chat', period: null, panel: null });
+  assert.deepStrictEqual(N.parseHash('#view&period=x'), { view: null, period: 'x', panel: null, sup: null });
+  assert.deepStrictEqual(N.parseHash('#unknown=1&view=chat'), { view: 'chat', period: null, panel: null, sup: null });
 });
 
 ok('order does not matter', () => {
   assert.deepStrictEqual(
-    N.parseHash('#period=run-1&view=chat'),
-    N.parseHash('#view=chat&period=run-1')
+    N.parseHash('#period=run-1&view=chat&sup=groq'),
+    N.parseHash('#view=chat&sup=groq&period=run-1')
   );
 });
 
 ok('percent-encoding survives, and malformed encoding does not throw', () => {
-  const s = { view: 'chat', period: 'run-a b&c', panel: 'prove-track' };
+  const s = { view: 'chat', period: 'run-a b&c', panel: 'prove-track', sup: 'openai a/b' };
   assert.deepStrictEqual(N.parseHash(N.buildHash(s)), s);
   assert.deepStrictEqual(N.parseHash('#view=%E0%A4%A'), EMPTY);
 });
@@ -66,13 +67,23 @@ ok('percent-encoding survives, and malformed encoding does not throw', () => {
  * never wrote. */
 ok('panel round-trips on its own, and is omitted when unset', () => {
   assert.strictEqual(N.buildHash({ panel: 'flows' }), '#panel=flows');
-  assert.deepStrictEqual(N.parseHash('#panel=flows'), { view: null, period: null, panel: 'flows' });
+  assert.deepStrictEqual(N.parseHash('#panel=flows'), { view: null, period: null, panel: 'flows', sup: null });
   assert.strictEqual(N.buildHash({ panel: null }), '');
+});
+
+/* ── the sup key: the same pure addition, for the Flows supplier desk ──────
+ * Selecting a supplier is part of the one selection state, so the selection
+ * survives Back/Forward, a refresh, and a shared URL. Its absence is absent. */
+ok('sup round-trips on its own, and is omitted when unset', () => {
+  assert.strictEqual(N.buildHash({ sup: 'deepseek' }), '#sup=deepseek');
+  assert.deepStrictEqual(N.parseHash('#sup=deepseek'), { view: null, period: null, panel: null, sup: 'deepseek' });
+  assert.strictEqual(N.buildHash({ sup: null }), '');
 });
 
 ok('an unknown key is still ignored rather than guessed at', () => {
   assert.deepStrictEqual(N.parseHash('#drawer=flows'), EMPTY);
   assert.deepStrictEqual(N.parseHash('#panel='), EMPTY);
+  assert.deepStrictEqual(N.parseHash('#sup='), EMPTY);
 });
 
 console.log('RESULT: ' + n + ' passed');

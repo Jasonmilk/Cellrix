@@ -50,8 +50,37 @@
   #view-flows .fl-bar { display:flex; align-items:center; justify-content:space-between;
     margin-bottom:12px; }
   #view-flows .fl-refresh { min-width:44px; height:44px; padding:0 14px; }
+  /* 供应商配置（Model Nexus 式 Desk）：池列表可选中 + 详情面板 + 表单回填 */
+  #view-flows .fl-sup { margin-top:14px; }
+  #view-flows .fl-sup-grid { display:grid; grid-template-columns:1fr 1.4fr; gap:14px; }
+  #view-flows .fl-sup-pane { min-width:0; }
+  #view-flows .fl-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:8px; margin-top:12px; }
+  #view-flows .fl-form input, #view-flows .fl-form select {
+    min-height:44px; padding:0 10px; border:1px solid var(--line); border-radius:var(--r-md);
+    background:var(--bg); color:var(--text); font-size:12px; }
+  #view-flows .fl-form .btn { min-height:44px; }
+  #view-flows .fl-del { min-width:44px; min-height:44px; padding:0 12px; font-size:11px;
+    background:transparent; color:var(--text-3); border:1px solid var(--line);
+    border-radius:var(--r-md); cursor:pointer; }
+  #view-flows .fl-del:hover { color:var(--warn); border-color:var(--warn); }
+  /* 池列表项 = 可点选的导航单元（DSH 会话卡同款：选中态高亮，不重建列表） */
+  #view-flows .fl-sup-listbox { cursor:pointer; }
+  #view-flows .fl-sup-listbox .fl-item { padding:9px 10px; border-radius:var(--r-md);
+    border-bottom:1px solid var(--line); }
+  #view-flows .fl-sup-listbox .fl-item:hover { background:var(--surface-2, rgba(0,0,0,.03)); }
+  #view-flows .fl-sup-listbox .fl-item.selected { background:var(--accent-soft, rgba(0,0,0,.06));
+    box-shadow:inset 3px 0 0 var(--accent); }
+  #view-flows .fl-sup-listbox .fl-del { visibility:hidden; }
+  #view-flows .fl-sup-listbox .fl-item:hover .fl-del,
+  #view-flows .fl-sup-listbox .fl-item.selected .fl-del { visibility:visible; }
+  #view-flows .fl-detail { padding:2px 0; }
+  #view-flows .fl-detail .fl-act { display:flex; gap:8px; margin-top:10px; }
+  #view-flows .fl-detail .btn { min-height:44px; }
+  #view-flows .fl-sup-note { font-size:11px; color:var(--text-3); margin-top:8px; }
   @media (max-width:760px) {
-    #view-flows .fl-body, #view-flows .fl-pool, #view-flows .fl-stats { grid-template-columns:1fr; }
+    #view-flows .fl-body, #view-flows .fl-pool, #view-flows .fl-stats,
+    #view-flows .fl-sup-grid { grid-template-columns:1fr; }
   }
 </style>
 
@@ -81,6 +110,32 @@
 <div class="fl-list fl-card">
   <h3>最近推理调用（Tuck 审计 · 仅路由可见字段，不泄 prompt）</h3>
   <div id="fl-recent"><div class="fl-empty">加载中…</div></div>
+</div>
+
+<div class="fl-list fl-card fl-sup">
+  <h3>供应商配置 <span class="fl-badge" id="fl-sup-n">0</span>
+    <span style="font-size:11px;color:var(--text-3);font-weight:400">· 经面板代理写入 flowmodus（声明与 API key 分离，key 仅存本机 registry/.secrets，权限 600；点选左侧查看详情）</span></h3>
+  <div class="fl-sup-grid">
+    <div class="fl-sup-pane">
+      <div id="fl-sup-list" class="fl-sup-listbox"><div class="fl-empty">加载中…</div></div>
+    </div>
+    <div class="fl-sup-pane">
+      <div id="fl-sup-detail"><div class="fl-empty">点选左侧供应商查看详情；填写下方表单新增或更新</div></div>
+      <form id="fl-sup-form" class="fl-form">
+        <select name="tier" aria-label="tier">
+          <option value="paid">paid</option>
+          <option value="free">free</option>
+        </select>
+        <input name="supplier_id" placeholder="supplier id（字母/数字/-/_）" required>
+        <input name="supplier_name" placeholder="名称（可选）">
+        <input name="base_url" placeholder="https://api.xxx.com/v1" required>
+        <input name="models" placeholder="模型 id，逗号分隔（可选）">
+        <input name="api_key" type="password" placeholder="API key（不回显，可留空）" autocomplete="off">
+        <button type="submit" class="btn">添加 / 更新</button>
+      </form>
+    </div>
+  </div>
+  <div class="fl-sup-note" id="fl-sup-note"></div>
 </div>
 
 <script>
@@ -122,7 +177,249 @@
       if (my !== seq) return;
       zero(document.getElementById('fl-route'), { code: 'flows-fetch-failed', detail: String(e.message || e) });
     });
+    loadSuppliers();
   }
+
+  /* ---- 供应商配置（flowmodus 唯一事实来源，经面板 /api/flowmodus/suppliers）----
+   * Desk 形态：左 = 池列表（可选中，keyed 复用，同一份数据绝不重建）；
+   * 右 = 详情面板 + 表单（新增/编辑共用，key 永不回显）。
+   * 选中 = 同一份单一选择状态（Cx.state.nav.sup，hash 可寻址），
+   * 由 setNav 单写 —— Back/Forward、刷新、分享都回到同一个供应商。 */
+
+  var supList = document.getElementById('fl-sup-list');
+  var supNote = document.getElementById('fl-sup-note');
+  var supForm = document.getElementById('fl-sup-form');
+  var supDetail = document.getElementById('fl-sup-detail');
+  var supLoading = false;
+  var selected = null;            /* 当前选中的 supplier_id（详情面板与 hash 的唯一真相） */
+  var SUP_BY_ID = {};             /* 最近一次列表数据的 id → 对象（详情面板按 id 查） */
+
+  function supMsg(text, isErr) {
+    supNote.textContent = text;
+    supNote.style.color = isErr ? 'var(--warn)' : 'var(--text-3)';
+  }
+
+  function navSup() {
+    return (window.Cx && window.Cx.state && window.Cx.state.nav && window.Cx.state.nav.sup) || null;
+  }
+  function setNavSup(id) {
+    if (window.Cx && window.Cx.setNav) window.Cx.setNav({ sup: id || null });
+  }
+
+  function loadSuppliers() {
+    /* 仅首次（或空列表）显示骨架：已有列表就地 keyed 更新，不被刷新清空 ——
+     * 否则 keyed 复用形同虚设（判据 3：同一份数据零重建）。失败态照旧诚实。 */
+    if (!supList.querySelector('.fl-item')) zero(supList, 'flows-loading');
+    fetch('/api/flowmodus/suppliers').then(function (r) { return r.json(); }).then(function (d) {
+      renderSuppliers(d.suppliers || []);
+    }).catch(function (e) {
+      zero(supList, { code: 'suppliers-fetch-failed', detail: String(e.message || e) });
+    });
+  }
+
+  function itemHtml(s) {
+    var models = (s.models || []).join(', ');
+    var badge = s.api_key_set
+      ? '<span class="fl-badge ok">KEY ✓</span>'
+      : '<span class="fl-badge warn">无 KEY</span>';
+    return '<div class="fl-item" data-tier="' + esc(s.tier) + '" data-id="' + esc(s.supplier_id) + '">' +
+      '<div><div class="nm">' + esc(s.supplier_id) +
+      (s.tier === 'free' ? ' <span class="fl-badge ok">FREE</span>' : ' <span class="fl-badge">PAID</span>') + '</div>' +
+      '<div class="sub">' + esc(s.supplier_name || '') + (models ? ' · ' + esc(models) : '') + '</div>' +
+      '<div class="sub mono">' + esc(s.base_url || '') + '</div></div>' +
+      badge +
+      '<button type="button" class="fl-del" data-action="del">删除</button>' +
+      '</div>';
+  }
+
+  /* Keyed 复用：列表按 supplier_id 认领节点。内容没变（__html 签名相同）就不碰那个
+   * 节点 —— 同一份数据零重建（判据 3）；变了的才换（判据 4：只更新变了的那一个）。 */
+  function renderSuppliers(list) {
+    document.getElementById('fl-sup-n').textContent = list.length;
+    SUP_BY_ID = {};
+    for (var i = 0; i < list.length; i++) SUP_BY_ID[list[i].supplier_id] = list[i];
+    if (!list.length) { zero(supList, 'providers-empty'); renderDetail(null); return; }
+    var byNode = {};
+    var kids = supList.querySelectorAll('.fl-item');
+    for (var k = 0; k < kids.length; k++) byNode[kids[k].getAttribute('data-id')] = kids[k];
+    var seen = {};
+    for (var j = 0; j < list.length; j++) {
+      var s = list[j];
+      seen[s.supplier_id] = true;
+      var html = itemHtml(s);
+      var node = byNode[s.supplier_id];
+      if (!node) {
+        supList.insertAdjacentHTML('beforeend', html);
+        var last = supList.lastElementChild;
+        last.__html = html;   /* 签名随节点走：下次渲染才能判断"没变" */
+        continue;
+      }
+      if (node.__html !== html) {
+        var ref = node.nextSibling;
+        node.remove();
+        var fresh = htmlToNode(html);
+        fresh.__html = html;
+        supList.insertBefore(fresh, ref);
+      }
+    }
+    for (var id in byNode) {
+      if (!seen[id] && byNode[id].parentNode) byNode[id].remove();
+    }
+    /* 选中态与 hash 对齐：hash 指向的供应商存在 → 保持选中；
+     * 不存在 → 诚实归零（0 硬编码：不猜、不保留悬空引用）。 */
+    var want = navSup();
+    if (want && !SUP_BY_ID[want]) { selected = null; setNavSup(null); }
+    if (selected && !SUP_BY_ID[selected]) { selected = null; }
+    if (!selected && want && SUP_BY_ID[want]) { selected = want; }
+    if (!selected && list.length) { selected = list[0].supplier_id; setNavSup(selected); }
+    updateSelection();
+    renderDetail(selected ? SUP_BY_ID[selected] : null);
+  }
+
+  function htmlToNode(html) {
+    var t = document.createElement('template');
+    t.innerHTML = html;
+    return t.content.firstChild;
+  }
+
+  function updateSelection() {
+    var items = supList.querySelectorAll('.fl-item');
+    for (var i = 0; i < items.length; i++) {
+      items[i].classList.toggle('selected', items[i].getAttribute('data-id') === selected);
+    }
+  }
+
+  function selectSupplier(id) {
+    if (id === selected) { renderDetail(selected ? SUP_BY_ID[selected] : null); return; }
+    selected = id || null;
+    updateSelection();
+    renderDetail(selected ? SUP_BY_ID[selected] : null);
+    setNavSup(selected);   /* 同一只手写同一份选择状态（N-003） */
+  }
+
+  function renderDetail(s) {
+    if (!s) {
+      supDetail.innerHTML = '<div class="fl-empty">点选左侧供应商查看详情；填写下方表单新增或更新</div>';
+      return;
+    }
+    var models = (s.models || []).join(', ');
+    var keyBadge = s.api_key_set
+      ? '<span class="fl-badge ok">KEY ✓（存于本机 registry/.secrets，不回显）</span>'
+      : '<span class="fl-badge warn">无 KEY</span>';
+    var t = s.updated_at_unix ? new Date(s.updated_at_unix * 1000).toLocaleString() : '未知';
+    supDetail.innerHTML =
+      '<div class="fl-detail">' +
+      '<div class="fl-row"><span class="fl-k">id</span><span class="fl-v">' + esc(s.supplier_id) + '</span></div>' +
+      '<div class="fl-row"><span class="fl-k">名称</span><span class="fl-v">' + esc(s.supplier_name || '—') + '</span></div>' +
+      '<div class="fl-row"><span class="fl-k">tier</span><span class="fl-v">' + esc(s.tier) + '</span></div>' +
+      '<div class="fl-row"><span class="fl-k">端点</span><span class="fl-v mono">' + esc(s.base_url || '—') + '</span></div>' +
+      '<div class="fl-row"><span class="fl-k">模型</span><span class="fl-v mono">' + esc(models || '—') + '</span></div>' +
+      '<div class="fl-row"><span class="fl-k">密钥</span><span class="fl-v">' + keyBadge + '</span></div>' +
+      '<div class="fl-row"><span class="fl-k">变更</span><span class="fl-v mono">' + esc(t) + '</span></div>' +
+      '<div class="fl-act">' +
+      '<button type="button" class="btn" id="fl-sup-edit">编辑</button>' +
+      '<button type="button" class="fl-del" id="fl-sup-del">删除</button>' +
+      '</div></div>';
+    document.getElementById('fl-sup-edit').onclick = function () { editSupplier(s); };
+    document.getElementById('fl-sup-del').onclick = function () { delSupplier(s.supplier_id, s.tier); };
+  }
+
+  /* 编辑 = 回填表单。API key 绝不回显：密码框留空 = 保持原 key（0 硬编码：不猜不补）。 */
+  function editSupplier(s) {
+    supForm.elements.namedItem('tier').value = s.tier || 'paid';
+    supForm.elements.namedItem('supplier_id').value = s.supplier_id;
+    supForm.elements.namedItem('supplier_name').value = s.supplier_name || '';
+    supForm.elements.namedItem('base_url').value = s.base_url || '';
+    supForm.elements.namedItem('models').value = (s.models || []).join(', ');
+    supForm.elements.namedItem('api_key').value = '';
+    supForm.elements.namedItem('api_key').placeholder = '留空 = 保持原 key';
+    supForm.dataset.mode = 'edit';
+    supMsg('编辑 ' + s.supplier_id + '：改完提交即更新（key 留空保持不变）');
+  }
+
+  function newSupplier() {
+    supForm.reset();
+    supForm.elements.namedItem('api_key').placeholder = 'API key（不回显，可留空）';
+    supForm.dataset.mode = 'new';
+    supMsg('');
+  }
+
+  /* 列表与详情面板共用这一个删除入口（单一职责：删除只有一条路）。 */
+  function delSupplier(id, tier) {
+    if (supLoading) return;
+    supLoading = true;
+    supMsg('删除 ' + tier + '/' + id + ' …');
+    fetch('/api/flowmodus/suppliers?tier=' + encodeURIComponent(tier) + '&id=' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        supLoading = false;
+        if (d && d.ok) {
+          if (selected === id) { selected = null; setNavSup(null); }
+          supMsg('已删除 ' + id);
+          loadSuppliers(); load();
+        } else { supMsg((d && d.error) || '删除失败', true); }
+      })
+      .catch(function (e) {
+        supLoading = false;
+        supMsg('删除失败: ' + (e.message || e), true);
+      });
+  }
+
+  /* 事件委托：一个 handler 管删除按钮 + 列表项选中（按需驱动）。 */
+  supList.addEventListener('click', function (ev) {
+    var btn = ev.target.closest && ev.target.closest('button[data-action="del"]');
+    if (btn) {
+      var item = btn.closest('.fl-item');
+      var id = item && item.getAttribute('data-id');
+      var tier = item && item.getAttribute('data-tier');
+      if (!id || !tier) return;
+      delSupplier(id, tier);
+      return;
+    }
+    var row = ev.target.closest && ev.target.closest('.fl-item');
+    if (row) selectSupplier(row.getAttribute('data-id'));
+  });
+
+  supForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (supLoading) return;
+    var fd = new FormData(supForm);
+    var mode = supForm.dataset.mode === 'edit' ? 'edit' : 'new';
+    var payload = {
+      tier: String(fd.get('tier') || 'paid'),
+      supplier_id: String(fd.get('supplier_id') || '').trim(),
+      supplier_name: String(fd.get('supplier_name') || '').trim(),
+      base_url: String(fd.get('base_url') || '').trim(),
+      models: String(fd.get('models') || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean),
+      api_key: String(fd.get('api_key') || '')
+    };
+    if (!payload.supplier_id || !payload.base_url) {
+      supMsg('supplier id 与 base_url 必填', true);
+      return;
+    }
+    supLoading = true;
+    supMsg('提交 ' + payload.supplier_id + ' …');
+    fetch('/api/flowmodus/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      supLoading = false;
+      if (d && d.ok) {
+        supMsg('已保存 ' + d.supplier_id + (d.api_key_set ? '（含 API key）' : '（未设 key）'));
+        /* 编辑保持原选中；新增选中新供应商 —— 详情面板跟着走，不悬空。 */
+        if (mode === 'edit' && SUP_BY_ID[payload.supplier_id]) selected = payload.supplier_id;
+        newSupplier();
+        loadSuppliers();
+        load();
+      } else {
+        supMsg((d && d.error) || '保存失败', true);
+      }
+    }).catch(function (e) {
+      supLoading = false;
+      supMsg('保存失败: ' + (e.message || e), true);
+    });
+  });
 
   function renderFlows(fm) {
     var routeEl = document.getElementById('fl-route');

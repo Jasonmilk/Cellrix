@@ -186,7 +186,7 @@
    * where we are, and nothing could report which one was current. */
   /* `panel` = 右栏侧板里开着哪个辅助面（N-001：主只有一个，其余是辅助）。
    * 它的语义在 N-001 落地时变了：以前是侧栏的"点击模式"，现在是"哪个辅助面开着"。 */
-  var STATE = { nav: { view: null, period: null, panel: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
+  var STATE = { nav: { view: null, period: null, panel: null, sup: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
   var NAV = STATE.nav;
 
   function hashFor(state) {
@@ -197,12 +197,14 @@
    * not even the two paths that adopt what the address bar already says. */
   function setNav(patch, opts) {
     opts = opts || {};
-    var before = NAV.view, beforePeriod = NAV.period, beforePanel = NAV.panel;
+    var before = NAV.view, beforePeriod = NAV.period, beforePanel = NAV.panel, beforeSup = NAV.sup;
     if (patch) {
       if (patch.view) NAV.view = patch.view;
       if (patch.period !== undefined) NAV.period = patch.period || null;
       /* 侧板状态也由这只手写：N-001 之后"哪个辅助面开着"是同一份位置状态的一部分。 */
       if (patch.panel !== undefined) NAV.panel = patch.panel || null;
+      /* Flows 检定台内选中的供应商：同一只手写同一份选择状态（N-003 加法）。 */
+      if (patch.sup !== undefined) NAV.sup = patch.sup || null;
       /* The metadata cache is written by the same hand as the period it
        * describes, so it cannot come to describe a different period. */
       if (patch.meta !== undefined) window.__proveTrackMeta = patch.meta;
@@ -646,10 +648,10 @@
    * leave the view empty. */
   function bootNav() {
     var N = window.CxNormalize;
-    var from = N ? N.parseHash(location.hash) : { view: null, period: null, panel: null };
+    var from = N ? N.parseHash(location.hash) : { view: null, period: null, panel: null, sup: null };
     /* N-010: total by construction — a hash the panel did not write yields an
      * empty state, and the default view still renders. */
-    setNav({ view: from.view || defaultView(), period: from.period || null, panel: from.panel || null },
+    setNav({ view: from.view || defaultView(), period: from.period || null, panel: from.panel || null, sup: from.sup || null },
       { replace: true });
   }
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bootNav); }
@@ -662,8 +664,8 @@
     var N = window.CxNormalize;
     if (!N) return;
     var from = N.parseHash(location.hash);
-    if (from.view === NAV.view && from.period === NAV.period && from.panel === NAV.panel) { return; }
-    setNav({ view: from.view || defaultView(), period: from.period || null, panel: from.panel || null },
+    if (from.view === NAV.view && from.period === NAV.period && from.panel === NAV.panel && from.sup === NAV.sup) { return; }
+    setNav({ view: from.view || defaultView(), period: from.period || null, panel: from.panel || null, sup: from.sup || null },
       { replace: true });
   });
   // 主题按钮状态初始化（与 head 引导脚本对齐）
