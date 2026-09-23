@@ -228,6 +228,21 @@ const PROBE_4A = `(async function () {
   });
   await new Promise(function (r) { ws.addEventListener('open', r); });
   await send('Page.enable'); await send('Runtime.enable');
+
+  /* 视口必须由**本测试**决定，不能继承浏览器默认。
+   *
+   * 实测（2026-09-23）：headless Chrome 默认 800×600 ⇒ 视口实测 413px ⇒ 触发窄屏
+   * 媒体查询 ⇒ 卡片被压成 0 宽 ⇒ 5 条判据量到 0 而报红。同一份代码，把视口设成
+   * 1440×900 后 **13 passed / 0 failed**。
+   *
+   * ⇒ 一个几何判据的测试若不掌握视口，它的结论就取决于"跑它的人开了多大窗口"——
+   * 而这条长期没被发现，正因为本套件此前一直因"没有 Chrome"而 SKIP。
+   * 故在此显式设成宽屏，让判据指向一个**被声明过的**几何环境。 */
+  const VIEWPORT = { width: 1440, height: 900 };
+  await send('Emulation.setDeviceMetricsOverride', {
+    width: VIEWPORT.width, height: VIEWPORT.height, deviceScaleFactor: 1, mobile: false
+  });
+
   await send('Page.navigate', { url: BASE + '/' });
   await new Promise(function (r) { setTimeout(r, 2500); });
   const evalIn = async function (expr) {

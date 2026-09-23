@@ -31,6 +31,79 @@
    * entering, declared the same way. */
   var ENTER = {}, LEAVE = {}, PERIOD = {};
 
+  /* ---- 按需渲染：谁在台上，谁才被渲染 ------------------------------------
+   *
+   * 一个视图**只有在激活时才该被渲染**。这台壳早就有这个概念（`applyView`，
+   * 以及 ADR-0018 D5 的 "the target is built only when its view activates it"），
+   * 但快照刷新那条路径**绕过了它**：`tick()` 每 2 秒无条件调 `CxCockpit.render`，
+   * 不管驾驶舱在不在台上。
+   *
+   * 实测（`web/tests/perf_measure.js`，6 秒窗口、只开着「对话」）：
+   *   `#entries`（驾驶舱里的 Ledger 表）被**整块重建 3 次**，而驾驶舱**不可见**。
+   *   ⇒ 这是"纸糊感"的机械来源：DOM 被定期销毁重建，界面没有稳定状态。
+   *
+   * 故：数据到了不直接渲染，先问"这个视图在台上吗"。离开时**不渲染**，
+   * 回来时由 `applyView` 补一次（见下）——**既不浪费，也不显示旧数据**。
+   */
+  function isViewActive(name) { return !!name && NAV.view === name; }
+
+  /* 每个视图的渲染器，只填 `render`：本表**不碰**任何视图自己的渲染逻辑
+   * （单一职责：这里只回答"何时"，不回答"怎么"）。键与 `base.html` 的
+   * `data-view` 同名，不额外发明标识（0 硬编码：视图清单仍只有一处来源）。 */
+  var RENDERERS = {};
+
+  /* 最近一次到达的数据，与"各视图渲染过哪一份"。
+   * 两者放在一起是因为它们共同回答**同一个问题**：这份数据对一个视图而言
+   * 是否需要重渲染。分成两个地方判断，就会有两个答案。 */
+  var LAST_SNAP = null;
+  var LAST_RENDERED = {};
+
+  /* 把"同一份数据"收敛成**同一个对象**。
+   *
+   * 为什么必须这么做：`tick` 每 2 秒 `fetch().json()` ⇒ **每次都造一个新对象**，
+   * 按对象身份比较永远不相等 ⇒ 变化检测形同虚设（实测：切走再切回，同一份数据
+   * 仍被重建 1 次）。
+   *
+   * 判据用**内容**而不是身份，但做法不是"比较两份对象"，而是**让同一内容只存在
+   * 一个引用**：内容没变就返回上一次那个对象，于是 `===` 重新有意义，且**产出
+   * 确定**（同一输入 ⇒ 同一对象，对应"确定性优先"）。
+   *
+   * 字段顺序固定列出，不依赖 `JSON.stringify` 的枚举顺序 —— 否则判据会随
+   * 对象构造顺序漂移（那正是"判据指向代理"）。
+   */
+  var SNAP_KEYS = ['mode', 'state', 'episode', 'ledger', 'ecosystem'];
+  var SNAP_SIG = null;
+  function canonical(snap) {
+    if (!snap || typeof snap !== 'object') { return snap; }
+    var sig = JSON.stringify(SNAP_KEYS.map(function (k) { return snap[k]; }));
+    if (sig === SNAP_SIG) { return LAST_SNAP; }   // 同一内容 ⇒ 同一个对象
+    SNAP_SIG = sig;
+    return snap;
+  }
+
+  /* 唯一的重渲染判据：台上的视图 + 没渲染过这份数据 ⇒ 渲染。
+   * `offerSnapshot`（数据到达）与 `renderOnActivate`（视图上台）都走这一条，
+   * 所以两个方向不会各自演化出不同的判断。 */
+  function renderIfNeeded(name, snap) {
+    var fn = RENDERERS[name];
+    if (!fn) { return false; }
+    if (snap === undefined || snap === null) { return false; }
+    if (LAST_RENDERED[name] === snap) { return false; }   // 同一份数据：不重复重建
+    fn(snap);
+    LAST_RENDERED[name] = snap;
+    return true;
+  }
+
+  /* 数据到达：先收敛成"同一内容同一个对象"，再只渲染**在台上**的那一个。 */
+  function offerSnapshot(raw) {
+    LAST_SNAP = canonical(raw);
+    if (!isViewActive(NAV.view)) { return false; }
+    return renderIfNeeded(NAV.view, LAST_SNAP);
+  }
+
+  /* 视图上台：把最近一次到达的数据补渲染一次（它不在台上时数据可能已经到过）。 */
+  function renderOnActivate(name, snap) { return renderIfNeeded(name, snap); }
+
   /* ---- the tape ---------------------------------------------------------
    * ONE tape for the panel (ADR-0018: one tape, many targets). Every view that
    * shows the same read feeds and reads this one, so two projections cannot
@@ -258,6 +331,11 @@
     }
     var hooks = ENTER[v] || [];
     for (i = 0; i < hooks.length; i++) hooks[i]();
+    /* 上台之后补渲染一次：数据可能在这个视图**不在台上**时到过（那时按需渲染
+     * 跳过了它）。放在 ENTER **之后**是有意的 —— 视图先有机会注册自己，
+     * 再补渲染，否则第一次进入会渲染出空白。
+     * 没有这一句就会是"省了浪费、换来空白"，那是拿一个缺陷换另一个。 */
+    renderOnActivate(v, LAST_SNAP);
   }
 
   window.Cx = {
@@ -303,6 +381,11 @@
     /* 同一视图内 period 变化。与 onEnter 分开，是因为两者的正确触发时机不同：
      * 进入视图要重新取数，换一段经历不该把列表重建一遍。 */
     onPeriod: function (name, fn) { (PERIOD[name] = PERIOD[name] || []).push(fn); },
+    /* 视图声明"我这样渲染一份快照"。壳据此**只在它上台时**调用它
+     * （按需渲染）。视图仍自己拥有渲染逻辑；壳只拥有"何时"。
+     * 与 onEnter 的分工：onEnter = 进这个视图时去取数/聚焦；
+     * onRender = 数据到了、而这个视图在台上，把这批数据画出来。 */
+    onRender: function (name, fn) { RENDERERS[name] = fn; },
     /* The tape and its read, for a view that projects from it. */
     tape: tape,
     tapeJob: function () { return TAPE_JOB; },
@@ -348,9 +431,11 @@
       st.textContent = 'state: ' + (snap.state || '?');
       conn.textContent = '● 在线';
       conn.className = 'badge live';
-      // The situation view renders its own content; the shell only hands the
-      // snapshot over (按需驱动：不替别的视图做渲染决定).
-      if (window.CxCockpit) window.CxCockpit.render(snap);
+      // The situation view renders its own content; the shell only decides
+      // **when** it is worth rendering (按需渲染：只有台上的视图才渲染).
+      // 这条此前无条件执行 —— 驾驶舱不在台上也每 2 秒整块重建一次（实测见
+      // perf_measure.js）。现在由 offerSnapshot 判断"在不在台上"。
+      offerSnapshot(snap);
     }).catch(function (e) {
       var conn = document.getElementById('conn');
       conn.textContent = '✗ 断开';

@@ -175,4 +175,12 @@
   }
 
   window.CxCockpit = { render: render, classifyStatus: classifyStatus, statusOf: statusOf };
+
+  /* 向壳声明"我这样渲染一份快照"。壳据此**只在驾驶舱上台时**调用 ——
+   * 这正是本资产此前缺失的那一句：壳每 2 秒无条件渲染它，哪怕它不在台上
+   * （实测见 `web/tests/perf_measure.js`）。
+   *
+   * 注册放在导出之后：壳在 `applyView` 里于 ENTER 之后补渲染，所以注册只要在
+   * 第一次数据到达前完成即可（本脚本与 `script.html` 同批装配，满足）。 */
+  if (window.Cx && window.Cx.onRender) { window.Cx.onRender('cockpit', render); }
 })();
