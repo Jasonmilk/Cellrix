@@ -363,6 +363,28 @@ function skip(label, why) {
         backRows === onRows && backFold === onFold && offRows > onRows,
         "on=" + onRows + "+" + onFold + " full=" + offRows + "+" + offFold + " back=" + backRows + "+" + backFold);
     }
+    /* I6 — CI-144 §13.3 names the assertion form: inject an empty field and an
+     * explicit `unknown`, and assert the former is NOT more permissive than the
+     * latter. Here the two states a fold can be in are "measured" (a number,
+     * including 0) and "not measured"; the header must not render them the same.
+     * Before the fix `(g.tok ? … : '')` printed nothing for BOTH. */
+    {
+      const hds = Array.from(doc.querySelectorAll("#eTbody tr.e-compact-hd"));
+      const stated = hds.map((r) => (r.textContent.match(/tok|未计量/) || ['<none>'])[0]);
+      /* NOT `hds.length === 0 || …`: that escape hatch made the assertion pass on
+       * nothing, and the mutation run proved it — with the bug restored the check
+       * still went green because a freshly-started panel had no folds at all.
+       * A criterion that passes when it exercises nothing is the fault this whole
+       * session keeps naming. No fold is a MISSING INPUT: say so, do not pass. */
+      if (hds.length === 0) {
+        skip("a fold states its tokens or says they were not measured (I6)",
+          "no fold in this period — the assertion would exercise nothing");
+      } else {
+        check("a fold states its tokens or says they were not measured (I6)",
+          stated.every((x) => x !== '<none>'),
+          hds.length + " fold(s): " + JSON.stringify(stated));
+      }
+    }
     check("the compact control states which presentation is on",
       cbtn.getAttribute("aria-pressed") === String(true) && cbtn.textContent.trim().length > 0,
       "aria-pressed=" + cbtn.getAttribute("aria-pressed") + " label=" + JSON.stringify(cbtn.textContent.trim()));

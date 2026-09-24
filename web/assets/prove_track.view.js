@@ -217,7 +217,13 @@
             '<span style="display:inline-block;width:14px" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>' +
             '<span>内部步骤已折叠</span>' +
             '<span class="cnt"> · ' + g.ids.length + ' internal steps · ' + fmtDur(g.dur) +
-            (g.tok ? ' · ' + fmtTok(g.tok) + ' tok' : '') +
+            /* I6 (CI-144 §13.3): 缺失不得比显式未知更宽松。
+             * `g.tok ? ... : ''` rendered an UNMEASURED fold and a fold that
+             * measured ZERO identically — both produced no statement at all.
+             * That is §2's constraint 3 (unknown must have a type-level
+             * representation, not a default) and the same shape as K-105.
+             * `0` now prints `0`; only "no measurement" says so. */
+            (typeof g.tok === 'number' ? ' · ' + fmtTok(g.tok) + ' tok' : ' · 未计量') +
             (g.failed ? ' · ⚠ ' + g.failed + ' failed' : '') + '</span>' +
             '</button></td></tr>' });
         }
