@@ -289,7 +289,27 @@ for (const [file, why] of NEEDS_INPUT) {
   console.log('  SKIP  ' + file.padEnd(24) + why);
 }
 console.log('');
+/* THREE VERDICTS, not two.
+ *
+ * `proven` = a criterion was EXERCISED and passed. `unproven` = it was never
+ * exercised (no fixture, no browser) — which is NOT the same as passing, and this
+ * line used to lead with a bare `OK` while six suites had never run: the headline
+ * read as a clean bill of health for a net that had not been applied.
+ *
+ * The exit code comes from CI-144's registered table, not from taste:
+ *   0 all PASS · 1 has FAIL · 2 AMBIGUOUS · 3 the checker's own error.
+ * "Not exercised" is precisely AMBIGUOUS — we can say neither pass nor fail. It
+ * gets 2, and only when the caller ASKS to be held to full proof (`--require-all`,
+ * the release-gate mode). A dev run stays 0 while nothing is red, so an absent
+ * fixture cannot hold the tree hostage — that failure mode is on record here
+ * (`K12`: "an unattended run stayed red" taught everyone to ignore it). */
+const proven = results.filter(function (r) { return r[0] === 'PASS'; }).length;
+const requireAll = process.argv.indexOf('--require-all') > -1;
 console.log(failed === 0
-  ? 'OK — ' + results.filter(function (r) { return r[0] === 'PASS'; }).length + ' suites green, ' + NEEDS_INPUT.length + ' need input'
-  : 'FAILED — ' + failed + ' suite(s) red');
-process.exit(failed === 0 ? 0 : 1);
+  ? (NEEDS_INPUT.length === 0
+      ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
+      : (requireAll ? 'AMBIGUOUS — ' : 'NOT FULLY PROVEN — ')
+        + proven + ' proven, ' + NEEDS_INPUT.length + ' unproven, 0 red'
+        + (requireAll ? '' : '  (pass --require-all to treat unproven as blocking)'))
+  : 'FAILED — ' + failed + ' red, ' + proven + ' proven, ' + NEEDS_INPUT.length + ' unproven');
+process.exit(failed > 0 ? 1 : ((requireAll && NEEDS_INPUT.length > 0) ? 2 : 0));

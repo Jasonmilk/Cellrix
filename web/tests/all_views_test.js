@@ -37,6 +37,31 @@ function skip(label, why) {
 (async () => {
   console.log("== all-views real render: " + BASE + " ==");
 
+  /* Is the panel actually THERE? Without this probe the suite filled the screen
+   * with failures when nothing was listening — "the product is broken" for an
+   * absent input. `run_all.js` has always claimed it runs this only against a
+   * reachable panel ("never silently skipped while it is up"); this is the half
+   * that makes the claim true. Measured 2026-09-24: stopping the stack turned the
+   * whole net red with no product change at all. */
+  try {
+    const probe = await fetch(BASE + '/', { signal: AbortSignal.timeout(4000) });
+    if (!probe.ok) { throw new Error('HTTP ' + probe.status); }
+    /* Reachability is not identity. Measured on this machine 2026-09-24: port
+     * 8080 — the harness's own default — was held by a `llama-server`, which
+     * answered cheerfully and whose page jsdom then died on. "Something is
+     * listening" must never be read as "the panel is up": that is the same fault
+     * as a health probe that ignores the status line, one level up. The marker is
+     * the panel's own root element id from `base.html`. */
+    const html = await probe.text();
+    if (html.indexOf('id="uxApp"') === -1) {
+      throw new Error('该端口应答的不是 Cellrix 面板（缺 id="uxApp"）');
+    }
+  } catch (e) {
+    console.log('NEEDS-INPUT: 面板不可达 ' + BASE + '（' + String((e && e.message) || e) + '）'
+      + ' —— 先起面板再跑（见 README 的 E2E 步骤）');
+    process.exit(3);
+  }
+
   /* With no job_id, ask the running panel for its newest period — the same
    * thing a person would do, and the difference between a check that can run
    * unattended and one that cannot. */
