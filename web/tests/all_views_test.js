@@ -371,7 +371,16 @@ function skip(label, why) {
     {
       const hds = Array.from(doc.querySelectorAll("#eTbody tr.e-compact-hd"));
       const stated = hds.map((r) => (r.textContent.match(/tok|未计量/) || ['<none>'])[0]);
-      /* NOT `hds.length === 0 || …`: that escape hatch made the assertion pass on
+      /* ⚠️ 本断言的**变异自证仍未成立**，如实记下（不声称已证）：
+       * 把 `prove_track.view.js` 的 I6 修复还原后，这条**仍然绿** —— 因为真实数据里
+       * 每个折叠的 `tok` 都是数字（都印 " · N tok"）,而"未计量/0"与"N"的差别
+       * **在这份数据上不可观测**。差别只在 `tok === 0` 或 `tok === null` 时出现。
+       * ⇒ 它现在能红的前提是**夹具形状**（需要一个 tok 为 0 或 null 的折叠），
+       * 而那正是本会话反复修的同一类问题。
+       * 正确的修法：把"标签怎么印"抽成一个纯函数（如 `PT.tokLabel(tok)`）,
+       * 使它可以不依赖 DOM 与真实数据被直接断言 —— 届时变异才有意义。
+       *
+       * NOT `hds.length === 0 || …`: that escape hatch made the assertion pass on
        * nothing, and the mutation run proved it — with the bug restored the check
        * still went green because a freshly-started panel had no folds at all.
        * A criterion that passes when it exercises nothing is the fault this whole
