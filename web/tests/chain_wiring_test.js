@@ -19,6 +19,7 @@
  */
 'use strict';
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 const path = require('path');
 
 const WS = path.join(__dirname, '..', '..', '..');
@@ -139,6 +140,43 @@ for (const { rel, kind } of CONVERTED) {
     check(`${rel}: asks the declaration for every declared component`,
       unasked.length === 0, unasked.join(', ') || 'all ' + named.length + ' looked up');
   }
+}
+
+/* ── 2a. the DERIVATION, asserted on its RESULT (ADR-0047 D3/D6) ───────────
+ * Re-judged criteria need a mutation proof, and these two were re-judged: they
+ * used to assert that a launcher mentions `chain-env`, which is an EXISTENCE
+ * assertion — "did it call the thing", not "is the thing right". Measured
+ * 2026-09-24: breaking the derivation two ways (dropping an endpoint, and failing
+ * outright) left the suite GREEN. So the assertions now point at the result:
+ * the derivation must RUN, and it must EMIT every declared env. */
+const CHAIN_ENV = path.join(__dirname, 'chain-env');
+function emitSh() {
+  try { return execFileSync(CHAIN_ENV, ['--emit-sh'], { encoding: 'utf8' }); }
+  catch (e) { return null; }
+}
+const emitted = emitSh();
+check('the derivation runs (chain-env --emit-sh)', emitted !== null,
+  emitted === null ? 'it failed — every consumer is now wired to nothing' : 'ok');
+{
+  const missing = [];
+  for (const c of comps) {
+    if (c.anaphase_env && (emitted || '').indexOf('export ' + c.anaphase_env + '=') === -1) {
+      missing.push(c.anaphase_env);
+    }
+    for (const k of Object.keys(c.start_env || {})) {
+      if ((emitted || '').indexOf('export ' + k + '=') === -1) { missing.push(k); }
+    }
+  }
+  check('the derivation EMITS every declared env (not merely called)',
+    emitted !== null && missing.length === 0,
+    missing.length ? 'not emitted: ' + missing.join(', ') : 'all ' + comps.length + ' component(s) covered');
+}
+try {
+  execFileSync(CHAIN_ENV, ['--check'], { encoding: 'utf8' });
+  check('the committed manifest is current', true, 'regenerated == committed');
+} catch (e) {
+  check('the committed manifest is current', false,
+    String((e.stdout || e.message || '')).trim().split('\n').pop());
 }
 
 /* ── 2b. the CONSUMERS carry no endpoint/port literal (ADR-0047 D5/D6) ──────
