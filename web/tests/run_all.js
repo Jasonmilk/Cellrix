@@ -62,6 +62,10 @@ const SELF_CONTAINED = [
    * (reply-only) turn, so a panel that shows nothing for a real turn can be
    * told apart from a table that has nothing to show. */
   ['row_shape_test.js', 'row shape — a reply-only turn still renders non-reply rows'],
+  /* The Anaphase <-> FlowModus reasoning contract. Two vendored .proto copies plus
+   * a field whose NAME disagreed with its MEANING: that cost three rounds of
+   * diagnosis, because both sides were internally consistent and neither errored. */
+  ['proto_contract_test.js', 'proto contract — one fact per field, and the two copies must not drift'],
   /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
    * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
    * the one entry point that actually gets run — a criterion nobody runs is a
