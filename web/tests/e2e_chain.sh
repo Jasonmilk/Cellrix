@@ -19,7 +19,12 @@ CHAIN="$WS/anaphase-helix/ecosystem/chain.json"
 CHAIN_MODEL="${CHAIN_MODEL:-mock-chat-1}"
 export NODE_PATH="${NODE_PATH:-$WS/.test-node/node_modules}"
 
-port_of() { python3 -c "import json;print([c['port'] for c in json.load(open('$CHAIN'))['components'] if c['name']=='$1'][0])"; }
+MANIFEST="$HERE/resolved.json"
+# The manifest is a committed artifact; a stale one is a lie about the wiring, and
+# this is the static control that says so in milliseconds (ADR-0047 D6).
+"$HERE/chain-env" --check >/dev/null || { echo "  ABORT: resolved.json is stale — run chain-env --write"; exit 3; }
+
+port_of() { python3 -c "import json;print(json.load(open('$MANIFEST'))['components']['$1']['port'])"; }
 # Every component that declares an endpoint FOR ANAPHASE contributes it — the
 # endpoints do not live on the `anaphase` entry, they live on each PEER
 # (`anaphase_env` / `anaphase_value`). Reading only the anaphase entry exported a
@@ -30,9 +35,9 @@ port_of() { python3 -c "import json;print([c['port'] for c in json.load(open('$C
 # shape as every other defect this session — a leg that degrades without saying so.
 env_of()  { python3 -c "
 import json
-for c in json.load(open('$CHAIN'))['components']:
-    if c.get('anaphase_env'): print('%s=%s' % (c['anaphase_env'], c['anaphase_value']))
-    for k,v in (c.get('start_env') or {}).items(): print('%s=%s' % (k, v.replace('<workspace>','$WS')))"; }
+m = json.load(open('$MANIFEST')); ws = '$WS'
+for k, v in sorted(m['anaphase_env'].items()): print('%s=%s' % (k, v))
+for k, v in sorted(m['start_env'].items()): print('%s=%s' % (k, v.replace('<workspace>', ws)))"; }
 
 echo "== e2e_chain: mode=$MODE =="
 MPORT="${MOCK_PORT:-59099}"

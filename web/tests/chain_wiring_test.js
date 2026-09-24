@@ -80,8 +80,15 @@ for (const { rel, kind } of CONVERTED) {
   // teach people to obfuscate fixtures rather than to single-source wiring.
   if (kind === 'rust') code = code.split('#[cfg(test)]')[0];
 
-  check(`${rel}: reads the declaration`,
-    code.includes('chain.json') || code.includes('Chain::load'), rel);
+  /* The property is "gets its wiring from the ONE declaration", and since
+   * Cellrix:ADR-0047 D3 a launcher may satisfy it by consuming the single
+   * derivation (`chain-env`) instead of reading the JSON itself. That is the
+   * STRONGER form — the script restates nothing — and it is why these two checks
+   * accept it. Measured 2026-09-24: replacing start-panel.sh's derivation block
+   * with a `chain-env` call turned both of these red, correctly, and the fix is to
+   * follow the design rather than to keep the old wording. */
+  check(`${rel}: gets its wiring from the one derivation`,
+    code.includes('chain.json') || code.includes('Chain::load') || code.includes('chain-env'), rel);
 
   // (a) it must not restate a declared port
   const restated = comps
@@ -96,8 +103,9 @@ for (const { rel, kind } of CONVERTED) {
   // field", so that is what is asserted.
   const derived = comps.filter((c) => c.anaphase_env).length;
   check(`${rel}: derives the endpoint env from the declaration (not restated)`,
-    derived === 0 || code.includes('anaphase_env'),
-    derived + ' declared env(s), field referenced: ' + code.includes('anaphase_env'));
+    derived === 0 || code.includes('anaphase_env') || code.includes('chain-env'),
+    derived + ' declared env(s), consumed via: '
+      + (code.includes('chain-env') ? 'chain-env (the one derivation)' : 'anaphase_env'));
 
   if (kind === 'shell') {
     // Parse the actual `spawn <name>` invocations.
@@ -131,6 +139,22 @@ for (const { rel, kind } of CONVERTED) {
     check(`${rel}: asks the declaration for every declared component`,
       unasked.length === 0, unasked.join(', ') || 'all ' + named.length + ' looked up');
   }
+}
+
+/* ── 2b. the CONSUMERS carry no endpoint/port literal (ADR-0047 D5/D6) ──────
+ * "There is only one derivation" is a promise; "these files contain zero declared
+ * ports in executable lines" is an invariant. Cheap, and it turns a spoken rule
+ * into a mechanism. */
+for (const rel of ['start-panel.sh', 'e2e_chain.sh']) {
+  const p = path.join(__dirname, rel);
+  if (!fs.existsSync(p)) { check(`consumer exists: ${rel}`, false); continue; }
+  const code = fs.readFileSync(p, 'utf8').split('\n')
+    .filter((l) => !l.trim().startsWith('#')).join('\n');
+  const restated = comps
+    .filter((c) => new RegExp('(?<![0-9.])' + c.port + '(?![0-9])').test(code))
+    .map((c) => c.name + ':' + c.port);
+  check(`consumer ${rel}: zero declared ports in executable lines`,
+    restated.length === 0, restated.join(', ') || 'all ' + comps.length + ' derived');
 }
 
 /* ── 3. non-vacuity: the same checks must report a restated fact ───────────

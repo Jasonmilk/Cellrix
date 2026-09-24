@@ -20,6 +20,13 @@ set -u
 # hardcoded: the script lives at <workspace>/Cellrix/web/tests/, so three
 # levels up is the workspace. Logs stay outside every repo (runtime only).
 WS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CHAIN_ENV="$WS/Cellrix/web/tests/chain-env"
+if [ ! -x "$CHAIN_ENV" ]; then echo "MISSING chain-env: $CHAIN_ENV"; exit 1; fi
+# The ONE derivation lives in `chain-env` (ADR-0047 D3). This script consumes it and
+# derives nothing: a second derivation has nowhere to live, rather than being
+# asserted absent. The manifest is committed, so a stale one is caught here.
+"$CHAIN_ENV" --check || exit 1
+eval "$("$CHAIN_ENV" --emit-sh)"
 PORT="${1:-$PORT_PANEL}"
 LOGS="$WS/.workbuddy-ai/tools/prove-track-verify/logs"
 
@@ -37,25 +44,6 @@ MIND_CFG="$WS/.helix/mind/config.toml"
 # Anaphase ran three Noop adapters (mind/tentacle/tuck) and called the fourth
 # (`grpc://127.0.0.1:60054`) a "bad endpoint". Exporting the declared env closes
 # the loop; `spawn` inherits it.
-CHAIN_JSON="$WS/anaphase-helix/ecosystem/chain.json"
-if [ ! -f "$CHAIN_JSON" ]; then echo "MISSING DECLARATION: $CHAIN_JSON"; exit 1; fi
-eval "$(python3 - "$CHAIN_JSON" "$WS" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-ws = sys.argv[2]
-for c in d["components"]:
-    print("PORT_%s=%s" % (c["name"].replace("-", "_").upper(), c["port"]))
-for c in d["components"]:
-    if "anaphase_env" in c:
-        print("export %s=%s" % (c["anaphase_env"], c["anaphase_value"]))
-    if c["name"] == "panel":
-        print("export PORT_PANEL=%s" % c["port"])
-    for k, v in (c.get("start_env") or {}).items():
-        # <workspace> is declared; expand it to this checkout.
-        print("export %s=%s" % (k, v.replace("<workspace>", ws)))
-print("CHAIN_ENV_COUNT=%d" % sum(1 for c in d["components"] if "anaphase_env" in c))
-PYEOF
-)"
 echo "chain declaration: $CHAIN_ENV_COUNT endpoint env(s) derived from $(basename "$CHAIN_JSON")"
 # Tuck's tamper-evident audit chain (Tuck:ADR-0006) closes the leg WITHOUT
 # editing Tuck/config.toml, which is gitignored: a machine-rebuilt config

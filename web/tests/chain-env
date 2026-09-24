@@ -73,8 +73,31 @@ def render(doc):
     return json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True) + '\n'
 
 
+def emit_sh(doc, expand_ws):
+    """The shell form of the SAME manifest — so `start-panel.sh` consumes this
+    script instead of re-deriving anything. `<workspace>` is expanded HERE, at use,
+    because the committed manifest must stay machine-independent (D4)."""
+    out = []
+    for name, c in sorted(doc['components'].items()):
+        out.append('PORT_%s=%s' % (name.replace('-', '_').upper(), c['port']))
+    for name, c in sorted(doc['components'].items()):
+        if name == 'panel':
+            out.append('export PORT_PANEL=%s' % c['port'])
+    for k, v in sorted(doc['anaphase_env'].items()):
+        out.append('export %s=%s' % (k, v))
+    for k, v in sorted(doc['start_env'].items()):
+        out.append('export %s=%s' % (k, v.replace('<workspace>', expand_ws)))
+    out.append('CHAIN_ENV_COUNT=%d' % doc['counts']['anaphase_env'])
+    out.append('CHAIN_JSON=%s' % CHAIN)
+    return '\n'.join(out) + '\n'
+
+
 def main(argv):
-    text = render(build())
+    doc = build()
+    if '--emit-sh' in argv:
+        sys.stdout.write(emit_sh(doc, WS))
+        return 0
+    text = render(doc)
     if '--check' in argv:
         try:
             with open(OUT, encoding='utf-8') as fh:
