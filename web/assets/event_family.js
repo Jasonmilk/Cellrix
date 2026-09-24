@@ -270,7 +270,20 @@
     'assistant/usage': {
       required: { prompt_tokens: ['number'], completion_tokens: ['number'] },
       optional: {
-        cached_tokens: ['number'], reasoning_tokens: ['number'],
+        /* `null` IS a value here, and it means "the upstream did not report it"
+         * — distinct from a reported zero (ADR-0038). The emitter writes the key
+         * explicitly with `null`, so omitting `'null'` from the type list did not
+         * make the field optional: it made a legal event INVALID and it was
+         * dropped in silence. Measured 2026-09-24: with the nulls present the tape
+         * built ZERO `metering` nodes and `REPLY.tok` was always null; with the
+         * keys removed, three nodes appeared and the row totalled 21.
+         *
+         * This is CI-144 §2 constraint 3 (unknown needs a type-level
+         * representation, not a default) and invariant I6 — and note the
+         * direction: a MISSING key was accepted while an EXPLICIT unknown was
+         * refused, which is exactly the inversion I6 forbids. `model` next door
+         * already declared `'null'`; these two simply did not. */
+        cached_tokens: ['number', 'null'], reasoning_tokens: ['number', 'null'],
         model: ['string', 'null']
       }
     },

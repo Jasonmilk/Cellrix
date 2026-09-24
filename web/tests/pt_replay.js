@@ -209,14 +209,51 @@ if (toolRes.length) {
   check('and keeps its own duration in the row', PT.node.buildSession(paneNodes)
     .some(function (r) { return r.kind === 'ev' && r.cls === EF.KIND_CLASS.tool && r.dur > 0; }));
 }
+/* A pass and a fail are TWO SHAPES and they live in two different recordings: a
+ * turn whose tool call failed has no passing check at all, and vice versa. Asking
+ * one file for both is why `a fail reads FAIL` reported "no failing check" while
+ * a failing recording sat right there in the directory (measured 2026-09-24).
+ * ⇒ each assertion picks the recording that can answer it, and a missing shape is
+ * a MISSING INPUT with its reason, not a red about the product. */
+function pickWithCheck(passedWanted) {
+  let best = null, bestN = -1;
+  fs.readdirSync(EV).forEach(function (name) {
+    if (!name.endsWith('.events.jsonl')) { return; }
+    const rows = fs.readFileSync(path.join(EV, name), 'utf8').split('\n')
+      .filter(function (l) { return l.trim(); }).map(function (l) { return JSON.parse(l); });
+    const t = {}; rows.forEach(function (r) { t[r.type] = true; });
+    if (!t['tool/result'] || !t['check/status']) { return; }
+    const hit = rows.some(function (r) {
+      if (r.type !== 'check/status') { return false; }
+      const d = r.data || {};
+      return String(d.actual || '').indexOf(passedWanted ? '=true' : '=false') > -1;
+    });
+    if (!hit) { return; }
+    if (rows.length > bestN) { bestN = rows.length; best = name; }
+  });
+  return best;
+}
+const passFixture = pickWithCheck(true), failFixture = pickWithCheck(false);
+function checksOf(file) {
+  if (!file) { return []; }
+  return load(file).nodes.filter(function (n) { return n.kind === 'check'; });
+}
 const checks = paneNodes.filter(function (n) { return n.kind === 'check'; });
-if (checks.length) {
-  const passed = checks.filter(function (n) { return n.payload.passed; })[0];
-  const failed = checks.filter(function (n) { return !n.payload.passed; })[0];
-  check('a pass reads PASS', passed && PT.render.summarize(passed).indexOf('PASS') > -1,
-    passed ? PT.render.summarize(passed) : 'no passing check');
-  check('a fail reads FAIL', failed && PT.render.summarize(failed).indexOf('FAIL') > -1,
-    failed ? PT.render.summarize(failed) : 'no failing check');
+{
+  const passed = checksOf(passFixture).filter(function (n) { return n.payload.passed; })[0];
+  const failed = checksOf(failFixture).filter(function (n) { return !n.payload.passed; })[0];
+  if (passed) {
+    check('a pass reads PASS', PT.render.summarize(passed).indexOf('PASS') > -1,
+      PT.render.summarize(passed));
+  } else {
+    skip('a pass reads PASS', 'no recording in ' + EV + ' carries a passing check/status');
+  }
+  if (failed) {
+    check('a fail reads FAIL', PT.render.summarize(failed).indexOf('FAIL') > -1,
+      PT.render.summarize(failed));
+  } else {
+    skip('a fail reads FAIL', 'no recording in ' + EV + ' carries a failing check/status');
+  }
   check('the gate label comes from the payload, not from a literal',
     checks.every(function (n) { return PT.render.summarize(n).indexOf(String(n.payload.gate)) === 0; }),
     JSON.stringify(checks.map(function (n) { return PT.render.summarize(n); })[0]));
