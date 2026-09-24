@@ -13,7 +13,8 @@
   /* The classes this layer draws differently, taken from the contract's kind
    * table: a class name is a type fact and has exactly one source. */
   var TOOL_CLS = EF.KIND_CLASS.tool, REPLY_CLS = EF.KIND_CLASS.reply,
-      THINK_CLS = EF.KIND_CLASS.reasoning, ATTEMPT_CLS = EF.KIND_CLASS.plan;
+      THINK_CLS = EF.KIND_CLASS.reasoning, ATTEMPT_CLS = EF.KIND_CLASS.plan,
+      CHECK_CLS = EF.KIND_CLASS.check, VERDICT_CLS = EF.KIND_CLASS.verdict;
 
   /* The lanes this view draws, read off the render table rather than retyped.
    * Each lane's element id is derived from its name; a lane with no element is
@@ -107,6 +108,24 @@
    * everything, because a filter that hides its own matches is worse than no
    * filter. Folding that dropped a failure would be the same fault as a status
    * column that only ever says "done". */
+  /* What compact must NEVER hide, stated once and used by BOTH halves — the fold
+   * selection and the fold skip.
+   *
+   * They used to disagree, and the disagreement hid the answer: the selection
+   * pushed REPLY into `ids` believing "a REPLY is always drawn, so it cannot be
+   * inside the disclosure either way", while the skip below removed EVERY row in
+   * `ids`. Measured in Chrome 2026-09-24: a reply-only turn — where the answer is
+   * the only content row — rendered a header saying "内部步骤已折叠 · 1 internal
+   * steps" and nothing else. The reader lost the reply, which is exactly what the
+   * rule above forbids ("an answer, a judgement, a verdict, a failure ... stays").
+   *
+   * A single predicate is the fix for the CLASS of bug, not just this instance:
+   * two halves of one rule drifting apart is how a status column comes to say
+   * only "done". */
+  function neverFolded(cls) {
+    return cls === REPLY_CLS || cls === CHECK_CLS || cls === VERDICT_CLS;
+  }
+
   function compactGroupsOf() {
     var out = {};
     if (!S.compact) { return out; }
@@ -141,7 +160,9 @@
            * the `pending` row and is already reserved above, so the requests stay
            * visible whichever way the reader set "Expand all calls". */
           if (e.cls === TOOL_CLS) { anyShown = true; }
-          else { ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; } tok += (e.tok || 0); }
+          else if (!neverFolded(e.cls)) {
+            ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; } tok += (e.tok || 0);
+          }
         } else { anyShown = true; }
       }
       if (ids.length && !anyShown) { out[it.id] = { ids: ids, tok: tok, dur: dur, failed: failed, turn: it }; }
@@ -209,7 +230,8 @@
        * Expanding a single turn (the turn header) is the per-turn exception and
        * it re-reveals these steps through `foldedTurns` — set by clicking the
        * folded row. Two independent disclosures, neither hidden by the other. */
-      if (grp && !S.q && !S.foldedTurns[it.turn] && grp.ids.indexOf(it.id) > -1) continue;
+      if (grp && !S.q && !S.foldedTurns[it.turn] && !neverFolded(it.cls)
+          && grp.ids.indexOf(it.id) > -1) continue;
       if (it.cls === TOOL_CLS && !S.callsOpen) continue;
 
       var st = STATUS[it.status] || STATUS.done;

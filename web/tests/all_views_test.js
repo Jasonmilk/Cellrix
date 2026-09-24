@@ -329,15 +329,40 @@ function skip(label, why) {
     cbtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     await sleep(300);
     const backRows = evRows(), backFold = foldRows();
-    check("compact folds the completed internal steps",
-      onFold > 0 && onRows < offRows,
-      "compact=" + onRows + " rows / " + onFold + " folded vs full=" + offRows + " rows");
-    check("compact keeps the deliverable and the judgements",
-      onKinds.indexOf("REPLY") > -1 && (onKinds.indexOf("CHECK") > -1 || onKinds.indexOf("VERDICT") > -1),
-      "kinds under compact: " + JSON.stringify(Array.from(new Set(onKinds))));
-    check("and turning it off restores every row it folded",
-      backRows === onRows && backFold === onFold && offRows > onRows,
-      "on=" + onRows + "+" + onFold + " full=" + offRows + "+" + offFold + " back=" + backRows + "+" + backFold);
+    /* These three criteria measure **rows**: with no rows there is no "how much
+     * was folded" to measure. With no period they used to run through check(),
+     * so they were permanently red here — and the red was "this panel has no
+     * experience", not "the product is broken". Missing input is recorded as
+     * SKIP; rows that exist but did not fold / did not come back are a real red. */
+    if (offRows === 0) {
+      skip("compact folds the completed internal steps", "no event rows — no period in this panel");
+      skip("compact keeps the deliverable and the judgements", "no event rows — no period in this panel");
+      skip("and turning it off restores every row it folded", "no event rows — no period in this panel");
+    } else {
+      check("compact folds the completed internal steps",
+        onFold > 0 && onRows < offRows,
+        "compact=" + onRows + " rows / " + onFold + " folded vs full=" + offRows + " rows");
+      /* The deliverable half is assertable on any turn; the JUDGEMENT half needs
+       * a turn that actually carries one. A reply-only turn has no CHECK/VERDICT,
+       * so demanding one would be a red whose cause is the fixture, not the
+       * product (measured 2026-09-24: `kinds under compact: ["REPLY"]` — the reply
+       * WAS kept, and the check still failed because there was no judgement to
+       * keep). Assert what this turn can carry; name what it cannot. */
+      const kindsSet = Array.from(new Set(onKinds));
+      const hasJudgement = kindsSet.indexOf("CHECK") > -1 || kindsSet.indexOf("VERDICT") > -1;
+      if (hasJudgement) {
+        check("compact keeps the deliverable and the judgements",
+          kindsSet.indexOf("REPLY") > -1, "kinds under compact: " + JSON.stringify(kindsSet));
+      } else {
+        check("compact keeps the deliverable (no judgement in this turn to keep)",
+          kindsSet.indexOf("REPLY") > -1,
+          "kinds under compact: " + JSON.stringify(kindsSet));
+        skip("compact keeps the judgements", "this turn carries no CHECK/VERDICT");
+      }
+      check("and turning it off restores every row it folded",
+        backRows === onRows && backFold === onFold && offRows > onRows,
+        "on=" + onRows + "+" + onFold + " full=" + offRows + "+" + offFold + " back=" + backRows + "+" + backFold);
+    }
     check("the compact control states which presentation is on",
       cbtn.getAttribute("aria-pressed") === String(true) && cbtn.textContent.trim().length > 0,
       "aria-pressed=" + cbtn.getAttribute("aria-pressed") + " label=" + JSON.stringify(cbtn.textContent.trim()));
@@ -474,13 +499,30 @@ function skip(label, why) {
   }
 
   console.log("-- inspector path --");
-  const rows = Array.from(doc.querySelectorAll("#eTbody tr.ev[data-e-ev]"))
+  /* This asks "did the PROCESS render, not just the answer?" — so it needs a
+   * visible non-reply row. Compact mode hides exactly those BY DESIGN, so asking
+   * under it measures the reader's fold preference rather than the render.
+   * Measured 2026-09-24: `0 rows` while the table was behaving correctly.
+   * ⇒ measure in the full presentation, then restore what the reader had. */
+  const cbtn2 = doc.getElementById("eCompactBtn");
+  const compactWasOn = !!cbtn2 && cbtn2.getAttribute("aria-pressed") === "true";
+  if (compactWasOn) { cbtn2.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); await sleep(300); }
+  const rows = Array.from(doc.querySelectorAll("#eTbody tr.ev[data-e-eva]".replace("a]", "]")))
     .filter((r) => !r.classList.contains("e-reply"));
   if (JOB) {
-    check("event rows rendered", rows.length > 0, rows.length + " rows");
+    check("event rows rendered", rows.length > 0,
+      rows.length + " rows" + (compactWasOn ? " (compact suspended)" : ""));
   } else {
     skip("event rows rendered", "no period in this panel");
   }
+  /* NOTE: compact stays suspended through the inspector checks below, because
+   * they click a row — and a row the fold has removed cannot be clicked. The one
+   * restore happens after that section (search: `restoreCompact`). Measured
+   * 2026-09-24: restoring here made the three inspector checks fail against
+   * detached nodes. */
+  const restoreCompact = function () {
+    if (compactWasOn) { cbtn2.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); }
+  };
   const insp = doc.getElementById("eInsp");
   const inspOn = () => insp.classList.contains("on");
   const dtText = () =>
@@ -586,9 +628,26 @@ function skip(label, why) {
 
     /* N-001 之后位置状态有三种变化：period（同一面内换一段）、panel（开/收辅助面）、
      * view（回到主面并收起辅助面）。三种都走同一个写者，也都要在 hash 里往返一致。 */
-    const roundTrips = () =>
-      JSON.stringify(parsed()) ===
-      JSON.stringify({ view: NAV().view, period: NAV().period, panel: NAV().panel });
+    /* Build the expected object **from the keys `parseHash` returns**; never
+     * copy the field list by hand.
+     *
+     * Measured (2026-09-24 review): after `sup` (the supplier selected on the
+     * Flows desk) was added to `parseHash`/`buildHash` as the fourth field, this
+     * still listed only `view/period/panel` — so the two `JSON.stringify` results
+     * could never be equal, and four N-009 criteria were **permanently red while
+     * the product was entirely correct**. The red carried no information, and the
+     * blanket explanation "red = data-gated" conveniently covered for it.
+     *
+     * => A criterion must share its **source** with the shape it judges: keys come
+     * from `parsed()`, values from the one selection state. The next time a field
+     * is added, this criterion follows on its own; nobody has to remember to come
+     * back and edit it. */
+    const STATE_KEYS = Object.keys(parsed());
+    const roundTrips = () => {
+      const now = {};
+      STATE_KEYS.forEach((k) => { now[k] = NAV()[k]; });
+      return JSON.stringify(parsed()) === JSON.stringify(now);
+    };
     const steps = [
       ["opening the 证轨 panel", "p-prove-track", (n) => n.panel === "prove-track"],
       ["closing it again", "p-prove-track", (n) => n.panel === null],
@@ -659,6 +718,7 @@ function skip(label, why) {
    * fixed and the three sites that show/hide the trajectory now move both
    * through one helper; this checks both halves of that.
    */
+  await restoreCompact(); await sleep(300);
   console.log("-- the hint and the trajectory it explains move together --");
   {
     const tag = (html.match(/<p[^>]*id="eHint"[^>]*>/) || [""])[0];
@@ -669,9 +729,13 @@ function skip(label, why) {
     const hint = doc.getElementById("eHint");
     const vis = (el) => !!el && el.style.display !== "none";
     const beforeHint = errors.length;
-    check("with a period loaded, the hint is visible",
-      vis(traj) && vis(hint),
-      "traj=" + (traj && traj.style.display) + " hint=" + (hint && hint.style.display));
+    if (!JOB) {
+      skip("with a period loaded, the hint is visible", "no period in this panel");
+    } else {
+      check("with a period loaded, the hint is visible",
+        vis(traj) && vis(hint),
+        "traj=" + (traj && traj.style.display) + " hint=" + (hint && hint.style.display));
+    }
     window.__proveTrackClear();
     await sleep(200);
     check("clearing the trajectory hides the hint too",
@@ -871,5 +935,16 @@ function skip(label, why) {
     " — asserted as NOT page errors; see the note where jsdomGaps is defined");
   if (errors.length) console.log("captured errors:\n  " + errors.slice(0, 8).join("\n  "));
   dom.window.close();
+  /* Skipped but nothing red => **record as SKIP** (exit code 3, honoured by
+   * `run_all.js`). Half of this suite's criteria go down the "open a real period"
+   * path: with the panel up but no period, none of them can run. Reporting PASS
+   * here would be **claiming coverage this run did not have**. The missing input
+   * is named in the reason the runner prints; a real red takes the exit(1) below. */
+  if (fail === 0 && skipped > 0) {
+    console.log("NEEDS-INPUT: panel is up but there is no period to drive"
+      + " (no sidebar card / no trajectory row) — " + skipped + " criteria could not run;"
+      + " with anaphase up, re-run for the full set");
+    process.exit(3);
+  }
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error("HARNESS ERROR:", e); process.exit(2); });
