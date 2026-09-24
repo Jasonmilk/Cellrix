@@ -51,6 +51,25 @@ if ! grep -q "mode=$MODE" /tmp/e2e_mock.log; then
   echo "  ABORT: the upstream did not come up in mode=$MODE"; cat /tmp/e2e_mock.log; exit 3
 fi
 echo "  upstream: $(head -1 /tmp/e2e_mock.log)"
+
+# SEMANTIC probe, not a log line. A log says what the process PRINTED; only an
+# answer says what it DOES — and a leftover process from the previous mode would
+# print anything. So: ask it something whose CORRECT ANSWER DIFFERS BY MODE, and
+# assert the answer. (Health checks lie; only a synthetic request through the real
+# path answers "is this the thing I asked for".)
+PROBE=$(curl -s --noproxy '*' -m 8 -X POST -H 'Content-Type: application/json' \
+  -d '{"model":"mode-probe","messages":[{"role":"user","content":"probe"}]}' \
+  "http://127.0.0.1:$MPORT/v1/chat/completions" 2>/dev/null || true)
+if [ "$MODE" = "tool" ]; then
+  if ! printf '%s' "$PROBE" | grep -q 'calls'; then
+    echo "  ABORT: upstream does NOT answer in tool mode (probe saw no calls)"; exit 3
+  fi
+else
+  if printf '%s' "$PROBE" | grep -q 'calls'; then
+    echo "  ABORT: upstream answers like TOOL mode while MODE=$MODE"; exit 3
+  fi
+fi
+echo "  upstream probe: answers as mode=$MODE  ✓"
 KEY=$(python3 -c "
 import re;s=open('$WS/Tuck/config.toml').read();m=re.search(r'api_key\s*=\s*\"([^\"]*)\"',s);print(m.group(1) if m else '')")
 ( cd "$WS/Cellrix" && nohup ./target/debug/up --restart --no-open --tuck-key "$KEY" > /tmp/e2e_up.log 2>&1 & )
@@ -64,14 +83,34 @@ pkill -f "target/debug/anaphase" 2>/dev/null; sleep 2
     nohup ./target/debug/anaphase --config config.toml > /tmp/e2e_ana.log 2>&1 & )
 sleep 5
 SINCE=$(date +%s)
-echo "  turn (recordings since $SINCE):"
+# DRIFT: the declaration is the source, so what anaphase is ACTUALLY RUNNING with
+# must match what the declaration derives. Read-only: it reports, it does not
+# repair — a drift that is silently applied is a signal destroyed.
+APID=$(pgrep -f "target/debug/anaphase" | head -1 || true)
+if [ -n "$APID" ]; then
+  RUNENV=$(ps eww -p "$APID" -o command= 2>/dev/null | tr ' ' '\n' | grep '^ANAPHASE_' || true)
+  MISSING=""
+  for kv in $(env_of); do
+    case "$kv" in
+      ANAPHASE_*) printf '%s\n' "$RUNENV" | grep -qx "$kv" || MISSING="$MISSING $kv" ;;
+    esac
+  done
+  if [ -n "$MISSING" ]; then
+    echo "  ABORT: anaphase is running WITHOUT declared env:$MISSING"
+    echo "         (that is silent Noop degradation — measured 0/5 dispatch, nodes 0)"; exit 3
+  fi
+  echo "  drift check: anaphase's live env matches the declaration  ✓"
+fi
+
+PROMPT="say pong"
+echo "  turn (recordings since $SINCE, prompt=$PROMPT):"
 curl -s --noproxy '*' -m 120 -X POST -H 'Content-Type: application/json' \
-  -d '{"message":"say pong"}' "http://127.0.0.1:$(port_of anaphase)/v1/chat" | head -c 200
+  -d "{\"message\":\"$PROMPT\"}" "http://127.0.0.1:$(port_of anaphase)/v1/chat" | head -c 200
 echo
 echo "  mock saw: $(grep -c 'POST' /tmp/e2e_mock.log) request(s)"
 
 echo "== criterion =="
-CHAIN_SINCE="$SINCE" CHAIN_REQUIRE="executor,metering" node "$HERE/chain_legs_test.js"
+CHAIN_SINCE="$SINCE" CHAIN_PROMPT="$PROMPT" CHAIN_REQUIRE="executor,metering" node "$HERE/chain_legs_test.js"
 CODE=$?
 
 pkill -f mock_upstream 2>/dev/null

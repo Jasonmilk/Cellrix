@@ -73,6 +73,21 @@ for (const [key, name, seen] of legs) {
   } else { skip('leg exercised: ' + name, 'no recording under ' + EV + ' shows it'); }
 }
 console.log('');
+/* BODY MATCHING. Selecting recordings by EVENT TYPE alone means a recording from
+ * an earlier turn — a different question — can satisfy a criterion about THIS one;
+ * the suite then answers every new question with an old answer and stays green.
+ * The window (`CHAIN_SINCE`) cuts by time; this cuts by content. */
+{
+  const WANT = process.env.CHAIN_PROMPT || '';
+  if (!WANT) { skip('the recordings answer the prompt this run sent', 'CHAIN_PROMPT not given'); }
+  else {
+    const said = byType('user/message').map(function (r) { return (r.data || {}).text; });
+    check('the recordings answer the prompt this run sent',
+      said.length > 0 && said.every(function (t) { return t === WANT; }),
+      said.length ? JSON.stringify(said.slice(0, 3)) + ' vs ' + JSON.stringify(WANT) : 'no user/message');
+  }
+}
+
 console.log('-- soundness (these are assertions, not coverage) --');
 
 /* 1. A tool call and its result are a PAIR. A call with no result is a request
