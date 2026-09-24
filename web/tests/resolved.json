@@ -1,0 +1,47 @@
+{
+  "anaphase_env": {
+    "ANAPHASE_FLOWMODUS_ENDPOINT": "grpc://127.0.0.1:60054",
+    "ANAPHASE_MIND_ENDPOINT": "http://127.0.0.1:50052",
+    "ANAPHASE_TENTACLE_ENDPOINT": "http://127.0.0.1:50051",
+    "ANAPHASE_TUCK_ENDPOINT": "http://127.0.0.1:60052"
+  },
+  "components": {
+    "anaphase": {
+      "kind": "http",
+      "port": 50061
+    },
+    "flowmodus-reason": {
+      "kind": "grpc",
+      "port": 60054
+    },
+    "flowmodus-serve": {
+      "kind": "http",
+      "port": 60053
+    },
+    "mind": {
+      "kind": "grpc",
+      "port": 50052
+    },
+    "panel": {
+      "kind": "http",
+      "port": 50050
+    },
+    "tentacle": {
+      "kind": "grpc",
+      "port": 50051
+    },
+    "tuck": {
+      "kind": "http",
+      "port": 60052
+    }
+  },
+  "counts": {
+    "anaphase_env": 4,
+    "components": 7,
+    "start_env": 2
+  },
+  "start_env": {
+    "ANAPHASE_SESSION_EVENTS_PATH": "<workspace>/.helix/events",
+    "TUCK_GATEWAY__AUDIT_PATH": "<workspace>/.helix/tuck/audit.chain"
+  }
+}

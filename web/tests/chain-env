@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""chain-env — the ONE derivation of the chain's wiring facts (Cellrix:ADR-0047 D3).
+
+Everything that needs a port or an endpoint reads `resolved.json` and nothing else:
+`start-panel.sh` and `e2e_chain.sh` shell out to this, so a SECOND derivation has
+nowhere to live (ADR-0047 D5/D2: make the illegal state unrepresentable rather than
+assert that it is absent).
+
+The manifest is a COMMITTED artifact, so it must be deterministic (D4) and it must
+never carry a credential:
+
+  * `<workspace>` placeholders are kept AS WRITTEN and expanded by the consumer;
+    an absolute path here would make `git diff --exit-code` non-empty on every other
+    machine — the tripwire would always be red, and a permanently red gate gets
+    switched off;
+  * keys are sorted recursively, `LC_ALL=C`, one trailing newline;
+  * a key shaped like a credential (`*KEY*`/`*TOKEN*`/`*SECRET*`) REFUSES the whole
+    manifest. Refusing, not redacting: a redacted value is a second source of truth
+    for the same fact.
+
+Usage:  chain-env [--write] [--check]
+        --write   regenerate resolved.json
+        --check   regenerate and compare with the committed one (exit 1 if stale)
+"""
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+WS = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
+CHAIN = os.environ.get('CHAIN_JSON') or os.path.join(
+    WS, 'anaphase-helix', 'ecosystem', 'chain.json')
+OUT = os.path.join(HERE, 'resolved.json')
+FORBIDDEN = ('KEY', 'TOKEN', 'SECRET')
+
+
+def build():
+    with open(CHAIN, encoding='utf-8') as fh:
+        decl = json.load(fh)
+    components, anaphase_env, start_env = {}, {}, {}
+    for c in decl.get('components', []):
+        components[c['name']] = {'port': c['port'], 'kind': c.get('kind', '')}
+        if c.get('anaphase_env'):
+            anaphase_env[c['anaphase_env']] = c['anaphase_value']
+        for k, v in (c.get('start_env') or {}).items():
+            start_env[k] = v
+
+    keys = list(anaphase_env) + list(start_env)
+    bad = [k for k in keys if any(t in k.upper() for t in FORBIDDEN)]
+    if bad:
+        raise SystemExit('chain-env: refusing to emit a manifest with credential-shaped '
+                         'keys: %s' % ', '.join(sorted(bad)))
+    for k in keys:
+        v = str(anaphase_env.get(k, start_env.get(k)))
+        if os.path.isabs(v):
+            raise SystemExit('chain-env: %s has an ABSOLUTE path (%s) — the manifest must '
+                             'stay machine-independent. Keep <workspace> and expand at use.'
+                             % (k, v))
+
+    # NOTE: no separate `panel_port` field. Panel is a declared component, so its
+    # port lives at components.panel.port — one fact, one place.
+    return {
+        'components': components,
+        'anaphase_env': anaphase_env,
+        'start_env': start_env,
+        'counts': {'components': len(components),
+                   'anaphase_env': len(anaphase_env),
+                   'start_env': len(start_env)},
+    }
+
+
+def render(doc):
+    return json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True) + '\n'
+
+
+def main(argv):
+    text = render(build())
+    if '--check' in argv:
+        try:
+            with open(OUT, encoding='utf-8') as fh:
+                current = fh.read()
+        except OSError:
+            print('chain-env: %s is missing — run `chain-env --write` and commit it' % OUT)
+            return 1
+        if current != text:
+            print('chain-env: %s is STALE — regenerate and commit (a stale manifest is a '
+                  'lie about the wiring)' % OUT)
+            return 1
+        print('chain-env: manifest current (%d components, %d env keys, %d start keys)'
+              % (load_counts(text)))
+        return 0
+    if '--write' in argv:
+        with open(OUT, 'w', encoding='utf-8') as fh:
+            fh.write(text)
+        print('chain-env: wrote %s' % OUT)
+        return 0
+    sys.stdout.write(text)
+    return 0
+
+
+def load_counts(text):
+    c = json.loads(text)['counts']
+    return (c['components'], c['anaphase_env'], c['start_env'])
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
