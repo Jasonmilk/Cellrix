@@ -38,8 +38,13 @@ function check(label, cond, detail) {
 }
 function skip(label, why) { skipped++; console.log('  SKIP  ' + label + '  -> ' + why); }
 
-/* ── the fields a ReasonRequest must be able to carry ───────────────────── */
+/* ── the fields each message must be able to carry ──────────────────────── */
 const REQUIRED = ['prompt', 'cognitive_mode', 'model', 'max_tokens'];
+/* The RESPONSE side owes the caller two facts it cannot derive: how many tokens
+ * the round trip cost, and which model actually served it (ADR-0036 — the routed
+ * fact, not the declared name). Both were being dropped, so a turn that succeeded
+ * still reported `model: null` and produced no `assistant/usage`. */
+const REQUIRED_RESPONSE = ['content', 'tokens_consumed', 'model'];
 
 /* Parse one message block's field names. Deliberately small: this reads a
  * contract, it is not a protobuf compiler. */
@@ -61,15 +66,17 @@ if (missingFile.length) {
 }
 const srcs = COPIES.map((c) => ({ ...c, src: fs.readFileSync(path.join(WS, c.rel), 'utf8') }));
 
-/* 1. Both copies declare both facts, under names that mean them. */
+/* 1. Both copies declare every fact each message must carry. */
 for (const c of srcs) {
-  const fields = fieldsOf(c.src, 'ReasonRequest');
-  if (!fields) { check(`${c.who}: ReasonRequest is parseable`, false); continue; }
-  const absent = REQUIRED.filter((f) => fields.indexOf(f) === -1);
-  check(`${c.who}: ReasonRequest carries ${REQUIRED.join(' + ')}`,
-    absent.length === 0,
-    absent.length ? 'missing ' + absent.join(', ') + ' (has ' + fields.join(',') + ')'
-                  : fields.join(', '));
+  for (const [msg, want] of [['ReasonRequest', REQUIRED], ['ReasonResponse', REQUIRED_RESPONSE]]) {
+    const fields = fieldsOf(c.src, msg);
+    if (!fields) { check(`${c.who}: ${msg} is parseable`, false); continue; }
+    const absent = want.filter((f) => fields.indexOf(f) === -1);
+    check(`${c.who}: ${msg} carries ${want.join(' + ')}`,
+      absent.length === 0,
+      absent.length ? 'missing ' + absent.join(', ') + ' (has ' + fields.join(',') + ')'
+                    : fields.join(', '));
+  }
 }
 
 /* 2. `model` must not be documented as the mode any more — the doc comment is
