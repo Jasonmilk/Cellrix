@@ -44,7 +44,14 @@ const REQUIRED = ['prompt', 'cognitive_mode', 'model', 'max_tokens'];
  * the round trip cost, and which model actually served it (ADR-0036 — the routed
  * fact, not the declared name). Both were being dropped, so a turn that succeeded
  * still reported `model: null` and produced no `assistant/usage`. */
-const REQUIRED_RESPONSE = ['content', 'tokens_consumed', 'model'];
+const REQUIRED_RESPONSE = ['content', 'model', 'usage'];
+/* The upstream's usage facts, DISJOINT. `cached_tokens` / `reasoning_tokens` are
+ * explicitly optional so "not reported" stays distinct from "reported zero". */
+const REQUIRED_USAGE = ['prompt_tokens', 'completion_tokens', 'cached_tokens', 'reasoning_tokens'];
+/* RETIRED and not to be reused: a derived total cannot rebuild a breakdown, and
+ * Anaphase's UsageSnapshot refuses a total-only object by design. Reserving the
+ * tag is what stops someone reusing the number for a different fact. */
+const RETIRED_RESPONSE_FIELDS = ['tokens_consumed'];
 
 /* Parse one message block's field names. Deliberately small: this reads a
  * contract, it is not a protobuf compiler. */
@@ -68,7 +75,8 @@ const srcs = COPIES.map((c) => ({ ...c, src: fs.readFileSync(path.join(WS, c.rel
 
 /* 1. Both copies declare every fact each message must carry. */
 for (const c of srcs) {
-  for (const [msg, want] of [['ReasonRequest', REQUIRED], ['ReasonResponse', REQUIRED_RESPONSE]]) {
+  for (const [msg, want] of [['ReasonRequest', REQUIRED], ['ReasonResponse', REQUIRED_RESPONSE],
+                             ['Usage', REQUIRED_USAGE]]) {
     const fields = fieldsOf(c.src, msg);
     if (!fields) { check(`${c.who}: ${msg} is parseable`, false); continue; }
     const absent = want.filter((f) => fields.indexOf(f) === -1);
@@ -77,6 +85,18 @@ for (const c of srcs) {
       absent.length ? 'missing ' + absent.join(', ') + ' (has ' + fields.join(',') + ')'
                     : fields.join(', '));
   }
+}
+
+/* 1b. The retired lossy field stays retired, and the tag stays reserved. */
+for (const c of srcs) {
+  const fields = fieldsOf(c.src, 'ReasonResponse') || [];
+  const back = RETIRED_RESPONSE_FIELDS.filter((f) => fields.indexOf(f) > -1);
+  check(`${c.who}: the lossy total is gone from ReasonResponse`, back.length === 0,
+    back.length ? 'still present: ' + back.join(', ') : 'absent');
+  const reserved = RETIRED_RESPONSE_FIELDS.filter((f) =>
+    new RegExp('reserved\\s+"?' + f + '"?').test(c.src));
+  check(`${c.who}: its tag is reserved, not reused`, reserved.length === RETIRED_RESPONSE_FIELDS.length,
+    reserved.join(', ') || 'no `reserved` statement');
 }
 
 /* 2. `model` must not be documented as the mode any more — the doc comment is
