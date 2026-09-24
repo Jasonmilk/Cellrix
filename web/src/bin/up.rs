@@ -679,7 +679,12 @@ fn restart_all(
     let anaphase_cmd = cfg.anaphase_cmd.clone().unwrap_or_else(|| {
         format!("{} --config {}", anaphase_bin_path(), anaphase_config_path())
     });
-    let anaphase_cmd = format!("{}{}", chain.env_prefix(), anaphase_cmd);
+    let anaphase_cmd = format!(
+        "{}{}{}",
+        chain.env_prefix(),
+        chain.start_env_prefix("anaphase"),
+        anaphase_cmd
+    );
     let tuck_cmd = cfg.tuck_cmd.clone().unwrap_or_else(|| tuck_default_cmd(&chain));
 
     let components: [(&str, String, PollKind); 6] = [
@@ -811,7 +816,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. Anaphase — the cockpit's own source of truth. Its command carries the
     //    declared endpoint env; Anaphase reads them once, at boot.
-    let anaphase_cmd = cfg.anaphase_cmd.clone().map(|c| format!("{}{}", chain.env_prefix(), c));
+    let anaphase_cmd = cfg.anaphase_cmd.clone().map(|c| {
+        format!(
+            "{}{}{}",
+            chain.env_prefix(),
+            chain.start_env_prefix("anaphase"),
+            c
+        )
+    });
     let saved_path = config_path();
     let save_anaphase = {
         let path = saved_path.clone();

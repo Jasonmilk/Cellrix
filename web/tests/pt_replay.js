@@ -66,14 +66,47 @@ function pick(needs) {
   return best;
 }
 
+/* ── 输入自证：真实事件文件是**运行时产物**，不入仓，换机时不会随之而来 ──────
+ *
+ * 实测（2026-09-24 审查）：迁移后 `<workspace>/.helix/events/` 为空，本套件曾
+ * 对本机**恒红**——而红色里没有信息，它报的不是"产品坏了"，是"这台机器没有数据"。
+ * 一颗永远红、红色里没有信息的套件会训练人忽略红色，于是真红也一起被忽略。
+ *
+ * ⇒ 缺输入时说清楚，并以**退出码 3** 让 `run_all.js` 登记为 SKIP（见该文件）。
+ * 与 `layout_test.js`「可达就跑、不可达说明原因」同一条纪律。
+ * ⚠️ 本段不得含 `FAIL` 字样：runner 只在输出没有 FAIL 时才认这个码。 */
+(function () {
+  var names = [];
+  try { names = fs.readdirSync(EV); } catch (e) { /* 目录不存在 */ }
+  if (names.some(function (n) { return n.endsWith('.events.jsonl'); })) { return; }
+  console.log('NEEDS-INPUT: 需要真实事件文件 ' + EV + '/*.events.jsonl'
+    + '（运行时产物，不入仓；本次迁移未随行）');
+  process.exit(3);
+})();
+
 let failures = 0;
 function check(name, cond, detail) {
   if (cond) { console.log('  PASS  ' + name); }
   else { failures++; console.log('  FAIL  ' + name + (detail ? ' -> ' + detail : '')); }
 }
 
+/* A fixture that exists but lacks the event types a block needs is a MISSING
+ * INPUT, not a defect: `pick` throws, which would surface as a red suite whose
+ * red says nothing about the product. Measured 2026-09-24: enabling the live
+ * white-box trail produced files that carry `assistant/reply` but no
+ * `assistant/usage` (the upstream call failed), which turned this suite red.
+ * A criterion is about a *kind* of recording, not about any file being present. */
+function pickOrSkip(needs) {
+  try {
+    return pick(needs);
+  } catch (e) {
+    console.log('NEEDS-INPUT: ' + e.message + '（需要 ' + EV + '/*.events.jsonl 且含这些类型）');
+    process.exit(3);
+  }
+}
+
 /* The window, through the tape, exactly as the panel does it. */
-const META = load(pick(['assistant/usage', 'assistant/reply']));
+const META = load(pickOrSkip(['assistant/usage', 'assistant/reply']));
 const events = META.rows, nodes = META.nodes;
 console.log('metering + reply fixture: ' + META.jobId + ' (' + events.length + ' events)');
 
@@ -165,7 +198,7 @@ console.log('\n=== 6) the panes a reviewer reads ===');
   check('and still truncates', D2.firstLine('x'.repeat(50), 10) === 'x'.repeat(10) + '\u2026');
   check('and an all-blank body is empty, not invented', D2.firstLine('\n\n', 60) === '');
 }
-const PANE = load(pick(['tool/result', 'check/status']));
+const PANE = load(pickOrSkip(['tool/result', 'check/status']));
 console.log('tool + check fixture: ' + PANE.jobId + ' (' + PANE.rows.length + ' events)');
 const paneNodes = PANE.nodes;
 const toolRes = paneNodes.filter(function (n) { return n.kind === 'tool' && n.payload.stage === 'result'; });

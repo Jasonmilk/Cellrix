@@ -55,6 +55,25 @@ function check(name, cond, detail) {
   else { failures++; console.log('  FAIL  ' + name + (detail ? '  -> ' + detail : '')); }
 }
 
+/* ── 输入自证：真实事件文件是**运行时产物**，不入仓，换机时不会随之而来 ──────
+ *
+ * 实测（2026-09-24 审查）：迁移后 `<workspace>/.helix/events/` 为空，本套件曾
+ * 对本机**恒红**（16 条判据全红）——而红色里没有信息，它报的不是"产品坏了"，
+ * 是"这台机器没有数据"。一颗永远红、红色里没有信息的套件会训练人忽略红色，
+ * 于是真红也一起被忽略。
+ *
+ * ⇒ 缺输入时说清楚，并以**退出码 3** 让 `run_all.js` 登记为 SKIP（见该文件）。
+ * 与 `layout_test.js`「可达就跑、不可达说明原因」同一条纪律。
+ * ⚠️ 本段不得含 `FAIL` 字样：runner 只在输出没有 FAIL 时才认这个码。 */
+(function () {
+  var names = [];
+  try { names = fs.readdirSync(EV); } catch (e) { /* 目录不存在 */ }
+  if (names.some(function (n) { return n.endsWith('.events.jsonl'); })) { return; }
+  console.log('NEEDS-INPUT: 需要真实事件文件 ' + EV + '/*.events.jsonl'
+    + '（运行时产物，不入仓；本次迁移未随行）');
+  process.exit(3);
+})();
+
 /* ---- the real files ---- */
 const periods = [];
 const byJob = {};
@@ -80,8 +99,25 @@ fs.readdirSync(EV).forEach(function (name) {
   periods.push({ period_id: jobId, job_id: (rows[0] && rows[0].job_id) || jobId, parent: parent, first_ts: rows[0].time || '' });
 });
 
+// The criterion is written against ONE recorded chain: the lineage from this
+// leaf (see the header note). A corpus of *other* event files is not that chain,
+// and running these checks against it would report "the product is broken" when
+// the truth is "this criterion's recording is not here".
+//
+// Measured 2026-09-24: turning on the live white-box trail (`session_events_path`,
+// anaphase:ADR-0046 C4) made this suite go RED — a fresh single-period file
+// satisfied the "some fixture exists" guard while containing none of the chain
+// the checks describe. A different recording is a MISSING INPUT, not a defect.
+const RECORDED_LEAF = 'run-0537fb101ecccb5e';
+if (!byJob[RECORDED_LEAF]) {
+  const n = fs.readdirSync(EV).filter(function (f) { return f.endsWith('.events.jsonl'); }).length;
+  console.log('NEEDS-INPUT: 需要有记录的 10 周期链条（叶 ' + RECORDED_LEAF + '）—— '
+    + EV + ' 现有 ' + n + ' 个事件文件，但不是这条链');
+  process.exit(3);
+}
+
 // A leaf, so the lineage path is the full 10 periods (see the header note).
-const ids = NORM.chainJobIds(periods, 'run-0537fb101ecccb5e');
+const ids = NORM.chainJobIds(periods, RECORDED_LEAF);
 const merged = NORM.mergeChain(byJob, ids);
 const tape = ASM.create();
 tape.feed(merged.events);
