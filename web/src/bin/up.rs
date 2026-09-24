@@ -25,19 +25,15 @@ const WAIT_DEFAULT_SECS: u64 = 30;
 const POLL_INTERVAL_MS: u64 = 500;
 /// Default web port when not given (mirrors the panel).
 const WEB_PORT_DEFAULT: u16 = 8080;
-/// Default Anaphase cap_http endpoint (mirrors the panel).
-const ANAPHASE_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:50061";
-// Tuck protocol defaults (source = Tuck gateway): local port + its default
-// local audit key. `up` never guesses — these are the protocol's own values.
-const TUCK_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:60052";
+// The Anaphase and Tuck endpoints are NOT declared here: they are the chain
+// declaration's own facts (anaphase:ADR-0046). `up` never guesses.
+// Tuck's key is a protocol default (a credential, deliberately absent from the
+// declaration, which is not a secrets store).
 const TUCK_KEY_DEFAULT: &str = "tk-local-gate";
-/// FlowModus protocol defaults: the port its own `serve` documents, and the URL
-/// the panel's Flows view reads. `up` starts it and wires it — the same shape
-/// `start-panel.sh` already had, which is why the test panel's Flows view was
-/// populated while the one-command path's was silently empty.
-const FLOWMODUS_PORT: u16 = 60053;
-const FLOWMODUS_GRPC_PORT: u16 = 60054;
-const FLOWMODUS_URL_DEFAULT: &str = "http://127.0.0.1:60053";
+// FlowModus's ports are NOT declared here (nor any other chain port): every one
+// of them comes from the chain declaration (anaphase:ADR-0046). A port restated
+// in a launcher is a port that will drift — measured: three launchers, three
+// wirings, and only one of them closed the loop.
 /// User config file: `$HOME/.cellrix/up.toml` (per-user, 0600, never in a
 /// repository). Key name is a fixed convention, not a hardcoded path.
 const CONFIG_REL_PATH: &str = ".cellrix/up.toml";
@@ -338,6 +334,154 @@ fn workspace_root() -> std::path::PathBuf {
         .unwrap_or_default()
 }
 
+/// The chain's wiring facts, from ONE declaration (anaphase:ADR-0046).
+///
+/// Ports and Anaphase's endpoint env are NOT restated in this launcher. Measured
+/// 2026-09-24: three launchers carried three different wirings — this one started
+/// tentacle/mind/flowmodus without ever injecting the endpoints, so Anaphase ran
+/// three silent Noop adapters while every port reported healthy.
+///
+/// Only the facts are read here; how each command is spelled stays this
+/// launcher's business (ADR-0046 §4).
+#[derive(serde::Deserialize)]
+struct ChainDecl {
+    components: Vec<ChainComp>,
+}
+
+#[derive(serde::Deserialize)]
+struct ChainComp {
+    name: String,
+    #[serde(default)]
+    port: u16,
+    #[serde(default)]
+    anaphase_env: Option<String>,
+    #[serde(default)]
+    anaphase_value: Option<String>,
+    #[serde(default)]
+    order: u32,
+    /// Start-time env a component needs but cannot supply itself. `<workspace>`
+    /// expands to the workspace root — a declared fact may be workspace-relative
+    /// (anaphase:ADR-0046).
+    #[serde(default)]
+    start_env: std::collections::BTreeMap<String, String>,
+}
+
+struct Chain {
+    comps: Vec<ChainComp>,
+}
+
+impl Chain {
+    fn path() -> PathBuf {
+        workspace_root().join("anaphase-helix/ecosystem/chain.json")
+    }
+
+    /// Missing/!invalid declaration is a HARD error, not a silent fallback: a
+    /// fallback would be a second source of truth, which is the defect this
+    /// replaces (ADR-0046 §5 risk note).
+    fn load() -> Result<Chain, Box<dyn std::error::Error>> {
+        let p = Chain::path();
+        let raw = std::fs::read_to_string(&p).map_err(|e| {
+            format!(
+                "chain declaration unreadable ({}): {e}\n\
+                 It is the one source for the chain's wiring (anaphase:ADR-0046).",
+                p.display()
+            )
+        })?;
+        let mut d: ChainDecl =
+            serde_json::from_str(&raw).map_err(|e| format!("{}: {e}", p.display()))?;
+        d.components.sort_by_key(|c| c.order);
+        Ok(Chain { comps: d.components })
+    }
+
+    fn port(&self, name: &str) -> Result<u16, String> {
+        self.comps
+            .iter()
+            .find(|c| c.name == name)
+            .map(|c| c.port)
+            .filter(|p| *p != 0)
+            .ok_or_else(|| format!("the declaration has no port for `{name}`"))
+    }
+
+    /// The endpoint value a component declares for Anaphase (Tuck carries one).
+    fn declared_value(&self, name: &str) -> Result<String, String> {
+        self.comps
+            .iter()
+            .find(|c| c.name == name)
+            .and_then(|c| c.anaphase_value.clone())
+            .ok_or_else(|| format!("the declaration has no anaphase_value for `{name}`"))
+    }
+
+    /// The `VAR=value ` prefix a component must be started with, workspace
+    /// placeholders expanded. Empty when the declaration declares none.
+    fn start_env_prefix(&self, name: &str) -> String {
+        let ws = workspace_root();
+        self.comps
+            .iter()
+            .find(|c| c.name == name)
+            .map(|c| {
+                c.start_env
+                    .iter()
+                    .map(|(k, v)| {
+                        format!("{k}={} ", v.replace("<workspace>", &ws.to_string_lossy()))
+                    })
+                    .collect::<String>()
+            })
+            .unwrap_or_default()
+    }
+
+    fn names(&self) -> Vec<String> {
+        self.comps.iter().map(|c| c.name.clone()).collect()
+    }
+
+    /// Every declared endpoint env, in declaration order.
+    fn env_pairs(&self) -> Vec<(String, String)> {
+        self.comps
+            .iter()
+            .filter_map(|c| match (&c.anaphase_env, &c.anaphase_value) {
+                (Some(k), Some(v)) => Some((k.clone(), v.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `VAR=value VAR=value ` — a prefix for `sh -c`, which is how
+    /// `spawn_detached` runs a start command.
+    fn env_prefix(&self) -> String {
+        self.env_pairs()
+            .into_iter()
+            .map(|(k, v)| format!("{k}={v} "))
+            .collect()
+    }
+}
+
+/// Start the components Anaphase resolves **at startup**, without asking.
+///
+/// Anaphase falls back to a silent Noop adapter for any endpoint that is not
+/// listening when it boots, so the dependencies must be up *before* it starts —
+/// and the endpoints are injected from the same declaration (ADR-0046).
+fn start_dependencies(chain: &Chain, wait_secs: u64) -> Result<(), String> {
+    let cmds: Vec<(&str, String)> = vec![
+        ("tentacle", tentacle_cmd(chain)?),
+        ("mind", mind_cmd(chain)?),
+        ("flowmodus-serve", flowmodus_serve_cmd(chain)?),
+        ("flowmodus-reason", flowmodus_reason_cmd(chain)?),
+    ];
+    for (name, cmd) in cmds {
+        let port = chain.port(name)?;
+        if tcp_connected(port) {
+            println!("  {name}: ✅ 运行中 (:{port})");
+            continue;
+        }
+        println!("  启动 {name} (:{port}): {cmd}");
+        spawn_detached(&cmd)?;
+        match tcp_poll_until(name, port, wait_secs) {
+            Ok(()) => println!("  {name}: ✅ 已就绪"),
+            Err(e) => println!("  {name}: ⚠️ {e}（Anaphase 会对这条腿静默降级为 Noop）"),
+        }
+    }
+    Ok(())
+}
+
 /// Locate the panel binary: `CARGO_BIN_EXE_cellrix-web` under cargo, else
 /// the sibling of this executable (same build dir). No hardcoded path.
 fn web_bin() -> String {
@@ -425,22 +569,26 @@ fn stop_port(name: &str, port: u16) {
 /// Derived start commands. Paths come from the fixed workspace layout
 /// (ECOSYSTEM.md §0); flags are each service's own protocol defaults
 /// (tentacle --grpc-port 50051, mind run, tuck --config) — never guesses.
-fn tentacle_cmd() -> String {
+fn tentacle_cmd(chain: &Chain) -> Result<String, String> {
     let ws = workspace_root();
-    format!(
-        "{} --transport grpc --grpc-port 50051 --plugins-dir {}",
+    Ok(format!(
+        "{} --transport grpc --grpc-port {} --plugins-dir {}",
         ws.join("helix-tentacle/target/debug/tentacle").to_string_lossy(),
+        chain.port("tentacle")?,
         ws.join("helix-tentacle/fixtures").to_string_lossy()
-    )
+    ))
 }
 
-fn mind_cmd() -> String {
+fn mind_cmd(chain: &Chain) -> Result<String, String> {
     let ws = workspace_root();
-    format!(
+    // Guard the documented trap: helix-mind's own default is also 50051, so the
+    // ecosystem lands it on the declared port to avoid tentacle.
+    let _ = chain.port("mind")?;
+    Ok(format!(
         "{} --config {} run",
-        ws.join("Helix-Mind/target/debug/helix-mind-cli").to_string_lossy(),
+        ws.join("helix-mind/target/debug/helix-mind-cli").to_string_lossy(),
         ws.join(".helix/mind/config.toml").to_string_lossy()
-    )
+    ))
 }
 
 /// FlowModus supplier pool / router. It resolves its registry through a
@@ -453,23 +601,40 @@ fn mind_cmd() -> String {
 /// chdirs for the same reason; this is the `up` path learning it.
 /// 双服务一条命令：HTTP serve（状态/供应商端点）+ gRPC Reason（anaphase
 /// 对话的推理入口）；单一职责：一个组件两个监听，健康检查走 HTTP 端口。
-fn flowmodus_cmd() -> String {
+/// FlowModus's two listeners, both declared. It resolves its registry through a
+/// RELATIVE path (`registry`), so it must be started from `flowmodus-rs/`.
+fn flowmodus_serve_cmd(chain: &Chain) -> Result<String, String> {
     let ws = workspace_root();
-    format!(
-        "cd {} && {} serve --port {} & cd {} && {} grpc --port {}",
+    Ok(format!(
+        "cd {} && {} serve --port {}",
         ws.join("FlowModus/flowmodus-rs").to_string_lossy(),
         ws.join("FlowModus/flowmodus-rs/target/debug/flowmodus").to_string_lossy(),
-        FLOWMODUS_PORT,
-        ws.join("FlowModus/flowmodus-rs").to_string_lossy(),
-        ws.join("FlowModus/flowmodus-rs/target/debug/flowmodus").to_string_lossy(),
-        FLOWMODUS_GRPC_PORT
-    )
+        chain.port("flowmodus-serve")?
+    ))
 }
 
-fn tuck_default_cmd() -> String {
+/// The reasoning entry. Anaphase dispatches to gRPC for any non-http scheme
+/// (anaphase:ADR-0045), so the declared value carries `grpc://`.
+fn flowmodus_reason_cmd(chain: &Chain) -> Result<String, String> {
+    let ws = workspace_root();
+    Ok(format!(
+        "cd {} && {} grpc --port {}",
+        ws.join("FlowModus/flowmodus-rs").to_string_lossy(),
+        ws.join("FlowModus/flowmodus-rs/target/debug/flowmodus").to_string_lossy(),
+        chain.port("flowmodus-reason")?
+    ))
+}
+
+/// Tuck's command carries its declared start env: without
+/// `TUCK_GATEWAY__AUDIT_PATH` the gateway still serves but `/v1/audit` answers
+/// 404 `no_audit_chain` (Tuck:ADR-0006) — measured, `up --restart` reported Tuck
+/// unhealthy for exactly that reason once the probe learned to read the status
+/// line (Cellrix:ADR-0045).
+fn tuck_default_cmd(chain: &Chain) -> String {
     let ws = workspace_root();
     format!(
-        "{} --config {}",
+        "{}{} --config {}",
+        chain.start_env_prefix("tuck"),
         ws.join("Tuck/target/debug/tuck").to_string_lossy(),
         ws.join("Tuck/config.toml").to_string_lossy()
     )
@@ -480,6 +645,7 @@ fn tuck_default_cmd() -> String {
 /// panel. Reversible and observable at every step.
 fn restart_all(
     cfg: &UpConfig,
+    chain: &Chain,
     wait_secs: u64,
     port: u16,
     anaphase_endpoint: &str,
@@ -495,31 +661,32 @@ fn restart_all(
     println!();
 
     // 1. Stop, reverse dependency order: face → gateway → orchestrator →
-    //    router → memory → executor.
-    for (name, p) in [
-        ("panel", 8080u16),
-        ("tuck", 60052),
-        ("anaphase", 50061),
-        ("flowmodus", FLOWMODUS_PORT),
-        ("flowmodus-grpc", FLOWMODUS_GRPC_PORT),
-        ("mind", 50052),
-        ("tentacle", 50051),
-    ] {
-        stop_port(name, p);
+    //    router → memory → executor. Ports come from the declaration.
+    let mut stop: Vec<(String, u16)> = vec![("panel".into(), port)];
+    for name in ["tuck", "anaphase", "flowmodus-serve", "flowmodus-reason", "mind", "tentacle"] {
+        stop.push((name.to_string(), chain.port(name)?));
+    }
+    for (name, p) in stop {
+        stop_port(&name, p);
     }
     println!();
 
     // 2. Start, dependency order. Saved commands win; otherwise derive.
-    let anaphase_cmd = cfg
-        .anaphase_cmd
-        .clone()
-        .unwrap_or_else(|| format!("{} --config {}", anaphase_bin_path(), anaphase_config_path()));
-    let tuck_cmd = cfg.tuck_cmd.clone().unwrap_or_else(tuck_default_cmd);
+    //    Anaphase's command carries the declared endpoint env: it resolves
+    //    tentacle/mind/tuck/flowmodus AT STARTUP and silently degrades to Noop
+    //    for any endpoint that is missing — which is how the loop stayed open
+    //    while every port reported healthy.
+    let anaphase_cmd = cfg.anaphase_cmd.clone().unwrap_or_else(|| {
+        format!("{} --config {}", anaphase_bin_path(), anaphase_config_path())
+    });
+    let anaphase_cmd = format!("{}{}", chain.env_prefix(), anaphase_cmd);
+    let tuck_cmd = cfg.tuck_cmd.clone().unwrap_or_else(|| tuck_default_cmd(&chain));
 
-    let components: [(&str, String, PollKind); 5] = [
-        ("tentacle", tentacle_cmd(), PollKind::Tcp(50051)),
-        ("mind", mind_cmd(), PollKind::Tcp(50052)),
-        ("flowmodus", flowmodus_cmd(), PollKind::Tcp(FLOWMODUS_PORT)),
+    let components: [(&str, String, PollKind); 6] = [
+        ("tentacle", tentacle_cmd(&chain)?, PollKind::Tcp(chain.port("tentacle")?)),
+        ("mind", mind_cmd(&chain)?, PollKind::Tcp(chain.port("mind")?)),
+        ("flowmodus-serve", flowmodus_serve_cmd(&chain)?, PollKind::Tcp(chain.port("flowmodus-serve")?)),
+        ("flowmodus-reason", flowmodus_reason_cmd(&chain)?, PollKind::Tcp(chain.port("flowmodus-reason")?)),
         (
             "anaphase",
             anaphase_cmd,
@@ -572,7 +739,7 @@ fn restart_all(
     // start-panel.sh's panel was populated).
     let flowmodus_url = flag(args, "--flowmodus-url")
         .or_else(|| env("FLOWMODUS_URL"))
-        .unwrap_or_else(|| FLOWMODUS_URL_DEFAULT.to_string());
+        .unwrap_or_else(|| format!("http://127.0.0.1:{}", chain.port("flowmodus-serve").unwrap_or(0)));
     cmd.arg("--flowmodus-url").arg(flowmodus_url);
     if !cfg.no_open {
         cmd.arg("--open");
@@ -592,14 +759,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let cfg = derive_config(&args);
 
-    let anaphase_endpoint = cfg
-        .anaphase_endpoint
-        .clone()
-        .unwrap_or_else(|| ANAPHASE_ENDPOINT_DEFAULT.to_string());
+    // The wiring facts, once — including the two endpoints this launcher must
+    // know before it can talk to anything (anaphase:ADR-0046).
+    let chain = Chain::load()?;
+
+    let anaphase_endpoint = cfg.anaphase_endpoint.clone().unwrap_or_else(|| {
+        format!("http://127.0.0.1:{}", chain.port("anaphase").unwrap_or_default())
+    });
     let tuck_endpoint = cfg
         .tuck_endpoint
         .clone()
-        .unwrap_or_else(|| TUCK_ENDPOINT_DEFAULT.to_string());
+        .unwrap_or_else(|| chain.declared_value("tuck").unwrap_or_default());
     let tuck_key = cfg.tuck_key.clone().unwrap_or_else(|| TUCK_KEY_DEFAULT.to_string());
     let wait_secs = cfg.wait_secs.unwrap_or(WAIT_DEFAULT_SECS);
     let port = cfg.port.unwrap_or(WEB_PORT_DEFAULT);
@@ -609,6 +779,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.iter().any(|a| a == "--restart" || a == "-r") {
         return restart_all(
             &cfg,
+            &chain,
             wait_secs,
             port,
             &anaphase_endpoint,
@@ -625,8 +796,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  ─────────────────────────────────────────────");
     println!();
 
-    // 1. Anaphase — the cockpit's own source of truth.
-    let anaphase_cmd = cfg.anaphase_cmd.clone();
+    println!(
+        "  链路声明：{} 个组件、{} 个端点 env（derived from ecosystem/chain.json）",
+        chain.names().len(),
+        chain.env_pairs().len()
+    );
+
+    // 1. The organs Anaphase resolves AT STARTUP, before it starts. Without this
+    //    the guided path started only Anaphase+Tuck and Anaphase silently ran
+    //    mind/tentacle/tuck as Noop adapters — every port healthy, loop open.
+    println!();
+    println!("  ── 依赖器官（按声明顺序启动，不问）──");
+    start_dependencies(&chain, wait_secs)?;
+
+    // 2. Anaphase — the cockpit's own source of truth. Its command carries the
+    //    declared endpoint env; Anaphase reads them once, at boot.
+    let anaphase_cmd = cfg.anaphase_cmd.clone().map(|c| format!("{}{}", chain.env_prefix(), c));
     let saved_path = config_path();
     let save_anaphase = {
         let path = saved_path.clone();
@@ -654,7 +839,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         save_anaphase,
     )?;
 
-    // 2. Tuck (protocol default 60052 — the audit/LLM gateway; the panel
+    // 3. Tuck (declared port; the audit/LLM gateway; the panel — the audit/LLM gateway; the panel
     //    degrades gracefully if it is down, but up always probes it).
     {
         let key = tuck_key.as_str();
@@ -684,7 +869,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
-    // 3. One-to-one binding (2026-09-07): Anaphase is the challenger —
+    // 4. One-to-one binding (2026-09-07): Anaphase is the challenger —
     //    it mints the pairing code and verifies the confirm; `up` only
     //    relays the human's physical presence (回车 = 在场证明, HITL).
     //    Unbound = open, honest; bound = every panel request is signed.
@@ -736,7 +921,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // 4. Surface choice: Web panel (default, 回车) or TUI terminal.
+    // 5. Surface choice: Web panel (default, 回车) or TUI terminal.
     //    The beginner's promise is "最多选择加回车" — the default is the
     //    Web panel; TUI is one extra choice, never a separate command to
     //    remember.
@@ -777,7 +962,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // 5. Launch the panel and open the browser.
+    // 6. Launch the panel and open the browser.
     let web = web_bin();
     let mut cmd = Command::new(web);
     cmd.arg("--anaphase-endpoint")
@@ -786,6 +971,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .arg(port.to_string());
     cmd.arg("--tuck-endpoint").arg(&tuck_endpoint);
     cmd.arg("--tuck-key").arg(&tuck_key);
+    // Always wired from the declaration, never from a remembered flag: this is
+    // how the one-command path's Flows view came up empty while the test
+    // launcher's was populated.
+    cmd.arg("--flowmodus-url")
+        .arg(format!("http://127.0.0.1:{}", chain.port("flowmodus-serve")?));
     if !cfg.no_open {
         cmd.arg("--open");
     }

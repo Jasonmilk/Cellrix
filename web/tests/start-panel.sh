@@ -38,25 +38,31 @@ MIND_CFG="$WS/.helix/mind/config.toml"
 # the loop; `spawn` inherits it.
 CHAIN_JSON="$WS/anaphase-helix/ecosystem/chain.json"
 if [ ! -f "$CHAIN_JSON" ]; then echo "MISSING DECLARATION: $CHAIN_JSON"; exit 1; fi
-eval "$(python3 - "$CHAIN_JSON" <<'PYEOF'
+eval "$(python3 - "$CHAIN_JSON" "$WS" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
+ws = sys.argv[2]
 for c in d["components"]:
     print("PORT_%s=%s" % (c["name"].replace("-", "_").upper(), c["port"]))
 for c in d["components"]:
     if "anaphase_env" in c:
         print("export %s=%s" % (c["anaphase_env"], c["anaphase_value"]))
+    for k, v in (c.get("start_env") or {}).items():
+        # <workspace> is declared; expand it to this checkout.
+        print("export %s=%s" % (k, v.replace("<workspace>", ws)))
 print("CHAIN_ENV_COUNT=%d" % sum(1 for c in d["components"] if "anaphase_env" in c))
 PYEOF
 )"
 echo "chain declaration: $CHAIN_ENV_COUNT endpoint env(s) derived from $(basename "$CHAIN_JSON")"
-# Tuck's tamper-evident audit chain (ADR-0006). The launcher closes the leg
-# WITHOUT editing Tuck/config.toml, which is gitignored: a machine-rebuilt
-# config silently lost `audit_path`, so `/v1/audit` answered 404 no_audit_chain
-# while the gateway still served — and every launcher called Tuck healthy.
-# Only the non-secret operational key goes through env; Tuck's api_key /
-# jwt_secret / upstream_key stay in the untracked 0600 config (DNA iron rule 3).
-TUCK_CHAIN="$WS/.helix/tuck/audit.chain"
+# Tuck's tamper-evident audit chain (Tuck:ADR-0006) closes the leg WITHOUT
+# editing Tuck/config.toml, which is gitignored: a machine-rebuilt config
+# silently lost `audit_path`, so `/v1/audit` answered 404 no_audit_chain while
+# the gateway still served — and every launcher called Tuck healthy.
+# The path itself is derived below; only non-secret operational keys go through
+# env (Tuck's api_key / jwt_secret / upstream_key stay in the untracked 0600
+# config — DNA iron rule 3).
+# Tuck's audit chain path is DERIVED below from the declaration's `start_env`
+# (anaphase:ADR-0046) — not restated here.
 # flowmodus resolves its registry through a *relative* path ("registry"), so it
 # must be launched from the crate dir or it reports an empty pool.
 FLOW_DIR="$WS/FlowModus/flowmodus-rs"
@@ -131,14 +137,14 @@ spawn() {
 }
 
 echo "[1/7] tuck      :$PORT_TUCK"
-spawn tuck "$WS/Tuck" env "TUCK_GATEWAY__AUDIT_PATH=$TUCK_CHAIN" "$TUCK_BIN" --config config.toml
+spawn tuck "$WS/Tuck" "$TUCK_BIN" --config config.toml
 wait_port "$PORT_TUCK" tuck 15 || exit 1
 # The port listening is NOT the criterion (ADR-0006): the gateway serves with an
 # empty audit_path too. The physical fact we require is that it OPENED a ledger.
-if [ -f "$TUCK_CHAIN" ]; then
-  echo "  OK    tuck audit chain open: $TUCK_CHAIN"
+if [ -f "$TUCK_GATEWAY__AUDIT_PATH" ]; then
+  echo "  OK    tuck audit chain open: $TUCK_GATEWAY__AUDIT_PATH"
 else
-  echo "  WARN  tuck audit chain NOT open ($TUCK_CHAIN missing) — /v1/audit will 404 no_audit_chain"
+  echo "  WARN  tuck audit chain NOT open ($TUCK_GATEWAY__AUDIT_PATH missing) — /v1/audit will 404 no_audit_chain"
 fi
 
 echo "[2/7] tentacle  :$PORT_TENTACLE (gRPC)"

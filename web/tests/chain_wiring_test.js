@@ -23,7 +23,10 @@ const path = require('path');
 
 const WS = path.join(__dirname, '..', '..', '..');
 const DECL = path.join(WS, 'anaphase-helix', 'ecosystem', 'chain.json');
-const CONVERTED = ['start-panel.sh'];
+const CONVERTED = [
+  { rel: 'start-panel.sh', kind: 'shell' },
+  { rel: path.join('..', 'src', 'bin', 'up.rs'), kind: 'rust' },
+];
 
 let pass = 0, fail = 0;
 function check(label, cond, detail) {
@@ -59,47 +62,75 @@ check('the start order is a dense 1..N sequence',
   orders.length > 0 && orders.every((o, i) => o === i + 1), JSON.stringify(orders));
 
 /* ── 2. each converted launcher derives rather than restates ─────────────── */
-for (const rel of CONVERTED) {
+for (const { rel, kind } of CONVERTED) {
   const p = path.join(__dirname, rel);
   if (!fs.existsSync(p)) { check(`a launcher at ${rel}`, false); continue; }
   const lines = fs.readFileSync(p, 'utf8').split('\n');
   // Comments may narrate ports; only executable lines are the launcher's claims.
-  const code = lines.filter((l) => !l.trim().startsWith('#')).join('\n');
+  // `#` is a comment only in shell. Stripping every `#`-prefixed line for Rust
+  // also removed `#[cfg(test)]` / `#[derive(..)]`, which silently defeated the
+  // test-module cut below (measured: the cut looked applied but was not).
+  const isComment = kind === 'shell'
+    ? (l) => l.trim().startsWith('#')
+    : (l) => l.trim().startsWith('//');
+  let code = lines.filter((l) => !isComment(l)).join('\n');
+  // A wiring criterion is about what the launcher DOES at runtime, not about the
+  // fixtures its unit tests round-trip. `ci/check_line_budget.py` makes the same
+  // cut at `#[cfg(test)]` for the same reason: policing a test fixture would
+  // teach people to obfuscate fixtures rather than to single-source wiring.
+  if (kind === 'rust') code = code.split('#[cfg(test)]')[0];
 
-  check(`${rel}: reads the declaration`, code.includes('chain.json'), rel);
+  check(`${rel}: reads the declaration`,
+    code.includes('chain.json') || code.includes('Chain::load'), rel);
 
   // (a) it must not restate a declared port
   const restated = comps
     .filter((c) => new RegExp('(?<![0-9.])' + c.port + '(?![0-9])').test(code))
     .map((c) => c.name + ':' + c.port);
-  check(`${rel}: no declared port is restated in executable code`,
+  check(`${rel}: no declared port is restated in code`,
     restated.length === 0, restated.join(', ') || 'all ' + comps.length + ' ports derived');
 
-  // (b) it must SUPPLY every declared endpoint env — by deriving them from the
-  // declaration, not by restating their names. A literal-name check would fail a
-  // launcher that is *more* single-sourced than one that passes; the property is
-  // "consumes the field", so that is what is asserted.
+  // (b) it must SUPPLY every declared endpoint env — by deriving them, not by
+  // restating their names. A literal-name check would fail a launcher that is
+  // *more* single-sourced than one that passes; the property is "consumes the
+  // field", so that is what is asserted.
   const derived = comps.filter((c) => c.anaphase_env).length;
   check(`${rel}: derives the endpoint env from the declaration (not restated)`,
-    derived === 0 || (code.includes('anaphase_env') && /export\s/.test(code)),
+    derived === 0 || code.includes('anaphase_env'),
     derived + ' declared env(s), field referenced: ' + code.includes('anaphase_env'));
 
-  // (c) it must START every declared component and be able to STOP it.
-  //
-  // ⚠️ Measured: the first version of this check searched for the bare name and
-  // passed on `helix-mind` — so renaming `spawn mind` to `spawn mindX` went
-  // undetected. A substring that happens to occur elsewhere is not evidence that
-  // the component is started. Parse the actual `spawn <name>` invocations.
-  const spawned = new Set([...code.matchAll(/\bspawn\s+([A-Za-z0-9_-]+)/g)].map((m) => m[1]));
-  const notStarted = named.filter((n) => !spawned.has(n));
-  check(`${rel}: spawns every declared component`, notStarted.length === 0,
-    notStarted.join(', ') || [...spawned].sort().join(' '));
+  if (kind === 'shell') {
+    // Parse the actual `spawn <name>` invocations.
+    //
+    // ⚠️ Measured: the first version searched for the bare name and passed on
+    // `helix-mind` — so renaming `spawn mind` to `spawn mindX` went undetected.
+    // A substring that happens to occur elsewhere is not evidence that the
+    // component is started.
+    const spawned = new Set([...code.matchAll(/\bspawn\s+([A-Za-z0-9_-]+)/g)].map((m) => m[1]));
+    const notStarted = named.filter((n) => !spawned.has(n));
+    check(`${rel}: spawns every declared component`, notStarted.length === 0,
+      notStarted.join(', ') || [...spawned].sort().join(' '));
 
-  // A component missing from SERVICES is not stopped by --stop (it leaks).
-  const svcLine = (code.match(/^\s*SERVICES="([^"]*)"/m) || [, ''])[1].split(/\s+/);
-  const notStoppable = named.filter((n) => !svcLine.includes(n));
-  check(`${rel}: every declared component is in SERVICES (so --stop covers it)`,
-    notStoppable.length === 0, notStoppable.join(', ') || svcLine.filter(Boolean).join(' '));
+    const svcLine = (code.match(/^\s*SERVICES="([^"]*)"/m) || [, ''])[1].split(/\s+/);
+    const notStoppable = named.filter((n) => !svcLine.includes(n));
+    check(`${rel}: every declared component is in SERVICES (so --stop covers it)`,
+      notStoppable.length === 0, notStoppable.join(', ') || svcLine.filter(Boolean).join(' '));
+  } else {
+    // Rust: "asks the declaration for each component" means an actual LOOKUP
+    // call, not the name occurring somewhere as a string.
+    //
+    // ⚠️ Measured: the first version tested `code.includes('"' + n + '"')`, so
+    // renaming `chain.port("mind")` to `chain.port("mindX")` still passed — the
+    // name `"mind"` occurred in an unrelated tuple. That is the third time a
+    // substring test on a NAME proved too weak here (the shell check passed on
+    // `helix-mind`; the port check passed on a port inside a comment). Names are
+    // not evidence; the lookup is.
+    const asked = new Set([...code.matchAll(/chain\.(?:port|declared_value)\(\s*"([A-Za-z0-9_-]+)"/g)]
+      .map((m) => m[1]));
+    const unasked = named.filter((n) => !asked.has(n));
+    check(`${rel}: asks the declaration for every declared component`,
+      unasked.length === 0, unasked.join(', ') || 'all ' + named.length + ' looked up');
+  }
 }
 
 /* ── 3. non-vacuity: the same checks must report a restated fact ───────────
