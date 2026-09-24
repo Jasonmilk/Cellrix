@@ -45,16 +45,62 @@ node web/tests/all_views_test.js http://127.0.0.1:18932 <job_id>
 ./web/tests/start-panel.sh --stop
 ```
 
-`node` must see `jsdom`. Install it into a managed workspace and point
-`NODE_PATH` at it — never `npm install -g`:
+### The whole net, and the exact workspace `jsdom` lives in
+
+`node` must see `jsdom`. It lives in a **managed workspace** — point `NODE_PATH` at it,
+never `npm install -g`. **The path below is the measured one (recorded 2026-09-24;
+before this, the file only said "a managed workspace", so "how do I get the net
+green" was unanswerable from inside the repo):**
 
 ```bash
-NODE_PATH=/path/to/node/workspace/node_modules node web/tests/render_test.js http://127.0.0.1:18932
+# the managed node workspace for this checkout
+export NODE_PATH=/Users/jason/Developer/Jasonmilk/.test-node/node_modules
+
+cd web/tests && node run_all.js        # => OK — 15 suites green, 6 need input
 ```
 
-`jsdom` needs two shims or the page dies during bootstrap: `window.fetch`
-(proxy relative paths to the live server) and `window.matchMedia` (the theme
-bootstrap in `base.html`).
+**Without `NODE_PATH`**, the four jsdom suites report `jsdom 不可用` and go red
+(7 red). Those are not product reds.
+
+### Baseline, stated as a measurement (not a claim)
+
+Measured in three configurations (2026-09-24, this machine):
+
+| Configuration | Measured |
+|---|---|
+| panel and browser down | **15 green, 6 need input, 0 red** |
+| the above + panel `:8080` + Chrome `:9222` (`CELLRIX_PANEL` / `CELLRIX_CDP` override) | **18 green, 4 need input, 0 red** |
+| plus all three upstreams (anaphase has a period) and the real event files in place | 22 green, 0 need input — **not reachable on this machine**, see below |
+
+Each of the four "need input" entries has its own reason, and **none of them is "the
+product is broken"**:
+
+| Suite | What it is missing |
+|---|---|
+| `prove_track_nodes_test.js` / `pt_replay.js` | the real event files `.helix/events/*.events.jsonl` — runtime output, never committed, **not carried over in the 2026-09-23 machine migration** |
+| `all_views_test.js` / `layout_test.js` | a **real period** (no anaphase, so the sidebar has no card and the trajectory has no row; half the checks cannot be driven) |
+
+> ⚠️ `all_views_test.js` has 9 checks that go down the "open a real period" path.
+> When that input is missing it reports `NEEDS-INPUT`, not PASS — a PASS there
+> would be **claiming coverage it does not have**.
+
+### "Needs input" is an exit code, not a comment
+
+When a suite is missing something this machine cannot supply, it prints
+`NEEDS-INPUT: <reason>` on its last line and calls `exit(3)`; `run_all.js` records it
+as a SKIP with that reason. The reason is the same as this file's first sentence: a
+suite that quietly did not run is indistinguishable from one that passed — and a
+suite that is **permanently red with no information in the red** is worse, because it
+trains people to ignore red, and then the real reds go too.
+
+⚠️ **That code is honoured only when the output contains no `FAIL` at all**, otherwise
+one real red would be buried under "needs input". Non-vacuity is proven by mutation
+injection: planting a `FAIL` on that path makes `run_all.js` report FAIL instead of
+SKIP; removing it returns the suite to SKIP.
+
+`node` must see `jsdom`; `jsdom` also needs two shims or the page dies during
+bootstrap: `window.fetch` (proxy relative paths to the live server) and
+`window.matchMedia` (the theme bootstrap in `base.html`).
 
 ### The geometry guard needs a browser, and it is only as good as the browser being up
 

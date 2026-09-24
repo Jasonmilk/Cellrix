@@ -33,8 +33,18 @@ function check(label, cond, detail) {
 
 /* The fields that make up the one selection state. `[^=]` keeps `==`, `===` and
  * `!==` out; the zero-state initialiser (`nav: { view: null, period: null }`)
- * uses `:` and is therefore not a writer. */
-const WRITER = /\b(?:NAV|nav|state\.nav)\.(?:view|period|panel)\s*=[^=]/;
+ * uses `:` and is therefore not a writer.
+ *
+ * ⚠️ This list must stay **as long as `parseHash`/`buildHash`'s field list**.
+ * Measured (2026-09-24 review): after `sup` was added to `period_normalize.js`
+ * as the fourth field, this regex still had three — so the "one selection
+ * state" (N-003) structural guard **could no longer see the new field**, while
+ * the commit message for that same change claimed "nav_state 14 (sup written
+ * by setNav)". A criterion that is present but no longer bites is exactly what
+ * rule 9 exists to treat.
+ * ⇒ The self-test in §1 injects **one writer per field**, so dropping any field
+ * turns this red on the spot. */
+const WRITER = /\b(?:NAV|nav|state\.nav)\.(?:view|period|panel|sup)\s*=[^=]/;
 /* Anything that used to be a second copy of the period. */
 const LEGACY = /\bchatJobId\b/;
 const META_WRITER = /\b__proveTrackMeta\s*=[^=]/;
@@ -82,12 +92,34 @@ const sources = assetSources();
 check('the assets were found', Object.keys(sources).length > 0,
   Object.keys(sources).length + ' files');
 
-/* ── 1. the detector is not vacuous ─────────────────────────────────────── */
-const selfBad = scan({ 'synthetic-second-writer.js': 'if (x) NAV.period = "run-1";' }, WRITER);
+/* ── 1. the detector is not vacuous, and it covers EVERY field ──────────────
+ *
+ * The authoritative field list is **not copied by hand here**: it is derived
+ * from the `parseHash` zero-state literal in `period_normalize.js` — the single
+ * source for the shape of the selection state. Then **every field** is injected
+ * once.
+ *
+ * Why per field: injecting one "representative" field cannot prove the list is
+ * complete. Measured (2026-09-24): after `sup` was added to `parseHash`, the
+ * `NAV.period = …` self-test was still fully green while the actual second
+ * writer, `NAV.sup = …`, was no longer guarded. Once the self-test and the list
+ * it guards share one source, adding a field makes this require the `WRITER`
+ * update by itself. */
+const DECLARED = (function () {
+  const m = (sources['period_normalize.js'] || '').match(/var\s+out\s*=\s*\{([^}]*)\}/);
+  return m ? m[1].split(',').map((s) => s.split(':')[0].trim()).filter(Boolean) : null;
+})();
+check('the selection-state shape has one source (`parseHash` zero state)',
+  Array.isArray(DECLARED) && DECLARED.length > 0, JSON.stringify(DECLARED));
+
+const missed = (DECLARED || []).filter(
+  (f) => scan({ 'synthetic-second-writer.js': 'if (x) NAV.' + f + ' = "v";' }, WRITER).length !== 1);
+check('the scanner finds an injected second writer — for every field of the state',
+  (DECLARED || []).length > 0 && missed.length === 0,
+  missed.length ? 'NOT covered: ' + missed.join(', ') : (DECLARED || []).join(', '));
+
 const selfGood = scan({ 'synthetic-reader.js': 'var v = Cx.state.nav.period || null;' }, WRITER);
 const selfDouble = scan({ 'synthetic-compare.js': 'if (nav.view === "chat") { go(); }' }, WRITER);
-check('the scanner finds an injected second writer', selfBad.length === 1,
-  JSON.stringify(selfBad));
 check('the scanner does not flag a reader', selfGood.length === 0, JSON.stringify(selfGood));
 check('the scanner does not flag a comparison', selfDouble.length === 0,
   JSON.stringify(selfDouble));

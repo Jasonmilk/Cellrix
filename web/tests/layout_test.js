@@ -30,6 +30,24 @@ function check(label, cond, detail) {
   else { fail++; console.log('  FAIL  ' + label + (detail ? '  [' + detail + ']' : '')); }
 }
 
+/* ── 需要输入 ≠ 失败 ────────────────────────────────────────────────────────
+ *
+ * 本套件的三条判据（扩展行是否装得下它的文字、卡片内容是否溢框、抽屉是否留出
+ * 中栏）**必须有一段真实经历才能量**。本机没起 anaphase 时侧栏无卡、证轨无行，
+ * 它们无从测量。
+ *
+ * 实测（2026-09-24 审查）：这些判据此前走 `check(...)`，于是**对本机恒红**，
+ * 红因是"没有数据"而不是"产品坏了"。一颗永远红、红色里没有信息的套件会训练人
+ * 忽略红色，于是真红也一起被忽略。
+ *
+ * ⇒ 记成 skipped，并在结尾以**退出码 3** 登记为 SKIP（由 `run_all.js` 认，
+ * 与「可达就跑、不可达说明原因」同一条纪律）。缺什么，由 reason 说出来。 */
+let skipped = 0;
+function skip(label, why) {
+  skipped++;
+  console.log('  SKIP  ' + label + (why ? '  [' + why + ']' : ''));
+}
+
 const PROBE = `(async function () {
   var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
   function R(e) { var r = e.getBoundingClientRect();
@@ -258,7 +276,7 @@ const PROBE_4A = `(async function () {
 
   /* --- 1. the process row ---------------------------------------------- */
   if (!d.row) {
-    check('a process row to expand', false, 'none in the loaded period');
+    skip('a process row to expand', 'none in the loaded period — needs a live anaphase period');
   } else {
     console.log('  measured: row grew ' + d.row.grewBy + 'px for ' + d.row.bodyH +
       'px of text (row bottom ' + d.row.rowBottom + ', content bottom ' + d.row.bodyBottom + ')');
@@ -275,7 +293,7 @@ const PROBE_4A = `(async function () {
 
   /* --- 2. the session card --------------------------------------------- */
   if (!d.card) {
-    check('a session card to measure', false, 'the sidebar has no card');
+    skip('a session card to measure', 'the sidebar has no card — needs a live anaphase period');
   } else {
     console.log('  measured: card ' + d.card.cardH + 'px, name ' + d.card.nameLines +
       ' line(s), preview ' + d.card.previewLines + ' of clamp ' + d.card.previewClamp +
@@ -341,16 +359,31 @@ const PROBE_4A = `(async function () {
        the main area visible — the drawer is width-limited, never full-screen;
        the scrim (blank area) or ✕ hides it again. Criterion: the main area's
        visible width while the drawer is open stays ≥ 200px. */
-    check('the inspector opens as a drawer that leaves part of the main area visible',
-      g && g.mainVisibleAfterOpen != null && g.mainVisibleAfterOpen >= 200,
-      'drawer w=' + (g && g.inspector && g.inspector.w) +
-      ' at x=' + (g && g.inspector && g.inspector.x) +
-      ' — main area still visible ' + (g && g.mainVisibleAfterOpen) + 'px');
+    /* 抽屉的测量依赖"点一行"这一步（`eInsp` 由行上的动作打开）。没有行就没有
+     * 抽屉可量 —— 那是缺输入，不是缺陷；反过来，**有行而抽屉没开**才是真红。 */
+    if (!d.row) {
+      skip('the inspector opens as a drawer that leaves part of the main area visible',
+        'no row to open it from — needs a live anaphase period');
+    } else {
+      check('the inspector opens as a drawer that leaves part of the main area visible',
+        g && g.mainVisibleAfterOpen != null && g.mainVisibleAfterOpen >= 200,
+        'drawer w=' + (g && g.inspector && g.inspector.w) +
+        ' at x=' + (g && g.inspector && g.inspector.x) +
+        ' — main area still visible ' + (g && g.mainVisibleAfterOpen) + 'px');
+    }
   }
 
   console.log('');
-  console.log(fail === 0 ? 'RESULT: ' + pass + ' passed, 0 failed'
-    : 'RESULT: ' + pass + ' passed, ' + fail + ' failed');
+  console.log((fail === 0 ? 'RESULT: ' + pass + ' passed, 0 failed'
+    : 'RESULT: ' + pass + ' passed, ' + fail + ' failed') +
+    (skipped ? ', ' + skipped + ' skipped (needs a live period)' : ''));
   ws.close();
+  /* 有跳过、但没有红 ⇒ **登记为 SKIP**（退出码 3，由 `run_all.js` 认）。
+   * 既不冒充通过，也不冒充失败：缺的输入是一段真实经历。 */
+  if (fail === 0 && skipped > 0) {
+    console.log('NEEDS-INPUT: 需要一段真实经历（anaphase 未起 ⇒ 侧栏无卡、证轨无行，'
+      + '扩展行 / 卡片溢框 / 抽屉留白三条判据无从测量）');
+    process.exit(3);
+  }
   process.exit(fail === 0 ? 0 : 1);
 })();
