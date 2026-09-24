@@ -48,7 +48,7 @@ pub fn route(path: &str) -> Route {
         "/api/events" => Route::Events,
         "/api/ecosystem" => Route::Ecosystem,
         "/api/flows" => Route::Flows,
-        "/api/flowmodus/suppliers" => Route::FlowsSuppliers,
+        "/api/flowmodus/suppliers" | "/api/flowmodus/suppliers/probe" => Route::FlowsSuppliers,
         "/api/chat" => Route::Chat,
         _ => Route::NotFound,
     }

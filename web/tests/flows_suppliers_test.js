@@ -31,6 +31,11 @@
  * - 把 selectSupplier 去掉 setNav ⇒ 「hash 同步」必红。
  * - 把 renderSuppliers 的 keyed 复用换成 innerHTML 整块重建 ⇒ 「节点复用」必红。
  * - 把 renderSuppliers 去掉首选中 ⇒ 「首渲染详情打开」必红。
+ * - 把探测按钮的 POST 目标改成非 probe ⇒ 「探测走代理 /probe」必红。
+ * - 把探测成功的回填去掉 ⇒ 「探测回填 models」必红。
+ * - 把 submit 的 model_tags 组装去掉 ⇒ 「标签随 payload 上行」必红。
+ * - 把 renderDetail 的 chips 渲染去掉 ⇒ 「详情标签 chips」必红。
+ * - 把 editSupplier 的 model_tags 回填去掉 ⇒ 「编辑回填标签」必红。
  *
  * 纯逻辑 + jsdom，不需要真浏览器与活面板（与 session_list_test.js 同款）。
  *
@@ -70,6 +75,7 @@ const PAGE = '<!DOCTYPE html><html><body>' +
   '<select name="tier"><option value="paid">paid</option><option value="free">free</option></select>' +
   '<input name="supplier_id"><input name="supplier_name">' +
   '<input name="base_url"><input name="models"><input name="api_key" type="password">' +
+  '<input name="model_tags"><button type="button" id="fl-sup-probe" class="fl-del">探测模型</button>' +
   '</form>' +
   '<div id="fl-sup-note"></div>' +
   '</div></body></html>';
@@ -83,6 +89,7 @@ const SUPPLIERS = [
   { supplier_id: 'deepseek', supplier_name: 'DeepSeek', tier: 'paid', verified: false,
     models: ['deepseek-chat', 'deepseek-reasoner'], base_url: 'https://api.deepseek.com/v1',
     updated_at_unix: 1, api_key_set: true,
+    model_tags: { 'deepseek-chat': ['fast', 'reasoning'], 'deepseek-reasoner': ['reasoning'] },
     /* 模拟后端误发的泄漏响应：即使响应里带了明文 key，渲染层也绝不能画进 DOM。
      * 这一行让"key 绝不进 DOM"从空转判据变成真实防御。 */
     api_key: 'sk-leak-123' },
@@ -107,6 +114,7 @@ function makeFetch(over) {
     }
     if (u.startsWith('/api/flowmodus/suppliers')) {
       if (o.method === 'DELETE') return Promise.resolve({ json: () => Promise.resolve({ ok: true, supplier_id: 'groq', tier: 'free' }) });
+      if (o.method === 'POST' && u.indexOf('/probe') >= 0) return Promise.resolve({ json: () => Promise.resolve({ models: ['p-a', 'p-b', 'p-c'] }) });
       if (o.method === 'POST') return Promise.resolve({ json: () => Promise.resolve({ ok: true, supplier_id: 'newsup', api_key_set: true }) });
       return Promise.resolve({ json: () => Promise.resolve({ suppliers: SUPPLIERS }) });
     }
@@ -172,8 +180,8 @@ const of = (p) => calls.filter((c) => c.url.indexOf(p) === 0);
   await sleep(20);
   check('空池 ⇒ 零态（exit layer render 被调）', zeroCalls > z0, 'zero renders ' + z0 + ' -> ' + zeroCalls);
   check('空池不产生列表项', w.document.querySelectorAll('#fl-sup-list .fl-item').length === 0);
-  check('空池 ⇒ 详情面板回零态（不悬空）',
-    w.document.getElementById('fl-sup-detail').textContent.indexOf('点选左侧供应商') >= 0,
+  check('空池 ⇒ 详情面板回零态（不悬空，带引导）',
+    w.document.getElementById('fl-sup-detail').textContent.indexOf('还没有供应商') >= 0,
     w.document.getElementById('fl-sup-detail').textContent);
 
   /* ── 表单提交：payload 形状（models 数组化、key 随行、必填校验） ─────── */
@@ -290,6 +298,81 @@ const of = (p) => calls.filter((c) => c.url.indexOf(p) === 0);
   check('详情删除按钮 ⇒ 同一 DELETE 契约（带 id/tier）',
     !!lastDel2 && lastDel2.url === '/api/flowmodus/suppliers?tier=paid&id=deepseek',
     lastDel2 && lastDel2.url);
+
+  /* ── 探测模型：按钮 → 代理 /probe → 回填 models（key 不出浏览器） ─────── */
+  const probeBtn = w.document.getElementById('fl-sup-probe');
+  check('探测按钮存在（触境 ≥44px 的类）', !!probeBtn && (probeBtn.className || '').indexOf('fl-del') >= 0);
+  set('base_url', ''); set('api_key', '');
+  const cProbe0 = calls.length;
+  probeBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await sleep(10);
+  check('缺 base_url ⇒ 不发探测请求 + 提示', calls.length === cProbe0 &&
+    w.document.getElementById('fl-sup-note').textContent.indexOf('先填 base_url') >= 0,
+    w.document.getElementById('fl-sup-note').textContent);
+
+  set('base_url', 'https://api.probe-x.com/v1'); set('api_key', 'sk-probe-777');
+  probeBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await sleep(20);
+  const probePosts = calls.filter((c) => c.method === 'POST' && c.url.indexOf('/probe') >= 0);
+  const lastProbe = probePosts[probePosts.length - 1];
+  check('探测 ⇒ POST 到代理 /probe 端点', !!lastProbe && lastProbe.url === '/api/flowmodus/suppliers/probe',
+    lastProbe && lastProbe.url);
+  if (lastProbe) {
+    let pb = null;
+    try { pb = JSON.parse(lastProbe.body); } catch (e) { /* 见下 */ }
+    check('探测 body 形状 {base_url, api_key}（key 仅出站用）',
+      !!pb && pb.base_url === 'https://api.probe-x.com/v1' && pb.api_key === 'sk-probe-777',
+      lastProbe.body);
+  }
+  check('探测成功 ⇒ 模型回填进 models 输入（逗号串）',
+    form.elements.namedItem('models').value === 'p-a, p-b, p-c',
+    form.elements.namedItem('models').value);
+  check('探测成功 ⇒ 提示模型数量', w.document.getElementById('fl-sup-note').textContent.indexOf('3 个模型') >= 0,
+    w.document.getElementById('fl-sup-note').textContent);
+
+  /* ── 打标签：model_tags 逗号串 → payload.model_tags（应用到全部模型） ─── */
+  set('supplier_id', 'tagged'); set('base_url', 'https://api.tagged.com/v1');
+  set('models', 'm-1, m-2'); set('model_tags', ' fast , reasoning ');
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await sleep(20);
+  const posts2 = calls.filter((c) => c.method === 'POST');
+  const lastPost2 = posts2[posts2.length - 1];
+  if (lastPost2) {
+    let p2 = null;
+    try { p2 = JSON.parse(lastPost2.body); } catch (e) { /* 见下 */ }
+    check('提交带标签 ⇒ payload.model_tags = {模型: 标签数组}（trim+去空+应用到全部模型）',
+      !!p2 && JSON.stringify(p2.model_tags) === JSON.stringify({ 'm-1': ['fast', 'reasoning'], 'm-2': ['fast', 'reasoning'] }),
+      p2 && JSON.stringify(p2.model_tags));
+  }
+  /* 无标签提交 ⇒ 声明纯净（不发 model_tags 键） */
+  await sleep(20);                  /* 等上一个提交结束（supLoading 复位 + newSupplier 已 reset 表单） */
+  set('supplier_id', 'plain'); set('base_url', 'https://api.plain.com/v1'); set('models', 'z-1');
+  set('model_tags', '');
+  form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await sleep(20);
+  const posts3 = calls.filter((c) => c.method === 'POST');
+  const lastPost3 = posts3[posts3.length - 1];
+  if (lastPost3) {
+    let p3 = null;
+    try { p3 = JSON.parse(lastPost3.body); } catch (e) { /* 见下 */ }
+    check('无标签提交 ⇒ payload 不带 model_tags（声明保持纯净）',
+      !!p3 && !('model_tags' in p3), p3 && JSON.stringify(p3));
+  }
+
+  /* ── 详情标签 chips（物理事实只读展示）与编辑回填 ─────────────────────── */
+  w.CxFlows.load();                 /* 回到带标签的 deepseek */
+  await sleep(20);
+  const det2 = w.document.getElementById('fl-sup-detail');
+  const chips = det2.querySelectorAll('.fl-chip');
+  check('详情展示模型标签 chips（跨模型去重）',
+    chips.length === 2 && det2.textContent.indexOf('fast') >= 0 && det2.textContent.indexOf('reasoning') >= 0,
+    'chips=' + chips.length + ' ' + det2.textContent.slice(0, 60));
+  det2.querySelector('#fl-sup-edit').click();
+  check('编辑 ⇒ model_tags 回填（跨模型去重逗号串）',
+    form.elements.namedItem('model_tags').value === 'fast, reasoning',
+    form.elements.namedItem('model_tags').value);
+  check('编辑 ⇒ 提示含「应用到全部模型」', w.document.getElementById('fl-sup-note').textContent.indexOf('全部模型') >= 0,
+    w.document.getElementById('fl-sup-note').textContent);
 
   console.log('');
   console.log(fail === 0

@@ -249,6 +249,7 @@ pub fn route_flows(
 ///
 /// GET    /api/flowmodus/suppliers          → list (key masked, only `api_key_set`)
 /// POST   /api/flowmodus/suppliers          → add/update (body carries api_key)
+/// POST   /api/flowmodus/suppliers/probe    → probe a supplier's /models (key stays in flowmodus)
 /// DELETE /api/flowmodus/suppliers?tier=&id= → remove declaration + secret
 ///
 /// Same transport contract as the other proxies: the browser never holds
@@ -272,7 +273,20 @@ pub fn route_flows_suppliers(
         "GET" => cellrix_web::fetch_json(fm, "/api/suppliers", None),
         "POST" => {
             let body = text.split("\r\n\r\n").nth(1).unwrap_or("{}");
-            cellrix_web::post_json(fm, "/api/suppliers", body, None)
+            /* /probe 是探测端点：flowmodus 持 key 出站拉模型列表，不落盘。
+             * 面板只是转发（浏览器永远不持有凭据）。 */
+            let target = if text
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .unwrap_or("")
+                .contains("/probe")
+            {
+                "/api/suppliers/probe"
+            } else {
+                "/api/suppliers"
+            };
+            cellrix_web::post_json(fm, target, body, None)
         }
         "DELETE" => {
             let query = text

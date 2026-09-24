@@ -199,6 +199,8 @@
 | `.fl-badge` | flows.html |
 | `.fl-body` | flows.html |
 | `.fl-card` | flows.html |
+| `.fl-chip` | flows.html |
+| `.fl-chips` | flows.html |
 | `.fl-del` | flows.html |
 | `.fl-detail` | flows.html |
 | `.fl-empty` | flows.html |
@@ -229,6 +231,7 @@
 | `fl-sup-n` | flows.html |
 | `fl-sup-note` | flows.html |
 | `.fl-sup-pane` | flows.html |
+| `fl-sup-probe` | flows.html |
 | `.fl-v` | flows.html |
 | `.frame` | base.html |
 | `.fxMain` | base.html |

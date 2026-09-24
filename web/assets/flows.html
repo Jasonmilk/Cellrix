@@ -77,6 +77,11 @@
   #view-flows .fl-detail { padding:2px 0; }
   #view-flows .fl-detail .fl-act { display:flex; gap:8px; margin-top:10px; }
   #view-flows .fl-detail .btn { min-height:44px; }
+  /* 模型标签 chips：详情面板只读展示声明里的语义标签（物理事实） */
+  #view-flows .fl-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
+  #view-flows .fl-chip { font-size:10px; padding:1px 7px; border-radius:999px;
+    background:var(--surface-2, rgba(0,0,0,.05)); color:var(--text-dim);
+    border:1px solid var(--line); }
   #view-flows .fl-sup-note { font-size:11px; color:var(--text-3); margin-top:8px; }
   @media (max-width:760px) {
     #view-flows .fl-body, #view-flows .fl-pool, #view-flows .fl-stats,
@@ -84,6 +89,34 @@
   }
 </style>
 
+
+<div class="fl-list fl-card fl-sup">
+  <h3>FlowModus 供应商 <span class="fl-badge" id="fl-sup-n">0</span>
+    <span style="font-size:11px;color:var(--text-3);font-weight:400">· 声明与 API key 分离（key 仅存本机 registry/.secrets，权限 600）；填 base_url + key 后点「探测模型」自动拉取模型列表</span></h3>
+  <div class="fl-sup-grid">
+    <div class="fl-sup-pane">
+      <div id="fl-sup-list" class="fl-sup-listbox"><div class="fl-empty">加载中…</div></div>
+    </div>
+    <div class="fl-sup-pane">
+      <div id="fl-sup-detail"><div class="fl-empty">还没有供应商 —— 填好右侧表单，点「探测模型」自动拉取模型列表，再打标签保存</div></div>
+      <form id="fl-sup-form" class="fl-form">
+        <select name="tier" aria-label="tier">
+          <option value="paid">paid</option>
+          <option value="free">free</option>
+        </select>
+        <input name="supplier_id" placeholder="supplier id（字母/数字/-/_）" required>
+        <input name="supplier_name" placeholder="名称（可选）">
+        <input name="base_url" placeholder="https://api.xxx.com/v1" required>
+        <input name="api_key" type="password" placeholder="API key（探测/保存用，不回显）" autocomplete="off">
+        <input name="models" placeholder="模型 id，逗号分隔（探测后自动回填）">
+        <input name="model_tags" placeholder="模型标签，逗号分隔（如 fast, reasoning）">
+        <button type="submit" class="btn">保存</button>
+        <button type="button" class="fl-del" id="fl-sup-probe">探测模型</button>
+      </form>
+    </div>
+  </div>
+  <div class="fl-sup-note" id="fl-sup-note"></div>
+</div>
 
 <div class="fl-body">
   <div class="fl-card">
@@ -110,32 +143,6 @@
 <div class="fl-list fl-card">
   <h3>最近推理调用（Tuck 审计 · 仅路由可见字段，不泄 prompt）</h3>
   <div id="fl-recent"><div class="fl-empty">加载中…</div></div>
-</div>
-
-<div class="fl-list fl-card fl-sup">
-  <h3>供应商配置 <span class="fl-badge" id="fl-sup-n">0</span>
-    <span style="font-size:11px;color:var(--text-3);font-weight:400">· 经面板代理写入 flowmodus（声明与 API key 分离，key 仅存本机 registry/.secrets，权限 600；点选左侧查看详情）</span></h3>
-  <div class="fl-sup-grid">
-    <div class="fl-sup-pane">
-      <div id="fl-sup-list" class="fl-sup-listbox"><div class="fl-empty">加载中…</div></div>
-    </div>
-    <div class="fl-sup-pane">
-      <div id="fl-sup-detail"><div class="fl-empty">点选左侧供应商查看详情；填写下方表单新增或更新</div></div>
-      <form id="fl-sup-form" class="fl-form">
-        <select name="tier" aria-label="tier">
-          <option value="paid">paid</option>
-          <option value="free">free</option>
-        </select>
-        <input name="supplier_id" placeholder="supplier id（字母/数字/-/_）" required>
-        <input name="supplier_name" placeholder="名称（可选）">
-        <input name="base_url" placeholder="https://api.xxx.com/v1" required>
-        <input name="models" placeholder="模型 id，逗号分隔（可选）">
-        <input name="api_key" type="password" placeholder="API key（不回显，可留空）" autocomplete="off">
-        <button type="submit" class="btn">添加 / 更新</button>
-      </form>
-    </div>
-  </div>
-  <div class="fl-sup-note" id="fl-sup-note"></div>
 </div>
 
 <script>
@@ -299,10 +306,19 @@
 
   function renderDetail(s) {
     if (!s) {
-      supDetail.innerHTML = '<div class="fl-empty">点选左侧供应商查看详情；填写下方表单新增或更新</div>';
+      supDetail.innerHTML = '<div class="fl-empty">还没有供应商 —— 填好右侧表单，点「探测模型」自动拉取模型列表，再打标签保存</div>';
       return;
     }
     var models = (s.models || []).join(', ');
+    /* 标签 chips：跨模型去重展示声明里的语义标签（物理事实，只读） */
+    var tagMap = s.model_tags || {};
+    var tagSet = [];
+    (s.models || []).forEach(function (m) {
+      (tagMap[m] || []).forEach(function (t) { if (tagSet.indexOf(t) < 0) tagSet.push(t); });
+    });
+    var chips = tagSet.length
+      ? '<div class="fl-chips">' + tagSet.map(function (t) { return '<span class="fl-chip">' + esc(t) + '</span>'; }).join('') + '</div>'
+      : '';
     var keyBadge = s.api_key_set
       ? '<span class="fl-badge ok">KEY ✓（存于本机 registry/.secrets，不回显）</span>'
       : '<span class="fl-badge warn">无 KEY</span>';
@@ -313,7 +329,7 @@
       '<div class="fl-row"><span class="fl-k">名称</span><span class="fl-v">' + esc(s.supplier_name || '—') + '</span></div>' +
       '<div class="fl-row"><span class="fl-k">tier</span><span class="fl-v">' + esc(s.tier) + '</span></div>' +
       '<div class="fl-row"><span class="fl-k">端点</span><span class="fl-v mono">' + esc(s.base_url || '—') + '</span></div>' +
-      '<div class="fl-row"><span class="fl-k">模型</span><span class="fl-v mono">' + esc(models || '—') + '</span></div>' +
+      '<div class="fl-row"><span class="fl-k">模型</span><span class="fl-v mono">' + esc(models || '—') + '</span>' + chips + '</div>' +
       '<div class="fl-row"><span class="fl-k">密钥</span><span class="fl-v">' + keyBadge + '</span></div>' +
       '<div class="fl-row"><span class="fl-k">变更</span><span class="fl-v mono">' + esc(t) + '</span></div>' +
       '<div class="fl-act">' +
@@ -324,7 +340,8 @@
     document.getElementById('fl-sup-del').onclick = function () { delSupplier(s.supplier_id, s.tier); };
   }
 
-  /* 编辑 = 回填表单。API key 绝不回显：密码框留空 = 保持原 key（0 硬编码：不猜不补）。 */
+  /* 编辑 = 回填表单。API key 绝不回显：密码框留空 = 保持原 key（0 硬编码：不猜不补）。
+   * 标签回填取跨模型并集；各模型标签不同时统一填写会覆盖（提示里写明）。 */
   function editSupplier(s) {
     supForm.elements.namedItem('tier').value = s.tier || 'paid';
     supForm.elements.namedItem('supplier_id').value = s.supplier_id;
@@ -333,13 +350,19 @@
     supForm.elements.namedItem('models').value = (s.models || []).join(', ');
     supForm.elements.namedItem('api_key').value = '';
     supForm.elements.namedItem('api_key').placeholder = '留空 = 保持原 key';
+    var tagMap = s.model_tags || {};
+    var tagSet = [];
+    (s.models || []).forEach(function (m) {
+      (tagMap[m] || []).forEach(function (t) { if (tagSet.indexOf(t) < 0) tagSet.push(t); });
+    });
+    supForm.elements.namedItem('model_tags').value = tagSet.join(', ');
     supForm.dataset.mode = 'edit';
-    supMsg('编辑 ' + s.supplier_id + '：改完提交即更新（key 留空保持不变）');
+    supMsg('编辑 ' + s.supplier_id + '：改完提交即更新（key 留空保持不变；标签统一填写将应用到全部模型）');
   }
 
   function newSupplier() {
     supForm.reset();
-    supForm.elements.namedItem('api_key').placeholder = 'API key（不回显，可留空）';
+    supForm.elements.namedItem('api_key').placeholder = 'API key（探测/保存用，不回显）';
     supForm.dataset.mode = 'new';
     supMsg('');
   }
@@ -380,6 +403,34 @@
     if (row) selectSupplier(row.getAttribute('data-id'));
   });
 
+  /* 探测模型：base_url + key → flowmodus 出站拉 /models（key 不出浏览器，
+   * 不落盘）。结果回填 models 输入 —— 探测是候选，保存才写库。 */
+  var supProbe = document.getElementById('fl-sup-probe');
+  supProbe.addEventListener('click', function () {
+    if (supLoading) return;
+    var base = String(supForm.elements.namedItem('base_url').value || '').trim();
+    var key = String(supForm.elements.namedItem('api_key').value || '').trim();
+    if (!base) { supMsg('先填 base_url 再探测', true); return; }
+    supLoading = true;
+    supMsg('探测 ' + base + ' /models …');
+    fetch('/api/flowmodus/suppliers/probe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base_url: base, api_key: key || undefined })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      supLoading = false;
+      if (d && d.models && d.models.length) {
+        supForm.elements.namedItem('models').value = d.models.join(', ');
+        supMsg('探测到 ' + d.models.length + ' 个模型，已回填 —— 打标签后点「保存」');
+      } else {
+        supMsg((d && d.error) || '探测失败', true);
+      }
+    }).catch(function (e) {
+      supLoading = false;
+      supMsg('探测失败: ' + (e.message || e), true);
+    });
+  });
+
   supForm.addEventListener('submit', function (ev) {
     ev.preventDefault();
     if (supLoading) return;
@@ -393,6 +444,13 @@
       models: String(fd.get('models') || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean),
       api_key: String(fd.get('api_key') || '')
     };
+    /* 标签：逗号分隔 → 应用到本次提交的全部模型（空则不发送，声明保持纯净）。 */
+    var rawTags = String(fd.get('model_tags') || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+    if (rawTags.length && payload.models.length) {
+      var mt = {};
+      payload.models.forEach(function (m) { mt[m] = rawTags; });
+      payload.model_tags = mt;
+    }
     if (!payload.supplier_id || !payload.base_url) {
       supMsg('supplier id 与 base_url 必填', true);
       return;
