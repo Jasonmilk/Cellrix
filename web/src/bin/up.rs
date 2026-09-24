@@ -36,6 +36,7 @@ const TUCK_KEY_DEFAULT: &str = "tk-local-gate";
 /// `start-panel.sh` already had, which is why the test panel's Flows view was
 /// populated while the one-command path's was silently empty.
 const FLOWMODUS_PORT: u16 = 60053;
+const FLOWMODUS_GRPC_PORT: u16 = 60054;
 const FLOWMODUS_URL_DEFAULT: &str = "http://127.0.0.1:60053";
 /// User config file: `$HOME/.cellrix/up.toml` (per-user, 0600, never in a
 /// repository). Key name is a fixed convention, not a hardcoded path.
@@ -446,13 +447,22 @@ fn mind_cmd() -> String {
 /// RELATIVE path (`registry`), so it must be started from `flowmodus-rs/` —
 /// starting it from the workspace root reports an empty pool. `start-panel.sh`
 /// chdirs for the same reason; this is the `up` path learning it.
+/// FlowModus supplier pool / router. It resolves its registry through a
+/// RELATIVE path (`registry`), so it must be started from `flowmodus-rs/` —
+/// starting it from the workspace root reports an empty pool. `start-panel.sh`
+/// chdirs for the same reason; this is the `up` path learning it.
+/// 双服务一条命令：HTTP serve（状态/供应商端点）+ gRPC Reason（anaphase
+/// 对话的推理入口）；单一职责：一个组件两个监听，健康检查走 HTTP 端口。
 fn flowmodus_cmd() -> String {
     let ws = workspace_root();
     format!(
-        "cd {} && {} serve --port {}",
+        "cd {} && {} serve --port {} & cd {} && {} grpc --port {}",
         ws.join("FlowModus/flowmodus-rs").to_string_lossy(),
         ws.join("FlowModus/flowmodus-rs/target/debug/flowmodus").to_string_lossy(),
-        FLOWMODUS_PORT
+        FLOWMODUS_PORT,
+        ws.join("FlowModus/flowmodus-rs").to_string_lossy(),
+        ws.join("FlowModus/flowmodus-rs/target/debug/flowmodus").to_string_lossy(),
+        FLOWMODUS_GRPC_PORT
     )
 }
 
@@ -491,6 +501,7 @@ fn restart_all(
         ("tuck", 60052),
         ("anaphase", 50061),
         ("flowmodus", FLOWMODUS_PORT),
+        ("flowmodus-grpc", FLOWMODUS_GRPC_PORT),
         ("mind", 50052),
         ("tentacle", 50051),
     ] {
