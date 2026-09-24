@@ -58,6 +58,10 @@ const SELF_CONTAINED = [
    * launcher *derives* rather than restates them — a restated port is a port that
    * will drift, which is exactly how three launchers came to disagree. */
   ['chain_wiring_test.js', 'chain wiring — launchers derive from the one declaration (anaphase:ADR-0046)'],
+  /* The render table decides the row set. This pins the SHAPE of a thin
+   * (reply-only) turn, so a panel that shows nothing for a real turn can be
+   * told apart from a table that has nothing to show. */
+  ['row_shape_test.js', 'row shape — a reply-only turn still renders non-reply rows'],
   /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
    * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
    * the one entry point that actually gets run — a criterion nobody runs is a
