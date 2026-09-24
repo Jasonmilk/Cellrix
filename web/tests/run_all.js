@@ -66,6 +66,10 @@ const SELF_CONTAINED = [
    * a field whose NAME disagreed with its MEANING: that cost three rounds of
    * diagnosis, because both sides were internally consistent and neither errored. */
   ['proto_contract_test.js', 'proto contract — one fact per field, and the two copies must not drift'],
+  /* The chain's soundness over real recordings: a call with no result, a `Met`
+   * verdict beside a failing check, or a usage row with only a total are the
+   * shapes that let a chain look whole while a leg was never used. */
+  ['chain_legs_test.js', 'chain legs — executor/memory/metering exercised, and the pairings hold'],
   /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
    * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
    * the one entry point that actually gets run — a criterion nobody runs is a
