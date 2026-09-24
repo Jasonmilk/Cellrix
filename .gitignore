@@ -70,3 +70,6 @@ Thumbs.db
 
 # JS test deps (installed --no-save, never committed)
 node_modules/
+
+# Runtime observation, not an artifact (ADR-0047 D7): records WHEN a control ran.
+web/tests/selfcheck.heartbeat.jsonl

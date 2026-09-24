@@ -13,6 +13,7 @@
 # absence is the finding rather than a skip.
 set -u
 MODE="${1:-tool}"
+
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WS="$(cd "$HERE/../../.." && pwd)"
 CHAIN="$WS/anaphase-helix/ecosystem/chain.json"
@@ -23,6 +24,40 @@ MANIFEST="$HERE/resolved.json"
 # The manifest is a committed artifact; a stale one is a lie about the wiring, and
 # this is the static control that says so in milliseconds (ADR-0047 D6).
 "$HERE/chain-env" --check >/dev/null || { echo "  ABORT: resolved.json is stale — run chain-env --write"; exit 3; }
+
+# ── Dead-man's switch ────────────────────────────────────────────────────────
+# `--self-check` runs BOTH controls and records a heartbeat. The doctrine is
+# "alarm on the ABSENCE of success": a control that never runs produces no error,
+# no exit code and no log, so polling-style monitoring is blind to it. Hence:
+#   * only TOOL=0 AND TEXT=1 writes a SUCCESS heartbeat (partial success does not);
+#   * a FAILURE is written too, so `failed` stays distinguishable from `missed`;
+#   * the record lands on DISK — the monitor must not share the monitored
+#     object's failure domain, so the freshness check rides along with ordinary
+#     runs instead of being another scheduler that could be forgotten.
+# Four states, kept apart: missed (no/stale heartbeat) · failed (ran, controls did
+# not hold) · late (past SLA) · skipped (an explicit opt-out, exit 2).
+HEARTBEAT="$HERE/selfcheck.heartbeat.jsonl"
+if [ "$MODE" = "--self-check" ]; then
+  RUN_ID="sc-$(date +%s)-$$"
+  T0=$(date +%s)
+  "$0" tool > /tmp/selfcheck_tool.log 2>&1; TE=$?
+  "$0" text > /tmp/selfcheck_text.log 2>&1; XE=$?
+  T1=$(date +%s)
+  OK=false
+  if [ "$TE" = "0" ] && [ "$XE" != "0" ]; then OK=true; fi
+  python3 - "$HEARTBEAT" "$RUN_ID" "$TE" "$XE" "$((T1-T0))" "$OK" <<'PYEOF'
+import datetime, json, sys
+path, run_id, te, xe, secs, ok = sys.argv[1:7]
+rec = {"at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+       "run_id": run_id, "tool_exit": int(te), "text_exit": int(xe),
+       "seconds": int(secs), "ok": ok == "true"}
+with open(path, "a", encoding="utf-8") as fh:
+    fh.write(json.dumps(rec, sort_keys=True) + "\n")
+print("  self-check: %s  tool=%s text=%s  %ss" % ("HEALTHY" if rec["ok"] else "FAILED", te, xe, secs))
+PYEOF
+  echo "  heartbeat: $HEARTBEAT"
+  if [ "$OK" = "true" ]; then exit 0; else exit 1; fi
+fi
 
 port_of() { python3 -c "import json;print(json.load(open('$MANIFEST'))['components']['$1']['port'])"; }
 # Every component that declares an endpoint FOR ANAPHASE contributes it — the

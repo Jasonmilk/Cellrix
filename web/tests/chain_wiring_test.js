@@ -209,6 +209,40 @@ check('the port scanner passes a derived port (synthetic good input)',
 check('the port scanner ignores a port in a comment',
   scanRestated('#   tuck      :60052   audit gateway', canary) === false);
 
+/* ── 4. the DYNAMIC control's heartbeat (ADR-0047 D7) ──────────────────────
+ * Cheap, runs with every ordinary run, and reads a file on disk. Absence is the
+ * alarm — but "never run" is NOT "failed": it is UNPROVEN, which this harness
+ * already has a word for (`NEEDS-INPUT` + exit 3), and the gate mode turns that
+ * into exit 2 AMBIGUOUS. Only a heartbeat that says `ok: false` is red. */
+{
+  const HB = path.join(__dirname, 'selfcheck.heartbeat.jsonl');
+  const SLA_DAYS = 7;
+  let recs = [];
+  try {
+    recs = fs.readFileSync(HB, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  } catch (e) { /* never run, or rotated away */ }
+  if (!recs.length) {
+    console.log('');
+    console.log('NEEDS-INPUT: 动态对照（tool→0 且 text→1）从未运行 —— 跑 ./e2e_chain.sh --self-check');
+    process.exit(3);
+  }
+  const last = recs[recs.length - 1];
+  if (last.ok !== true) {
+    check('the dynamic control held at its last run', false,
+      'tool=' + last.tool_exit + ' text=' + last.text_exit + ' at ' + last.at);
+  } else {
+    const ageDays = (Date.now() - Date.parse(last.at)) / 86400000;
+    if (ageDays > SLA_DAYS) {
+      console.log('');
+      console.log('NEEDS-INPUT: 动态对照已过期（' + ageDays.toFixed(1) + ' 天 > ' + SLA_DAYS
+        + '）—— 重跑 ./e2e_chain.sh --self-check');
+      process.exit(3);
+    }
+    check('the dynamic control held at its last run', true,
+      last.at + ' (' + ageDays.toFixed(2) + 'd ago)');
+  }
+}
+
 console.log('');
 console.log(fail === 0 ? 'OK — ' + pass + ' checks green (' + CONVERTED.length + ' launcher(s) converted)'
   : 'FAILED — ' + fail + ' of ' + (pass + fail) + ' checks red');
