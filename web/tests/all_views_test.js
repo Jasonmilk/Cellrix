@@ -515,6 +515,21 @@ function skip(label, why) {
   } else {
     skip("event rows rendered", "no period in this panel");
   }
+  /* A loading state must not outlive the load that produced it.
+   *
+   * Measured 2026-09-24 (real Chrome): the ctrl layer wrote a raw
+   * "Loading <id>…" row into `eTbody` with innerHTML. The keyed render never
+   * knew that node, so it survived every later render and sat ABOVE the real
+   * rows — a state with no exit, which N-012 forbids, and which nothing
+   * reported. The loading state now comes from the one exit-layer resolver and
+   * is cleared by the same pass that owns the table (ADR-0044 §P1b). */
+  if (JOB) {
+    const tbText = doc.getElementById("eTbody").textContent;
+    check("no loading state outlives its load (N-012)",
+      tbText.indexOf("正在取这一段的事件") === -1,
+      tbText.indexOf("正在取这一段的事件") > -1 ? "loading text still in the table" : "none");
+  }
+
   /* NOTE: compact stays suspended through the inspector checks below, because
    * they click a row — and a row the fold has removed cannot be clicked. The one
    * restore happens after that section (search: `restoreCompact`). Measured

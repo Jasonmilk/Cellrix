@@ -238,8 +238,10 @@
     if (!jobId) return;
     $('eEmpty').style.display = 'none';
     showTrajectory(true);
-    $('eTbody').innerHTML = '<tr class="e-turn-hd"><td colspan="5" style="color:var(--e-dim)">Loading ' +
-      esc(jobId) + '…</td></tr>';
+    /* The loading state belongs to the view that owns the table (ADR-0044
+     * §P1b). Writing it here with innerHTML put a node in `eTbody` that the
+     * keyed render could not account for, so nothing ever removed it. */
+    window.CxProveTrack.showLoading(jobId);
   };
 
   /* ---------- The view's own lifecycle hook -------------------------------

@@ -175,7 +175,7 @@
    * 展开态/滚动位置/焦点全丢（与账本同病）。照 cockpit.js 账本范式做 keyed 复用。
    * ⚠️ 键不含数组下标（教训：下标随追加平移 ⇒ 全部被当新行重建）；
    * ⚠️ "节点有没有被重建"与"它排在哪里"是两件独立的事 —— 两条都要断言。 */
-  var TBL_NODES = {}, TBL_HTML = {}, TBL_EMPTY = false, LANE_HTML = {}, STATS_HTML = '';
+  var TBL_NODES = {}, TBL_HTML = {}, TBL_EMPTY = false, TBL_LOADING = false, LANE_HTML = {}, STATS_HTML = '';
 
   function renderTable() {
     var rows = [], COLS = 5;
@@ -257,19 +257,25 @@
      * is depends on whether a filter is on, and the exit layer says so. */
     var box = $('eTbody');
     if (!rows.length) {
-      /* 空态只建一次：此前每次轮询都清空重造同一个占位行（同数据不该重建） */
-      if (!TBL_EMPTY) {
+      /* 空态只建一次：此前每次轮询都清空重造同一个占位行（同数据不该重建）。
+       * 正在取数时(`TBL_LOADING`)例外：空态要把 loading 换成真正的零态，
+       * 否则"正在载入"会永远留在那里 —— 没有人会回来把它换掉。 */
+      if (!TBL_EMPTY || TBL_LOADING) {
         Object.keys(TBL_NODES).forEach(function (old) {
           (TBL_NODES[old] || []).forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
           delete TBL_NODES[old]; delete TBL_HTML[old];
         });
-        var code = S.q ? 'trajectory-no-match' : 'trajectory-no-rows';
-        var act = S.q
-          ? { run: function () { S.q = ''; $('eQ').value = ''; renderTable(); } }
-          : { label: '看左边的经历列表', run: function () {
-                var side = document.getElementById('s-side');
-                if (side && side.scrollIntoView) { side.scrollIntoView({ block: 'nearest' }); }
-              } };
+        var code = TBL_LOADING
+          ? 'trajectory-loading'
+          : (S.q ? 'trajectory-no-match' : 'trajectory-no-rows');
+        var act = TBL_LOADING
+          ? undefined
+          : (S.q
+            ? { run: function () { S.q = ''; $('eQ').value = ''; renderTable(); } }
+            : { label: '看左边的经历列表', run: function () {
+                  var side = document.getElementById('s-side');
+                  if (side && side.scrollIntoView) { side.scrollIntoView({ block: 'nearest' }); }
+                } });
         var tr = document.createElement('tr');
         var td = document.createElement('td');
         td.colSpan = COLS;
@@ -277,12 +283,12 @@
         tr.appendChild(td);
         box.innerHTML = '';
         box.appendChild(tr);
-        TBL_EMPTY = true;
+        TBL_EMPTY = true; TBL_LOADING = false;
       }
       updTbl();
       return;
     }
-    if (TBL_EMPTY) { box.innerHTML = ''; TBL_EMPTY = false; }
+    if (TBL_EMPTY || TBL_LOADING) { box.innerHTML = ''; TBL_EMPTY = false; TBL_LOADING = false; }
     /* ── 局部渲染：按 key 复用行，不整表重建 ──────────────────────────────
      * 键：ev 行取事件 id，turn 头与折叠头取 turn id，前缀防撞键；键不含下标。
      * 顺序自顶向下（旧在前）⇒ 逐个 appendChild（对已挂载节点是**移动**），
@@ -609,6 +615,19 @@
 
   /* ---------- Exports (consumed by the ctrl layer) ---------- */
   PT.S = S; PT.HAS = HAS;
+  /* "正在取这一段的事件…" is a STATE, so it comes from the one exit-layer resolver
+   * like every other one (ADR-0044 §P1b) — and it is cleared by the same keyed
+   * pass that owns the table.
+   *
+   * Measured 2026-09-24: the ctrl layer used to write the loading row straight
+   * into `eTbody` with `innerHTML`. The keyed render never knew that node, so it
+   * survived every later render and sat above the real rows forever — a state
+   * with no exit, which N-012 forbids outright. */
+  PT.showLoading = function (jobId) {
+    S.loadingJob = jobId;
+    TBL_EMPTY = true; TBL_LOADING = true;
+    renderTable();
+  };
   PT.renderStats = renderStats; PT.renderTable = renderTable; PT.renderLanes = renderLanes;
   PT.renderCertificate = renderCertificate; PT.showTimeline = showTimeline;
   PT.bindTermEdges = bindTermEdges; PT.isModal = isModal; PT.applyModality = applyModality;
