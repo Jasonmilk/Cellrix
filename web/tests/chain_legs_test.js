@@ -26,8 +26,20 @@ function check(label, cond, detail) {
 }
 function skip(label, why) { skipped++; console.log('  SKIP  ' + label + '  -> ' + why); }
 
+/* `CHAIN_SINCE` (epoch seconds) restricts this to the recordings THIS run just
+ * wrote. Without it the criterion aggregates over all history, so a leg exercised
+ * once — last week, or by the previous execution — keeps satisfying it and the
+ * red case can never be red. Measured 2026-09-24: `tool` and `text` both passed
+ * until the history was cut out of the picture. */
+const SINCE = Number(process.env.CHAIN_SINCE || 0);
 let files = [];
-try { files = fs.readdirSync(EV).filter((f) => f.endsWith('.events.jsonl')); } catch (e) { /* absent */ }
+try {
+  files = fs.readdirSync(EV).filter(function (f) {
+    if (!f.endsWith('.events.jsonl')) { return false; }
+    if (!SINCE) { return true; }
+    try { return fs.statSync(path.join(EV, f)).mtimeMs >= SINCE * 1000; } catch (e) { return false; }
+  });
+} catch (e) { /* absent */ }
 if (!files.length) {
   console.log('NEEDS-INPUT: 需要真实事件文件 ' + EV + '/*.events.jsonl（先跑一个回合：见 README 的 E2E 步骤）');
   process.exit(3);
@@ -39,18 +51,26 @@ const recs = files.map((f) => ({
 const all = recs.flatMap((r) => r.rows);
 const byType = (t) => all.filter((r) => r.type === t);
 
-console.log('-- what the recordings prove --');
+console.log('-- what the recordings prove --' + (SINCE ? ' (since ' + SINCE + ')' : ''));
 const legs = [
-  ['memory      context/inject with nodes', byType('context/inject').some((r) => (r.data || {}).nodes > 0)],
-  ['reasoning   assistant/attempt', byType('assistant/attempt').length > 0],
-  ['executor    tool/call + tool/result', byType('tool/call').length > 0 && byType('tool/result').length > 0],
-  ['judgement   check/status + verdict/status', byType('check/status').length > 0 && byType('verdict/status').length > 0],
-  ['metering    assistant/usage (disjoint)', byType('assistant/usage').length > 0],
-  ['routing     a routed model name', all.some((r) => (r.data || {}).model)],
+  ['memory', 'context/inject with nodes', byType('context/inject').some((r) => (r.data || {}).nodes > 0)],
+  ['reasoning', 'assistant/attempt', byType('assistant/attempt').length > 0],
+  ['executor', 'tool/call + tool/result', byType('tool/call').length > 0 && byType('tool/result').length > 0],
+  ['judgement', 'check/status + verdict/status', byType('check/status').length > 0 && byType('verdict/status').length > 0],
+  ['metering', 'assistant/usage (disjoint)', byType('assistant/usage').length > 0],
+  ['routing', 'a routed model name', all.some((r) => (r.data || {}).model)],
 ];
-for (const [name, seen] of legs) {
+/* Coverage alone can only SKIP: a machine may legitimately hold no recording of a
+ * leg. But an END-TO-END RUN knows which legs it just asked for, and for those an
+ * absent leg is the finding itself. `CHAIN_REQUIRE=executor,metering` is how the
+ * one-command E2E turns "not proven" into red — without it, `MOCK_MODE=text`
+ * (which plans no tool call) would leave this suite green and prove nothing. */
+const REQUIRED = (process.env.CHAIN_REQUIRE || '').split(',').map((x) => x.trim()).filter(Boolean);
+for (const [key, name, seen] of legs) {
   if (seen) { pass++; console.log('  PASS  leg exercised: ' + name); }
-  else { skip('leg exercised: ' + name, 'no recording under ' + EV + ' shows it'); }
+  else if (REQUIRED.indexOf(key) > -1) {
+    fail++; console.log('  FAIL  leg REQUIRED by this run was never exercised: ' + name);
+  } else { skip('leg exercised: ' + name, 'no recording under ' + EV + ' shows it'); }
 }
 console.log('');
 console.log('-- soundness (these are assertions, not coverage) --');
