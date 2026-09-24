@@ -23,8 +23,6 @@ use cellrix_web::{extract_json_str, post_json, probe};
 const WAIT_DEFAULT_SECS: u64 = 30;
 /// Poll interval while waiting for health.
 const POLL_INTERVAL_MS: u64 = 500;
-/// Default web port when not given (mirrors the panel).
-const WEB_PORT_DEFAULT: u16 = 8080;
 // The Anaphase and Tuck endpoints are NOT declared here: they are the chain
 // declaration's own facts (anaphase:ADR-0046). `up` never guesses.
 // Tuck's key is a protocol default (a credential, deliberately absent from the
@@ -777,7 +775,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| chain.declared_value("tuck").unwrap_or_default());
     let tuck_key = cfg.tuck_key.clone().unwrap_or_else(|| TUCK_KEY_DEFAULT.to_string());
     let wait_secs = cfg.wait_secs.unwrap_or(WAIT_DEFAULT_SECS);
-    let port = cfg.port.unwrap_or(WEB_PORT_DEFAULT);
+    let port = cfg.port.unwrap_or(chain.port("panel")?);
 
     // `--restart` short-circuits everything else: no questions, no binding
     // prompts — full ecosystem cycle in dependency order.

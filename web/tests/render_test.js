@@ -8,7 +8,8 @@
  */
 const { JSDOM, VirtualConsole } = require("jsdom");
 
-const BASE = process.argv[2] || "http://127.0.0.1:18932";
+const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
+if (!BASE) { console.log('NEEDS-INPUT: 未给面板地址（argv[2] / CELLRIX_PANEL）—— 端口见 chain.json 的 `panel` 条目'); process.exit(3); }
 const JOB = process.argv[3];
 const CJK = /[\u4e00-\u9fff]/;
 

@@ -13,19 +13,33 @@ mod server;
 use std::net::TcpListener;
 use std::thread;
 
-use config::{PanelConfig, WEB_PORT_DEFAULT};
+use config::PanelConfig;
 use server::{handle, health_check, panel_already_up};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let cfg = PanelConfig::derive(&args);
 
-    let port = args
+    /* No silent port default. The port is ONE declared fact — the `panel` entry in
+     * `anaphase-helix/ecosystem/chain.json` — and the launchers (`up`,
+     * `start-panel.sh`) derive it from there and pass it. A literal here would be a
+     * fourth restatement of a fact that already had four (measured 2026-09-24:
+     * 18932 in the shell launcher, 8080 in this binary and the test runner, 18932
+     * in two suites). Refusing to guess is what makes the declaration the source. */
+    let port = match args
         .windows(2)
         .find(|w| w[0] == "--port")
         .and_then(|w| w[1].parse::<u16>().ok())
         .or_else(|| std::env::var("WEB_PORT").ok().and_then(|v| v.parse().ok()))
-        .unwrap_or(WEB_PORT_DEFAULT);
+    {
+        Some(p) => p,
+        None => {
+            eprintln!("cellrix-web: no port. Pass --port <n> or set WEB_PORT.");
+            eprintln!("  The single source is the `panel` entry in anaphase-helix/ecosystem/chain.json;");
+            eprintln!("  `up` and start-panel.sh derive it from there. Run one of those, or name a port.");
+            std::process::exit(2);
+        }
+    };
 
     println!("cellrix-web: cockpit+prove_track panel on http://127.0.0.1:{port}");
     println!("             anaphase snapshot @ {}", cfg.anaphase_endpoint);

@@ -6,12 +6,13 @@
 #   mind      :50052   memory hub (gRPC) -> Anaphase's memory retrieval
 #   flowmodus :60053   supplier pool + routing (serve); the panel's Flows view reads it
 #   anaphase  :50061   cognitive engine (CAP HTTP)
-#   panel     :18932   Cellrix web panel (proxies anaphase + tuck + flowmodus)
+#   panel     :from the declaration   Cellrix web panel (proxies anaphase + tuck + flowmodus)
 #
 # Order matters: Anaphase resolves tentacle/mind/tuck at startup, so those three
 # must be listening first or Anaphase silently falls back to Noop adapters.
 #
-# Usage:  ./start-panel.sh [port]     (default 18932)
+# Usage:  ./start-panel.sh [port]     (default: the `panel` entry in
+#                                     anaphase-helix/ecosystem/chain.json)
 #         ./start-panel.sh --stop     stop all six
 set -u
 
@@ -19,7 +20,7 @@ set -u
 # hardcoded: the script lives at <workspace>/Cellrix/web/tests/, so three
 # levels up is the workspace. Logs stay outside every repo (runtime only).
 WS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-PORT="${1:-18932}"
+PORT="${1:-$PORT_PANEL}"
 LOGS="$WS/.workbuddy-ai/tools/prove-track-verify/logs"
 
 TUCK_BIN="$WS/Tuck/target/debug/tuck"
@@ -47,6 +48,8 @@ for c in d["components"]:
 for c in d["components"]:
     if "anaphase_env" in c:
         print("export %s=%s" % (c["anaphase_env"], c["anaphase_value"]))
+    if c["name"] == "panel":
+        print("export PORT_PANEL=%s" % c["port"])
     for k, v in (c.get("start_env") or {}).items():
         # <workspace> is declared; expand it to this checkout.
         print("export %s=%s" % (k, v.replace("<workspace>", ws)))

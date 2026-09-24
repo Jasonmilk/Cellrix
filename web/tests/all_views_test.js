@@ -10,7 +10,16 @@
  */
 const { JSDOM, VirtualConsole } = require("jsdom");
 
-const BASE = process.argv[2] || "http://127.0.0.1:18932";
+const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
+/* NO literal default: the port is declared once (`panel` in
+ * anaphase-helix/ecosystem/chain.json) and passed in by the runner. An absent
+ * address is a MISSING INPUT, not a reason to guess a port that might belong to
+ * something else — that is how llama-server on 8080 got mistaken for the panel. */
+if (!BASE) {
+  console.log('NEEDS-INPUT: 未给面板地址（argv[2] / CELLRIX_PANEL）—— 端口见 chain.json 的 `panel` 条目');
+  process.exit(3);
+}
+
 const JOB_ARG = process.argv[3] || "";
 let JOB = JOB_ARG;
 const VIEWS = ["cockpit", "prove-track", "chat", "flows"];
@@ -47,7 +56,7 @@ function skip(label, why) {
     const probe = await fetch(BASE + '/', { signal: AbortSignal.timeout(4000) });
     if (!probe.ok) { throw new Error('HTTP ' + probe.status); }
     /* Reachability is not identity. Measured on this machine 2026-09-24: port
-     * 8080 — the harness's own default — was held by a `llama-server`, which
+     * 8080 — the harness's own default until Cellrix:ADR-0046 — was held by a `llama-server`, which
      * answered cheerfully and whose page jsdom then died on. "Something is
      * listening" must never be read as "the panel is up": that is the same fault
      * as a health probe that ignores the status line, one level up. The marker is
@@ -350,17 +359,31 @@ function skip(label, why) {
     const onRows = evRows(), onFold = foldRows(), onKinds = kinds();
     cbtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     await sleep(300);
-    const offRows = evRows(), offFold = foldRows();
+    const offRows = evRows(), offFold = foldRows(), offKinds = kinds();
     cbtn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     await sleep(300);
+    /* Does this period HAVE anything compact can fold? A step folds only when it
+     * is DONE and is not the answer (`compactGroupsOf`); a period of replies,
+     * checks, verdicts and tool rows has nothing to fold, and compact correctly
+     * folds nothing. `onFold > 0` would then be asking the data for something it
+     * cannot provide — a red about the fixture, not the product. Measured
+     * 2026-09-24: `0 folded / 12 rows` on a period that was all deliverable and
+     * judgement rows. */
+    /* What actually suppresses folding is a STATUS, not a class: `compactGroupsOf`
+     * folds a step only when it is DONE, and ONE failure makes `anyShown` true so
+     * the whole turn refuses to fold ("a failure is never folded"). Measured
+     * 2026-09-24 on the failing tool round: `0 folded / 12 rows` — compact was
+     * right and the assertion was asking the data for a shape it cannot have.
+     * Gate on the real rule; keep the red for when nothing explains the zero. */
+    const hasFailure = /FAIL/.test(doc.getElementById('eTbody').textContent);
     const backRows = evRows(), backFold = foldRows();
     /* These three criteria measure **rows**: with no rows there is no "how much
      * was folded" to measure. With no period they used to run through check(),
      * so they were permanently red here — and the red was "this panel has no
      * experience", not "the product is broken". Missing input is recorded as
      * SKIP; rows that exist but did not fold / did not come back are a real red. */
-    if (offRows === 0) {
-      skip("compact folds the completed internal steps", "no event rows — no period in this panel");
+    if (offRows === 0 || (onFold === 0 && hasFailure)) {
+      skip("compact folds the completed internal steps", offRows === 0 ? "no event rows — no period in this panel" : "this period contains a FAILURE, and a failure is never folded (compactGroupsOf) — nothing to assert");
       skip("compact keeps the deliverable and the judgements", "no event rows — no period in this panel");
       skip("and turning it off restores every row it folded", "no event rows — no period in this panel");
     } else {

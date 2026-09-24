@@ -81,7 +81,7 @@
 > (idle animation violates `[PHYS:R-003]`); degradation ladder covers
 > reduced-motion / high-contrast / narrow screens (卷三 3.5.3).
 >
-> **Status 2026-09-08**: Web panel (:8080) is now the primary white-box
+> **Status 2026-09-08**: Web panel (:50050) is now the primary white-box
 > window (ADR-0033): 证轨 ProveTrack (pre-v3) was a **turn outline**;
 > chat shows a collapsible **思考 (think) row** (streamed `think` field,
 > display-only, never judged) and the SSE stream is deterministically
@@ -108,7 +108,7 @@
 > auto-injected). TUI/Web share one state model (isomorphic display;
 > renderers are thin backends).
 > **Start**: `cargo run --bin up` from the repo root — Enter through the
-> prompts, the panel opens at http://127.0.0.1:8080/ (or `up --restart`
+> prompts, the panel opens at http://127.0.0.1:50050/ (or `up --restart`
 > to restart the whole ecosystem; bind/1-to-1 pairing happens on first
 > launch).
 > **全链路正文回放**：Anaphase 设 `reasoning_trace_path`（本地 config）后，ProveTrack 详情可回放每轮 prompt/response（写前脱敏 + 截断）；推理经 `x-tuck-trace` 头把 `run-xxx` id 传给 Tuck 审计链，链与正文共用一键 join。
@@ -332,17 +332,17 @@ cargo run --bin up -- --cockpit   # in anaphase-helix: tentacle + anaphase + coc
 snapshot 协议——模式 / 认知状态 / 经历 / ledger 逐条可查，自动刷新。
 
 ```bash
-cargo run -p cellrix-web          # 打开 http://127.0.0.1:8080
+cargo run -p cellrix-web          # 打开 http://127.0.0.1:50050
 # --anaphase-endpoint 默认 http://127.0.0.1:50061（Anaphase cap_http 协议默认）
-# --port / WEB_PORT 默认 8080
+# --port / WEB_PORT 默认 50050
 ```
 
 零依赖（std-only HTTP + 单文件 HTML，无构建链）。先起 Anaphase
 （`cargo run --bin up`）再看面板；未起时页面显示离线。
 
-**已验证**（2026-09-06）：`anaphase :50061 snapshot → cellrix-web :8080 代理`
+**已验证**（2026-09-06）：`anaphase :50061 snapshot → cellrix-web :50050 代理`
 全链路实测通过——mode / state / episode / ledger / ecosystem 六组件点亮，
-2 秒轮询，`curl http://127.0.0.1:8080/api/snapshot` 返回真实快照。
+2 秒轮询，`curl http://127.0.0.1:50050/api/snapshot` 返回真实快照。
 
 ### 6.9 操作方式（2026-09-07）
 
@@ -501,7 +501,7 @@ the browser):
 
 ```bash
 cellrix-web --tuck-endpoint http://127.0.0.1:60052 --tuck-key tk-local-gate
-# -> http://127.0.0.1:8080  (WEB_PORT / --port override)
+# -> http://127.0.0.1:50050  (WEB_PORT / --port override)
 ```
 
 - Top bar buttons switch Cockpit ↔ ProveTrack ↔ Chat (mirrors the TUI `Ctrl+E`)

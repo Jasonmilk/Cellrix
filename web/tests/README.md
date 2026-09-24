@@ -69,7 +69,7 @@ Measured in three configurations (2026-09-24, this machine):
 | Configuration | Measured |
 |---|---|
 | panel and browser down | **15 green, 6 need input, 0 red** |
-| the above + panel `:8080` + Chrome `:9222` (`CELLRIX_PANEL` / `CELLRIX_CDP` override) | **18 green, 4 need input, 0 red** |
+| the above + panel `:50050` + Chrome `:9222` (`CELLRIX_PANEL` / `CELLRIX_CDP` override) | **18 green, 4 need input, 0 red** |
 | plus all three upstreams (anaphase has a period) and the real event files in place | 22 green, 0 need input — **not reachable on this machine**, see below |
 
 Each of the four "need input" entries has its own reason, and **none of them is "the

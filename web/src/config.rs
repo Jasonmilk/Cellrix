@@ -4,9 +4,6 @@
 //! (ADR-0010 / Tuck gateway); `--tuck-limit` default 200 matches the CLI
 //! contract; unset tuck -> ProveTrack shows a setup hint.
 
-/// Web panel listening port when no `--port`/`WEB_PORT` is given (this
-/// panel's documented protocol default; unassigned common HTTP port).
-pub const WEB_PORT_DEFAULT: u16 = 8080;
 
 /// Anaphase cap_http protocol default (ADR-0010).
 pub const ANAPHASE_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:50061";

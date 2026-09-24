@@ -79,10 +79,22 @@ const SELF_CONTAINED = [
 
 /* The panel test is RUN when the panel is reachable and SKIPPED only when it is
  * not — never silently skipped while it is up. The base used to be hardcoded to
- * :18932 while the panel actually serves :8080, so this test sat idle for as long
+ * :18932 while the panel actually serves :8080 (the default was 8080 at the time; it is 50050 since Cellrix:ADR-0046), so this test sat idle for as long
  * as that mismatch existed: a passing test that never ran, which is worse than no
  * test because it looks like coverage. Override with CELLRIX_PANEL. */
-const PANEL = process.env.CELLRIX_PANEL || 'http://127.0.0.1:8080';
+/* The panel's address comes from the ONE declaration, not from a literal here.
+ * Measured 2026-09-24: this file, the shell launcher, the binary and two suites
+ * each carried their own default (8080 / 18932 / 50050) for the same fact. */
+const WS_ROOT = path.resolve(__dirname, '..', '..', '..');
+function declared(kind) {
+  try {
+    const d = JSON.parse(fs.readFileSync(
+      path.join(WS_ROOT, 'anaphase-helix', 'ecosystem', 'chain.json'), 'utf8'));
+    const c = (d.components || []).find(function (x) { return x.name === kind; });
+    return c ? 'http://127.0.0.1:' + c.port : '';
+  } catch (e) { return ''; }
+}
+const PANEL = process.env.CELLRIX_PANEL || declared('panel');
 
 /* 可达性探针：**超时要宽、失败要重试**。
  *
@@ -261,8 +273,10 @@ const NEEDS_INPUT_EXIT = 3;
 
 for (const [file, what] of SELF_CONTAINED) {
   const target = path.join(__dirname, file);
+  /* Addresses are passed IN, so no suite needs a default of its own. */
   const extra = file === 'all_views_test.js' ? [PANEL]
-    : (file === 'layout_test.js' || file === 'measure_test.js') ? [PANEL, CDP] : [];
+    : (file === 'layout_test.js' || file === 'measure_test.js'
+       || file === 'perf_measure.js' || file === 'hit_targets_test.js') ? [PANEL, CDP] : [];
   try {
     execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' });
     results.push(['PASS', file, what]);

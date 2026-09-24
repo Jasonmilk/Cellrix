@@ -23,7 +23,16 @@
  */
 'use strict';
 
-const BASE = process.argv[2] || process.env.CELLRIX_PANEL || 'http://127.0.0.1:8080';
+const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
+/* NO literal default: the port is declared once (`panel` in
+ * anaphase-helix/ecosystem/chain.json) and passed in by the runner. An absent
+ * address is a MISSING INPUT, not a reason to guess a port that might belong to
+ * something else — that is how llama-server on 8080 got mistaken for the panel. */
+if (!BASE) {
+  console.log('NEEDS-INPUT: 未给面板地址（argv[2] / CELLRIX_PANEL）—— 端口见 chain.json 的 `panel` 条目');
+  process.exit(3);
+}
+
 const CDP = process.argv[3] || process.env.CELLRIX_CDP || 'http://127.0.0.1:9222';
 
 /* 覆盖三类机型 + 一个桌面粗指针窗口。SE 最窄，ProMax 最宽，桌面用于防"只在窄屏修好"。 */

@@ -1,5 +1,6 @@
 const { JSDOM, VirtualConsole } = require("jsdom");
-const BASE = "http://127.0.0.1:18932";
+const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
+if (!BASE) { console.log('NEEDS-INPUT: 未给面板地址（argv[2] / CELLRIX_PANEL）—— 端口见 chain.json 的 `panel` 条目'); process.exit(3); }
 const JOB = require("fs").readFileSync("/tmp/richest_job.txt", "utf8").trim();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let pass = 0, fail = 0;
