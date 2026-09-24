@@ -226,21 +226,37 @@ check('the port scanner ignores a port in a comment',
     console.log('NEEDS-INPUT: 动态对照（tool→0 且 text→1）从未运行 —— 跑 ./e2e_chain.sh --self-check');
     process.exit(3);
   }
-  const last = recs[recs.length - 1];
-  if (last.ok !== true) {
-    check('the dynamic control held at its last run', false,
-      'tool=' + last.tool_exit + ' text=' + last.text_exit + ' at ' + last.at);
-  } else {
-    const ageDays = (Date.now() - Date.parse(last.at)) / 86400000;
-    if (ageDays > SLA_DAYS) {
-      console.log('');
-      console.log('NEEDS-INPUT: 动态对照已过期（' + ageDays.toFixed(1) + ' 天 > ' + SLA_DAYS
-        + '）—— 重跑 ./e2e_chain.sh --self-check');
-      process.exit(3);
-    }
-    check('the dynamic control held at its last run', true,
-      last.at + ' (' + ageDays.toFixed(2) + 'd ago)');
+  /* TWO FACTS, REPORTED SEPARATELY. Reading only the newest record means a
+   * `failed` row forever answers "failed" and the ABSENCE of any success becomes
+   * unreportable — `missed` would be masked by `failed`, which is the one thing
+   * the four-state split exists to prevent. So: the newest row says whether the
+   * last ATTEMPT held; the newest `ok: true` row says how long success has been
+   * absent. (Measured — this file previously read `recs[recs.length - 1]` only.) */
+  const lastAttempt = recs[recs.length - 1];
+  const lastOk = recs.slice().reverse().find(function (r) { return r.ok === true; });
+  check('the last dynamic-control attempt held',
+    lastAttempt.ok === true,
+    'tool=' + lastAttempt.tool_exit + ' text=' + lastAttempt.text_exit + ' at ' + lastAttempt.at);
+  if (!lastOk) {
+    console.log('');
+    console.log('NEEDS-INPUT: 心跳里**没有任何一次成功**的动态对照 —— 重跑 ./e2e_chain.sh --self-check');
+    process.exit(3);
   }
+  const ageDays = (Date.now() - Date.parse(lastOk.at)) / 86400000;
+  /* SLA_DAYS is a POLICY value, not a derivation: the control is human-triggered,
+   * so there is no expected_interval to compute it from. The stronger form is to
+   * stop looking at the clock entirely and compare the COMMIT of the sealing path
+   * recorded in the heartbeat with the current one (content-addressed staleness,
+   * the same property `job_id` has). Until that lands, the number is declared
+   * here as a policy and must be justified in ADR-0047. */
+  if (ageDays > SLA_DAYS) {
+    console.log('');
+    console.log('NEEDS-INPUT: 距上次**成功**已 ' + ageDays.toFixed(1) + ' 天（> ' + SLA_DAYS
+      + '，策略值）—— 重跑 ./e2e_chain.sh --self-check');
+    process.exit(3);
+  }
+  check('a successful dynamic control ran within the SLA', true,
+    lastOk.at + ' (' + ageDays.toFixed(2) + 'd ago)');
 }
 
 console.log('');
