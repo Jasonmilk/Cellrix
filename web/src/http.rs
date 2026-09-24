@@ -13,24 +13,20 @@ use std::net::TcpStream;
 // timeout made the panel proxy hit macOS WouldBlock (os error 35) mid-reply.
 const READ_TIMEOUT_SECS: u64 = 180;
 
-/// Hand-rolled HTTP GET: read the body after the blank line.
-/// `bearer` is an optional identity credential (never sent to the browser).
-pub fn fetch_json(base: &str, path: &str, bearer: Option<&str>) -> Result<String, String> {
-    plain_request("GET", base, path, bearer)
-}
-
-/// Hand-rolled HTTP DELETE: same transport, no body (query carries the
-/// target). One implementation for both verb-only methods (极致复用).
-pub fn delete_json(base: &str, path: &str, bearer: Option<&str>) -> Result<String, String> {
-    plain_request("DELETE", base, path, bearer)
-}
-
-fn plain_request(
+/// One GET/DELETE round trip, keeping the HTTP status code.
+///
+/// The status line is the only field the protocol defines for "did this request
+/// succeed". A probe that guesses from the body shape cannot see a 404 —
+/// measured 2026-09-24: Tuck answered `/v1/audit?limit=1` with
+/// `404 {"error":{"message":"audit chain not configured",…}}` and, because the
+/// body starts with `{`, the old probe read it as healthy while the audit chain
+/// was unconfigured (ADR-0045).
+fn plain_request_status(
     method: &str,
     base: &str,
     path: &str,
     bearer: Option<&str>,
-) -> Result<String, String> {
+) -> Result<(u16, String), String> {
     let base = base.trim_start_matches("http://").trim_end_matches('/');
     let (host, port) = match base.rsplit_once(':') {
         Some((h, p)) => (h.to_string(), p.parse::<u16>().map_err(|e| e.to_string())?),
@@ -48,17 +44,58 @@ fn plain_request(
     stream.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
     let mut buf = String::new();
     stream.read_to_string(&mut buf).map_err(|e| e.to_string())?;
-    buf.split("\r\n\r\n")
-        .nth(1)
-        .map(|s| s.to_string())
-        .ok_or_else(|| "empty response".to_string())
+    let (head, body) = buf
+        .split_once("\r\n\r\n")
+        .ok_or_else(|| "empty response".to_string())?;
+    // Fail-closed: a response we cannot read a status out of is not a success.
+    let status = head
+        .lines()
+        .next()
+        .and_then(|l| l.split_whitespace().nth(1))
+        .and_then(|c| c.parse::<u16>().ok())
+        .ok_or_else(|| "no status line in response".to_string())?;
+    Ok((status, body.to_string()))
 }
 
-/// Probe one data source: Ok when the peer answers with a JSON body.
+/// Hand-rolled HTTP GET: read the body after the blank line.
+///
+/// Status-blind by design: callers that must **judge health** use `probe()`
+/// (ADR-0045); callers that must **show the peer's own words** (the panel's
+/// proxies) want the body even on a failure, so the status stays out of this
+/// return contract.
+/// `bearer` is an optional identity credential (never sent to the browser).
+pub fn fetch_json(base: &str, path: &str, bearer: Option<&str>) -> Result<String, String> {
+    plain_request("GET", base, path, bearer)
+}
+
+/// Hand-rolled HTTP DELETE: same transport, no body (query carries the
+/// target). One implementation for both verb-only methods (极致复用).
+pub fn delete_json(base: &str, path: &str, bearer: Option<&str>) -> Result<String, String> {
+    plain_request("DELETE", base, path, bearer)
+}
+
+fn plain_request(
+    method: &str,
+    base: &str,
+    path: &str,
+    bearer: Option<&str>,
+) -> Result<String, String> {
+    plain_request_status(method, base, path, bearer).map(|(_, body)| body)
+}
+
+/// Probe one data source: Ok when the peer answers **2xx** with a JSON body.
 /// Refused/half-open/timeout peers are Err — callers decide what to do
 /// (panel: report; `up`: start the missing component or guide).
+///
+/// The 2xx requirement is ADR-0045: a probe that ignores the status line reads a
+/// `404 no_audit_chain` as healthy, which is how a whole dead audit leg stayed
+/// green. The body-shape check stays as a cheap second condition (a 2xx that is
+/// not our JSON contract is still not this organ answering).
 pub fn probe(base: &str, path: &str, bearer: Option<&str>) -> Result<(), String> {
-    let body = fetch_json(base, path, bearer)?;
+    let (status, body) = plain_request_status("GET", base, path, bearer)?;
+    if !(200..300).contains(&status) {
+        return Err(format!("HTTP {status}"));
+    }
     if body.trim_start().starts_with('{') {
         Ok(())
     } else {
@@ -268,20 +305,8 @@ fn read_http_body(stream: &mut TcpStream) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::io::{Read, Write};
     use std::net::TcpListener;
-
-    #[test]
-    fn probe_ok_on_json_and_err_on_garbage() {
-        let l = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = l.local_addr().unwrap().to_string();
-        std::thread::spawn(move || {
-            if let Ok((mut s, _)) = l.accept() {
-                let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"ok\":true}");
-            }
-        });
-        assert!(probe(&format!("http://{addr}"), "/v1/health", None).is_ok());
-    }
 
     #[test]
     fn probe_errs_on_refused() {
@@ -303,5 +328,76 @@ mod tests {
     fn unhealthy_names_ok_body_is_empty() {
         let body = r#"{"ok":true,"checks":[]}"#;
         assert!(unhealthy_names(body).is_empty());
+    }
+
+    /// Serve exactly one raw HTTP response, then close. Returns `host:port`.
+    /// A synthetic peer keeps the criterion independent of any real service's
+    /// availability — the same rule this repo applies to vendor-facing tests.
+    ///
+    /// ⚠️ The request is **drained before answering**, and the write side is
+    /// shut down explicitly. Measured 2026-09-24: closing a socket that still
+    /// holds unread request bytes makes the kernel send RST instead of FIN, and
+    /// the client's `read_to_string` then fails with ECONNRESET **even though
+    /// the response was delivered** — the positive controls went red under
+    /// parallel test execution and green in isolation. A flaky criterion is a
+    /// criterion nobody trusts (RNA rule 9).
+    fn serve_once(response: &'static str) -> String {
+        let l = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = l.local_addr().unwrap().to_string();
+        std::thread::spawn(move || {
+            if let Ok((mut s, _)) = l.accept() {
+                let mut scratch = [0u8; 1024];
+                let _ = s.read(&mut scratch);
+                let _ = s.write_all(response.as_bytes());
+                let _ = s.shutdown(std::net::Shutdown::Write);
+            }
+        });
+        addr
+    }
+
+    /* ── ADR-0045: the probe reads the status line ───────────────────────────
+     *
+     * Measured 2026-09-24: Tuck answered `/v1/audit?limit=1` with
+     * `404 {"error":{"message":"audit chain not configured",…}}`; that body
+     * starts with `{`, so the status-blind probe called a dead audit leg
+     * healthy. The five cases below pin **both** halves of the judgement
+     * (status AND shape), so neither half can rot into a rubber stamp. */
+
+    #[test]
+    fn probe_errs_on_404_with_a_json_body() {
+        let addr = serve_once(
+            "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\n\r\n\
+             {\"error\":{\"message\":\"audit chain not configured\",\"type\":\"no_audit_chain\"}}",
+        );
+        let e = probe(&format!("http://{addr}"), "/v1/audit?limit=1", None).unwrap_err();
+        assert!(e.contains("404"), "the failure must name the status: {e}");
+    }
+
+    #[test]
+    fn probe_errs_on_500_with_a_json_body() {
+        let addr = serve_once("HTTP/1.1 500 Internal Server Error\r\n\r\n{}");
+        assert!(probe(&format!("http://{addr}"), "/v1/health", None).is_err());
+    }
+
+    #[test]
+    fn probe_errs_on_2xx_that_is_not_our_json() {
+        // Negative control for the second half: adding the status check must
+        // not make the shape check stop biting.
+        let addr = serve_once("HTTP/1.1 200 OK\r\n\r\nnot json");
+        assert!(probe(&format!("http://{addr}"), "/v1/health", None).is_err());
+    }
+
+    #[test]
+    fn probe_errs_fail_closed_when_there_is_no_status_line() {
+        let addr = serve_once("garbage with no status line\r\n\r\n{}");
+        assert!(probe(&format!("http://{addr}"), "/v1/health", None).is_err());
+    }
+
+    #[test]
+    fn probe_ok_on_200_with_json() {
+        // Positive control for the same pair.
+        let addr = serve_once("HTTP/1.1 200 OK\r\n\r\n{\"ok\":true}");
+        let r = probe(&format!("http://{addr}"), "/v1/health", None);
+        assert!(r.is_ok(), "expected Ok, got {r:?}");
     }
 }

@@ -29,6 +29,13 @@ FLOW_BIN="$WS/FlowModus/flowmodus-rs/target/debug/flowmodus"
 ANA_BIN="$WS/anaphase-helix/target/debug/anaphase"
 PANEL_BIN="$WS/Cellrix/target/debug/cellrix-web"
 MIND_CFG="$WS/.helix/mind/config.toml"
+# Tuck's tamper-evident audit chain (ADR-0006). The launcher closes the leg
+# WITHOUT editing Tuck/config.toml, which is gitignored: a machine-rebuilt
+# config silently lost `audit_path`, so `/v1/audit` answered 404 no_audit_chain
+# while the gateway still served — and every launcher called Tuck healthy.
+# Only the non-secret operational key goes through env; Tuck's api_key /
+# jwt_secret / upstream_key stay in the untracked 0600 config (DNA iron rule 3).
+TUCK_CHAIN="$WS/.helix/tuck/audit.chain"
 # flowmodus resolves its registry through a *relative* path ("registry"), so it
 # must be launched from the crate dir or it reports an empty pool.
 FLOW_DIR="$WS/FlowModus/flowmodus-rs"
@@ -103,8 +110,15 @@ spawn() {
 }
 
 echo "[1/6] tuck      :60052"
-spawn tuck "$WS/Tuck" "$TUCK_BIN" --config config.toml
+spawn tuck "$WS/Tuck" env "TUCK_GATEWAY__AUDIT_PATH=$TUCK_CHAIN" "$TUCK_BIN" --config config.toml
 wait_port 60052 tuck 15 || exit 1
+# The port listening is NOT the criterion (ADR-0006): the gateway serves with an
+# empty audit_path too. The physical fact we require is that it OPENED a ledger.
+if [ -f "$TUCK_CHAIN" ]; then
+  echo "  OK    tuck audit chain open: $TUCK_CHAIN"
+else
+  echo "  WARN  tuck audit chain NOT open ($TUCK_CHAIN missing) — /v1/audit will 404 no_audit_chain"
+fi
 
 echo "[2/6] tentacle  :50051 (gRPC)"
 # Without --plugins-dir tentacle registers NOTHING, list_tools() returns empty,
@@ -136,16 +150,35 @@ wait_port "$PORT" panel 20 || exit 1
 
 # --- report ----------------------------------------------------------------
 echo
-echo "--- adapters actually wired? (grep Anaphase's startup log) ---"
-if grep -q "Pipeline wired to Tentacle" "$LOGS/anaphase.log" 2>/dev/null; then
-  echo "  OK    tentacle adapter active"
+echo "--- what Anaphase actually wired (its own /v1/health) ---"
+# Single source of truth: /v1/health is the hub's own physical report of its
+# organs. This block used to grep the log instead, and the mind line was a
+# FALSE GREEN: when `mind_endpoint` is unset, resolve_memory_adapter takes
+# `_ => Arc::new(NoopMemoryAdapter)` and logs NOTHING (adapters/mod.rs:195);
+# only "configured but unreachable" warns "mind degraded" (:187). So the script
+# printed "OK mind adapter active" while mind was Noop (measured 2026-09-24).
+# Absence of a warning is not evidence of a wire.
+# python3 is already a harness dependency (verify_live.py / coupling_audit.py),
+# and this body carries nested commas that a `tr ','` scan would split wrongly.
+HEALTH=$(curl -s --noproxy '*' -m 8 "http://127.0.0.1:50061/v1/health" 2>/dev/null || true)
+if [ -z "$HEALTH" ]; then
+  echo "  WARN  /v1/health unreachable — cannot tell what is wired (do NOT read this as ready)"
 else
-  echo "  WARN  tentacle adapter NOT wired (legacy execution fallback)"
-fi
-if grep -q "mind degraded" "$LOGS/anaphase.log" 2>/dev/null; then
-  echo "  WARN  mind degraded to Noop — check $LOGS/mind.log"
-else
-  echo "  OK    mind adapter active"
+  printf '%s' "$HEALTH" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+for c in d.get("checks", []):
+    cfg, ok = c.get("configured"), c.get("ok")
+    if not cfg:
+        tag = "NOT-CONFIGURED (silent Noop)"
+    elif ok:
+        tag = "ok"
+    else:
+        tag = "BAD"
+    print("  %-22s configured=%-5s ok=%-5s %s"
+          % (c.get("name"), str(cfg).lower(), str(ok).lower(), tag))
+print("  %-22s %s" % ("governance.state", d.get("governance", {}).get("state")))
+'
 fi
 
 echo
