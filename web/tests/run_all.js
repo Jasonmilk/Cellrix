@@ -54,6 +54,10 @@ const SELF_CONTAINED = [
   ['prove_track_rows_test.js', 'trajectory rows — keyed reuse, not a whole-table rebuild (PANEL-PLAN §2)'],
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
   ['flows_suppliers_test.js', 'flows supplier config — panel proxy contract, key never echoed (PANEL-PLAN §3)'],
+  /* The chain's wiring facts have ONE source (anaphase:ADR-0046). This asserts a
+   * launcher *derives* rather than restates them — a restated port is a port that
+   * will drift, which is exactly how three launchers came to disagree. */
+  ['chain_wiring_test.js', 'chain wiring — launchers derive from the one declaration (anaphase:ADR-0046)'],
   /* Not a web suite: this validates the ADR-0022 anchoring table and every ADR
    * reference in the repo (ADR-0022 §4.1). It rides the net because the net is
    * the one entry point that actually gets run — a criterion nobody runs is a
@@ -222,19 +226,46 @@ if (engBad.length) {
   engBad.forEach(function (b) { console.log('        ' + b); });
 }
 
+/* ── Exit code 3 = "this machine cannot supply one input I need" ─────────────
+ *
+ * The suite names what it is missing on its last line (`NEEDS-INPUT: <reason>`);
+ * the runner records it as a **SKIP with the reason**, the same shape as
+ * `NEEDS_INPUT` above. The reason is the file header's first sentence: **a suite
+ * that quietly did not run is indistinguishable from one that passed** — and a
+ * suite that is **permanently red with no information in the red** is worse,
+ * because it trains people to ignore red, and then the real reds go too.
+ *
+ * Measured (2026-09-24 review): the real event files that
+ * `prove_track_nodes_test.js` / `pt_replay.js` need
+ * (`<workspace>/.helix/events/*.events.jsonl`, runtime output, never committed)
+ * were lost in the machine migration, so both suites went **permanently red**
+ * here. `layout_test.js`'s three checks need a real period, same story. None of
+ * them was reporting "the product is broken".
+ *
+ * ⚠️ **This code is honoured only when the output contains no FAIL at all.**
+ * Otherwise one real red would be buried under "needs input" — the exact thing
+ * this file exists to prevent. */
+const NEEDS_INPUT_EXIT = 3;
+
 for (const [file, what] of SELF_CONTAINED) {
   const target = path.join(__dirname, file);
+  const extra = file === 'all_views_test.js' ? [PANEL]
+    : (file === 'layout_test.js' || file === 'measure_test.js') ? [PANEL, CDP] : [];
   try {
-    const extra = file === 'all_views_test.js' ? [PANEL]
-      : (file === 'layout_test.js' || file === 'measure_test.js') ? [PANEL, CDP] : [];
     execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' });
     results.push(['PASS', file, what]);
   } catch (e) {
+    const out = (e.stdout || Buffer.from('')).toString();
+    const lines = out.trim().split('\n').filter(Boolean);
+    const why = lines.filter(function (l) { return l.indexOf('NEEDS-INPUT:') === 0; }).pop();
+    if (e.status === NEEDS_INPUT_EXIT && why && !/\bFAIL\b/.test(out)) {
+      NEEDS_INPUT.push([file,
+        why.replace(/^.*NEEDS-INPUT:\s*/, '') + '  — ' + what]);
+      continue;
+    }
     failed++;
     results.push(['FAIL', file, what]);
-    const out = (e.stdout || Buffer.from('')).toString();
-    const lastLine = out.trim().split('\n').filter(Boolean).pop();
-    if (lastLine) console.log('    ' + lastLine.trim());
+    if (lines.length) { console.log('    ' + lines.pop().trim()); }
   }
 }
 

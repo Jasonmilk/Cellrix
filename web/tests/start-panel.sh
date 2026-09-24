@@ -29,6 +29,27 @@ FLOW_BIN="$WS/FlowModus/flowmodus-rs/target/debug/flowmodus"
 ANA_BIN="$WS/anaphase-helix/target/debug/anaphase"
 PANEL_BIN="$WS/Cellrix/target/debug/cellrix-web"
 MIND_CFG="$WS/.helix/mind/config.toml"
+# ── The chain's wiring facts, from ONE declaration (anaphase:ADR-0046) ───────
+# Ports and Anaphase's endpoint env are NOT restated here. Measured 2026-09-24:
+# three launchers carried three different wirings, and only anaphase's own `up`
+# injected the endpoints — so this harness started six healthy processes while
+# Anaphase ran three Noop adapters (mind/tentacle/tuck) and called the fourth
+# (`grpc://127.0.0.1:60054`) a "bad endpoint". Exporting the declared env closes
+# the loop; `spawn` inherits it.
+CHAIN_JSON="$WS/anaphase-helix/ecosystem/chain.json"
+if [ ! -f "$CHAIN_JSON" ]; then echo "MISSING DECLARATION: $CHAIN_JSON"; exit 1; fi
+eval "$(python3 - "$CHAIN_JSON" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+for c in d["components"]:
+    print("PORT_%s=%s" % (c["name"].replace("-", "_").upper(), c["port"]))
+for c in d["components"]:
+    if "anaphase_env" in c:
+        print("export %s=%s" % (c["anaphase_env"], c["anaphase_value"]))
+print("CHAIN_ENV_COUNT=%d" % sum(1 for c in d["components"] if "anaphase_env" in c))
+PYEOF
+)"
+echo "chain declaration: $CHAIN_ENV_COUNT endpoint env(s) derived from $(basename "$CHAIN_JSON")"
 # Tuck's tamper-evident audit chain (ADR-0006). The launcher closes the leg
 # WITHOUT editing Tuck/config.toml, which is gitignored: a machine-rebuilt
 # config silently lost `audit_path`, so `/v1/audit` answered 404 no_audit_chain
@@ -39,9 +60,9 @@ TUCK_CHAIN="$WS/.helix/tuck/audit.chain"
 # flowmodus resolves its registry through a *relative* path ("registry"), so it
 # must be launched from the crate dir or it reports an empty pool.
 FLOW_DIR="$WS/FlowModus/flowmodus-rs"
-FLOW_PORT=60053
+FLOW_PORT="$PORT_FLOWMODUS_SERVE"
 
-SERVICES="tuck tentacle mind flowmodus anaphase panel"
+SERVICES="tuck tentacle mind flowmodus-serve flowmodus-reason anaphase panel"
 
 pidfile() { echo "$LOGS/$1.pid"; }
 
@@ -109,9 +130,9 @@ spawn() {
   disown 2>/dev/null || true
 }
 
-echo "[1/6] tuck      :60052"
+echo "[1/7] tuck      :$PORT_TUCK"
 spawn tuck "$WS/Tuck" env "TUCK_GATEWAY__AUDIT_PATH=$TUCK_CHAIN" "$TUCK_BIN" --config config.toml
-wait_port 60052 tuck 15 || exit 1
+wait_port "$PORT_TUCK" tuck 15 || exit 1
 # The port listening is NOT the criterion (ADR-0006): the gateway serves with an
 # empty audit_path too. The physical fact we require is that it OPENED a ledger.
 if [ -f "$TUCK_CHAIN" ]; then
@@ -120,30 +141,34 @@ else
   echo "  WARN  tuck audit chain NOT open ($TUCK_CHAIN missing) — /v1/audit will 404 no_audit_chain"
 fi
 
-echo "[2/6] tentacle  :50051 (gRPC)"
+echo "[2/7] tentacle  :$PORT_TENTACLE (gRPC)"
 # Without --plugins-dir tentacle registers NOTHING, list_tools() returns empty,
 # and the tools block is silently dropped from the system prompt — the model then
 # truthfully reports "no tools available" (measured: 40+ periods with zero tool
 # calls after 2026-09-13 20:04, the last run that DID call one, against the same
 # model). The launcher has to name the directory that holds the tools.
-spawn tentacle "$WS/helix-tentacle" "$TENT_BIN" --transport grpc --grpc-port 50051 \
+spawn tentacle "$WS/helix-tentacle" "$TENT_BIN" --transport grpc --grpc-port "$PORT_TENTACLE" \
   --plugins-dir "$WS/helix-tentacle/fixtures"
-wait_port 50051 tentacle 20 || exit 1
+wait_port "$PORT_TENTACLE" tentacle 20 || exit 1
 
-echo "[3/6] mind      :50052 (gRPC)"
+echo "[3/7] mind      :$PORT_MIND (gRPC)"
 spawn mind "$WS/helix-mind" "$MIND_BIN" -c "$MIND_CFG" run
-wait_port 50052 mind 25 || exit 1
+wait_port "$PORT_MIND" mind 25 || exit 1
 
-echo "[4/6] flowmodus :$FLOW_PORT (serve)"
-spawn flowmodus "$FLOW_DIR" "$FLOW_BIN" serve --port "$FLOW_PORT"
+echo "[4/7] flowmodus :$FLOW_PORT (serve)"
+spawn flowmodus-serve "$FLOW_DIR" "$FLOW_BIN" serve --port "$FLOW_PORT"
 wait_port "$FLOW_PORT" flowmodus 15 || exit 1
 
-echo "[5/6] anaphase  :50061"
+echo "[5/7] flowmodus-reason :$PORT_FLOWMODUS_REASON (gRPC Reason — the reasoning entry)"
+spawn flowmodus-reason "$FLOW_DIR" "$FLOW_BIN" grpc --port "$PORT_FLOWMODUS_REASON"
+wait_port "$PORT_FLOWMODUS_REASON" flowmodus-reason 15 || exit 1
+
+echo "[6/7] anaphase  :$PORT_ANAPHASE"
 spawn anaphase "$WS/anaphase-helix" \
   env ANAPHASE_CONFIG="$WS/anaphase-helix/config.toml" "$ANA_BIN"
-wait_port 50061 anaphase 25 || exit 1
+wait_port "$PORT_ANAPHASE" anaphase 25 || exit 1
 
-echo "[6/6] panel     :$PORT"
+echo "[7/7] panel     :$PORT"
 spawn panel "$WS/Cellrix" "$PANEL_BIN" --port "$PORT" \
   --flowmodus-url "http://127.0.0.1:$FLOW_PORT"
 wait_port "$PORT" panel 20 || exit 1
@@ -160,7 +185,7 @@ echo "--- what Anaphase actually wired (its own /v1/health) ---"
 # Absence of a warning is not evidence of a wire.
 # python3 is already a harness dependency (verify_live.py / coupling_audit.py),
 # and this body carries nested commas that a `tr ','` scan would split wrongly.
-HEALTH=$(curl -s --noproxy '*' -m 8 "http://127.0.0.1:50061/v1/health" 2>/dev/null || true)
+HEALTH=$(curl -s --noproxy '*' -m 8 "http://127.0.0.1:$PORT_ANAPHASE/v1/health" 2>/dev/null || true)
 if [ -z "$HEALTH" ]; then
   echo "  WARN  /v1/health unreachable — cannot tell what is wired (do NOT read this as ready)"
 else
