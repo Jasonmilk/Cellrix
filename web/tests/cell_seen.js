@@ -20,7 +20,19 @@ function loadReal() {
   try {
     const files = fs.readdirSync(EV).filter(function (f) { return f.endsWith('.events.jsonl'); }).sort();
     if (!files.length) { return null; }
-    const f = files[files.length - 1];
+    /* DECLARE which sample the criterion applies to (ADR-0048 §45). Taking the
+     * "newest" file picked a 5-event period with NO assistant/usage events, so the
+     * completion criterion (§44.1) could not be satisfied by construction — the
+     * "evs 取错" case. Pick the RICHEST file by content: the one that actually
+     * carries usage (and note the counts either way). */
+    let f = null, best = -1;
+    for (const cand of files) {
+      const t = fs.readFileSync(path.join(EV, cand), 'utf8');
+      const n = (t.match(/"assistant\/usage"/g) || []).length;
+      const tot = t.trim().split('\n').filter(Boolean).length;
+      const score = n * 1000 + tot;   // usage-bearing first, then size
+      if (score > best) { best = score; f = cand; }
+    }
     const evs = fs.readFileSync(path.join(EV, f), 'utf8').trim().split('\n')
       .filter(Boolean).map(function (l) { try { return JSON.parse(l); } catch (e) { return {}; } });
     return { name: f, events: evs };
