@@ -91,6 +91,18 @@
       "owner": "jason",
       "due": "2026-12-10",
       "retirement_plan": "trusted-types-two-layer: adopt CSP require-trusted-types-for script plus a trustedTypes policy as the RUNTIME half of the innerHTML discipline, but do NOT downgrade the static check to 'assert the header is present'. Trusted Types is enforced only by Chromium engines; Firefox and Safari ignore the directive, so on those engines the runtime half does not exist and the static check remains the cross-engine backstop. Two layers, not a replacement."
+    },
+    {
+      "id": "mutation-script-crash-safe",
+      "owner": "jason",
+      "due": "2026-10-25",
+      "retirement_plan": "mutation-script-crash-safe: mutation runs must be IDEMPOTENT and CRASH-SAFE. Measured 2026-09-24: set -e aborted a verification script mid-way (the mutated runner deliberately exited 3) and the RESTORE never ran, leaving the register in the mutated state. Correct form is BOTH: trap ... EXIT for unconditional restore, AND a start-time assertion that the tree is at baseline; and the restore itself must be asserted afterwards. Explicit per-command capture alone is not enough because it relies on attention, which is the whole lesson of this family."
+    },
+    {
+      "id": "probe-known-good-assertion",
+      "owner": "jason",
+      "due": "2026-10-25",
+      "retirement_plan": "probe-known-good-assertion: the probe is a verification apparatus and it must itself be verified. requires-entries never expire because the probe re-decides reachability every run, but that argument assumes a HEALTHY probe: a probe that is broken or always answers absent leaves those suites held forever with a green gate and nobody watching. Add a known-good assertion (in an environment where the capability IS present the probe must report present); in the current environment CDP is absent so that assertion is itself held, and it must be REPORTED as held rather than assumed fine."
     }
   ]
 }
