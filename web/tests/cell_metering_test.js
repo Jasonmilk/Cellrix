@@ -76,9 +76,23 @@ ok('DATA state: all-zero and all-absent produce unknown WITHOUT throwing',
           && sh2.every(function (x) { return x.value.k !== 'p'; });
     } catch (e) { return false; }
   }()));
-ok('DATA state is COUNTED (never silent, gate can assert it must be 0)',
-  M.shares(M.project([{tok:0},{tok:0}])).dataUnknowns === 2
-  && M.shares(M.project([{tok:120},{tok:80}])).dataUnknowns === 0);
+/* The gate must NOT turn red on legitimate absence — otherwise this cell can never
+ * be "seen" on real data (which necessarily contains null/absent). Only non-finite
+ * values are debt, because `div` is total and anything else bypassed it. */
+(function () {
+  const clean = M.shares(M.project([{tok:120},{tok:80}]));
+  const withNull = M.shares(M.project([{tok:120},{tok:null}]));
+  const allZero = M.shares(M.project([{tok:0},{tok:0}]));
+  ok('legitimate unknown is INFORMATION (clean: legit=0, nonFinite=0)',
+    clean.legitUnknown === 0 && clean.nonFinite === 0);
+  /* Note: with a null in the batch the MAX is poisoned, so §28.3's direction-flip
+   * rule makes EVERY bar unknown (legit=2). The property under test is that this
+   * legitimate state does not turn the gate red — nonFinite stays 0. */
+  ok('a legitimate null does NOT make the gate red (legit=2 because max is poisoned)',
+    withNull.legitUnknown === 2 && withNull.nonFinite === 0);
+  ok('all-zero is legitimate too (legit=2, nonFinite=0)',
+    allZero.legitUnknown === 2 && allZero.nonFinite === 0);
+}());
 ok('PROGRAMMER error still throws (bad input shape is not a data state)',
   (function () { try { M.shares([{tok:1}]); return false; } catch (e) { return true; } }()));
 ok('ratio with a partial input degrades to explicit unknown',

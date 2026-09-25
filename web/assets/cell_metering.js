@@ -70,7 +70,7 @@
     var denomPartial = p.maxPartial;
     var denom = p.max;
     var events = p.states;
-    var out = [];
+    var out = [], nonFinite = 0;
     for (var i = 0; i < events.length; i++) {
       var num = events[i];
       if (denomPartial || denom.k !== 'p') {
@@ -80,7 +80,13 @@
       } else if (num.k !== 'p') {
         out.push({ value: num.k === 'a' ? TS.A() : TS.N(), reason: 'numerator-not-measured' });
       } else {
-        out.push({ value: TS.div(num, denom), reason: null });
+        var d = TS.div(num, denom);
+        /* SECOND LINE OF DEFENCE (ADR §26.2): since `div` is TOTAL, a non-finite
+         * value can only appear where something bypassed it (a bare `/`). That is
+         * the case "loud" must catch — NOT the legitimate unknown. */
+        if (d.k === 'p' && !Number.isFinite(d.v)) {
+          nonFinite++; out.push({ value: TS.N(), reason: 'non-finite' });
+        } else { out.push({ value: d, reason: null }); }
       }
     }
     /* TWO CLASSES OF "LOUD" (measured: reading "must be loud" literally into the render
@@ -89,7 +95,15 @@
      *   DATA STATE        -> renderable unknown + a COUNTING channel
      * The counter is the same discipline as the pending-overdue WARN: never silent, but
      * it does not take the interface down. The gate asserts it must be 0. */
-    out.dataUnknowns = out.filter(function (x) { return x.value.k !== 'p'; }).length;
+    /* TWO COUNTERS, because ONE would have closed the gate on honest data:
+     *   legitUnknown — a legitimate missing value renders as "unknown". That is the
+     *                  CORRECT output of this cell, so it is INFORMATION, not debt.
+     *   nonFinite    — NaN/Infinity appeared. The gate asserts this must be 0.
+     * A detector that counts the normal unknown as positive has specificity 0 — it is
+     * not a detector (same family as "8080 answered, so the panel is up"). */
+    var unknownTotal = out.filter(function (x) { return x.value.k !== 'p'; }).length;
+    out.legitUnknown = unknownTotal - nonFinite;
+    out.nonFinite = nonFinite;
     return out;
   }
   return { tokOf: tokOf, project: project, ratioOf: ratioOf, shares: shares };
