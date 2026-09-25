@@ -130,8 +130,6 @@ try {
       membersByGlobal[g] = membersByGlobal[g] || [];
       /* (a) direct assignment: window.CxX = { a: ..., b: ... } */
       const direct = new RegExp('(?:window|root)\\.' + g + '\\s*=\\s*\\{([\\s\\S]*?)\\}').exec(src);
-             || /(?:^|\n)\s*var\s+(Cx[A-Za-z0-9_]+)\s*=/.exec(src)
-             || /function\s+(Cx[A-Za-z0-9_]+)\s*\(/.exec(src);
       if (direct) {
         (direct[1].match(/([A-Za-z_$][\w$]*)\s*:/g) || []).forEach(function (m) {
           membersByGlobal[g].push(m.replace(/\s*:$/, ''));
