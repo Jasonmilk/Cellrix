@@ -361,25 +361,24 @@
    * semantic cells", so ONE CELL is the minimum visible width. 200 is a DEFAULT that must
    * come from the real terminal (measure its column count; 80 columns => 1.25%). The
    * alignment the renderer actually uses must be declared here if it is not cell-aligned. */
-  var GRID_COLS = 200;
-  function setGridCols(n) {
-    if (typeof n === 'number' && n > 0) { GRID_COLS = n; CELL_PCT = 100 / GRID_COLS; }
-    return { gridCols: GRID_COLS, cellPct: CELL_PCT };
-  }
-  var CELL_PCT = 100 / GRID_COLS;
+  var GRID_COLS_DEFAULT = 200;
+  function cellPctOf(gridCols) { return 100 / ((gridCols > 0) ? gridCols : GRID_COLS_DEFAULT); }
   var RESERVE_CAP_PCT = 50;
 
-  function allocate(rows) {
+  function allocate(rows, opts) {
+    var gridCols = (opts && opts.gridCols > 0) ? opts.gridCols : GRID_COLS_DEFAULT;
+    var CELL_PCT = cellPctOf(gridCols);
     /* rows: [{state}] where state is a three-state value. Returns ONE object with the
      * per-column percentages AND the row-level state, from one projection pass. */
     var present = [], i;
     for (i = 0; i < rows.length; i++) { if (isPresent(rows[i].state)) { present.push(rows[i].state.v); } }
     var nUnknown = rows.length - present.length;
     if (present.length === 0 || nUnknown === 0 && present.length === 0) {
-      return { state: 'unavailable', reason: 'no-present-rows', cols: [], tickPct: 0 };
+      return { state: 'unavailable', reason: 'no-present-rows', cols: [], tickPct: 0, gridCols: gridCols };
     }
     if (nUnknown === 0) {
-      return { state: 'ok', reason: null, cols: rows.map(function () { return null; }), tickPct: 0 };
+      return { state: 'ok', reason: null, cols: rows.map(function () { return null; }), tickPct: 0,
+               gridCols: gridCols };
     }
     var minPresent = Math.min.apply(null, present), sumPresent = 0;
     for (i = 0; i < present.length; i++) { sumPresent += present[i]; }
@@ -391,6 +390,16 @@
      * =>  tick <= 100*s/(1 + n*s), and TICK_K > 1 makes it strictly narrower. */
     var minShare = sumPresent === 0 ? 0 : minPresent / sumPresent;
     var tick = Math.min(CELL_PCT, (100 * minShare) / (TICK_K + nUnknown * minShare));
+    /* "CANNOT FIT" IS ITS OWN STATE (ADR-0048 §98.3). Clamping every unknown column to one
+     * cell is fine only while n * cell <= 100; beyond that the clamp itself overflows the
+     * row (measured 250 columns => 312%), which is aliasing, not rendering. The row is a
+     * WINDOW on a long strip: when the unknowns outnumber the grid, the honest answer is a
+     * declared state, not a clamped sum. (Windowing itself belongs to the on-demand
+     * rendering line.) */
+    if (nUnknown > gridCols) {
+      return { state: 'unavailable', reason: 'row-exceeds-grid',
+               cols: rows.map(function () { return CELL_PCT; }), tickPct: tick, gridCols: gridCols };
+    }
     if (nUnknown * tick > RESERVE_CAP_PCT) {
       /* DEGRADED: say so in the projection, do not fabricate a proportion. */
       return { state: 'unavailable', reason: 'reserve-over-budget',
@@ -405,7 +414,8 @@
         cols.push(sumPresent === 0 ? 0 : (rows[i].state.v / sumPresent) * remaining / 1);
       } else { cols.push(tick); }
     }
-    return { state: 'ok', reason: null, cols: cols, tickPct: tick, remainingPct: remaining };
+    return { state: 'ok', reason: null, cols: cols, tickPct: tick, remainingPct: remaining,
+             gridCols: gridCols };
   }
   function barWidth(r, i) {
     var scaleDur = W_FULL, scaleTok = W_TOK, minW = MIN_W;
@@ -431,8 +441,8 @@
     return { wPx: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
   return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, stateText: stateText,
-           allocate: allocate, setGridCols: setGridCols, GRID_COLS: function () { return GRID_COLS; },
-           TICK_K: TICK_K, CELL_PCT: function () { return CELL_PCT; }, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
+           allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
+           TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
            foldedCell: foldedCell,
            W_UNIT: W_UNIT, W_RANGE: W_RANGE, BAR_KEYS: BAR_KEYS,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,

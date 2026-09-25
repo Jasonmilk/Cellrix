@@ -284,13 +284,18 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
   const P = {state:M.P(4)}, N = {state:M.A()};
   const okCase = M.allocate([P,P,P].concat(new Array(11).fill(N)));
   ok('allocation: normal case splits the remainder among present rows, tick per unknown',
-    okCase.state === 'ok' && okCase.tickPct > 0 && okCase.tickPct <= M.CELL_PCT()
+    okCase.state === 'ok' && okCase.tickPct > 0 && okCase.tickPct <= M.cellPctOf(M.GRID_COLS_DEFAULT)
     && okCase.cols.filter(function (c, i) { return i < 3; }).reduce(function (a,b) { return a+b; }, 0)
        + 11 * okCase.tickPct > 99.999);
   ok('allocation DEGRADED: over-budget unknown count is a STATE, not a negative width',
     (function () {
-      const r = M.allocate(new Array(250).fill(N).concat([P]));
-      return r.state === 'unavailable' && r.reason === 'reserve-over-budget'
+      /* 250 unknowns > 200 cells, so the MORE PRECISE reason fires first: the row simply
+       * does not fit the grid. reserve-over-budget still covers the in-grid case (below). */
+      const r = M.allocate(new Array(250).fill(N).concat([P]), {gridCols:200});
+      /* 150 unknowns stay IN the grid (<=200) but exceed the reserve: 150 x 0.5 = 75 > 50. */
+      const inGrid = M.allocate([P].concat(new Array(150).fill(N)), {gridCols:200});
+      return r.state === 'unavailable' && r.reason === 'row-exceeds-grid'
+        && inGrid.state === 'unavailable' && inGrid.reason === 'reserve-over-budget'
         && r.cols.every(function (c) { return c >= 0 && isFinite(c); });
     }()));
   ok('allocation DEGRADED: a segment with no present rows is a STATE, not a divide-by-zero',
@@ -305,7 +310,27 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
       return r.state === 'ok' && tick < (1 / 1001) * (100 - tick);
     }()));
   ok('allocation constants have DERIVED provenance (K>1; cell width from the grid)',
-    M.TICK_K > 1 && Math.abs(M.CELL_PCT() - 100 / 200) < 1e-12 && M.RESERVE_CAP_PCT <= 50);
+    M.TICK_K > 1 && Math.abs(M.cellPctOf(M.GRID_COLS_DEFAULT) - 100 / 200) < 1e-12 && M.RESERVE_CAP_PCT <= 50);
+}());
+/* §98.3 — CRITERIA ARE PER STATE (§98.2): a clamped sum is aliasing, not rendering.
+ * ok => Σ===100 (with tolerance); unavailable => a DECLARED reason, carbon and silicon
+ * both read it (README dual-aspect). */
+(function () {
+  const N = {state:M.A()}, P = {state:M.P(4)};
+  const top = function (r) { return r.cols.reduce(function (x, y) { return x + y; }, 0); };
+  const ok11 = M.allocate([P,P,P].concat(new Array(11).fill(N)), {gridCols:200});
+  const ok30 = M.allocate([P].concat(new Array(30).fill(N)), {gridCols:200});
+  const over = M.allocate([P].concat(new Array(250).fill(N)), {gridCols:200});
+  const none = M.allocate([N,N], {gridCols:200});
+  ok('state ok => Σ === 100 (tolerance declared), for a small and a large unknown count',
+    ok11.state === 'ok' && Math.abs(top(ok11) - 100) <= 1e-9
+    && ok30.state === 'ok' && Math.abs(top(ok30) - 100) <= 1e-9);
+  ok('state unavailable carries a DECLARED reason (three reasons, one column)',
+    over.state === 'unavailable' && over.reason === 'row-exceeds-grid'
+    && none.state === 'unavailable' && none.reason === 'no-present-rows');
+  ok('gridCols is a DECLARED INPUT, not mutable module state (no setter on the exports)',
+    M.setGridCols === undefined && M.cellPctOf(80) === 1.25
+    && M.allocate([P], {gridCols:80}).gridCols === 80);
 }());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
