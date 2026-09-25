@@ -73,6 +73,15 @@ ok('division never yields NaN/Infinity', [P(0), P(5), N(), A()].every(function (
   const withNull = TS.lowerBound(TS.fold([P(120), P(80), N(), P(200)]));
   ok('null => poisoned => NO bound (explicit unknown)', withNull.k === 'n' && withNull.bound === undefined);
 }());
+/* The point where "carry the flag" and "scan for any absent" actually DIFFER:
+ * partial requires BOTH an absent AND a present. Scanning for "any absent" makes an
+ * all-absent fold call itself partial. (An earlier attempt to add these silently
+ * inserted NOTHING because its anchor no longer existed — the claim that the mutant
+ * was killed was therefore false until this assertion existed.) */
+ok('partial requires BOTH: an all-absent fold is NOT partial',
+  TS.fold([A(), A()]).partial === false);
+ok('partial requires BOTH: present-only is NOT partial',
+  TS.fold([P(1), P(2)]).partial === false);
 ok('ratio degrades to null when any input is partial',
   TS.ratio(TS.fold([P(120), A()]), TS.fold([P(800)])).value.k === 'n');
 console.log(bad === 0 ? 'OK — three-state algebra holds' : 'FAILED — ' + bad + ' assertion(s)');
