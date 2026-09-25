@@ -47,6 +47,37 @@ const widths = evs.map(function (e) {
   return Math.max(1.2, (v / (maxDur || 1)) * 22);
 });
 
+/* ── KAT double-check (ADR-0048 §57): a transcription must pass BOTH a vector with
+ * a KNOWN answer (the old top-level shape) and the real shape. Passing only the
+ * known vector validates "my reading of the old code"; passing only the real shape
+ * could be a lazily-written "it is all 0/NaN anyway". Both is evidence.
+ * (Giant path: cryptographic Known-Answer Test vectors.) */
+function run(events) {
+  let t = 0;
+  for (const e of events) { t += (e.tok || 0); }
+  const summary = (typeof t === 'number') ? (' · ' + fmtTok(t) + ' tok') : ' · 未计量';
+  let md = 0, mt = 0;
+  events.forEach(function (e) { if (e.dur > md) { md = e.dur; } if (e.tok > mt) { mt = e.tok; } });
+  const w = events.map(function (e) {
+    const v = e.dur > 0 ? e.dur : (e.tok / (mt || 1)) * md * 0.5;
+    return Math.max(1.2, (v / (md || 1)) * 22);
+  });
+  return { summary, w: w, mt: mt, md: md };
+}
+const kat1 = run([{tok:120, dur:60}, {tok:80}, {tok:200}]);
+const kat2 = run(evs);
+console.log('KAT-1 (old top-level shape, known answer):');
+console.log('  summary ' + JSON.stringify(kat1.summary) + '   [expect " · 400 tok"]  maxTok=' + kat1.mt + ' maxDur=' + kat1.md);
+console.log('  widths  ' + kat1.w.map(function (x) { return x.toFixed(3); }).join(' '));
+console.log('KAT-2 (real shape):');
+console.log('  summary ' + JSON.stringify(kat2.summary) + '   [expect " · 0 tok"]');
+console.log('  widths  ' + kat2.w.map(function (x) { return Number.isNaN(x) ? 'NaN' : x.toFixed(3); }).join(' '));
+if (kat1.summary !== ' · 400 tok' || kat2.summary !== ' · 0 tok') {
+  console.log('KAT FAILED: the transcription does not reproduce BOTH known answers.');
+  process.exit(1);
+}
+console.log('KAT OK — both vectors reproduced (transcription is faithful).');
+console.log('');
 console.log('BEFORE (pre-fix, verbatim) — pinned sample ' + PIN);
 console.log('  summary text : ' + JSON.stringify(summary));
 console.log('  tok value    : ' + tok + '   maxTok=' + maxTok + ' maxDur=' + maxDur);

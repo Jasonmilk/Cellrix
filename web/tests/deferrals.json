@@ -145,5 +145,9 @@
       "sentinel_held.js"
     ],
     "_why": "A CLOSED DECLARED SET *AND* AN INDEPENDENT MEMBERSHIP CHECK. The declared set alone fixed the name-convention hole but NOT membership: adding an ordinary suite here would silently absorb a real red. So the set lives in its own directory and is joined BOTH ways with the directory listing. Declaration over discovery, third instance."
-  }
+  },
+  "exempt_files": [
+    "cell_before.js"
+  ],
+  "_exempt_why": "cell_before.js is a MUSEUM PIECE: it deliberately keeps `|| 0`, a bare `/` and the 1.2 identity element, so the static assertions would never reach 0 and the mutation tool could 'kill' a deliberately wrong transcription meaninglessly. The FILE is exempt, never the RULE — same discipline as 'equivalent mutants must be explicitly exempted and counted'."
 }
