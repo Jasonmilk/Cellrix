@@ -233,19 +233,20 @@ function checkEngScannerSelfTest() {
 
 let failed = 0;
 const results = [];
+const failedRoster = [];
 
 /* 先证明**检查器本身**有效，再用它去判别人。
  * 顺序有意如此：一个失效的扫描器会给出"干净"的结论，而那个结论看起来与真干净一样。 */
 const engSelfBad = checkEngScannerSelfTest();
 if (engSelfBad.length) {
-  failed++;
+  failed++; if (typeof file !== "undefined") { failedRoster.push(file + (typeof e !== "undefined" && e && e.status ? " (exit " + e.status + ")" : "")); }
   console.log('  FAIL  eng-scanner self-test     the scanner cannot see what it claims to forbid');
   engSelfBad.forEach(function (b) { console.log('        ' + b); });
 }
 
 const engBad = checkEngAssertions();
 if (engBad.length) {
-  failed++;
+  failed++; if (typeof file !== "undefined") { failedRoster.push(file + (typeof e !== "undefined" && e && e.status ? " (exit " + e.status + ")" : "")); }
   console.log('  FAIL  eng-assertion check        ADR-0022 §2.5 — hard-asserted [ENG] value');
   engBad.forEach(function (b) { console.log('        ' + b); });
 }
@@ -289,7 +290,7 @@ for (const [file, what] of SELF_CONTAINED) {
         why.replace(/^.*NEEDS-INPUT:\s*/, '') + '  — ' + what]);
       continue;
     }
-    failed++;
+    failed++; if (typeof file !== "undefined") { failedRoster.push(file + (typeof e !== "undefined" && e && e.status ? " (exit " + e.status + ")" : "")); }
     results.push(['FAIL', file, what]);
     if (lines.length) { console.log('    ' + lines.pop().trim()); }
   }
@@ -353,6 +354,12 @@ function classify(file) {
       if (badPlan) {
         return { kind: 'unknown', why: 'deferral ' + d.id + ': retirement_plan must be non-empty,'
                  + ' at least 40 characters, and name ' + d.id };
+      }
+      if (!d.depends_on) {
+        return { kind: 'unknown', why: 'deferral ' + d.id + ' must DECLARE the input it depends on'
+                 + ' (depends_on) instead of discovering it: a scanned input is a HIDDEN input,'
+                 + ' and a hidden input drifts — measured 2026-09-24, this very deferral flipped'
+                 + ' between unproven and red as runs wrote into the shared events directory' };
       }
       if (!d.expiry || isNaN(Date.parse(d.expiry))) {
         return { kind: 'unknown', why: 'deferral ' + d.id
@@ -421,6 +428,23 @@ if (declLines.length === 0) {
     + DECL_SUITES.length + ' file(s) — the SET is wrong, not the reader.');
   process.exit(3);
 }
+
+/* The INPUT SHA is the capture for the drift bug: hash what the gate actually
+ * looked at, so "same input, same result" becomes checkable instead of hoped for. */
+function inputSha(rel) {
+  try {
+    const base = path.join(WS_ROOT, rel);
+    const entries = fs.readdirSync(base).sort();
+    const h = require('crypto').createHash('sha256');
+    for (const e2 of entries) {
+      try { h.update(e2 + ':' + fs.statSync(path.join(base, e2)).size + '\n'); } catch (x) { h.update(e2 + ':?\n'); }
+    }
+    return h.digest('hex').slice(0, 10);
+  } catch (x) { return 'absent'; }
+}
+const DEFERRAL_INPUTS = (DEFERRALS.deferrals || []).map(function (d) {
+  return d.id + '@' + (d.depends_on || '?') + '=' + inputSha(d.depends_on || '.');
+});
 
 const deferred = [], unknown = [];
 /* XPASS — the semantic of `test.failing()` / `xfail(strict=True)`: a registered
@@ -515,6 +539,10 @@ console.log('');
  * (`K12`: "an unattended run stayed red" taught everyone to ignore it). */
 const proven = results.filter(function (r) { return r[0] === 'PASS'; }).length;
 const requireAll = process.argv.indexOf('--require-all') > -1;
+if (failedRoster.length) {
+  console.log('  RED ROSTER (a count is not attributable — name the members): '
+    + failedRoster.join(', '));
+}
 if (xpass.length) {
   console.log('  XPASS ' + xpass.join(', ')
     + ' — registered as a deferral but it PASSED. The criterion is reachable again:'
@@ -530,7 +558,7 @@ console.log(failed === 0
       : (NEEDS_INPUT.length === 0
           ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
-            + ' held (registered), 0 red  [env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
+            + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
   : (xpass.length ? 'LEDGER STALE — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered');
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
