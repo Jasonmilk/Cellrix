@@ -63,6 +63,12 @@ const EMBEDDED: &[(&str, &str)] = &[
     ("session.html", include_str!("../assets/session.html")),
     ("gleam.html", include_str!("../assets/gleam.html")),
     ("flows.html", include_str!("../assets/flows.html")),
+    // ADR-0048 §70: the cell's projection is a PRODUCT asset, so it must reach the
+    // page like every other asset — in the manifest, in the substitution table, and
+    // with a placeholder in base.html. Order matters: three_state.js defines the
+    // algebra that cell_metering.js consumes.
+    ("three_state.js", include_str!("../assets/three_state.js")),
+    ("cell_metering.js", include_str!("../assets/cell_metering.js")),
 ];
 
 /// Look one embedded asset up by name.
@@ -219,6 +225,10 @@ mod tests {
         ("__PROVE_TRACK__", "prove_track.html"),
         ("__PROVE_TRACK_CSS__", "prove_track.css"),
         ("__EVENT_FAMILY__", "event_family.js"),
+        // Load ORDER is part of the wiring: cell_metering.js reads
+        // window.CxThreeState at call time, and three_state.js must be defined first.
+        ("__THREE_STATE__", "three_state.js"),
+        ("__CELL_METERING__", "cell_metering.js"),
         ("__NORMALIZE__", "period_normalize.js"),
         ("__WAYOUT_WORDS__", "wayout.words.js"),
         ("__WAYOUT__", "wayout.js"),
