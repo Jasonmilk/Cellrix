@@ -320,6 +320,11 @@ function probeOk(name) {
 function classify(file) {
   if (!DEFERRALS) { return { kind: 'unknown', why: 'no deferrals.json — nothing is registered' }; }
   for (const r of (DEFERRALS.requires || [])) {
+    if (!r.owner || !r.id || !r.probe) {
+      return { kind: 'unknown', why: 'requires entry ' + (r.id || '(no id)')
+        + ' is malformed: id, owner and probe are all mandatory (an entry without an owner is a'
+        + ' capability nobody is watching)' };
+    }
     if ((r.suites || []).indexOf(file) > -1) {
       const cap = probeOk(r.probe);
       if (cap === true) {
@@ -335,13 +340,20 @@ function classify(file) {
       /* MACHINE-CHECKABLE, not free text. A non-empty blob would be filled once and
        * then the gate is dead — the same argument that killed the global allow
        * switch. Required: non-empty, names its own id, and states a target date. */
+      /* The DATE is a structured field, not a date that happens to appear in prose:
+       * matching a date inside free text is not a machine check, it is a coincidence
+       * detector. The prose must still name its own id and say what retiring means. */
       const plan = d.retirement_plan;
       const badPlan = !plan || typeof plan !== 'string' || plan.length < 40
-        || plan.indexOf(d.id) === -1 || !/\d{4}-\d{2}-\d{2}/.test(plan);
+        || plan.indexOf(d.id) === -1;
       if (badPlan) {
         return { kind: 'unknown',
-                 why: 'deferral ' + d.id + ': retirement_plan must be machine-checkable — '
-                      + 'non-empty, name ' + d.id + ', and state a target date (YYYY-MM-DD)' };
+                 why: 'deferral ' + d.id + ': retirement_plan must be non-empty, at least 40'
+                      + ' characters, and name ' + d.id };
+      }
+      if (!d.expiry || isNaN(Date.parse(d.expiry))) {
+        return { kind: 'unknown',
+                 why: 'deferral ' + d.id + ': expiry must be a parseable ISO date (a prose date is not a check)' };
       }
       if (d.expiry && Date.parse(d.expiry) < Date.now()) {
         return { kind: 'unknown', why: 'deferral ' + d.id + ' EXPIRED on ' + d.expiry };
@@ -351,6 +363,23 @@ function classify(file) {
   }
   return { kind: 'unknown', why: 'not registered in deferrals.json' };
 }
+/* My OWN un-done items live in the same register, with the same mandatory fields.
+ * If they lived in a todo file they would be the exact failure mode this register
+ * exists to kill — suites must be registered, but my own work need not. */
+const pendingBad = [], pendingOverdue = [];
+for (const w of (DEFERRALS.pending || [])) {
+  const bad = !w.id || !w.owner || !w.due || isNaN(Date.parse(w.due))
+    || !w.retirement_plan || String(w.retirement_plan).length < 40
+    || String(w.retirement_plan).indexOf(w.id) === -1;
+  if (bad) { pendingBad.push(w.id || '(no id)'); continue; }
+  if (Date.parse(w.due) < Date.now()) { pendingOverdue.push(w.id + ' due ' + w.due); }
+}
+if (pendingBad.length) {
+  console.log('REGISTER ERROR: pending item(s) missing id/owner/due/retirement_plan: '
+    + pendingBad.join(', '));
+  process.exit(3);
+}
+
 const deferred = [], unknown = [];
 for (const [file, why] of NEEDS_INPUT) {
   const c = classify(file);
@@ -387,6 +416,9 @@ console.log('');
  * (`K12`: "an unattended run stayed red" taught everyone to ignore it). */
 const proven = results.filter(function (r) { return r[0] === 'PASS'; }).length;
 const requireAll = process.argv.indexOf('--require-all') > -1;
+if (pendingOverdue.length) {
+  console.log('  WARN  own un-done items past due: ' + pendingOverdue.join('; '));
+}
 console.log(failed === 0
   ? (unknown.length > 0
       ? 'BLOCKED — ' + proven + ' proven, ' + deferred.length + ' held (registered), '
