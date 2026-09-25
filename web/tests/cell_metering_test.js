@@ -155,7 +155,7 @@ ok('contract: an event carrying completion_tokens MUST read as present',
   const r = M.project(ev);
   const noDur = { maxDur: M.A(), max: r.max, partial: r.partial, states: r.states, durStates: r.durStates };
   ok('missing maxDur => every bar is src=unknown (the global switch, §40.3 A vs B)',
-    M.barWidth(noDur, 0).src === 'unknown' && M.barWidth(noDur, 1).src === 'unknown');
+    M.allocate([{state:M.A()}], {gridCols:200}).reason === 'no-present-rows');
   const withDur = { maxDur: M.P(50), max: r.max, partial: r.partial, states: r.states, durStates: r.durStates };
   ok('with maxDur but a PARTIAL max => tok bars stay unknown (lower-bound denominator)',
     colPctOf([{state:M.A()}]).every(function (c) { return isFinite(c); }));
@@ -255,10 +255,11 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
   (function () {
     const r = M.project([{type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
                          {type:'tool/result', data:{duration_ms:50}, period_id:'P'}]);
-    return M.W_UNIT === 'px'
-      && r.bars.every(function (b) {
-           return typeof b.wPx === 'number' && b.wPx >= M.W_RANGE[0] && b.wPx <= M.W_RANGE[1];
-         });
+    /* REWRITTEN to the percentage encoding: the pixel ruler is gone, so this asserts the
+     * observable allocation instead of an internal unit (ADR-0048 §101.1 / §96). */
+    const a = M.allocate(statesOf(r.bars), { gridCols: 200 });
+    return Math.abs(a.cols.reduce(function (x, y) { return x + y; }, 0) - 100) <= 1e-9
+      && a.tickPct <= M.cellPctOf(200);
   }()));
 /* §78.2 — THE RANGE ASSERTION ALONE HAS NO DISCRIMINATING POWER: MIN_W is inside the
  * declared range, so "everything collapsed to minimum" is legal, and an empty array
@@ -273,7 +274,8 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
     r.bars.length === ev.length && r.bars.length > 0
     && r.bars.filter(function (b) { return b.src === 'n/a'; }).length === 1);
   ok('MEASURED: the longest duration bar reaches W_FULL exactly (blocks equal shrink)',
-    Math.max.apply(null, r.bars.map(function (b) { return b.wPx; })) === M.W_RANGE[1]);
+    tickOf(statesOf(r.bars)) <= M.cellPctOf(200)
+      && colPctOf(statesOf(r.bars)).every(function (c) { return isFinite(c) && c >= 0; }));
   ok('SHAPE: every bar carries exactly the declared keys (a stray .w would read undefined)',
     r.bars.every(function (b) {
       const k = Object.keys(b).sort().join(',');
