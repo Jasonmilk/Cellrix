@@ -73,12 +73,50 @@ const KNOWN_ALL_BROKEN = ['var a = b / c;', "var d = e || 0;", "typeof f === 'nu
   if (blind.length) { bad++; }
 }());
 
+let bad = 0;   /* declared BEFORE any block that increments it (TDZ: a
+               * check that throws when it should fail is not a check) */
+
+/* ── PRESENCE-TYPE GATE: can every name the view calls actually RESOLVE? ─────────
+ * A count gate is ABSENCE-type: it forbids bad patterns, so it is always satisfiable
+ * by DELETION. Written this way it passed a change that made the panel throw
+ * `CxCellMetering is not defined` (ADR-0048 §67.4). Lint cannot find "the feature is
+ * gone"; a test cannot find "the style is broken" — so BOTH must run (§67.3).
+ *
+ * The loaded set is DECLARED FROM THE BOOT MANIFEST, not guessed: boot.rs embeds a
+ * literal list of asset files, and the page gets exactly those. A `Cx<Name>` used by
+ * the view must be provided by one of them.
+ */
+const BOOT = path.join(__dirname, '..', 'src', 'boot.rs');
+const ASSETS = path.join(__dirname, '..', 'assets');
+let loaded = [], usedGlobals = [];
+try {
+  const boot = fs.readFileSync(BOOT, 'utf8');
+  const names = (boot.match(/"([A-Za-z0-9_.]+[.]html)"/g) || [])
+    .map(function (x) { return x.replace(/"/g, ''); })
+    .concat((boot.match(/"([A-Za-z0-9_.]+[.]js)"/g) || []).map(function (x) { return x.replace(/"/g, ''); }));
+  for (const f of names) {
+    const fp = path.join(ASSETS, f);
+    if (!fs.existsSync(fp)) { continue; }
+    const src = fs.readFileSync(fp, 'utf8');
+    (src.match(/window\.(Cx[A-Za-z0-9_]+)\s*=/g) || []).forEach(function (m) {
+      loaded.push(m.replace(/window\./, '').replace(/\s*=$/, ''));
+    });
+  }
+  (code.match(/\b(Cx[A-Za-z0-9_]+)\s*\./g) || []).forEach(function (m) {
+    usedGlobals.push(m.replace(/\s*\.$/, ''));
+  });
+} catch (e) { /* handled below */ }
+const unresolved = Array.from(new Set(usedGlobals)).filter(function (n) { return loaded.indexOf(n) === -1; });
+console.log((unresolved.length ? '  FAIL ' : '  ok   ')
+  + 'REFERENCE — every Cx* global the view calls is provided by a boot-manifest asset'
+  + (unresolved.length ? ' (unresolved: ' + unresolved.join(', ') + ')' : ''));
+if (unresolved.length) { bad++; }
+
 if (process.argv.indexOf('--emit-baseline') > -1) {
   console.log(JSON.stringify(counts));
   process.exit(0);
 }
 
-let bad = 0;
 const total = Object.keys(counts).reduce(function (a, k) { return a + counts[k]; }, 0);
 const baseTotal = Object.keys(BASELINE).reduce(function (a, k) { return a + BASELINE[k]; }, 0);
 /* THE TARGET IS ZERO, NOT THE BASELINE (ADR-0048 §65.5). Using the baseline as a
