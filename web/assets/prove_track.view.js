@@ -240,7 +240,7 @@
              * That is §2's constraint 3 (unknown must have a type-level
              * representation, not a default) and the same shape as K-105.
              * `0` now prints `0`; only "no measurement" says so. */
-            (g.tok && g.tok.k === 'p' ? ' · ' + fmtTok(g.tok.v) + ' tok'
+            (window.CxCellMetering.isPresent(g.tok) ? ' · ' + fmtTok(g.tok.v) + ' tok'
                                       : ' · ' + window.CxCellMetering.foldedCell(g)) +
             (g.failed ? ' · ⚠ ' + g.failed + ' failed' : '') + '</span>' +
             '</button></td></tr>' });

@@ -279,6 +279,14 @@
    *     completion criterion reads (w alone has no discriminating power);
    *   - treats maxDur as a GLOBAL SWITCH: missing maxDur means every bar is unknown,
    *     even when tok has a value (measured: maxDur=0 collapses tok bars too). */
+  /* A PREDICATE INSTEAD OF A LITERAL (ADR-0048 §73.3): the view compared `k === 'p'`
+   * against a projection that returns 'P' — no crash, every gate green, and the cell
+   * silently showed "unmeasured" forever. Callers ask; they do not spell state.
+   * (Zero-hard-coding: the state vocabulary lives HERE, once.) */
+  function isPresent(st) { return !!st && st.k === TS.P(0).k; }
+  /* The vocabulary is DERIVED from the algebra, never re-spelled: the first draft of
+   * this predicate wrote 'P' while the algebra emits 'p', which would have shown
+   * "unmeasured" forever with every gate green (ADR-0048 §73.3). */
   function barWidth(r, i) {
     /* DECLARED, NOT SCATTERED (ADR-0048 §61.3). The old source had bare 22, a bare
      * 0.5 and a bare 1.2 in the formula, which is why "22 vs 11" looked like an
@@ -308,7 +316,7 @@
     if (!isPresent(tokOfEvent)) { return { w: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
     return { w: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
-  return { P: TS.P, N: TS.N, A: TS.A, foldedCell: foldedCell,
+  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, foldedCell: foldedCell,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
            project: project, ratioOf: ratioOf, shares: shares };
 }));
