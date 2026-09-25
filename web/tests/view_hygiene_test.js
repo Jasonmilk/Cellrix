@@ -106,6 +106,60 @@ try {
     usedGlobals.push(m.replace(/\s*\.$/, ''));
   });
 } catch (e) { /* handled below */ }
+/* ── M0+: ONE LAYER DEEPER — MEMBERS, NOT JUST GLOBALS (§69.2) ────────────────
+ * Last time the panel crashed on a MEMBER that did not exist, while this gate only
+ * checked that the GLOBAL was provided. Once cell_metering.js enters the manifest,
+ * that crash mode would pass. The member table is READ OFF THE LOADED ASSETS (their
+ * export object literals) — not guessed, not maintained here. */
+const membersByGlobal = {};
+try {
+  /* BOTH export shapes, and members are UNIONED across every file that touches the
+   * same global: `return { ... }` (factory style) and `window.CxX = { ... }` (direct
+   * assignment). First draft only read the factory form and therefore reported
+   * `CxWayout.build` — which exists (wayout.js:232) — as unknown: a FALSE POSITIVE.
+   * An imprecise gate produces false reds, and a falsely-red gate gets switched off. */
+  const boot2 = fs.readFileSync(BOOT, 'utf8');
+  const files = (boot2.match(/"([A-Za-z0-9_.]+[.](html|js))"/g) || []).map(function (x) { return x.replace(/"/g, ''); });
+  for (const f of files) {
+    const fp = path.join(ASSETS, f);
+    if (!fs.existsSync(fp)) { continue; }
+    const src = fs.readFileSync(fp, 'utf8');
+    for (const g of Array.from(new Set((src.match(/(?:window|root)\.(Cx[A-Za-z0-9_]+)/g) || [])
+      .map(function (x) { return x.replace(/^(window|root)\./, ''); })))) {
+      membersByGlobal[g] = membersByGlobal[g] || [];
+      /* (a) direct assignment: window.CxX = { a: ..., b: ... } */
+      const direct = new RegExp('(?:window|root)\\.' + g + '\\s*=\\s*\\{([\\s\\S]*?)\\}').exec(src);
+      if (direct) {
+        (direct[1].match(/([A-Za-z_$][\w$]*)\s*:/g) || []).forEach(function (m) {
+          membersByGlobal[g].push(m.replace(/\s*:$/, ''));
+        });
+      }
+      /* (b) member-wise accretion: PT.render = ... ; window.CxX.build = ... */
+      (src.match(new RegExp(g + '\\.([A-Za-z_$][\\w$]*)\\s*=', 'g')) || []).forEach(function (m) {
+        membersByGlobal[g].push(m.replace(new RegExp('^' + g + '\\.'), '').replace(/\s*=$/, ''));
+      });
+      /* (c) factory return { ... } */
+      const ret = /return\s*\{([\s\S]*?)\}\s*;/.exec(src);
+      if (ret) {
+        (ret[1].match(/([A-Za-z_$][\w$]*)\s*:/g) || []).forEach(function (m) {
+          membersByGlobal[g].push(m.replace(/\s*:$/, ''));
+        });
+      }
+    }
+  }
+} catch (e) { /* handled below */ }
+const badMembers = [];
+(code.match(/\b(Cx[A-Za-z0-9_]+)[.]([A-Za-z_$][\w$]*)/g) || []).forEach(function (m) {
+  const parts = m.split('.');
+  const g = parts[0], mem = parts[1];
+  if (loaded.indexOf(g) === -1) { return; }          /* reported by the global check */
+  const known = membersByGlobal[g] || [];
+  if (known.length && known.indexOf(mem) === -1) { badMembers.push(g + '.' + mem); }
+});
+console.log((badMembers.length ? '  FAIL ' : '  ok   ')
+  + 'MEMBER — every member the view calls is exported by the loaded asset'
+  + (badMembers.length ? ' (unknown: ' + Array.from(new Set(badMembers)).join(', ') + ')' : ''));
+if (badMembers.length) { bad++; }
 const unresolved = Array.from(new Set(usedGlobals)).filter(function (n) { return loaded.indexOf(n) === -1; });
 console.log((unresolved.length ? '  FAIL ' : '  ok   ')
   + 'REFERENCE — every Cx* global the view calls is provided by a boot-manifest asset'
