@@ -75,8 +75,8 @@
    * view keeps its own :335 max loop and the cell has TWO aggregation paths, which is
    * guaranteed drift (the "two menus" problem). `max` also carries the three states. */
   function project(events) {
-    var list = [];
-    for (var i = 0; i < events.length; i++) { list.push(tokOf(events[i])); }
+    var list = [], durList = [];
+    for (var i = 0; i < events.length; i++) { list.push(tokOf(events[i])); durList.push(durOf(events[i])); }
     var folded = TS.fold(list);
     var acc = TS.start(), seenPMax = false, seenAMax = false, seenAnyNull = false;
     var displayMax = null;
@@ -90,6 +90,7 @@
     }
     return {
       states: list,
+      durStates: durList,
       projected: true,
       /* MAX HAS TWO USES, ADJUDICATED SEPARATELY (ADR §33):
        *   as DISPLAY      -> a LOWER BOUND is a true statement (>=200),
@@ -180,8 +181,7 @@
    *     completion criterion reads (w alone has no discriminating power);
    *   - treats maxDur as a GLOBAL SWITCH: missing maxDur means every bar is unknown,
    *     even when tok has a value (measured: maxDur=0 collapses tok bars too). */
-  function barWidth(r, durOfEvent, opts) {
-    var o = opts || {};
+  function barWidth(r, i) {
     var scaleDur = 22, scaleTok = 11, minW = 1.2;
     var maxDur = r.maxDur, maxTok = r.max;
     var isPresent = function (n) { return n && n.k === 'p' && Number.isFinite(n.v); };
@@ -190,6 +190,7 @@
        * scaled without it (its divisor cancels), so the bar carries NO information. */
       return { w: minW, src: 'unknown', reason: 'maxDur-not-measured' };
     }
+    var durOfEvent = r.durStates[i];
     if (durOfEvent && isPresent(durOfEvent) && durOfEvent.v > 0) {
       return { w: Math.max(minW, (durOfEvent.v / maxDur.v) * scaleDur), src: 'dur', reason: null };
     }
@@ -197,7 +198,7 @@
       return { w: minW, src: 'unknown', reason: 'denominator-not-measured' };
     }
     if (maxTok.v === 0) { return { w: minW, src: 'unknown', reason: 'denominator-zero' }; }
-    var tokOfEvent = o.tokOfEvent;
+    var tokOfEvent = r.states[i];
     if (!isPresent(tokOfEvent)) { return { w: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
     return { w: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }

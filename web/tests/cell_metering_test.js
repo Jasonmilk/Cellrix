@@ -1,3 +1,10 @@
+/* §49.4 — a CRASH must not read as a RED. If the test dies on a type error or an
+ * undefined call, that is not a killed mutant and not a failed assertion; it is an
+ * ABORTED run and it must be labelled as such (this exact confusion happened once). */
+process.on('uncaughtException', function (e) {
+  console.log('TEST CRASHED (this is NOT a red and NOT a killed mutant): ' + e.message);
+  process.exit(4);
+});
 /* cell_metering_test — GOLDEN MASTER for the projection (ADR-0048 1d).
  *
  * Recorded BEFORE wiring the view, because after removing `|| 0` the cell's output
@@ -138,17 +145,16 @@ ok('contract: an event carrying completion_tokens MUST read as present',
 (function () {
   const ev = [{data:{completion_tokens:5}, period_id:'P'}, {data:{duration_ms:50}, period_id:'P'}];
   const r = M.project(ev);
-  const noDur = { maxDur: M.A(), max: r.max, partial: r.partial };
+  const noDur = { maxDur: M.A(), max: r.max, partial: r.partial, states: r.states, durStates: r.durStates };
   ok('missing maxDur => every bar is src=unknown (the global switch, §40.3 A vs B)',
-    M.barWidth(noDur, M.A(), {}).src === 'unknown'
-    && M.barWidth(noDur, M.A(), { tokOfEvent: M.P(5) }).src === 'unknown');
-  const withDur = { maxDur: M.P(50), max: r.max, partial: r.partial };
+    M.barWidth(noDur, 0).src === 'unknown' && M.barWidth(noDur, 1).src === 'unknown');
+  const withDur = { maxDur: M.P(50), max: r.max, partial: r.partial, states: r.states, durStates: r.durStates };
   ok('with maxDur but a PARTIAL max => tok bars stay unknown (lower-bound denominator)',
-    M.barWidth(withDur, M.A(), { tokOfEvent: M.P(5) }).src === 'unknown');
+    M.barWidth(withDur, 0).src === 'unknown');
   ok('bar width is never NaN or Infinity, for any combination',
     [[M.A(), M.A()], [M.A(), M.P(5)], [M.P(50), M.A()], [M.P(50), M.P(5)]].every(function (pair) {
-      const rr = { maxDur: pair[0], max: M.P(5), partial: false };
-      const b = M.barWidth(rr, pair[1], { tokOfEvent: M.P(5) });
+      const rr = { maxDur: pair[0], max: M.P(5), partial: false, states: [M.P(5)], durStates: [pair[1]] };
+      const b = M.barWidth(rr, 0);
       return isFinite(b.w) && !Number.isNaN(b.w) && ['dur','tok','unknown'].indexOf(b.src) > -1;
     }));
 }());
