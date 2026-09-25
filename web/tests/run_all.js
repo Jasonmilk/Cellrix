@@ -452,6 +452,31 @@ for (const [file, why] of NEEDS_INPUT) {
 /* Derived AFTER the loop populates `deferred`. Computing these earlier made every
  * label vanish while the summary still said "5 held": the gate looked normal and
  * had silently dropped the information. Order matters. */
+/* REGISTER-DRIVEN JOIN (the other direction). Iterate the REGISTER, locate each
+ * named suite file, and require it to exist and to be something that can actually
+ * be re-tested. A scan-driven version would move the SET bug instead of killing
+ * it: measured 2026-09-24, the scanned set and the declaring set were different.
+ * A deferral whose suite is neither declared nor executed is a suite nothing will
+ * ever re-test -> it must carry an expiry or it is a permanent exemption. */
+const joinProblems = [];
+for (const d of (DEFERRALS.deferrals || [])) {
+  let src = null;
+  try { src = fs.readFileSync(path.join(__dirname, d.suite), 'utf8'); } catch (e) { src = null; }
+  if (src === null) {
+    joinProblems.push('deferral ' + d.id + ': suite file ' + d.suite + ' does not exist');
+    continue;
+  }
+  const declared = /^const\s+REQUIRES/m.test(src);
+  if (!declared && EXECUTED.indexOf(d.suite) === -1 && !d.expiry) {
+    joinProblems.push('deferral ' + d.id + ': suite ' + d.suite
+      + ' is neither declared nor executed, so nothing re-tests it — it must carry an expiry');
+  }
+}
+if (joinProblems.length) {
+  console.log('REGISTER ERROR: ' + joinProblems.join('; '));
+  process.exit(3);
+}
+
 const heldAttempted = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) > -1; });
 const heldNever = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) === -1; });
 
