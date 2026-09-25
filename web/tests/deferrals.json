@@ -145,19 +145,19 @@
       "id": "view-geometry-fallback-or-1",
       "owner": "jason",
       "due": "2026-12-15",
-      "retirement_plan": "in `prove_track.view.js` geometry: `(e.tok / (maxTok || 1)) * maxDur * 0.5` and `Math.max(1.2, (v / (maxDur || 1)) * 22)`. Line numbers DRIFT (they were 356/357 when registered, 258/259 after the grouping change) so this entry anchors by CONTENT. These two lines collapse an unmeasured denominator into 1 and are the root of `NaNpx`. Retires in step b1."
+      "retirement_plan": "view-geometry-fallback-or-1: in `prove_track.view.js` geometry, `(e.tok / (maxTok || 1)) * maxDur * 0.5` and `Math.max(1.2, (v / (maxDur || 1)) * 22)`. Line numbers DRIFT, so this entry anchors by CONTENT. These collapse an unmeasured denominator into 1 and are the root of `NaNpx`. Retires in b1b."
     },
     {
       "id": "view-lane-normalizer-fallback-or-1",
       "owner": "jason",
       "due": "2026-12-15",
-      "retirement_plan": "in `prove_track.view.js`: `raw.reduce(function (a, b) { return a + b; }, 0) || 1` (line 371 when registered, 273 after). A zero total is turned into 1 instead of being a distinct state. Retires in step b2."
+      "retirement_plan": "view-lane-normalizer-fallback-or-1: in `prove_track.view.js`, `raw.reduce(function (a, b) { return a + b; }, 0) || 1`. A zero total becomes 1 instead of a distinct state. Retires in b2, the same commit that deletes the shared `raw`."
     },
     {
       "id": "duration-axis-three-states",
       "owner": "jason",
       "due": "2026-12-15",
-      "retirement_plan": "in `prove_track.view.js`: `typeof e.dur === 'number'` (line 116). Presence judged by TYPE; the duration axis needs the same states as the share axis plus applicability. Retires when the duration axis is projected."
+      "retirement_plan": "duration-axis-three-states: in `prove_track.view.js`, `typeof e.dur === 'number'` judges presence by TYPE; the duration axis needs the same states as the share axis plus applicability. Retires when the duration axis is projected."
     },
     {
       "id": "attribution-within-renderLanes",

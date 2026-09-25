@@ -3374,3 +3374,21 @@ Hickey（《Simple Made Easy》/《The Value of Values》）把**可缓存性列
 新块又被插在 `let bad = 0;` **之前** ⇒ **正常路径绿、红色路径崩**。
 ⇒ **修复**（声明提前）;**并且两条路径都跑过**（这正是 §68.5 那条纪律存在的理由：
 **"该红时却崩"= 检查失效**）。
+
+## 83. 门文件**确定性重写**（三次盲改失败之后）
+
+**我在 `view_hygiene_test.js` 上盲改连续失败三次**（重复 `let bad` ×2、覆盖 `direct` 行、
+孤儿注释行）——**每一次都提交了**,其中一次还**把空输出误读成成功**。
+⇒ **停手,一次性重写**为一份结构清晰的实现（五项检查 + 两个 emit 模式）。
+
+**重写后实测**（顺序：语法 → 正常 → **红色路径** → 整门）：
+```
+META ok · DERIVED-STORE ok · REFERENCE ok · MEMBER ok · ASSERTED TOTAL 14 (target 0)
+红色路径: FAIL DERIVED-STORE (253: CACHE_X = …project(S.session))   exit=1（红,不崩）
+```
+⇒ **`ASSERTED TOTAL 14`** —— 与归属表的 14 项**逐项对上**;`DERIVED-STORE` **有牙**。
+
+**教训（本 ADR 第 N 次同族）**：
+**"改一个检查器"与"改一个检查器所检查的东西"风险相当**——
+**检查器自身也要先 `node --check`、并且必须跑红色路径**;
+**盲改第四次之前就该重写**。
