@@ -1817,3 +1817,57 @@ README 明写 **"colors represent system states, never decoration"** ⇒
 ### 51.4 退路（已备）
 
 若 `:258` **不是**能直接遍历 `r.bars` 的形态 ⇒ **只完成 a/b/c1 也是可见交付**（§48.1/§44.4）。
+
+## 52. **Codd 第四态：`inapplicable`**（摘要「4 还是 4 ≥」的答案）+ `foldedCell`
+
+### 52.1 我把它当成了未定选择——它其实有答案
+
+实测：
+
+```
+assistant/usage  → 有 completion_tokens
+context/inject   → 从来没有这个字段
+tool/result      → 从来没有这个字段
+```
+
+⇒ **inject 缺这个字段,不是"这次没测到",是"该维度对这个事件类型不成立（N/A）"。**
+当成 `absent` ⇒ **每组都含 inject ⇒ 每组都 partial ⇒ 摘要全带 `≥` ⇒ 假警报泛滥**——
+**正是本 ADR §1 用来否掉"`absent` = partial"的那个理由。**
+
+### 52.2 巨人路径（**Codd 的第四态**，已核实）
+
+Codd 主张两种 NULL 标记——**"missing but applicable"** 与 **"missing but inapplicable"**,
+配 **四值逻辑** `T / F / unknown / inapplicable`;三值逻辑把后两者合并成 `⊥_{U/I}`,
+而合并会产生**不正确的结果**（Date：「**I hate NULL**」）。
+
+⇒ **本 ADR 的三态正是合并后的那一档,缺的就是 `inapplicable`。**
+
+| 关系 | 含义 | 处置 |
+|---|---|---|
+| `present(v)` | 适用且测到 | 贡献 |
+| `null` | 适用但没测到 | 下界 ⇒ 触发 `partial` |
+| `absent` | 适用但该步未发生 | 不贡献、不置 `partial` |
+| **`inapplicable`** | **该维度对此事件类型不成立** | **选行阶段排除，不进聚合** |
+
+⇒ **加上它,「4 还是 4 ≥」自动消失**：N/A 被排除 ⇒ 只剩 usage 参与 ⇒ **摘要 = `4`（不带 `≥`）**,
+除非批次里**真有 `null`**。
+
+### 52.3 `foldedCell(r) -> text`（**只返回文本**）
+
+格式化是它**唯一**职责（King：push the burden of proof upward, **but no further**——
+返回 `{text, bars}` 就是 §27 否掉的**宽 DTO**）。
+⇒ `cell_seen` 打印 `text` ⇒ **「界面会显示什么」变可测**;
+⇒ 视图只剩 `el.textContent = foldedCell(r)` ⇒ **「值不住在 DOM」第一次真正成立**（DOM 只搬运字符串）。
+
+### 52.4 落地时我连犯**三**处同族错（如实记）
+
+1. 夹具没有 `type` ⇒ 按新规则**全部行被判 N/A 而排除**（18 条红）⇒ 夹具补 `type`;
+2. **把"对 dur 适用"的行也往 tok 列表塞了 `A()`** ⇒ **tok 折叠因此 partial** ⇒
+   **假警报照旧**（这条最讽刺：在修它的过程中犯了它）⇒ 改为**每维度各自选行**;
+3. 一条断言的**前提**被这次语义改进改掉了（N/A 排除后那批不再 partial）⇒
+   用**真 `null`** 重构该断言。
+
+### 52.5 留痕：ADR 保留「原预期 12 → 更正为 4」，**不删**
+
+删了旧值就**无法区分「测前澄清」与「测后改口」**——那正是 §51.1 要守的 **HARKing 界限**。
+（Feathers：approved 的 golden master **必须提交进版本控制**——*"它们就是规格书"*。）

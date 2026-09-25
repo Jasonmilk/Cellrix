@@ -34,6 +34,15 @@
     return cur;
   }
   var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens'];
+  /* APPLICABILITY (ADR-0048 §52, Codd's fourth state). A dimension is INAPPLICABLE
+   * to an event type that never carries it — that is NOT "unmeasured this time".
+   * Merging the two (as three-valued logic does) floods every group with `>=`:
+   * inject/tool never carry completion_tokens, so every group would look partial.
+   * Inapplicable rows are EXCLUDED at row selection; they never reach the algebra. */
+  var TOK_APPLICABLE = ['assistant/usage'];
+  var DUR_APPLICABLE = ['tool/result'];
+  function eventType(e) { return (e && typeof e.type === 'string') ? e.type : ''; }
+  function applicable(e, list) { return list.indexOf(eventType(e)) > -1; }
   var DUR_PATHS = ['/data/duration_ms'];
   function readChain(e, paths) {
     for (var i = 0; i < paths.length; i++) {
@@ -75,9 +84,22 @@
    * view keeps its own :335 max loop and the cell has TWO aggregation paths, which is
    * guaranteed drift (the "two menus" problem). `max` also carries the three states. */
   function project(events) {
-    var list = [], durList = [];
-    for (var i = 0; i < events.length; i++) { list.push(tokOf(events[i])); durList.push(durOf(events[i])); }
-    var folded = TS.fold(list);
+    /* EACH DIMENSION SELECTS ITS OWN ROWS. Pushing an A() into the tok list for a row
+     * that is merely applicable to DURATION makes the tok fold partial — the exact
+     * false-alarm flood this rule exists to prevent (measured: it happened even while
+     * fixing it). `rows` is the UNION, for display; the two folds see only their own. */
+    var list = [], durList = [], naCount = 0;
+    var tokFold = [], durFold = [];
+    for (var i = 0; i < events.length; i++) {
+      var applicableTok = applicable(events[i], TOK_APPLICABLE);
+      var applicableDur = applicable(events[i], DUR_APPLICABLE);
+      if (!applicableTok && !applicableDur) { naCount++; continue; }
+      list.push(applicableTok ? tokOf(events[i]) : TS.A());
+      durList.push(applicableDur ? durOf(events[i]) : TS.A());
+      if (applicableTok) { tokFold.push(tokOf(events[i])); }
+      if (applicableDur) { durFold.push(durOf(events[i])); }
+    }
+    var folded = TS.fold(tokFold);
     var acc = TS.start(), seenPMax = false, seenAMax = false, seenAnyNull = false;
     var displayMax = null;
     var maxDurAcc = TS.A(), seenPDur = false, seenADur = false;
@@ -116,7 +138,8 @@
       maxPartial: seenAMax && seenPMax,
       partial: folded.partial,
       count: folded.count,
-      bound: TS.lowerBound(folded).bound || null
+      bound: TS.lowerBound(folded).bound || null,
+      na: naCount
     };
     /* BARS ARE RETURNED BY project, NOT INDEXED BY THE VIEW (ADR-0048 §50): if the
      * view passed its own index, a filtered/sorted iteration would silently mismatch
@@ -124,6 +147,18 @@
      * that misalignment UNREPRESENTABLE — the same move as shares(project(x)). */
     self.bars = list.map(function (_, i) { return barWidth(self, i); });
     return self;
+  }
+  /* foldedCell(r) -> text. Formatting is its ONLY job (King: push the burden of proof
+   * upward, but no further — a {text, bars} return would be the wide DTO ADR §27
+   * rejected). Printing this text makes "what the UI will show" TESTABLE, and the view
+   * shrinks to `el.textContent = foldedCell(r)` — so the value lives in `r`, never in
+   * the DOM. Inapplicable rows are already excluded, so a plain number carries no
+   * false `>=`. */
+  function foldedCell(r) {
+    if (!r || r.tok.k === 'a') { return '· 无数据'; }
+    if (r.tok.k === 'n') { return '· 未计量'; }
+    var body = String(r.tok.v);
+    return r.partial ? (body + ' ≥') : body;
   }
   function ratioOf(a, b) {
     var r = TS.ratio({ value: a.tok, partial: a.partial }, { value: b.tok, partial: b.partial });
@@ -215,7 +250,7 @@
     if (!isPresent(tokOfEvent)) { return { w: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
     return { w: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
-  return { P: TS.P, N: TS.N, A: TS.A,
+  return { P: TS.P, N: TS.N, A: TS.A, foldedCell: foldedCell,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
            project: project, ratioOf: ratioOf, shares: shares };
 }));

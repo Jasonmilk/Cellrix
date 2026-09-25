@@ -22,22 +22,22 @@ const S = (label, events, expect) => {
     + (f.partial ? ' [partial]' : ''));
   return f;
 };
-const A = {}, N = {data:{completion_tokens:null}}, Z = {data:{completion_tokens:0}};
+const A = {type:'assistant/usage'}, N = {type:'assistant/usage', data:{completion_tokens:null}}, Z = {type:'assistant/usage', data:{completion_tokens:0}};
 S('all absent            ', [A, A], 'a');
 S('single present(0)     ', [Z], 'p:0');
 S('present(0)+absent     ', [Z, A], 'p:0 [partial]');
 S('present(0)+null       ', [Z, N], 'n');
-S('[120,80,absent,200]   ', [{data:{completion_tokens:120}},{data:{completion_tokens:80}},A,{data:{completion_tokens:200}}], 'p:400 [partial]');
-S('[120,80,null,200]     ', [{data:{completion_tokens:120}},{data:{completion_tokens:80}},N,{data:{completion_tokens:200}}], 'n');
+S('[120,80,absent,200]   ', [{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},A,{type:'assistant/usage', data:{completion_tokens:200}}], 'p:400 [partial]');
+S('[120,80,null,200]     ', [{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},N,{type:'assistant/usage', data:{completion_tokens:200}}], 'n');
 (function () {
-  const all = [[A,A],[Z],[Z,A],[Z,N],[{data:{completion_tokens:120}},{data:{completion_tokens:80}},A,{data:{completion_tokens:200}}],[{data:{completion_tokens:120}},{data:{completion_tokens:80}},N,{data:{completion_tokens:200}}]];
+  const all = [[A,A],[Z],[Z,A],[Z,N],[{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},A,{type:'assistant/usage', data:{completion_tokens:200}}],[{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},N,{type:'assistant/usage', data:{completion_tokens:200}}]];
   ok('max comes from the SAME pass (no second aggregation path)',
   (function () {
-    const f = M.project([{data:{completion_tokens:120}}, {data:{completion_tokens:80}}, A, {data:{completion_tokens:200}}]);
+    const f = M.project([{type:'assistant/usage', data:{completion_tokens:120}}, {type:'assistant/usage', data:{completion_tokens:80}}, A, {type:'assistant/usage', data:{completion_tokens:200}}]);
     return f.max.k === 'p' && f.max.v === 200;
   }()));
 ok('max also carries three states (absent-only max is absent, not 0)',
-  M.project([A, A]).max.k === 'a' && M.project([{data:{completion_tokens:null}}]).max.k === 'n');
+  M.project([A, A]).max.k === 'a' && M.project([{type:'assistant/usage', data:{completion_tokens:null}}]).max.k === 'n');
 ok('no NaN / no Infinity anywhere', all.every(function (ev) {
     const f = M.project(ev);
     return f.tok.k !== 'p' || (isFinite(f.tok.v) && !Number.isNaN(f.tok.v));
@@ -46,39 +46,39 @@ ok('no NaN / no Infinity anywhere', all.every(function (ev) {
     (function () { const r = M.ratioOf(M.project([Z, Z]), M.project([Z])); return r.value.k === 'n' && r.reason === null ? true : r.value.k !== 'p'; }()));
   ok('shares are PER-EVENT (three different bars, not one number)',
   (function () {
-    const ev = [{data:{completion_tokens:120}},{data:{completion_tokens:80}},{data:{completion_tokens:200}}];
+    const ev = [{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},{type:'assistant/usage', data:{completion_tokens:200}}];
     const sh = M.shares(M.project(ev));
     const vals = sh.map(function (x) { return x.value.k + ':' + x.value.v; });
     return vals[0] === 'p:0.6' && vals[1] === 'p:0.4' && vals[2] === 'p:1' && vals[0] !== vals[1];
   }()));
 ok('denominator NOT MEASURED (max null) => every share unknown, even known bars',
   (function () {
-    const ev = [{data:{completion_tokens:120}}, {data:{completion_tokens:null}}, {data:{completion_tokens:200}}];
+    const ev = [{type:'assistant/usage', data:{completion_tokens:120}}, {type:'assistant/usage', data:{completion_tokens:null}}, {type:'assistant/usage', data:{completion_tokens:200}}];
     const sh = M.shares(M.project(ev));
     return sh.every(function (x) { return x.value.k !== 'p'; });
   }()));
 ok('denominator absent => shares unknown (not 0/z)',
   (function () {
-    const ev = [{data:{completion_tokens:120}}, {}];
+    const ev = [{type:'assistant/usage', data:{completion_tokens:120}}, {type:'assistant/usage'}];
     const sh = M.shares(M.project(ev));
     return sh.every(function (x) { return x.value.k !== 'p'; });
   }()));
 ok('shares() REFUSES anything that is not a project() result (no second denominator)',
   (function () {
     let threw = false;
-    try { M.shares([{data:{completion_tokens:120}}]); } catch (e) { threw = /only the result of project/.test(String(e.message)); }
+    try { M.shares([{type:'assistant/usage', data:{completion_tokens:120}}]); } catch (e) { threw = /only the result of project/.test(String(e.message)); }
     return threw;
   }()));
 ok('pipeline is lazy: a caller that needs only the cell value never computes shares',
-  typeof M.project([{data:{completion_tokens:1}}]).projected === 'boolean');
+  typeof M.project([{type:'assistant/usage', data:{completion_tokens:1}}]).projected === 'boolean');
 /* The two classes, asserted separately: a DATA state must NOT take the cell down,
  * a PROGRAMMER error must. Reading "must be loud" literally into the render path made
  * three cells crash and disappear — worse than a fake 0.000, because then nothing shows. */
 ok('DATA state: all-zero and all-absent produce unknown WITHOUT throwing',
   (function () {
     try {
-      const sh1 = M.shares(M.project([{data:{completion_tokens:0}},{data:{completion_tokens:0}}]));
-      const sh2 = M.shares(M.project([{},{}]));
+      const sh1 = M.shares(M.project([{type:'assistant/usage', data:{completion_tokens:0}},{type:'assistant/usage', data:{completion_tokens:0}}]));
+      const sh2 = M.shares(M.project([{type:'assistant/usage'},{type:'assistant/usage'}]));
       return sh1.every(function (x) { return x.value.k !== 'p'; })
           && sh2.every(function (x) { return x.value.k !== 'p'; });
     } catch (e) { return false; }
@@ -87,9 +87,9 @@ ok('DATA state: all-zero and all-absent produce unknown WITHOUT throwing',
  * be "seen" on real data (which necessarily contains null/absent). Only non-finite
  * values are debt, because `div` is total and anything else bypassed it. */
 (function () {
-  const clean = M.shares(M.project([{data:{completion_tokens:120}},{data:{completion_tokens:80}}]));
-  const withNull = M.shares(M.project([{data:{completion_tokens:120}},{data:{completion_tokens:null}}]));
-  const allZero = M.shares(M.project([{data:{completion_tokens:0}},{data:{completion_tokens:0}}]));
+  const clean = M.shares(M.project([{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}}]));
+  const withNull = M.shares(M.project([{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:null}}]));
+  const allZero = M.shares(M.project([{type:'assistant/usage', data:{completion_tokens:0}},{type:'assistant/usage', data:{completion_tokens:0}}]));
   ok('legitimate unknown is INFORMATION (clean: legit=0, nonFinite=0)',
     clean.legitUnknown === 0 && clean.nonFinite === 0);
   /* Note: with a null in the batch the MAX is poisoned, so §28.3's direction-flip
@@ -101,23 +101,23 @@ ok('DATA state: all-zero and all-absent produce unknown WITHOUT throwing',
     allZero.legitUnknown === 2 && allZero.nonFinite === 0);
 }());
 ok('PROGRAMMER error still throws (bad input shape is not a data state)',
-  (function () { try { M.shares([{data:{completion_tokens:1}}]); return false; } catch (e) { return true; } }()));
+  (function () { try { M.shares([{type:'assistant/usage', data:{completion_tokens:1}}]); return false; } catch (e) { return true; } }()));
 /* MAX'S TWO USES ARE ADJUDICATED SEPARATELY (ADR §33). [120, null, 200]:
  * strict (as denominator) would make every bar unknown — but the DISPLAY can still
  * honestly say ">=200", because a lower bound is a true statement. */
 (function () {
-  const r = M.project([{data:{completion_tokens:120}},{data:{completion_tokens:null}},{data:{completion_tokens:200}}]);
+  const r = M.project([{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:null}},{type:'assistant/usage', data:{completion_tokens:200}}]);
   ok('max as DENOMINATOR stays unknown (direction flip) on [120,null,200]',
     r.max.k === 'n' && M.shares(r).every(function (x) { return x.value.k !== 'p'; }));
   ok('max as DISPLAY is an honest lower bound >=200 on [120,null,200]',
     r.maxDisplay.k === 'p' && r.maxDisplay.v === 200 && r.maxDisplay.bound === '>=');
-  const clean = M.project([{data:{completion_tokens:120}},{data:{completion_tokens:200}}]);
+  const clean = M.project([{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:200}}]);
   ok('max as DISPLAY has NO bound when nothing is unmeasured',
     clean.maxDisplay.bound === null && clean.maxDisplay.v === 200);
 }());
 ok('a measured-zero denominator yields UNKNOWN, never NaN (div is total)',
   (function () {
-    const sh = M.shares(M.project([{data:{completion_tokens:0}},{data:{completion_tokens:0}}]));
+    const sh = M.shares(M.project([{type:'assistant/usage', data:{completion_tokens:0}},{type:'assistant/usage', data:{completion_tokens:0}}]));
     return sh.every(function (x) { return x.value.k !== 'p'; }) && sh.nonFinite === 0;
   }()));
 /* §47.2 — mutation ③'s target: a PARTIAL max is a LOWER BOUND, so every share must
@@ -125,7 +125,7 @@ ok('a measured-zero denominator yields UNKNOWN, never NaN (div is total)',
  * max.k==='present' while missing max.partial yields 1.000/1.000/1.000 — fake
  * exact values, the disease this cell exists to treat. */
 (function () {
-  const ev = [{data:{completion_tokens:5}}, {}];      // present + absent => partial max
+  const ev = [{type:'assistant/usage', data:{completion_tokens:5}}, {type:'assistant/usage'}];      // present + absent => partial max
   const r = M.project(ev);
   ok('a PARTIAL max makes every share unknown (not 1.000)',
     r.partial === true && r.maxPartial === true
@@ -135,15 +135,18 @@ ok('a measured-zero denominator yields UNKNOWN, never NaN (div is total)',
  * under the old top-level fixtures a CORRECT implementation read nothing and
  * returned absent,absent, so every "reads a value" criterion was never exercised. */
 ok('contract: an event carrying completion_tokens MUST read as present',
-  M.tokOf({data:{completion_tokens:7}}).k === 'p'
-  && M.tokOf({data:{completion_tokens:0}}).k === 'p'
-  && M.tokOf({data:{completion_tokens:null}}).k === 'n'
-  && M.tokOf({}).k === 'a');
+  M.tokOf({type:'assistant/usage', data:{completion_tokens:7}}).k === 'p'
+  && M.tokOf({type:'assistant/usage', data:{completion_tokens:0}}).k === 'p'
+  && M.tokOf({type:'assistant/usage', data:{completion_tokens:null}}).k === 'n'
+  && M.tokOf({type:'assistant/usage'}).k === 'a');
 /* §40.3's three cases, now asserted on the pure geometry: the tok path cannot be
  * scaled when maxDur is missing (it cancels), so src must be 'unknown' — NOT a
  * bar at 1.2 pretending to be information. */
 (function () {
-  const ev = [{data:{completion_tokens:5}, period_id:'P'}, {data:{duration_ms:50}, period_id:'P'}];
+  /* A genuinely UNMEASURED denominator needs a real null — after N/A exclusion a
+   * usage+tool batch is no longer partial (that partiality was the false alarm). */
+  const ev = [{type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
+              {type:'assistant/usage', data:{completion_tokens:null}, period_id:'P'}];
   const r = M.project(ev);
   const noDur = { maxDur: M.A(), max: r.max, partial: r.partial, states: r.states, durStates: r.durStates };
   ok('missing maxDur => every bar is src=unknown (the global switch, §40.3 A vs B)',
@@ -162,18 +165,34 @@ ok('contract: an event carrying completion_tokens MUST read as present',
  * filtered/sorted iteration cannot silently mismatch bars against events. */
 ok('project returns bars, so the view never passes an index',
   (function () {
-    const r = M.project([{data:{completion_tokens:5}, period_id:'P'},
-                         {data:{duration_ms:50}, period_id:'P'}]);
+    const r = M.project([{type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
+                         {type:'tool/result', data:{duration_ms:50}, period_id:'P'}]);
     return Array.isArray(r.bars) && r.bars.length === 2
       && r.bars.every(function (b) { return ['dur','tok','unknown'].indexOf(b.src) > -1
                                           && isFinite(b.w); });
   }()));
+/* §52 — INAPPLICABLE is not ABSENT. inject/tool never carry completion_tokens, so
+ * excluding them must NOT make the group partial (that would flood every summary
+ * with a false ">="). And foldedCell is the observable text the UI will show. */
+(function () {
+  const ev = [{type:'assistant/usage', data:{completion_tokens:4}, period_id:'P'},
+              {type:'context/inject', data:{chars:800}, period_id:'P'},
+              {type:'tool/result', data:{duration_ms:50}, period_id:'P'}];
+  const r = M.project(ev);
+  ok('inapplicable rows are EXCLUDED, not treated as absent (no false partial)',
+    r.na === 1 && r.partial === false && r.tok.k === 'p' && r.tok.v === 4);
+  ok('foldedCell(r) returns the plain number the UI will show (no ">=")',
+    M.foldedCell(r) === '4');
+  ok('foldedCell: absent => "· 无数据"; poisoned => "· 未计量"',
+    M.foldedCell(M.project([{type:'assistant/usage', data:{}, period_id:'P'}])) === '· 无数据'
+    && M.foldedCell(M.project([{type:'assistant/usage', data:{completion_tokens:null}, period_id:'P'}])) === '· 未计量');
+}());
 ok('ratio with a partial input degrades to explicit unknown',
-    M.ratioOf(M.project([{data:{completion_tokens:120}}, A]), M.project([{data:{completion_tokens:800}}])).value.k === 'n');
+    M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
     (function () {
-      const a = M.project([{data:{completion_tokens:120}},{data:{completion_tokens:80}},A,{data:{completion_tokens:200}}]);
-      const b = M.project([{data:{completion_tokens:200}},A,{data:{completion_tokens:120}},{data:{completion_tokens:80}}]);
+      const a = M.project([{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},A,{type:'assistant/usage', data:{completion_tokens:200}}]);
+      const b = M.project([{type:'assistant/usage', data:{completion_tokens:200}},A,{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}}]);
       return a.tok.k === b.tok.k && a.tok.v === b.tok.v && a.partial === b.partial;
     }()));
 }());
