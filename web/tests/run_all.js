@@ -317,45 +317,48 @@ function probeOk(name) {
     return true;
   } catch (e) { return false; }
 }
+function declaredRequires(file) {
+  /* The SUITE says what it needs; the register cannot attach one. */
+  try {
+    const src = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    const m = src.match(/^const\s+REQUIRES\s*=\s*'([^']+)'/m);
+    return m ? m[1] : null;
+  } catch (e) { return null; }
+}
 function classify(file) {
   if (!DEFERRALS) { return { kind: 'unknown', why: 'no deferrals.json — nothing is registered' }; }
-  for (const r of (DEFERRALS.requires || [])) {
-    if (!r.owner || !r.id || !r.probe) {
-      return { kind: 'unknown', why: 'requires entry ' + (r.id || '(no id)')
-        + ' is malformed: id, owner and probe are all mandatory (an entry without an owner is a'
-        + ' capability nobody is watching)' };
+  const cap = declaredRequires(file);
+  if (cap) {
+    const entry = (DEFERRALS.requires || []).filter(function (r) { return r.id === cap; })[0];
+    if (!entry) {
+      return { kind: 'unknown', why: 'the suite declares REQUIRES=' + cap
+        + ' but the register has no such capability' };
     }
-    if ((r.suites || []).indexOf(file) > -1) {
-      const cap = probeOk(r.probe);
-      if (cap === true) {
-        return { kind: 'unknown',
-                 why: 'capability ' + r.probe + ' IS present, yet this suite is unproven — that is not an absent capability' };
-      }
-      if (cap === null) { return { kind: 'unknown', why: 'probe ' + r.probe + ' is inconclusive' }; }
-      return { kind: 'requires', why: r.probe + ' absent (probed, not dated)' };
+    if (!entry.owner || !entry.probe) {
+      return { kind: 'unknown', why: 'REGISTER-CORRUPT: capability ' + cap + ' lacks owner/probe' };
     }
+    const p = probeOk(entry.probe);
+    if (p === true) {
+      return { kind: 'unknown', why: 'capability ' + cap
+        + ' IS present (probed), yet this suite is unproven — that is not an absent capability' };
+    }
+    if (p === null) { return { kind: 'unknown', why: 'probe ' + entry.probe + ' is inconclusive' }; }
+    return { kind: 'requires', why: cap + ' absent (probed, not dated)' };
   }
   for (const d of (DEFERRALS.deferrals || [])) {
     if (d.suite === file) {
-      /* MACHINE-CHECKABLE, not free text. A non-empty blob would be filled once and
-       * then the gate is dead — the same argument that killed the global allow
-       * switch. Required: non-empty, names its own id, and states a target date. */
-      /* The DATE is a structured field, not a date that happens to appear in prose:
-       * matching a date inside free text is not a machine check, it is a coincidence
-       * detector. The prose must still name its own id and say what retiring means. */
       const plan = d.retirement_plan;
       const badPlan = !plan || typeof plan !== 'string' || plan.length < 40
         || plan.indexOf(d.id) === -1;
       if (badPlan) {
-        return { kind: 'unknown',
-                 why: 'deferral ' + d.id + ': retirement_plan must be non-empty, at least 40'
-                      + ' characters, and name ' + d.id };
+        return { kind: 'unknown', why: 'deferral ' + d.id + ': retirement_plan must be non-empty,'
+                 + ' at least 40 characters, and name ' + d.id };
       }
       if (!d.expiry || isNaN(Date.parse(d.expiry))) {
-        return { kind: 'unknown',
-                 why: 'deferral ' + d.id + ': expiry must be a parseable ISO date (a prose date is not a check)' };
+        return { kind: 'unknown', why: 'deferral ' + d.id
+                 + ': expiry must be a parseable ISO date (a prose date is not a check)' };
       }
-      if (d.expiry && Date.parse(d.expiry) < Date.now()) {
+      if (Date.parse(d.expiry) < Date.now()) {
         return { kind: 'unknown', why: 'deferral ' + d.id + ' EXPIRED on ' + d.expiry };
       }
       return { kind: 'deferral', why: d.id + ' (owner ' + d.owner + ', expires ' + d.expiry + ')' };
@@ -373,6 +376,14 @@ for (const w of (DEFERRALS.pending || [])) {
     || String(w.retirement_plan).indexOf(w.id) === -1;
   if (bad) { pendingBad.push(w.id || '(no id)'); continue; }
   if (Date.parse(w.due) < Date.now()) { pendingOverdue.push(w.id + ' due ' + w.due); }
+}
+const attachAttempts = (DEFERRALS.requires || []).filter(function (r) { return r.suites; })
+  .map(function (r) { return r.id; });
+if (attachAttempts.length) {
+  console.log('REGISTER ERROR: ' + attachAttempts.join(', ')
+    + ' tries to ATTACH suites from the register. A suite declares its own requirement;'
+    + ' attaching from here is how a suite gets hidden.');
+  process.exit(3);
 }
 if (pendingBad.length) {
   console.log('REGISTER ERROR: pending item(s) missing id/owner/due/retirement_plan: '

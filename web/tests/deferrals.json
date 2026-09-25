@@ -11,13 +11,7 @@
     {
       "id": "cdp-browser",
       "probe": "cdp",
-      "reason": "needs a real browser on the CDP port plus the live panel. Decided by PROBE, never by a date: a date is a guess, and 'the instance was never configured' must not read as 'the capability is absent'. NOTE (measured): fabricating a NEW capability name is already blocked — an unimplemented probe returns null, which classifies as UNKNOWN and blocks. What is NOT blocked is filing a suite here that does not need this capability, which is why an owner is now mandatory.",
-      "suites": [
-        "layout_test.js",
-        "measure_test.js",
-        "perf_measure.js",
-        "hit_targets_test.js"
-      ],
+      "reason": "needs a real browser on the CDP port plus the live panel. Decided by PROBE, never by a date: a date is a guess, and 'the instance was never configured' must not read as 'the capability is absent'. NOTE (measured): fabricating a NEW capability name is already blocked — an unimplemented probe returns null, which classifies as UNKNOWN and blocks. What is NOT blocked is filing a suite here that does not need this capability, which is why an owner is now mandatory. The suite list is GONE on purpose: attaching a suite from here is exactly how a suite would be hidden. A `suites` key is now a REGISTER ERROR.",
       "owner": "jason"
     }
   ],
@@ -49,6 +43,18 @@
       "owner": "jason",
       "due": "2026-12-15",
       "retirement_plan": "paired-criteria-rule: make 'every blocking assertion needs a known-good positive control' a general rule of this register and of ADR-0047, not a one-off request, and add the positive controls it implies."
+    },
+    {
+      "id": "paired-controls-for-register-rules",
+      "owner": "jason",
+      "due": "2026-11-15",
+      "retirement_plan": "paired-controls-for-register-rules: give each register rule a known-good counterpart. Deleting the expiry check entirely leaves the default at exit 0, so today 'the rule fired' and 'the rule was satisfied' are indistinguishable for: deleted entry, platitude retirement_plan, expired deferral, missing owner, malformed pending."
+    },
+    {
+      "id": "probe-identity-family-open",
+      "owner": "jason",
+      "due": "2026-10-30",
+      "retirement_plan": "probe-identity-family-open: the chain-wide scan for liveness-instead-of-identity probes has NOT been done (only the panel probe is fixed). Carry this INTO the ADR as an open question plus the invariant 'having a signal is not being the thing', never as an answer — recording a conclusion that does not exist is the same family of error."
     }
   ]
 }

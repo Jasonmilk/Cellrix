@@ -21,8 +21,17 @@
  *
  * Usage: node hit_targets_test.js [panel_url] [cdp_url]
  */
+
+/* CAPABILITY REQUIREMENT (Cellrix:ADR-0047): this suite declares what it needs in its
+ * OWN source, not in the register. A register that can ATTACH a suite is a register that
+ * can hide one — the trace must land in this suite's diff. register/retire only. */
+const REQUIRES = 'cdp-browser';
 'use strict';
 
+/* CAPABILITY REQUIREMENT (Cellrix:ADR-0047). This suite declares what it needs
+ * HERE, in its own source — not in the register. A register that can ATTACH a suite
+ * is a register that can hide one: whoever wanted to stop a suite would edit a JSON
+ * file and the trace would never appear in that suite's diff. register/retire only. */
 const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
 /* NO literal default: the port is declared once (`panel` in
  * anaphase-helix/ecosystem/chain.json) and passed in by the runner. An absent
