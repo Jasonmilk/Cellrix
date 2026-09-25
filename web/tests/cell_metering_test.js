@@ -223,10 +223,14 @@ ok('project returns bars, so the view never passes an index',
   ok('multi-turn: additivity holds', r.turns.length === 2
     && r.turns[0].tok.v === 5 && r.turns[1].tok.v === 8 && r.sessionTok.v === 13);
   /* ATTRIBUTION: turn 2 must carry ITS OWN bars, not turn 1's. */
+  /* EXPECTATION UPDATED WITH A RECORDED REASON (ADR-0048 §78.8, same class as §59):
+   * a turn's events/bars now include the MARKER that opens it, so 2/2 became 3/3. The
+   * property under test is unchanged — turn 2's bars come from turn 2's events, and
+   * tok is still 5 vs 8 (attribution is about WHICH events, not how many). */
   ok('multi-turn: ATTRIBUTION — turn 2 bars come from turn 2 events',
-    r.turns[0].events.length === 2 && r.turns[1].events.length === 2
+    r.turns[0].events.length === 3 && r.turns[1].events.length === 3
     && r.turns[1].tok.v === 8 && r.turns[0].tok.v === 5
-    && r.turns[0].bars.length === 2 && r.turns[1].bars.length === 2);
+    && r.turns[0].bars.length === 3 && r.turns[1].bars.length === 3);
 }());
 /* §61.1 — THREE VALUE-POINT ASSERTIONS. The four states must not collapse at the fold
  * layer: if turns[i].tok were a bare number, "contains null" (4) and "all unavailable"
