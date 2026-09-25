@@ -158,6 +158,12 @@
       "owner": "jason",
       "due": "2026-12-15",
       "retirement_plan": "in `prove_track.view.js`: `typeof e.dur === 'number'` (line 116). Presence judged by TYPE; the duration axis needs the same states as the share axis plus applicability. Retires when the duration axis is projected."
+    },
+    {
+      "id": "attribution-within-renderLanes",
+      "owner": "jason",
+      "due": "2026-12-20",
+      "retirement_plan": "attribution-within-renderLanes: lines 267/269/275 sit in `renderLanes` but are NOT yet proven to serve THIS cell (the reviewer reads them as another view path). Attribution must come from a scan of who calls them / which DOM node they feed (static slicing by caller, not by shape), not from co-location. Until then they are NEITHER this cell's credit NOR written off; M3 counts only the proven this-cell items (258/259/262/273)."
     }
   ],
   "sentinels": {
