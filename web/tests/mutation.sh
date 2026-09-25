@@ -39,7 +39,11 @@ fi
 
 REPO="$1"; TARGET="$2"; MUTATE="$3"; ASSERT="$4"; EXPECT="${5:-}"; RESTORE="${6:-}"
 # UNCONDITIONAL RESTORE — not part of the happy path.
-[ -n "$RESTORE" ] && trap 'eval "$RESTORE"' EXIT INT TERM
+# RESTORE MUST NOT DEPEND ON GIT. Measured 2026-09-25: the target was UNTRACKED, so
+# `git checkout --` failed, the mutant stayed, and it got committed. Back the file up
+# to a temp path and restore from THAT, unconditionally.
+BACKUP="$(mktemp)"; cp "$REPO/$TARGET" "$BACKUP"
+trap 'cp "$BACKUP" "$REPO/$TARGET"; rm -f "$BACKUP"' EXIT INT TERM
 
 before=$(hash_of "$REPO" "$TARGET")
 eval "$MUTATE"
