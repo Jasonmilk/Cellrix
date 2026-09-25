@@ -104,6 +104,30 @@
       "owner": "jason",
       "due": "2026-10-25",
       "retirement_plan": "probe-known-good-assertion: the probe is a verification apparatus and it must itself be verified. requires-entries never expire because the probe re-decides reachability every run, but that argument assumes a HEALTHY probe: a probe that is broken or always answers absent leaves those suites held forever with a green gate and nobody watching. Add a known-good assertion (in an environment where the capability IS present the probe must report present); in the current environment CDP is absent so that assertion is itself held, and it must be REPORTED as held rather than assumed fine."
+    },
+    {
+      "id": "input-isolation-private-copies",
+      "owner": "jason",
+      "due": "2026-11-30",
+      "retirement_plan": "input-isolation-private-copies: declaration is not isolation. depends_on plus a sha makes drift VISIBLE, not IMPOSSIBLE, and the suites still flip between exit 1 and exit 3 while other runs write into the shared events directory. Give every suite a PRIVATE copy of its declared inputs (Bazel execroot / Nix / pytest tmp_path), and record the registered input sha so a green run is bound to a determinate input (lockfile semantics)."
+    },
+    {
+      "id": "depends-on-all-suites",
+      "owner": "jason",
+      "due": "2026-11-15",
+      "retirement_plan": "depends-on-all-suites: extend the mandatory depends_on declaration from deferrals to ALL registered suites, because the risk sits on the 20 proven ones too - they may read shared mutable state and merely happen to be green, with no sha and no signal. A suite with no inputs must declare 'none': declaring none is still a declaration."
+    },
+    {
+      "id": "sentinel-red",
+      "owner": "jason",
+      "due": "2026-10-20",
+      "retirement_plan": "sentinel-red: add an always-failing SENTINEL_RED suite as a permanent NEGATIVE control, and assert the gate reports it red AND that RED ROSTER names it with its exit code. This pairs the roster mechanism at zero cost: no mutation, no restore, and it cannot leave the tree in a bad state."
+    },
+    {
+      "id": "hash-normalisation",
+      "owner": "jason",
+      "due": "2026-11-10",
+      "retirement_plan": "hash-normalisation: normalise the input hash - sort paths, drop mtime, use relative paths, and prefer CONTENT hashing over name+size (name+size is stable but blind to a same-size edit). A hash containing mtime, traversal order or absolute paths produces FALSE drift, which is worse than no sha at all because it sends you chasing a drift that does not exist. See reproducible-builds.org, git hash-object, Bazel/Nix content addressing."
     }
   ]
 }
