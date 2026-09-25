@@ -3333,3 +3333,44 @@ b1b 后**重发站点**：喂本格 ⇒ 归零;证明喂他格 ⇒ **他格在�
 ⇒ **approved 文件必须进版本控制——"它们就是规格书"。**
 
 ### 81.5 待定 `267/269/275`：b1b 后**重发站点**清零（喂本格 ⇒ 归零;喂他格 ⇒ 他格在账附证据）。
+
+## 82. **memo 整体删除**（缓存 = 第二份真相）+ 门新增 **DERIVED-STORE**
+
+### 82.1 三条更硬的依据（巨人路径,已核实原文）
+
+| # | 依据 | 结论 |
+|---|---|---|
+| ① | **"There are only two hard things in Computer Science: cache invalidation and naming things."**（Karlton,见 Fowler TwoHardThings）;**缓存引入第二份真相**;"**只偶尔生效**"的失效形态**最贵** | 与本链一路抓的"**静默、不崩、门全绿**"**完全一致**;与「**唯一事实来源**」**直接冲突** |
+| ② | Guava `CacheBuilder`：**"By default, cache instances … will not perform any type of eviction."**;Caffeine 同（size / time / reference 三类驱逐,须显式设） | 我的 `RENDER_SEQ` memo：**无上界、无 TTL、无弱引用、无清理** ⇒ **永不命中 + 永久留存 = 泄漏**,而这是**默认行为**,不是写错 |
+| ③ | React（`useMemo`）：**"React never guarantees cache retention"**、**"Never rely on useMemo for correctness, only for performance"**、**"Over-memoizing … BAD: memoizing a trivial computation … GOOD: just compute it"** | 这一处 memo **恰恰被用来保证正确性** ⇒ **正是禁止项**;而被 memo 的**只是一次 `project()`** ⇒ 属"**不该 memo**"那一类 |
+
+### 82.2 反直觉的一条（避免教条）：**坏在"键不是值"**
+
+Hickey（《Simple Made Easy》/《The Value of Values》）把**可缓存性列为不可变值的好处之一**
+⇒ **正确的判据不是"不许缓存",而是：**
+> **只有输入是不可变值、且键就是那个值时,缓存才合法。**
+
+而本仓 **`S.session` 被原地 `push`**（内容变、身份不变）⇒ **它不是一个值**
+⇒ **对其缓存不合法** ⇒ **删除。**
+
+**与《Out of the Tar Pit》同构**：**"一份本可以派生的值,一旦被存下来,就变成了必须被维护正确的东西"**
+⇒ 本链判词「**值住在 DOM 里 = 纸糊**」是这条的变体;
+⇒ **memo = 被存下来的派生值** ⇒ 与"**每次渲染派生**"直接冲突。
+
+### 82.3 行动（**已落地**）
+
+1. **整体删除 memo**（`CELL_BARS` / `CELL_BARS_RENDER` / `RENDER_SEQ` 全部消失）,
+   `cellBarAt(i)` **直接派生**（`project()` 便宜,**就计算它**）;
+2. 日后若真测出性能问题：**先令输入成为值**（渲染开始快照 / 键含内容：长度 + 末条 `seq`）,
+   **再**谈缓存,且**必须显式声明上界或 TTL**;
+3. **门新增 `DERIVED-STORE`**：渲染函数内出现**存放派生值**的写入
+   （`S._xxx = window.CxCellMetering.project(…)` / 模块级可变表）⇒ **FAIL**。
+   **反向验证**：注入一处 ⇒ **红**（`253: CELL_BARS_CACHE = …`）✓
+
+⇒ **判词可翻译成一句可检查的话：这一格不该有任何被存起来的派生值;有,就是纸糊。**
+
+### 82.4 ⚠️ 同一处 TDZ **第二次**（已修,且这次两条路径都验）
+
+新块又被插在 `let bad = 0;` **之前** ⇒ **正常路径绿、红色路径崩**。
+⇒ **修复**（声明提前）;**并且两条路径都跑过**（这正是 §68.5 那条纪律存在的理由：
+**"该红时却崩"= 检查失效**）。

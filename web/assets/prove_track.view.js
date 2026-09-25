@@ -350,23 +350,19 @@
    * from the previous session. Keyed on the ARRAY IDENTITY, it re-derives exactly when
    * the input changes. (Same rule the compact groups already follow one screen up:
    * "derived on every render rather than stored, so it cannot go stale".) */
-  /* DERIVED EVERY RENDER — NO CACHE ACROSS RENDERS (ADR-0048 §81.2). Keying on the
-   * session ARRAY IDENTITY fixed replacement but not IN-PLACE APPENDS (push into the
-   * same array), which a live view does constantly; a cache is a second truth source.
-   * The key is the RENDER COUNTER, bumped at the top of renderLanes, so the value can
-   * never outlive the render that derived it. */
-  var CELL_BARS = null, CELL_BARS_RENDER = -1;
+  /* NO STORED DERIVED VALUE (ADR-0048 §82). A cache is a SECOND COPY OF TRUTH, and its
+   * invalidation is the classic hard problem; every variant of storing this one was
+   * wrong in a different way (session identity misses in-place pushes; a render counter
+   * never evicts anything, and no bound/TTL is a cache's DEFAULT, not an accident).
+   * Legitimate caching needs an IMMUTABLE VALUE as the key, and `S.session` is pushed
+   * into in place — so it is not a value, and caching it is illegitimate. project() is
+   * cheap: just compute it. */
   function cellBarAt(i) {
-    if (CELL_BARS_RENDER !== RENDER_SEQ) {
-      CELL_BARS = window.CxCellMetering.project(S.session).bars;
-      CELL_BARS_RENDER = RENDER_SEQ;
-    }
-    return CELL_BARS[i] ? CELL_BARS[i].value : null;
+    var bars = window.CxCellMetering.project(S.session).bars;
+    return bars[i] ? bars[i].value : null;
   }
 
-  var RENDER_SEQ = 0;
   function renderLanes() {
-    RENDER_SEQ++;   /* invalidates the per-render derivations below */
     var lanes = {}, evs = [];
     LANES.forEach(function (k) { lanes[k] = []; });
     S.session.forEach(function (e) { if (e.kind === 'ev') evs.push(e); });

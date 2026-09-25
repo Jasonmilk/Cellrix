@@ -73,6 +73,23 @@ const KNOWN_ALL_BROKEN = ['var a = b / c;', "var d = e || 0;", "typeof f === 'nu
   if (blind.length) { bad++; }
 }());
 
+let bad = 0;   /* declared before EVERY block that increments it: a check that
+               * throws when it should fail is not a check (second time — §68.5). */
+
+/* §82.3 — NO STORED DERIVED VALUE: the judgment becomes one checkable sentence.
+ * "This cell must not have any stored derived value; if it does, it is paper-mache."
+ * Detects a projection result assigned into a persistent store in the view. */
+const derivedStore = [];
+code.split('\n').forEach(function (line, n) {
+  if (/^\s*(S\._\w+|[A-Z][A-Z0-9_]*)\s*=\s*window\.CxCellMetering\.project\s*\(/.test(line)) {
+    derivedStore.push((n + 1) + ': ' + line.trim().slice(0, 60));
+  }
+});
+console.log((derivedStore.length ? '  FAIL ' : '  ok   ')
+  + 'DERIVED-STORE — no projection result is stored in the view'
+  + (derivedStore.length ? ' (' + derivedStore.join(' | ') + ')' : ''));
+if (derivedStore.length) { bad++; }
+
 let bad = 0;   /* declared BEFORE any block that increments it (TDZ: a
                * check that throws when it should fail is not a check) */
 
