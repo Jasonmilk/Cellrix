@@ -205,6 +205,26 @@ ok('project returns bars, so the view never passes an index',
     r.turns[0].bars.length === 2 && r.turns[1].bars.length === 1
     && r.turns[0].bars.length + r.turns[1].bars.length === r.bars.length - 0);
 }());
+/* §60 — A SINGLE-TURN SAMPLE IS THE GROUPING IDENTITY ELEMENT: the wrong variant
+ * ("all bars belong to turn[0]") is digit-for-digit identical to the correct one, and
+ * additivity holds trivially. Synthetic input is legitimate HERE because what is under
+ * test is the INVARIANT, not the golden master's actual behaviour. */
+(function () {
+  const ev = [{kind:'turn', id:'T1'},
+              {type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
+              {type:'context/inject',  data:{chars:1}, period_id:'P'},
+              {kind:'turn', id:'T2'},
+              {type:'assistant/usage', data:{completion_tokens:7}, period_id:'P'},
+              {type:'assistant/usage', data:{completion_tokens:1}, period_id:'P'}];
+  const r = M.project(ev);
+  ok('multi-turn: additivity holds', r.turns.length === 2
+    && r.turns[0].tok.v === 5 && r.turns[1].tok.v === 8 && r.sessionTok.v === 13);
+  /* ATTRIBUTION: turn 2 must carry ITS OWN bars, not turn 1's. */
+  ok('multi-turn: ATTRIBUTION — turn 2 bars come from turn 2 events',
+    r.turns[0].events.length === 2 && r.turns[1].events.length === 2
+    && r.turns[1].tok.v === 8 && r.turns[0].tok.v === 5
+    && r.turns[0].bars.length === 2 && r.turns[1].bars.length === 2);
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
