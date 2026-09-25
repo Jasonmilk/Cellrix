@@ -35,6 +35,8 @@
       acc = { value: TS.max(acc.value, list[j]), seenP: seenPMax, seenA: seenAMax };
     }
     return {
+      states: list,
+      projected: true,
       tok: folded.value,
       max: acc.value,
       maxPartial: seenAMax && seenPMax,
@@ -56,15 +58,21 @@
    * And the denominator carries the direction-flip rule: if the MAX was not
    * measured (absent/null) or is only a lower bound (partial), then even a known
    * bar's share is unknown — the denominator being a bound flips the direction. */
-  /* ONE aggregation path: `shares` derives the denominator ITSELF, so a caller
-   * cannot pass the sum where the max belongs (that bug happened once already). */
-  function shares(events) {
-    var p = project(events);
+  /* PIPELINE, not a wide DTO: `shares` accepts ONLY the result of `project`, so the
+   * denominator can only come from `projected.max`. The burden of proof is pushed up
+   * as far as possible — and no further (King, "Parse, don't validate"): a caller that
+   * does not need shares is not forced to compute them. */
+  function shares(p) {
+    if (!p || p.projected !== true) {
+      throw new Error('shares() accepts only the result of project(); refusing to guess a'
+        + ' denominator from anything else (a second denominator source is an illegal state).');
+    }
     var denomPartial = p.maxPartial;
     var denom = p.max;
+    var events = p.states;
     var out = [];
     for (var i = 0; i < events.length; i++) {
-      var num = tokOf(events[i]);
+      var num = events[i];
       if (denomPartial || denom.k !== 'p') {
         out.push({ value: denom.k === 'a' ? TS.A() : TS.N(), reason: 'denominator-not-measured' });
       } else if (denom.v === 0) {

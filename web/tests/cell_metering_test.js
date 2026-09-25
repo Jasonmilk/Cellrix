@@ -40,22 +40,30 @@ ok('no NaN / no Infinity anywhere', all.every(function (ev) {
   ok('shares are PER-EVENT (three different bars, not one number)',
   (function () {
     const ev = [{tok:120},{tok:80},{tok:200}];
-    const sh = M.shares(ev);
+    const sh = M.shares(M.project(ev));
     const vals = sh.map(function (x) { return x.value.k + ':' + x.value.v; });
     return vals[0] === 'p:0.6' && vals[1] === 'p:0.4' && vals[2] === 'p:1' && vals[0] !== vals[1];
   }()));
 ok('denominator NOT MEASURED (max null) => every share unknown, even known bars',
   (function () {
     const ev = [{tok:120}, {tok:null}, {tok:200}];
-    const sh = M.shares(ev);
+    const sh = M.shares(M.project(ev));
     return sh.every(function (x) { return x.value.k !== 'p'; });
   }()));
 ok('denominator absent => shares unknown (not 0/z)',
   (function () {
     const ev = [{tok:120}, {}];
-    const sh = M.shares(ev);
+    const sh = M.shares(M.project(ev));
     return sh.every(function (x) { return x.value.k !== 'p'; });
   }()));
+ok('shares() REFUSES anything that is not a project() result (no second denominator)',
+  (function () {
+    let threw = false;
+    try { M.shares([{tok:120}]); } catch (e) { threw = /only the result of project/.test(String(e.message)); }
+    return threw;
+  }()));
+ok('pipeline is lazy: a caller that needs only the cell value never computes shares',
+  typeof M.project([{tok:1}]).projected === 'boolean');
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{tok:120}, A]), M.project([{tok:800}])).value.k === 'n');
   ok('order independence of the projection',
