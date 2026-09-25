@@ -4217,3 +4217,59 @@ tick ≤ s × (100 − n × tick)     ⇒     tick ≤ 100 s / (1 + n s)
 ### 99.5 判词仍只死一半（如实）
 
 投影侧已兑现;**视图零改动、`wPx` 仍 9 处、`NaNpx` 的根仍在。**
+
+## 100. 方向修正：**投影只出「权重 + 状态」,几何交回布局引擎** + **曳光弹** + ③ 的未完成交代
+
+### 100.1 缺失值：有**实验**支撑（不只是外部权威）
+
+**IEEE TVCG 2022《Where's My Data? Evaluating Visualizations with Missing Data》**：
+**把缺失填成零或估计值会导致误读**;**推荐显式编码缺失**。
+⇒ **§91/§92 裁的"`n/a`/`absent` 不进分配、走状态通道",不是偏好,是有实验支撑的结论。**
+
+### 100.2 ⚠️ 方向修正：我们近十轮**堆进了本该声明的约束**
+
+**Moritz 等《Formalizing Visualization Design Knowledge as Constraints》（Draco, IEEE TVCG 2019）**：
+**把可视化设计知识形式化为约束,由求解器求解**;
+更早同族：**Borning 等 Cassowary（UIST 1997）**、**Badros 等 Constraint CSS（1999）**。
+**而本仓就有这个引擎**：README 明确 **`cellrix-layout` 是 pure-mathematical layout engine**,
+且 CI-144 第一条哲学正是「**理论支撑、不猜测**」。
+
+**我们近十轮往投影里堆的**——`tick` 预算、`RESERVE_CAP`、clamp、最大余数、
+三个 `reason` 里的两个——**正是那条研究的反面：把本该声明的约束写成了命令式规则。**
+
+⇒ **建议（下一次投影改动前定,不新增一轮）**：
+**投影只输出「测得量 + 状态」,几何由布局引擎分配**（或 CSS `grow` 权重 + 表示层 `min-width`）
+⇒ **`toFixed`、`Σ=100` 断言、最大余数、预算 / 超预算那一半整簇消失。**
+⇒ **消不掉的只有一对**：**「最小可见尺寸 vs 诚实排序」**（§93）——**那对属本质困难,到哪里都在。**
+⇒ **唯一张力是 headless 可测性** ⇒ **布局引擎本身是纯函数、可在 Node 里测**,README 说它正
+是 pure-mathematical ⇒ **两者兼得**,且**第一次让"值住在投影、几何住在布局"各归一个出处**
+（单一职责 / 极致解耦）。
+
+### 100.3 **曳光弹**（Tracer Bullet, *The Pragmatic Programmer*）
+
+**先打通一条端到端的细切片验证整条链路**,而不是把每个零件磨到完美再组装。
+⇒ **六十多轮里我们没打过一发（视图零改动）。**
+⇒ **③ 之后立刻做 `b1b-1`,在 pinned 单样本上端到端跑一次**,再回头做 `-0.5`/`-2` 与人工查看。
+
+### 100.4 ⚠️ 本轮 ③ **未完成**（如实,且已回退不留破树）
+
+**已验证的源侧部分**（回退前实测,随后 `git checkout --` 丢弃）：
+- **导出中像素编码:无 ✓**（`wPx`/`barWidth`/`W_UNIT`/`W_RANGE` 均不在导出里）;
+- **`bars` 键:`src,reason,value,idx,eventId`**;`src` 实测 `tok,n/a` ✓;
+- **加载冒烟通过**。
+
+**未完成**：**判据文件的迁移**（`cell_metering_test.js` 仍有 `M.barWidth` / `b.wPx` / `W_UNIT` / `W_RANGE`
+的引用）⇒ 我的改写**漏了一处**（崩溃：`Cannot read properties of undefined (reading 'every')`）
+⇒ **未提交,已回退**。
+
+**③ 的确切动作（下一步可直接执行）**：
+```
+源: 删常量 6 行（W_FULL/TOK_RATIO/W_TOK/MIN_W/W_UNIT/W_RANGE）
+    删 barWidth 整函数（23 行）
+    导出行去掉 barWidth
+    self.bars 映射 → { src, reason, value, idx, eventId }（**本轮已写出并验证过**）
+测: 迁移 ~6 处引用（153/156/160/161/172/255/273）——**注意其中一处改写用了不存在的 `cols`**
+```
+⇒ **本轮的收获有一半是"门挡下了我"**：
+**加载冒烟当场抓到 `W_UNIT is not defined`**（`node --check` 查不出）,
+**§49 的 `exit=4` 又把"崩"与"红"分开**,使我没有把崩溃当成红。
