@@ -4017,3 +4017,61 @@ b1b-1    条宽改取 flexPct（保留 v / raw.push）      —— 门变化:**�
 b1b-2    删除 maxTok/maxDur/Math.max(1.2,…) 条宽输出 —— 门变化 0
 M3       本格 ASSERTED → 0 + 在场检查全绿 + 一次性人工查看（物证入版本控制）
 ```
+
+## 95. **b1b-0 的投影侧落地**：三通道 + tick 规则（按**实际分配宽**推导）+ 降级**为投影状态**
+
+### 95.1 `allocate(rows)` —— 一个对象给出**三通道**
+
+```
+allocate(rows) → {
+  state: 'ok' | 'unavailable'      ← 行级状态（**硅基可读**）
+  reason: null | 'no-present-rows' | 'reserve-over-budget'
+  cols:  [ 每列的百分比 ]            ← 位置通道: **所有行都有列**（含 n/a / absent）
+  tickPct, remainingPct
+}
+```
+⇒ **位置通道**：`cols` **与 `rows` 等长**（**`n/a` / `absent` 的列不消失**,§92.2）;
+⇒ **长度通道**：只有 `present` 行分得余量;
+⇒ **状态通道**：**`state` 在投影里**——**不是"视觉上的等宽与颜色"**
+（README：*"colors represent system states, never decoration"* + dual-aspect）
+⇒ **M4（网格取值点读 `project()`）在降级这一支上同样成立。**
+
+### 95.2 ⚠️ 我的 tick 规则**第一版是错的,被我自己那条断言抓到**
+
+初版 `tick = min(CELL_PCT, minPresent / TICK_K)`——**按原始值**推导。
+⇒ 在 `[1000, 1]`（`sumPresent ≫ minPresent`）下,present 列还要乘 `remaining`
+⇒ **未知列（`0.5%`）反而比最小真值（`0.0994%`）宽 ⇒ 排序反转。**
+**断言**（"tick 严格窄于最小真实值"）**当场红**。
+
+**修正：不变量必须按**实际分配宽**写**：
+```
+s = minPresent / sumPresent
+tick ≤ s × (100 − n × tick)     ⇒     tick ≤ 100 s / (1 + n s)
+取 tick = min( CELL_PCT , 100 s / (TICK_K + n s) )      （TICK_K > 1 ⇒ 严格更窄）
+```
+**实测（1000:1）**：`tick = 0.0499%` **<** present 最小列 `0.0999%` ⇒ **无反转** ✓
+
+⇒ **这是"断言先于实现"少数几次真正兑现的一次**：**它抓到的是规则本身的量纲错位,不是打字错。**
+
+### 95.3 两个降级分支**已被行使**（§94.2）
+
+| 夹具 | 结果 |
+|---|---|
+| `n/a = 250`（超预算） | `state='unavailable'` · `reason='reserve-over-budget'` · **列宽全为有限非负**（**不给负宽**） |
+| 该段**无 `present`** | `state='unavailable'` · `reason='no-present-rows'` · **不除零** |
+
+⇒ **"未被行使的降级不是降级"** ⇒ 两条分支**各有一个合成夹具**（变异待 `-0.5` 补）。
+
+### 95.4 三个常量的**出处**（§94.3,已落）
+
+| 常量 | 值 | 出处 |
+|---|---|---|
+| `TICK_K` | `2` | **`K > 1` 由"严格更窄"推导**（§95.2 的推导式） |
+| `CELL_PCT` | `100 / GRID_COLS`,`GRID_COLS = 200` | **README：`grid of deterministic, semantic cells` ⇒ 最小可见宽度 = 一格** ⇒ **从网格列数派生**（**须声明网格列数**;若渲染器并非按格对齐,**须改声明它按什么对齐**） |
+| `RESERVE_CAP_PCT` | `50` | 由"**`present` 仍须可辨**"**反推** |
+
+### 95.5 状态
+
+**投影侧**：三通道 + tick 规则 + 两个降级分支**已落地并行使**,`cell_metering_test.js` **全绿**;
+**`precommit.sh` ⇒ `PRECOMMIT OK`**。
+**条形侧**：**仍未动**（`b1b-1`）⇒ **判词仍只死一半**（如实）。

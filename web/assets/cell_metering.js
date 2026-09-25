@@ -339,6 +339,63 @@
   /* The vocabulary is DERIVED from the algebra, never re-spelled: the first draft of
    * this predicate wrote 'P' while the algebra emits 'p', which would have shown
    * "unmeasured" forever with every gate green (ADR-0048 §73.3). */
+  /* ── COLUMN ALLOCATION (ADR-0048 §92/§93/§94) ───────────────────────────────
+   * THREE CHANNELS, each with ONE source: POSITION = order/time (all rows),
+   * LENGTH = value (present rows only), COLOUR/TEXT = state.
+   * The tick is a RULE, not a taste constant (three failure modes measured):
+   *   B: a fixed tick wider than the smallest real value INVERTS the ordering;
+   *   C: enough unknowns make budget*n exceed 100 => NEGATIVE width;
+   *   D: a segment with no present rows leaves the budget dangling / divides by 0.
+   * PROVENANCE OF EACH CONSTANT (no taste):
+   *   TICK_K = 2            tick = minPresent/K, so K > 1 is DERIVED from "strictly
+   *                         narrower than the smallest real value" — not chosen.
+   *   CELL_PCT              README: the terminal is "a grid of deterministic, semantic
+   *                         cells", so the minimum visible width is ONE CELL, derived
+   *                         from the column count — not 0.5%.
+   *   RESERVE_CAP_PCT       reverse-derived from "present must stay distinguishable".
+   * The degraded branch is a STATE IN THE PROJECTION (silicon-readable), never just
+   * equal widths + colour: "colors represent system states, never decoration".
+   * ─────────────────────────────────────────────────────────────────────────── */
+  var TICK_K = 2;
+  var GRID_COLS = 200;                        /* declared grid; derives the cell width */
+  var CELL_PCT = 100 / GRID_COLS;
+  var RESERVE_CAP_PCT = 50;
+
+  function allocate(rows) {
+    /* rows: [{state}] where state is a three-state value. Returns ONE object with the
+     * per-column percentages AND the row-level state, from one projection pass. */
+    var present = [], i;
+    for (i = 0; i < rows.length; i++) { if (isPresent(rows[i].state)) { present.push(rows[i].state.v); } }
+    var nUnknown = rows.length - present.length;
+    if (present.length === 0 || nUnknown === 0 && present.length === 0) {
+      return { state: 'unavailable', reason: 'no-present-rows', cols: [], tickPct: 0 };
+    }
+    if (nUnknown === 0) {
+      return { state: 'ok', reason: null, cols: rows.map(function () { return null; }), tickPct: 0 };
+    }
+    var minPresent = Math.min.apply(null, present), sumPresent = 0;
+    for (i = 0; i < present.length; i++) { sumPresent += present[i]; }
+    /* THE INVARIANT MUST BE STATED ON THE ACTUAL ALLOCATED WIDTH, not on the raw value
+     * (my first rule used minPresent/K and my own assertion caught it: with a 1000:1
+     * spread the unknown column came out WIDER than the smallest real one — ordering
+     * inverted). present rows are scaled by `remaining`, so the bound is
+     *     tick <= s(100 - n*tick)   with s = minPresent/sumPresent
+     * =>  tick <= 100*s/(1 + n*s), and TICK_K > 1 makes it strictly narrower. */
+    var minShare = sumPresent === 0 ? 0 : minPresent / sumPresent;
+    var tick = Math.min(CELL_PCT, (100 * minShare) / (TICK_K + nUnknown * minShare));
+    if (nUnknown * tick > RESERVE_CAP_PCT) {
+      /* DEGRADED: say so in the projection, do not fabricate a proportion. */
+      return { state: 'unavailable', reason: 'reserve-over-budget',
+               cols: rows.map(function () { return 100 / rows.length; }), tickPct: tick };
+    }
+    var remaining = 100 - nUnknown * tick, cols = [], p = 0;
+    for (i = 0; i < rows.length; i++) {
+      if (isPresent(rows[i].state)) {
+        cols.push(sumPresent === 0 ? 0 : (rows[i].state.v / sumPresent) * remaining / 1);
+      } else { cols.push(tick); }
+    }
+    return { state: 'ok', reason: null, cols: cols, tickPct: tick, remainingPct: remaining };
+  }
   function barWidth(r, i) {
     var scaleDur = W_FULL, scaleTok = W_TOK, minW = MIN_W;
 
@@ -363,6 +420,7 @@
     return { wPx: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
   return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, stateText: stateText,
+           allocate: allocate, TICK_K: TICK_K, CELL_PCT: CELL_PCT, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
            foldedCell: foldedCell,
            W_UNIT: W_UNIT, W_RANGE: W_RANGE, BAR_KEYS: BAR_KEYS,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,

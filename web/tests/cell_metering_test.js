@@ -277,6 +277,36 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
       return k === M.BAR_KEYS.slice().sort().join(',');
     }));
 }());
+/* §94.2/§94.3 — THE DEGRADED BRANCHES MUST BE EXERCISED, and the constants must have
+ * provenance rather than taste. A fallback that no fault has ever reached is not a
+ * fallback. */
+(function () {
+  const P = {state:M.P(4)}, N = {state:M.A()};
+  const okCase = M.allocate([P,P,P].concat(new Array(11).fill(N)));
+  ok('allocation: normal case splits the remainder among present rows, tick per unknown',
+    okCase.state === 'ok' && okCase.tickPct > 0 && okCase.tickPct <= M.CELL_PCT
+    && okCase.cols.filter(function (c, i) { return i < 3; }).reduce(function (a,b) { return a+b; }, 0)
+       + 11 * okCase.tickPct > 99.999);
+  ok('allocation DEGRADED: over-budget unknown count is a STATE, not a negative width',
+    (function () {
+      const r = M.allocate(new Array(250).fill(N).concat([P]));
+      return r.state === 'unavailable' && r.reason === 'reserve-over-budget'
+        && r.cols.every(function (c) { return c >= 0 && isFinite(c); });
+    }()));
+  ok('allocation DEGRADED: a segment with no present rows is a STATE, not a divide-by-zero',
+    (function () {
+      const r = M.allocate([N,N]);
+      return r.state === 'unavailable' && r.reason === 'no-present-rows';
+    }()));
+  ok('allocation: the tick is strictly narrower than the smallest real value (no ordering inversion)',
+    (function () {
+      const r = M.allocate([{state:M.P(1000)}, {state:M.P(1)}, N]);
+      const tick = r.tickPct;
+      return r.state === 'ok' && tick < (1 / 1001) * (100 - tick);
+    }()));
+  ok('allocation constants have DERIVED provenance (K>1; cell width from the grid)',
+    M.TICK_K > 1 && Math.abs(M.CELL_PCT - 100 / 200) < 1e-12 && M.RESERVE_CAP_PCT <= 50);
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
