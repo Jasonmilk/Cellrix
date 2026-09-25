@@ -55,6 +55,18 @@
       "owner": "jason",
       "due": "2026-10-30",
       "retirement_plan": "probe-identity-family-open: the chain-wide scan for liveness-instead-of-identity probes has NOT been done (only the panel probe is fixed). Carry this INTO the ADR as an open question plus the invariant 'having a signal is not being the thing', never as an answer — recording a conclusion that does not exist is the same family of error."
+    },
+    {
+      "id": "reader-inconsistent-under-control",
+      "owner": "jason",
+      "due": "2026-10-20",
+      "retirement_plan": "reader-inconsistent-under-control: the unconditional addition of a positive control made the declaration reader report ZERO matches while the same regex matched every file in isolation (per-file cap=\"cdp-browser\", 4/4), a bare test on a 20419-byte read was true, flags were identical (m), and there was no /g so no lastIndex reuse. All three candidate causes are REFUTED BY MEASUREMENT, so the fault lives in that patch's OWN construction (block placement/scope), not in the regex or the files. Re-land the three items ATOMICALLY - reader self-proof, then two-way join, then input sha - each one green, and verify the reader against an INDEPENDENT known-answer fixture (a minimal file with N declarations, assert N are read) instead of against itself."
+    },
+    {
+      "id": "new-criteria-born-paired",
+      "owner": "jason",
+      "due": "2026-11-20",
+      "retirement_plan": "new-criteria-born-paired: new criteria must be born WITH a known-good counterpart (hard rule); existing ones stay WARN (soft) so historical debt does not turn the gate red. This is the meta-rule that governs every other criterion, so a soft door here is a soft door on all of them."
     }
   ]
 }
