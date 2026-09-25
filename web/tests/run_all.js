@@ -600,6 +600,25 @@ if (sentProblems.length) {
   process.exit(3);
 }
 
+/* ── the inventory DEBT must affect the verdict ─────────────────────────────
+ * A debt that is recorded but does not influence judgement gets ignored — the same
+ * trajectory as a pending list that only grows. The count is READ FROM THE TABLE
+ * (not hand-filled here), which also makes the gate a consumer of the inventory
+ * rather than a document beside it. */
+let unpaired = -1;
+try {
+  const inv = fs.readFileSync(path.join(__dirname, 'CRITERIA-INVENTORY.md'), 'utf8');
+  const sec = inv.split('\n## ').filter(function (b) { return b.indexOf('`unpaired`') === 0; })[0] || '';
+  unpaired = sec.split('\n').filter(function (l) {
+    return l.indexOf('| ') === 0 && l.indexOf('| 判据') !== 0 && l.indexOf('|---') !== 0;
+  }).length;
+} catch (e) { unpaired = -1; }
+if (unpaired !== 0) {
+  console.log('  YELLOW  inventory debt: ' + (unpaired < 0 ? 'unreadable' : unpaired)
+    + ' criterion/ies have NO mutation proof (see CRITERIA-INVENTORY.md). They are NOT'
+    + ' "proven" — recorded debt that does not affect judgement gets ignored.');
+}
+
 if (failedRoster.length) {
   console.log('  RED ROSTER (a count is not attributable — name the members): '
     + failedRoster.join(', '));
@@ -619,7 +638,7 @@ console.log(failed === 0
       : (NEEDS_INPUT.length === 0
           ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
-            + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' pinned:' + (DEFERRALS.deferrals || []).filter(function (d) { return d.depends_on; }).length + '/' + SELF_CONTAINED.length + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
+            + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' pinned:' + (DEFERRALS.deferrals || []).filter(function (d) { return d.depends_on; }).length + '/' + SELF_CONTAINED.length + ' unpaired:' + unpaired + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
   : (xpass.length ? 'LEDGER STALE — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered');
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
