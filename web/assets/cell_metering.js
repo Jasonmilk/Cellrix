@@ -43,6 +43,22 @@
    * over discovery", the EIGHTH time). The view's session objects carry `kind: 'turn'`;
    * the落盘 events carry `type: 'turn/start'`. Both vocabularies are declared here so
    * `project` never guesses a grouping key. */
+  /* PROJECTION CONSTANTS (module scope: they belong to the projection, not to a call).
+   * The old source had bare 22, a bare 0.5 and a bare 1.2 in the formula, which is why
+   * "22 vs 11" looked like an unexplained scale mismatch — 11 was 22 x 0.5, unwritten. */
+  var W_FULL = 22;        /* a duration-carrying bar at the session maximum */
+  var TOK_RATIO = 0.5;    /* a token-share bar, relative to a duration bar */
+  var W_TOK = W_FULL * TOK_RATIO;
+  var MIN_W = 1.2;        /* the geometric identity element: see §36 */
+  /* THE UNIT LIVES IN THE NAME (ADR-0048 §77.3, "declaration over discovery" #10).
+   * `wPx` is FINAL PIXELS in [MIN_W, W_FULL]: directly usable, never to be
+   * re-normalised, never to be treated as a ratio. Measured failure modes of the
+   * unnamed version: re-normalising gave the longest bar 6.59 instead of 22.00;
+   * treating it as a ratio gave 242.00 (a 22x unit error); indexing bars by event
+   * count gave undefined -> NaNpx back in a new form. None of them crashed, and all
+   * of them passed a gate that only checked names and counts. */
+  var W_UNIT = 'px';
+  var W_RANGE = [MIN_W, W_FULL];
   var TURN_MARKS = [['/kind', 'turn'], ['/type', 'turn/start']];
   function isTurnMark(e) {
     for (var i = 0; i < TURN_MARKS.length; i++) {
@@ -288,35 +304,30 @@
    * this predicate wrote 'P' while the algebra emits 'p', which would have shown
    * "unmeasured" forever with every gate green (ADR-0048 §73.3). */
   function barWidth(r, i) {
-    /* DECLARED, NOT SCATTERED (ADR-0048 §61.3). The old source had bare 22, a bare
-     * 0.5 and a bare 1.2 in the formula, which is why "22 vs 11" looked like an
-     * unexplained scale mismatch: 11 was 22 x 0.5, never written down. The measured
-     * output is unchanged digit for digit (22.00 / 11.00 / 1.20). */
-    var W_FULL = 22;        /* a duration-carrying bar at the session maximum */
-    var TOK_RATIO = 0.5;    /* a token-share bar, relative to a duration bar */
-    var W_TOK = W_FULL * TOK_RATIO;
-    var MIN_W = 1.2;        /* the geometric identity element: see §36 */
+    var scaleDur = W_FULL, scaleTok = W_TOK, minW = MIN_W;
+
     var scaleDur = W_FULL, scaleTok = W_TOK, minW = MIN_W;
     var maxDur = r.maxDur, maxTok = r.max;
     var isPresent = function (n) { return n && n.k === 'p' && Number.isFinite(n.v); };
     if (!isPresent(maxDur)) {
       /* Global switch off: no duration anywhere in this batch. A tok share cannot be
        * scaled without it (its divisor cancels), so the bar carries NO information. */
-      return { w: minW, src: 'unknown', reason: 'maxDur-not-measured' };
+      return { wPx: minW, src: 'unknown', reason: 'maxDur-not-measured' };
     }
     var durOfEvent = r.durStates[i];
     if (durOfEvent && isPresent(durOfEvent) && durOfEvent.v > 0) {
-      return { w: Math.max(minW, (durOfEvent.v / maxDur.v) * scaleDur), src: 'dur', reason: null };
+      return { wPx: Math.max(minW, (durOfEvent.v / maxDur.v) * scaleDur), src: 'dur', reason: null };
     }
     if (r.partial || !isPresent(maxTok)) {
-      return { w: minW, src: 'unknown', reason: 'denominator-not-measured' };
+      return { wPx: minW, src: 'unknown', reason: 'denominator-not-measured' };
     }
-    if (maxTok.v === 0) { return { w: minW, src: 'unknown', reason: 'denominator-zero' }; }
+    if (maxTok.v === 0) { return { wPx: minW, src: 'unknown', reason: 'denominator-zero' }; }
     var tokOfEvent = r.states[i];
-    if (!isPresent(tokOfEvent)) { return { w: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
-    return { w: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
+    if (!isPresent(tokOfEvent)) { return { wPx: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
+    return { wPx: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
   return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, foldedCell: foldedCell,
+           W_UNIT: W_UNIT, W_RANGE: W_RANGE,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
            project: project, ratioOf: ratioOf, shares: shares };
 }));

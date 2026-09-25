@@ -158,7 +158,7 @@ ok('contract: an event carrying completion_tokens MUST read as present',
     [[M.A(), M.A()], [M.A(), M.P(5)], [M.P(50), M.A()], [M.P(50), M.P(5)]].every(function (pair) {
       const rr = { maxDur: pair[0], max: M.P(5), partial: false, states: [M.P(5)], durStates: [pair[1]] };
       const b = M.barWidth(rr, 0);
-      return isFinite(b.w) && !Number.isNaN(b.w) && ['dur','tok','unknown'].indexOf(b.src) > -1;
+      return isFinite(b.wPx) && !Number.isNaN(b.wPx) && ['dur','tok','unknown'].indexOf(b.src) > -1;
     }));
 }());
 /* §50.1 — the view must NOT pass an index: project returns bars itself, so a
@@ -169,7 +169,7 @@ ok('project returns bars, so the view never passes an index',
                          {type:'tool/result', data:{duration_ms:50}, period_id:'P'}]);
     return Array.isArray(r.bars) && r.bars.length === 2
       && r.bars.every(function (b) { return ['dur','tok','unknown'].indexOf(b.src) > -1
-                                          && isFinite(b.w); });
+                                          && isFinite(b.wPx); });
   }()));
 /* §52 — INAPPLICABLE is not ABSENT. inject/tool never carry completion_tokens, so
  * excluding them must NOT make the group partial (that would flood every summary
@@ -239,6 +239,17 @@ ok('value point: absent reads as "no data"',
   ok('value point: a null carries the lower bound HERE (and the fold is not a bare number)',
     r.maxDisplay.bound === '>=' && r.tok.k === 'n' && r.partial === false);
 }());
+/* §77.3 — THE UNIT IS ASSERTED, not assumed: every width is final pixels inside the
+ * declared range, and no ratio-like field exists to be misread by 22x. */
+ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)',
+  (function () {
+    const r = M.project([{type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
+                         {type:'tool/result', data:{duration_ms:50}, period_id:'P'}]);
+    return M.W_UNIT === 'px'
+      && r.bars.every(function (b) {
+           return typeof b.wPx === 'number' && b.wPx >= M.W_RANGE[0] && b.wPx <= M.W_RANGE[1];
+         });
+  }()));
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
