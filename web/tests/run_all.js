@@ -428,12 +428,22 @@ const deferred = [], unknown = [];
  * must be retired NOW. A DATE is a heuristic (expiring is not the same as
  * reachable); XPASS is EVIDENCE (it really ran). This is also the missing
  * "the door can open" direction for deferrals. */
+/* ABSENCE IS NOT A PASS. The first version of this tested only "not in
+ * NEEDS_INPUT", which is equally true of a suite that was NEVER EXECUTED — it
+ * would have reported XPASS for a suite that never ran. Positive evidence is
+ * required: the suite must be one the runner actually EXECUTES (SELF_CONTAINED)
+ * and it must not have reported unproven. This is the `0` / `null` / absent
+ * family again, inside the detector for that family. */
+const EXECUTED = SELF_CONTAINED.map(function (e) { return e[0]; });
 const xpass = [];
 for (const d of (DEFERRALS.deferrals || [])) {
-  if (!NEEDS_INPUT.some(function (e) { return e[0] === d.suite; })) {
+  if (EXECUTED.indexOf(d.suite) > -1
+      && !NEEDS_INPUT.some(function (e) { return e[0] === d.suite; })) {
     xpass.push(d.suite + ' [' + d.id + ']');
   }
 }
+const heldAttempted = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) > -1; });
+const heldNever = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) === -1; });
 
 for (const [file, why] of NEEDS_INPUT) {
   const c = classify(file);
@@ -446,8 +456,13 @@ console.log('regression net');
 for (const [status, file, what] of results) {
   console.log('  ' + status + '  ' + file.padEnd(24) + what);
 }
-for (const [file, kind, why] of deferred) {
+for (const [file, kind, why] of heldAttempted) {
   console.log('  HELD  ' + file.padEnd(24) + '[' + kind + '] ' + why);
+}
+/* NEVER ATTEMPTED is not the same as ATTEMPTED BUT UNPROVEN — the first says
+ * nothing about reachability, so it is the one that must carry an expiry. */
+for (const [file, kind, why] of heldNever) {
+  console.log('  HELD? ' + file.padEnd(24) + '[' + kind + '] NEVER ATTEMPTED — ' + why);
 }
 for (const [file, why, kwhy] of unknown) {
   console.log('  ????  ' + file.padEnd(24) + 'UNREGISTERED/BLOCKING — ' + kwhy);
@@ -478,7 +493,7 @@ if (xpass.length) {
 if (pendingOverdue.length) {
   console.log('  WARN  own un-done items past due: ' + pendingOverdue.join('; '));
 }
-console.log((failed === 0 && xpass.length === 0)
+console.log(failed === 0
   ? (unknown.length > 0
       ? 'BLOCKED — ' + proven + ' proven, ' + deferred.length + ' held (registered), '
         + unknown.length + ' UNREGISTERED, 0 red'
@@ -486,6 +501,9 @@ console.log((failed === 0 && xpass.length === 0)
           ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
             + ' held (registered), 0 red  [env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
-  : (xpass.length ? 'XPASS — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
+  : (xpass.length ? 'LEDGER STALE — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered');
-process.exit((failed > 0 || xpass.length > 0) ? 1 : (unknown.length > 0 ? 2 : 0));
+/* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
+ * ledger". Merging them into exit 1 would guarantee the wrong remedy, so XPASS
+ * rides the register channel (3 = the checker's own bookkeeping is stale). */
+process.exit(failed > 0 ? 1 : (xpass.length > 0 ? 3 : (unknown.length > 0 ? 2 : 0)));
