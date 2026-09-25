@@ -613,10 +613,21 @@ try {
     return l.indexOf('| ') === 0 && l.indexOf('| 判据') !== 0 && l.indexOf('|---') !== 0;
   }).length;
 } catch (e) { unpaired = -1; }
+/* ADJUDICATED, not left implicit. An unreadable inventory is ORACLE ABSENCE, the same
+ * class as an unusable git, and this gate already blocks that class (exit 3) with the
+ * reasoning "an unusable oracle is not an empty change set". Leaving the two opposite
+ * defaults in place for the same class of absence is how a gate rots. So: block. */
+if (unpaired < 0) {
+  console.log('REGISTER ERROR: the criteria inventory is unreadable, so the mutation-coverage'
+    + ' debt cannot be judged. Oracle absence, not an empty debt — refusing to continue.');
+  process.exit(3);
+}
 if (unpaired !== 0) {
-  console.log('  YELLOW  inventory debt: ' + (unpaired < 0 ? 'unreadable' : unpaired)
+  console.log('  YELLOW  inventory debt (SELF-DECLARED): ' + unpaired
     + ' criterion/ies have NO mutation proof (see CRITERIA-INVENTORY.md). They are NOT'
-    + ' "proven" — recorded debt that does not affect judgement gets ignored.');
+    + ' "proven". NOTE: this count is read from a HAND-WRITTEN table, so it is'
+    + ' self-declared — structurally a claim, not evidence, until the table is generated'
+    + ' from harness output (TAP13 / JUnit XML) instead of typed by hand.');
 }
 
 if (failedRoster.length) {
@@ -638,7 +649,7 @@ console.log(failed === 0
       : (NEEDS_INPUT.length === 0
           ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
-            + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' pinned:' + (DEFERRALS.deferrals || []).filter(function (d) { return d.depends_on; }).length + '/' + SELF_CONTAINED.length + ' unpaired:' + unpaired + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
+            + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' pinned:' + (DEFERRALS.deferrals || []).filter(function (d) { return d.depends_on; }).length + '/' + SELF_CONTAINED.length + ' unpaired-self-declared:' + unpaired + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
   : (xpass.length ? 'LEDGER STALE — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered');
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the

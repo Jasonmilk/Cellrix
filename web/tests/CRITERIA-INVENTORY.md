@@ -65,6 +65,19 @@
 | 巨人路径（ArchUnit / TanStack / Bazel / Nix …） | 参照，非本仓判据 |
 | `_why` 类元说明字段 | 元数据 |
 
+
+## 裁定（显式，不留隐式默认）
+
+**表不可读 ⇒ exit 3（阻断）。** 理由：**表不可读是 oracle 缺失**,与本门已经阻断的
+`git` 不可用**同类**（`an unusable oracle is not an empty change set`）。
+**同一类缺失不能有两个相反的默认。**
+
+**本表目前是手写的** ⇒ `unpaired:N` 是**自报数**（结论行已标 `self-declared`）,
+结构上**仍是"陈述强于证据"**。
+**出路（未做）**：harness 输出 **TAP13 / JUnit XML**,表由**解析器生成** ⇒
+**从此不可能与运行结果不一致**,且 `paired` 档**天然不可手填**;
+更远一步是 **in-toto / SLSA provenance**——**表即判据的出处证明**。
+
 ## 用法
 
 - **`paired` 才可以被称作"已证"**;`unpaired` 一律**欠账**;`document` **不进已证清单**。
