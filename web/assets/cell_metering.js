@@ -28,12 +28,16 @@
     var list = [];
     for (var i = 0; i < events.length; i++) { list.push(tokOf(events[i])); }
     var folded = TS.fold(list);
-    var acc = TS.start();
-    for (var j = 0; j < list.length; j++) { acc = { value: TS.max(acc.value, list[j]),
-                                                   seenP: acc.seenP, seenA: acc.seenA }; }
+    var acc = TS.start(), seenPMax = false, seenAMax = false;
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].k === 'p') { seenPMax = true; }
+      if (list[j].k === 'a') { seenAMax = true; }
+      acc = { value: TS.max(acc.value, list[j]), seenP: seenPMax, seenA: seenAMax };
+    }
     return {
       tok: folded.value,
       max: acc.value,
+      maxPartial: seenAMax && seenPMax,
       partial: folded.partial,
       count: folded.count,
       bound: TS.lowerBound(folded).bound || null
@@ -43,5 +47,35 @@
     var r = TS.ratio({ value: a.tok, partial: a.partial }, { value: b.tok, partial: b.partial });
     return { value: r.value, reason: r.reason };
   }
-  return { tokOf: tokOf, project: project, ratioOf: ratioOf };
+  /* PER-EVENT SHARES — `:338` is a share BAR, not a whole-cell ratio: [120,80,200]
+   * shows 0.600/0.400/1.000, three different numbers. Replacing it with
+   * ratioOf(sum, max) would make every bar identical — a USER-VISIBLE SEMANTIC
+   * CHANGE, not a bug fix. So each event goes through the three states on its own,
+   * against the same denominator.
+   *
+   * And the denominator carries the direction-flip rule: if the MAX was not
+   * measured (absent/null) or is only a lower bound (partial), then even a known
+   * bar's share is unknown — the denominator being a bound flips the direction. */
+  /* ONE aggregation path: `shares` derives the denominator ITSELF, so a caller
+   * cannot pass the sum where the max belongs (that bug happened once already). */
+  function shares(events) {
+    var p = project(events);
+    var denomPartial = p.maxPartial;
+    var denom = p.max;
+    var out = [];
+    for (var i = 0; i < events.length; i++) {
+      var num = tokOf(events[i]);
+      if (denomPartial || denom.k !== 'p') {
+        out.push({ value: denom.k === 'a' ? TS.A() : TS.N(), reason: 'denominator-not-measured' });
+      } else if (denom.v === 0) {
+        out.push({ value: TS.N(), reason: 'denominator-zero' });
+      } else if (num.k !== 'p') {
+        out.push({ value: num.k === 'a' ? TS.A() : TS.N(), reason: 'numerator-not-measured' });
+      } else {
+        out.push({ value: TS.div(num, denom), reason: null });
+      }
+    }
+    return out;
+  }
+  return { tokOf: tokOf, project: project, ratioOf: ratioOf, shares: shares };
 }));
