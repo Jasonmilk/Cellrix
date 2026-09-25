@@ -539,6 +539,46 @@ console.log('');
  * (`K12`: "an unattended run stayed red" taught everyone to ignore it). */
 const proven = results.filter(function (r) { return r[0] === 'PASS'; }).length;
 const requireAll = process.argv.indexOf('--require-all') > -1;
+/* ── SENTINEL PAIR: the roster's own calibration ─────────────────────────────
+ * Two directions, both asserted, and NEITHER may change the exit code (a permanent
+ * red that counted would weld the gate shut). Admission is by DECLARATION only. */
+const SENT = DEFERRALS.sentinels || { red: [], held: [] };
+function runSentinel(f) {
+  try { execFileSync(process.execPath, [path.join(__dirname, f)], { stdio: 'pipe' }); return 0; }
+  catch (e) { return (e && typeof e.status === 'number') ? e.status : -1; }
+}
+const sentProblems = [];
+/* AN EMPTY DECLARED SET IS SILENT DEATH: deleting the sentinel from the register
+ * would otherwise remove the control and every assertion with it. */
+if (!(SENT.red || []).length || !(SENT.held || []).length) {
+  sentProblems.push('the sentinel pair must be DECLARED (red and held): an empty set'
+    + ' removes the control and its assertions silently');
+}
+for (const f of (SENT.red || [])) {
+  const code = runSentinel(f);
+  if (code === 1) {
+    console.log('  RED ROSTER (sentinel, NOT counted): ' + f + ' (exit ' + code + ')');
+  } else {
+    sentProblems.push('SENTINEL_RED ' + f + ' returned ' + code + ', expected 1'
+      + ' — the negative control is dead, so "the roster works" is unproven');
+  }
+}
+for (const f of (SENT.held || [])) {
+  const code = runSentinel(f);
+  if (code !== 3) {
+    sentProblems.push('SENTINEL_HELD ' + f + ' returned ' + code + ', expected 3');
+  } else if (failedRoster.some(function (x) { return String(x).indexOf(f) > -1; })) {
+    sentProblems.push('SENTINEL_HELD ' + f + ' appeared in the RED ROSTER'
+      + ' — held and failed are being conflated, which is the bug this pair exists for');
+  } else {
+    console.log('  HELD  ' + f.padEnd(24) + '[sentinel] unproven on purpose, NOT counted');
+  }
+}
+if (sentProblems.length) {
+  console.log('REGISTER ERROR: ' + sentProblems.join('; '));
+  process.exit(3);
+}
+
 if (failedRoster.length) {
   console.log('  RED ROSTER (a count is not attributable — name the members): '
     + failedRoster.join(', '));
@@ -558,7 +598,7 @@ console.log(failed === 0
       : (NEEDS_INPUT.length === 0
           ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
-            + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
+            + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' pinned:' + (DEFERRALS.deferrals || []).filter(function (d) { return d.depends_on; }).length + '/' + SELF_CONTAINED.length + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
   : (xpass.length ? 'LEDGER STALE — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered');
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the

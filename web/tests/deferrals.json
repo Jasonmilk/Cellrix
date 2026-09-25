@@ -129,5 +129,14 @@
       "due": "2026-11-10",
       "retirement_plan": "hash-normalisation: normalise the input hash - sort paths, drop mtime, use relative paths, and prefer CONTENT hashing over name+size (name+size is stable but blind to a same-size edit). A hash containing mtime, traversal order or absolute paths produces FALSE drift, which is worse than no sha at all because it sends you chasing a drift that does not exist. See reproducible-builds.org, git hash-object, Bazel/Nix content addressing."
     }
-  ]
+  ],
+  "sentinels": {
+    "red": [
+      "sentinel_red.js"
+    ],
+    "held": [
+      "sentinel_held.js"
+    ],
+    "_why": "A CLOSED DECLARED SET. 'Not counted' must never be inferable from a name: anyone could then relabel a failing suite as a sentinel to bypass the gate. Declaration is the only admission path, exactly as with `requires`."
+  }
 }
