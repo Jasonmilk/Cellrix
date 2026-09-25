@@ -273,7 +273,7 @@
         (it.repeat ? '<span class="e-rep">stuck ×' + it.repeat + '</span>' : '') + '</td>' +
         '<td><span class="e-st ' + st.c + '"><span class="d"></span>' + st.t + '</span></td>' +
         '<td class="e-dur">' + fmtDur(it.dur) + '</td>' +
-        '<td class="e-tok">' + fmtTok(it.tok) + '</td></tr>' });
+        '<td class="e-tok">' + window.CxCellMetering.stateText(cellBarAt(i)) + '</td></tr>' });
     }
     /* Nothing to draw. Before this the table simply went blank, which is
      * indistinguishable from "still loading" and gives no way forward
@@ -345,6 +345,20 @@
   }
 
   /* ---------- Three lanes: one shared ruler ---------- */
+  /* BARS FOR THE ROW CELL, DERIVED — NOT STORED STALE (ADR-0048 §80.2). The first draft
+   * memoised on a plain field, which would survive a session change and serve widths
+   * from the previous session. Keyed on the ARRAY IDENTITY, it re-derives exactly when
+   * the input changes. (Same rule the compact groups already follow one screen up:
+   * "derived on every render rather than stored, so it cannot go stale".) */
+  var CELL_BARS = null, CELL_BARS_OF = null;
+  function cellBarAt(i) {
+    if (CELL_BARS_OF !== S.session) {
+      CELL_BARS = window.CxCellMetering.project(S.session).bars;
+      CELL_BARS_OF = S.session;
+    }
+    return CELL_BARS[i] ? CELL_BARS[i].value : null;
+  }
+
   function renderLanes() {
     var lanes = {}, evs = [];
     LANES.forEach(function (k) { lanes[k] = []; });

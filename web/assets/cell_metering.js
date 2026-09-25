@@ -325,6 +325,17 @@
    * silently showed "unmeasured" forever. Callers ask; they do not spell state.
    * (Zero-hard-coding: the state vocabulary lives HERE, once.) */
   function isPresent(st) { return !!st && st.k === TS.P(0).k; }
+  /* A STATE BECOMES TEXT HERE, ONCE (ADR-0048 §80.1). The view used to pass a STATE
+   * into a number formatter, which is the third instance of the same family: the
+   * interface changed shape and the CONSUMER did not (barWidthsFor crashed; `k === 'p'`
+   * was never true; this one rendered "unmeasured"/NaN forever). No consumer may spell
+   * the states again. */
+  function stateText(st) {
+    if (!st) { return '\u00b7 \u65e0\u6570\u636e'; }
+    if (st.k === TS.P(0).k) { return String(st.v); }
+    if (st.k === TS.N().k) { return '\u00b7 \u672a\u8ba1\u91cf'; }
+    return '\u00b7 \u65e0\u6570\u636e';
+  }
   /* The vocabulary is DERIVED from the algebra, never re-spelled: the first draft of
    * this predicate wrote 'P' while the algebra emits 'p', which would have shown
    * "unmeasured" forever with every gate green (ADR-0048 §73.3). */
@@ -351,7 +362,8 @@
     if (!isPresent(tokOfEvent)) { return { wPx: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
     return { wPx: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
-  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, foldedCell: foldedCell,
+  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, stateText: stateText,
+           foldedCell: foldedCell,
            W_UNIT: W_UNIT, W_RANGE: W_RANGE, BAR_KEYS: BAR_KEYS,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
            project: project, ratioOf: ratioOf, shares: shares };
