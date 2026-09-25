@@ -134,6 +134,12 @@
       "owner": "jason",
       "due": "2026-12-20",
       "retirement_plan": "a11y-same-number-criterion: implement ADR-0048 1.4 - ask the SAME question of the rendered screen and of the semantic grid and require the SAME number. The screen side needs a programmatic carbon proxy, and the only usable one is the CDP Accessibility domain, which is ABSENT in this environment, so this criterion lands HELD (unable to go red) - exactly the class N-012 forbids shipping silently. Register the ASSERTION MEANS together with the criterion (CDP Accessibility domain, or axe-core where CDP is unavailable) and do NOT substitute jsdom: a jsdom approximation would make 'the same number' false while looking green. Prerequisite: the grid must be derived DIRECTLY from the ledger, never via the DOM, or the two sides share a chain and the criterion self-certifies, losing all discriminating power and leaving invariant B (no ghost semantics) untestable."
+    },
+    {
+      "id": "pending-axis-three-states",
+      "owner": "jason",
+      "due": "2026-12-05",
+      "retirement_plan": "pending-axis-three-states: THREE AXES, NOT TWO (share / duration / pending). `v > PEND_MIN` makes null and undefined both false, so the pending axis collapses exactly like `|| 0` did on the share axis. Give it the same three states, AND move the pending markers (pendIdx) so they are distributed WITH turns[i].bars: today pendIdx holds BATCH indices ([0,3]) while each segment has only its own 0..n, so a marker pointing at index 3 lands on undefined inside a 3-bar segment and misaligns WITHOUT AN ERROR. This is the FIFTH location of the one invariant: two denominator sources -> two groupings -> two sources for one cell -> subset/full set -> pending index."
     }
   ],
   "sentinels": {
