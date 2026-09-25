@@ -44,4 +44,17 @@ step "4/4 whole gate"
 node run_all.js 2>&1 | tail -2
 
 step "verdict"
-if [ "$fail" = 0 ]; then echo "  PRECOMMIT OK — safe to commit"; else echo "  PRECOMMIT FAILED — do NOT commit"; exit 1; fi
+# THE VERDICT MUST REFLECT THE WHOLE GATE (a verdict of OK while the suite is red is
+# exactly the self-deception this script exists to prevent). Two reds are expected and
+# named: this cell's gate (M3 target) and the pre-existing unrelated rows test.
+whole=$(node run_all.js 2>&1)
+last=$(printf '%s' "$whole" | tail -1)
+unexpected=$(printf '%s' "$last" | sed -n 's/.*\([0-9]*\) red.*/\1/p')
+# NAMES come from the whole output (the RED ROSTER line), never from the summary line —
+# reading only the summary is how a gate stays green while naming nothing.
+known=$(printf '%s' "$whole" | grep -E 'view_hygiene_test\.js|prove_track_rows_test\.js' | grep -c 'exit 1')
+if [ "$fail" != 0 ]; then echo "  PRECOMMIT FAILED — do NOT commit (syntax/red-path)"; exit 1; fi
+if [ -n "$unexpected" ] && [ "$unexpected" -gt "$known" ]; then
+  echo "  PRECOMMIT FAILED — $unexpected red(s), only $known expected: $last"; exit 1
+fi
+echo "  PRECOMMIT OK — safe to commit ($last)" 
