@@ -172,6 +172,36 @@
     out.nonFinite = nonFinite;
     return out;
   }
-  return { tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet,
+  /* BAR GEOMETRY as a pure function (ADR-0048 §36/§40): the two diseases both live
+   * here — the `1.2` identity element that disguises "no data" as a legal minimum
+   * width, and `NaNpx` from a bare `/` on an absent value. So this function:
+   *   - NEVER produces NaN or Infinity;
+   *   - returns { w, src } with src in {dur, tok, unknown}, and src is what the
+   *     completion criterion reads (w alone has no discriminating power);
+   *   - treats maxDur as a GLOBAL SWITCH: missing maxDur means every bar is unknown,
+   *     even when tok has a value (measured: maxDur=0 collapses tok bars too). */
+  function barWidth(r, durOfEvent, opts) {
+    var o = opts || {};
+    var scaleDur = 22, scaleTok = 11, minW = 1.2;
+    var maxDur = r.maxDur, maxTok = r.max;
+    var isPresent = function (n) { return n && n.k === 'p' && Number.isFinite(n.v); };
+    if (!isPresent(maxDur)) {
+      /* Global switch off: no duration anywhere in this batch. A tok share cannot be
+       * scaled without it (its divisor cancels), so the bar carries NO information. */
+      return { w: minW, src: 'unknown', reason: 'maxDur-not-measured' };
+    }
+    if (durOfEvent && isPresent(durOfEvent) && durOfEvent.v > 0) {
+      return { w: Math.max(minW, (durOfEvent.v / maxDur.v) * scaleDur), src: 'dur', reason: null };
+    }
+    if (r.partial || !isPresent(maxTok)) {
+      return { w: minW, src: 'unknown', reason: 'denominator-not-measured' };
+    }
+    if (maxTok.v === 0) { return { w: minW, src: 'unknown', reason: 'denominator-zero' }; }
+    var tokOfEvent = o.tokOfEvent;
+    if (!isPresent(tokOfEvent)) { return { w: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
+    return { w: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
+  }
+  return { P: TS.P, N: TS.N, A: TS.A,
+           tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
            project: project, ratioOf: ratioOf, shares: shares };
 }));

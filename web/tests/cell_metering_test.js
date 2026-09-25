@@ -132,6 +132,26 @@ ok('contract: an event carrying completion_tokens MUST read as present',
   && M.tokOf({data:{completion_tokens:0}}).k === 'p'
   && M.tokOf({data:{completion_tokens:null}}).k === 'n'
   && M.tokOf({}).k === 'a');
+/* §40.3's three cases, now asserted on the pure geometry: the tok path cannot be
+ * scaled when maxDur is missing (it cancels), so src must be 'unknown' — NOT a
+ * bar at 1.2 pretending to be information. */
+(function () {
+  const ev = [{data:{completion_tokens:5}, period_id:'P'}, {data:{duration_ms:50}, period_id:'P'}];
+  const r = M.project(ev);
+  const noDur = { maxDur: M.A(), max: r.max, partial: r.partial };
+  ok('missing maxDur => every bar is src=unknown (the global switch, §40.3 A vs B)',
+    M.barWidth(noDur, M.A(), {}).src === 'unknown'
+    && M.barWidth(noDur, M.A(), { tokOfEvent: M.P(5) }).src === 'unknown');
+  const withDur = { maxDur: M.P(50), max: r.max, partial: r.partial };
+  ok('with maxDur but a PARTIAL max => tok bars stay unknown (lower-bound denominator)',
+    M.barWidth(withDur, M.A(), { tokOfEvent: M.P(5) }).src === 'unknown');
+  ok('bar width is never NaN or Infinity, for any combination',
+    [[M.A(), M.A()], [M.A(), M.P(5)], [M.P(50), M.A()], [M.P(50), M.P(5)]].every(function (pair) {
+      const rr = { maxDur: pair[0], max: M.P(5), partial: false };
+      const b = M.barWidth(rr, pair[1], { tokOfEvent: M.P(5) });
+      return isFinite(b.w) && !Number.isNaN(b.w) && ['dur','tok','unknown'].indexOf(b.src) > -1;
+    }));
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{data:{completion_tokens:120}}, A]), M.project([{data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
