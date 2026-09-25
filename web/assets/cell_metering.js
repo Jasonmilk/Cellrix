@@ -280,7 +280,15 @@
    *   - treats maxDur as a GLOBAL SWITCH: missing maxDur means every bar is unknown,
    *     even when tok has a value (measured: maxDur=0 collapses tok bars too). */
   function barWidth(r, i) {
-    var scaleDur = 22, scaleTok = 11, minW = 1.2;
+    /* DECLARED, NOT SCATTERED (ADR-0048 §61.3). The old source had bare 22, a bare
+     * 0.5 and a bare 1.2 in the formula, which is why "22 vs 11" looked like an
+     * unexplained scale mismatch: 11 was 22 x 0.5, never written down. The measured
+     * output is unchanged digit for digit (22.00 / 11.00 / 1.20). */
+    var W_FULL = 22;        /* a duration-carrying bar at the session maximum */
+    var TOK_RATIO = 0.5;    /* a token-share bar, relative to a duration bar */
+    var W_TOK = W_FULL * TOK_RATIO;
+    var MIN_W = 1.2;        /* the geometric identity element: see §36 */
+    var scaleDur = W_FULL, scaleTok = W_TOK, minW = MIN_W;
     var maxDur = r.maxDur, maxTok = r.max;
     var isPresent = function (n) { return n && n.k === 'p' && Number.isFinite(n.v); };
     if (!isPresent(maxDur)) {

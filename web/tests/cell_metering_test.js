@@ -225,6 +225,20 @@ ok('project returns bars, so the view never passes an index',
     && r.turns[1].tok.v === 8 && r.turns[0].tok.v === 5
     && r.turns[0].bars.length === 2 && r.turns[1].bars.length === 2);
 }());
+/* §61.1 — THREE VALUE-POINT ASSERTIONS. The four states must not collapse at the fold
+ * layer: if turns[i].tok were a bare number, "contains null" (4) and "all unavailable"
+ * (0) would be indistinguishable there, and 0 is the additive identity — the same trap
+ * as observing three states through a sum. */
+ok('value point: present(0) must NOT read as "no data" (the additive identity trap)',
+  M.foldedCell(M.project([{type:'assistant/usage', data:{completion_tokens:0}, period_id:'P'}])) === '0');
+ok('value point: absent reads as "no data"',
+  M.foldedCell(M.project([{type:'assistant/usage', data:{}, period_id:'P'}])) === '· 无数据');
+(function () {
+  const r = M.project([{type:'assistant/usage', data:{completion_tokens:4}, period_id:'P'},
+                       {type:'assistant/usage', data:{completion_tokens:null}, period_id:'P'}]);
+  ok('value point: a null carries the lower bound HERE (and the fold is not a bare number)',
+    r.maxDisplay.bound === '>=' && r.tok.k === 'n' && r.partial === false);
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
