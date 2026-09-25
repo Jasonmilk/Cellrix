@@ -170,6 +170,12 @@
       "owner": "jason",
       "due": "2026-12-31",
       "retirement_plan": "four-src-states-in-grid: bars[j].src now ranges over {dur, tok, unknown, n/a}. Cellrix README says colors represent system states, never decoration, so all FOUR states must be representable in the semantic grid (not only in the render). This is the silicon-side extension of the judgment (M4 reads project(), never infers from the DOM). Registered, NOT part of b1."
+    },
+    {
+      "id": "m3-excludes-unrelated-red",
+      "owner": "jason",
+      "due": "2026-12-31",
+      "retirement_plan": "m3-excludes-unrelated-red: M3 is this cell's delivery point, and the whole gate reports a SECOND red that predates this work and belongs to another surface (prove_track_rows_test.js, trajectory row keyed reuse). Counting it inside M3 makes the delivery point unreachable for reasons this cell cannot fix. M3 therefore reads: this cell's ASSERTED classes -> 0 AND the presence checks green; the unrelated red stays on the ledger with its own name."
     }
   ],
   "sentinels": {

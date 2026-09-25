@@ -13,7 +13,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const TARGET = path.join(__dirname, '..', 'assets', 'prove_track.view.js');
+/* VIEW_TARGET lets the pre-commit script run the RED-PATH self-test against a
+ * temporary copy: an unverified red path is how a check silently stops working. */
+const TARGET = process.env.VIEW_TARGET || path.join(__dirname, '..', 'assets', 'prove_track.view.js');
 const ASSETS = path.join(__dirname, '..', 'assets');
 const BOOT = path.join(__dirname, '..', 'src', 'boot.rs');
 
