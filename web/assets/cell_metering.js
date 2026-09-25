@@ -80,6 +80,7 @@
     var folded = TS.fold(list);
     var acc = TS.start(), seenPMax = false, seenAMax = false, seenAnyNull = false;
     var displayMax = null;
+    var maxDurAcc = TS.A(), seenPDur = false, seenADur = false;
     for (var j = 0; j < list.length; j++) {
       if (list[j].k === 'p') { seenPMax = true; }
       if (list[j].k === 'a') { seenAMax = true; }
@@ -87,10 +88,16 @@
       if (list[j].k === 'p') { displayMax = (displayMax === null) ? list[j].v
                                                               : Math.max(displayMax, list[j].v); }
       acc = { value: TS.max(acc.value, list[j]), seenP: seenPMax, seenA: seenAMax };
+      var dj = durList[j];
+      if (dj.k === 'p') { seenPDur = true; }
+      if (dj.k === 'a') { seenADur = true; }
+      maxDurAcc = TS.max(maxDurAcc, dj);
     }
-    return {
+    var self = {
       states: list,
       durStates: durList,
+      maxDur: maxDurAcc,
+      maxDurPartial: seenPDur && seenADur,
       projected: true,
       /* MAX HAS TWO USES, ADJUDICATED SEPARATELY (ADR §33):
        *   as DISPLAY      -> a LOWER BOUND is a true statement (>=200),
@@ -111,6 +118,12 @@
       count: folded.count,
       bound: TS.lowerBound(folded).bound || null
     };
+    /* BARS ARE RETURNED BY project, NOT INDEXED BY THE VIEW (ADR-0048 §50): if the
+     * view passed its own index, a filtered/sorted iteration would silently mismatch
+     * bars against events (React: "don't use index as key"). Returning the array makes
+     * that misalignment UNREPRESENTABLE — the same move as shares(project(x)). */
+    self.bars = list.map(function (_, i) { return barWidth(self, i); });
+    return self;
   }
   function ratioOf(a, b) {
     var r = TS.ratio({ value: a.tok, partial: a.partial }, { value: b.tok, partial: b.partial });

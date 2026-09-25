@@ -158,6 +158,16 @@ ok('contract: an event carrying completion_tokens MUST read as present',
       return isFinite(b.w) && !Number.isNaN(b.w) && ['dur','tok','unknown'].indexOf(b.src) > -1;
     }));
 }());
+/* §50.1 — the view must NOT pass an index: project returns bars itself, so a
+ * filtered/sorted iteration cannot silently mismatch bars against events. */
+ok('project returns bars, so the view never passes an index',
+  (function () {
+    const r = M.project([{data:{completion_tokens:5}, period_id:'P'},
+                         {data:{duration_ms:50}, period_id:'P'}]);
+    return Array.isArray(r.bars) && r.bars.length === 2
+      && r.bars.every(function (b) { return ['dur','tok','unknown'].indexOf(b.src) > -1
+                                          && isFinite(b.w); });
+  }()));
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{data:{completion_tokens:120}}, A]), M.project([{data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
