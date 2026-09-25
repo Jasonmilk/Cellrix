@@ -445,3 +445,61 @@ TAP/解析器**是工具链**,不该排在竖切片前面 ⇒ **同轮做，且�
   ⇒ **先只修读取点**;判据 4 **仍红再引入适配层**（不预先造层）;
 - **静态断言会立刻全红遗留代码** ⇒ **必须限定该格**（或带计数，
   形态同 `pinned` / `unpaired`）,否则它会成为又一道被关掉的门。
+
+## 21. 巨人路径的**核实结果**及其对本格的约束
+
+> **来源**：由审查方**联网核实**后提供（Flutter issue #145954 与 docs.flutter.dev、
+> figma.com/blog、flatbuffers.dev、capnproto-rust、protobuf `docs/field_presence.md`）。
+> **本 ADR 记录其结论，未由本仓独立复核**——按本仓纪律，未复核者**不作已证事实**,
+> 仅作**设计约束**引用。
+
+### 21.1 Flutter：教训是**后端数量**，不是 DOM（审查方亦更正了自身措辞）
+
+官方理由为三条：**维护成本 / 开发者面对多渲染器的复杂度 / 焦点分散**——
+（审查方上一轮说的"DOM 无法保证跨端一致"是**其推断，官方未这样写**;已更正。
+**这与本仓反复在杀的"陈述强于证据"同形。**）
+
+⇒ **对三后端的约束**：**不要并行推进**。**先固一个，其余登记。**
+这比 Strangler Fig 更强：**Strangler Fig 约束格子数量,本条约束后端数量。**
+
+### 21.2 `WebGoldenComparator` 废弃 ⇒ 判据载体的**硬约束**
+
+官方：`WebGoldenComparator` 因 **HTML 后端移除**而废弃——**DOM 后端无法产出编码后的
+PNG 字节缓冲**。
+
+⇒ **「渲染确定性快照」在 DOM 侧只能是 DOM 结构快照,不得假装是字节 golden。**
+**判据要写清它比的是什么**,否则"确定性"一词会比证据强一档。
+
+### 21.3 Figma：**同源两投影的工业级实例**（ADR §1 的更佳出处）
+
+同一份 C++ 渲染器**编译两次**（浏览器 WASM / 服务端原生）⇒
+**用户所见与服务端导出 pixel-perfect 一致。**
+⇒ **本 ADR §1 的正式表述可引它**（比 proto3 更贴）。
+
+### 21.4 反面：**离开 DOM，a11y 要自己重建**（对 `a11y-tree-projection` 是决定性的）
+
+Figma 明确付出此代价：*"you rebuild text layout, input, hit-testing, and accessibility
+yourself, because you left the platform that gave them to you."*
+
+⇒ **`a11y-tree-projection` 绑定 DOM 后端**，**不指望从 WASM/WebGL 后端产出**。
+⇒ 三后端分工照 Figma：**DOM 后端负责 a11y 与文本;WASM/WebGL 后端负责高保真渲染。**
+（网格本身仍**ledger 直出**——§2;DOM 只是**对外导出**那条最便宜的路。）
+
+### 21.5 schema：路是现成的，**但本 spike 不引入**
+
+FlatBuffers（`--rust`/`--js`/`--ts`）与 Cap'n Proto（`capnpc` / `node-capnp`）**官方均支持
+Rust + JS/TS 双侧** ⇒ "一份 schema → 多语言生成"**不必自造**。
+**但引入 schema 工具链＝新的构建依赖**，与 ADR-0022「不引入新构建体系」**有张力，未解**。
+⇒ **本 spike 只保留设计纪律：状态模型的形状受 schema 表达力约束**
+（不引入 Rust 无法表达的构造）;**工具化留待全量阶段。**
+
+### 21.6 Protobuf field presence：**比原判断更强**（CI-144 约束的实证）
+
+proto3 早期**移除** presence ⇒ 标量上 `0` 与"未设置"不可分;移除理由当时是
+*"field presence info is not needed in most cases"*;此后 **3.12 实验性 → 3.15 默认**重新引入
+`optional`（底层：合成 oneof + `has_xxx()`）;**官方文档现在建议 proto3 标量始终加 `optional`**;
+更远是 **Protobuf Editions**。
+
+⇒ **CI-144 那条「`0`/`null` 不可分」的约束有全球规模的实证。**
+且那句移除理由 **"大多数情况不需要"**,与本仓 deferral 里的"以后再说"**是同一种乐观**——
+**这类乐观是本 ADR 全部机制存在的理由。**
