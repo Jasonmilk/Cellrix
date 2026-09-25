@@ -24,7 +24,14 @@ S('[120,80,absent,200]   ', [{tok:120},{tok:80},A,{tok:200}], 'p:400 [partial]')
 S('[120,80,null,200]     ', [{tok:120},{tok:80},N,{tok:200}], 'n');
 (function () {
   const all = [[A,A],[Z],[Z,A],[Z,N],[{tok:120},{tok:80},A,{tok:200}],[{tok:120},{tok:80},N,{tok:200}]];
-  ok('no NaN / no Infinity anywhere', all.every(function (ev) {
+  ok('max comes from the SAME pass (no second aggregation path)',
+  (function () {
+    const f = M.project([{tok:120}, {tok:80}, A, {tok:200}]);
+    return f.max.k === 'p' && f.max.v === 200;
+  }()));
+ok('max also carries three states (absent-only max is absent, not 0)',
+  M.project([A, A]).max.k === 'a' && M.project([{tok:null}]).max.k === 'n');
+ok('no NaN / no Infinity anywhere', all.every(function (ev) {
     const f = M.project(ev);
     return f.tok.k !== 'p' || (isFinite(f.tok.v) && !Number.isNaN(f.tok.v));
   }));

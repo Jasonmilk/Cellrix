@@ -21,12 +21,19 @@
     if (e.tok === null) { return TS.N(); }
     return TS.P(e.tok);
   }
+  /* BOTH aggregates the cell needs, from the SAME list, in ONE pass — otherwise the
+   * view keeps its own :335 max loop and the cell has TWO aggregation paths, which is
+   * guaranteed drift (the "two menus" problem). `max` also carries the three states. */
   function project(events) {
     var list = [];
     for (var i = 0; i < events.length; i++) { list.push(tokOf(events[i])); }
     var folded = TS.fold(list);
+    var acc = TS.start();
+    for (var j = 0; j < list.length; j++) { acc = { value: TS.max(acc.value, list[j]),
+                                                   seenP: acc.seenP, seenA: acc.seenA }; }
     return {
       tok: folded.value,
+      max: acc.value,
       partial: folded.partial,
       count: folded.count,
       bound: TS.lowerBound(folded).bound || null
