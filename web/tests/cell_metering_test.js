@@ -332,6 +332,18 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
     M.setGridCols === undefined && M.cellPctOf(80) === 1.25
     && M.allocate([P], {gridCols:80}).gridCols === 80);
 }());
+/* ② migrate (ADR-0048 §99): THE ASSERTION THAT MUST GO RED BEFORE ③.
+ * It covers the WHOLE pixel encoding, not just one name — deleting a single constant
+ * must not be enough to turn it green. Expected state RIGHT NOW: RED (the encoding is
+ * still present). ③ deletes wPx/W_UNIT/W_RANGE/barWidth and this same assertion turns
+ * GREEN: red -> green IS the evidence for that commit (expand -> migrate -> contract). */
+ok('EXPECTED-RED until ③: no pixel encoding coexists with the percentage encoding',
+  !('wPx' in M) && !('W_UNIT' in M) && !('W_RANGE' in M) && !('barWidth' in M)
+  && !/\bwPx\b/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'cell_metering.js'), 'utf8')));
+/* META (same rule as the gate's META): the assertion above must EXIST and be EXERCISED —
+ * a list of expected reds that nobody ever exercised is not a list. */
+ok('META: the coexistence assertion above is present in this file',
+  require('fs').readFileSync(__filename, 'utf8').indexOf('EXPECTED-RED until') > -1);
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',

@@ -10,7 +10,7 @@ export NODE_PATH="${NODE_PATH:-/Users/jason/Developer/Jasonmilk/.test-node/node_
 fail=0
 step() { printf '\n== %s\n' "$1"; }
 
-step "1/4 syntax of every touched JS"
+step "1/5 syntax of every touched JS"
 for f in view_hygiene_test.js cell_metering_test.js three_state_test.js cell_seen.js \
          ../assets/cell_metering.js ../assets/prove_track.view.js; do
   if ! out=$(node --check "$f" 2>&1); then
@@ -19,10 +19,24 @@ for f in view_hygiene_test.js cell_metering_test.js three_state_test.js cell_see
 done
 [ "$fail" = 0 ] && echo "  ok"
 
-step "2/4 gate (normal path)"
+step "2/5 LOAD SMOKE (does the module still load and run?)"
+# A syntax check cannot see a load-time ReferenceError (a renamed declaration's leftover
+# is valid syntax and throws on evaluation — §67.4 TDZ, §98.5 stale constant). Smoke/BVT
+# answers exactly one question: does the program run? It also covers circular deps and
+# top-level evaluation throws.
+node -e "
+const M = require('../assets/cell_metering.js');
+const T = require('../assets/three_state.js');
+const r = M.project([{type:'assistant/usage', data:{completion_tokens:4}, period_id:'P'}]);
+const a = M.allocate([{state:M.P(4)},{state:M.A()}], {gridCols:200});
+if (!r || !r.bars || !a || typeof a.state !== 'string') { throw new Error('smoke: no usable output'); }
+console.log('  ok (project + allocate both ran)');
+" || { echo "  FAIL load smoke"; fail=1; }
+
+step "3/5 gate (normal path)"
 node view_hygiene_test.js || true
 
-step "3/4 gate RED PATH (a check that cannot go red is not a check)"
+step "4/5 gate RED PATH (a check that cannot go red is not a check)"
 tmp=$(mktemp /tmp/viewred.XXXXXX.js)
 cp ../assets/prove_track.view.js "$tmp"
 python3 - "$tmp" <<'PY'
@@ -40,7 +54,7 @@ else
 fi
 rm -f "$tmp"
 
-step "4/4 whole gate"
+step "5/5 whole gate"
 node run_all.js 2>&1 | tail -2
 
 step "verdict"
