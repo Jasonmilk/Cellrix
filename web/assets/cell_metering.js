@@ -16,10 +16,60 @@
   else { root.CxCellMetering = factory(root.CxThreeState); }
 }(typeof self !== 'undefined' ? self : this, function (TS) {
   'use strict';
-  function tokOf(e) {
-    if (!e || !('tok' in e) || e.tok === undefined) { return TS.A(); }
-    if (e.tok === null) { return TS.N(); }
-    return TS.P(e.tok);
+  /* DECLARED FIELD PATHS (ADR-0048 §42/§43): RFC 6901 JSON Pointer, ordered
+   * candidate chain, terminating on the FIRST KEY THAT EXISTS — not on the first
+   * non-empty value. Key present with null => N (explicitly unmeasured); key absent
+   * => A (not recorded); 0 => P(0). Reading top-level `e.tok` was the wrong drawer:
+   * real data carries /data/completion_tokens (OTel output_tokens, incremental). */
+  function ptrGet(obj, ptr) {
+    if (typeof ptr !== 'string' || ptr.charAt(0) !== '/') { return undefined; }
+    var cur = obj;
+    var parts = ptr.slice(1).split('/');
+    for (var i = 0; i < parts.length; i++) {
+      var key = parts[i].replace(/~1/g, '/').replace(/~0/g, '~');
+      if (cur === null || typeof cur !== 'object') { return undefined; }
+      if (!Object.prototype.hasOwnProperty.call(cur, key)) { return undefined; }
+      cur = cur[key];
+    }
+    return cur;
+  }
+  var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens'];
+  var DUR_PATHS = ['/data/duration_ms'];
+  function readChain(e, paths) {
+    for (var i = 0; i < paths.length; i++) {
+      var seg = paths[i].slice(1).split('/');
+      var cur = e, exists = true;
+      for (var j = 0; j < seg.length; j++) {
+        var key = seg[j].replace(/~1/g, '/').replace(/~0/g, '~');
+        if (cur === null || typeof cur !== 'object'
+            || !Object.prototype.hasOwnProperty.call(cur, key)) { exists = false; break; }
+        cur = cur[key];
+      }
+      if (!exists) { continue; }                 /* FIRST EXISTING KEY WINS */
+      if (cur === null) { return TS.N(); }        /* explicit null => unmeasured  */
+      return TS.P(cur);                           /* incl. 0                      */
+    }
+    return TS.A();                                /* nothing recorded             */
+  }
+  function tokOf(e) { return readChain(e, TOK_PATHS); }
+  function durOf(e) { return readChain(e, DUR_PATHS); }
+  /* INPUT SCOPE (ADR-0048 §41/§43): this cell aggregates ONE period.
+   * Missing period_id normalises to "" (PromQL: an undefined label matches the
+   * empty label value — it is not an error); two DISTINCT non-empty periods is a
+   * programmer error. Events lacking it do not participate, and are COUNTED. */
+  function scopeOf(events) {
+    var seen = {}, distinct = [], missing = 0, i, pid;
+    for (i = 0; i < events.length; i++) {
+      pid = (events[i] && events[i].period_id !== undefined) ? String(events[i].period_id) : '';
+      if (pid === '') { missing++; continue; }
+      if (!seen[pid]) { seen[pid] = true; distinct.push(pid); }
+    }
+    if (distinct.length > 1) {
+      throw new Error('project() accepts ONE period per batch; got ' + JSON.stringify(distinct)
+        + ' (ADR-0048 §41: cross-period aggregation crushes one period\'s shares with'
+        + ' another\'s magnitude). Group upstream, do not relax this check.');
+    }
+    return { period: distinct[0] || '', missing: missing };
   }
   /* BOTH aggregates the cell needs, from the SAME list, in ONE pass — otherwise the
    * view keeps its own :335 max loop and the cell has TWO aggregation paths, which is
@@ -122,5 +172,6 @@
     out.nonFinite = nonFinite;
     return out;
   }
-  return { tokOf: tokOf, project: project, ratioOf: ratioOf, shares: shares };
+  return { tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet,
+           project: project, ratioOf: ratioOf, shares: shares };
 }));
