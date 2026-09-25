@@ -10,9 +10,19 @@
 const { execFileSync } = require('child_process');
 const path = require('path');
 
-/* Cellrix is its own git repository, so the base is TWO levels up — not three.
- * (Every repo in this workspace has its own .git; the parent directory has none.) */
-const ROOT = path.join(__dirname, '..', '..');
+/* The repo root is DECLARED by asking git, not DISCOVERED by counting '..' levels.
+ * Counting levels was wrong once already (each repo here has its own .git), and it is
+ * the same 'discovery instead of declaration' shape as the rest of ADR-0048 §6. */
+let ROOT;
+try {
+  ROOT = execFileSync('git', ['-C', __dirname, 'rev-parse', '--show-toplevel'],
+    { encoding: 'utf8' }).trim();
+} catch (e) {
+  console.log('NEEDS-INPUT: the repository root cannot be DECLARED here (git rev-parse'
+    + ' failed). Failing closed rather than reporting clean: an unusable oracle is not'
+    + ' an empty change set.');
+  process.exit(3);
+}
 const ADR = 'docs/decisions/ADR-0048-panel-state-owner-and-render-contract.md';
 
 /* The governor: the CONCERN, with the path list as its projection. */
@@ -26,6 +36,14 @@ try {
 } catch (e) {
   console.log('NEEDS-INPUT: git is not usable here, so the boundary cannot be judged');
   process.exit(3);
+}
+
+/* A fence with nothing to judge has proven nothing. Say so instead of printing a
+ * pass that a reader will take as evidence. */
+if (files.length === 0) {
+  console.log('VACUOUS — no changed file to judge, so this run proves nothing about the'
+    + ' boundary (a clean tree is expected in CI; it is not a fence result).');
+  process.exit(0);
 }
 
 const inConcern = function (f) {
