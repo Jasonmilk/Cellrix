@@ -12,7 +12,12 @@
       "id": "cdp-browser",
       "probe": "cdp",
       "reason": "needs a real browser on the CDP port plus the live panel. Decided by PROBE, never by a date: a date is a guess, and 'the instance was never configured' must not read as 'the capability is absent'.",
-      "suites": ["layout_test.js", "measure_test.js", "perf_measure.js", "hit_targets_test.js"]
+      "suites": [
+        "layout_test.js",
+        "measure_test.js",
+        "perf_measure.js",
+        "hit_targets_test.js"
+      ]
     }
   ],
   "deferrals": [
@@ -22,7 +27,7 @@
       "owner": "jason",
       "expiry": "2026-12-31",
       "reason": "The criterion pins the DERIVED leaf id run-0537fb101ecccb5e. That recording was lost in the machine migration, and a hash cannot be inverted — so this is not 'not yet proven', it is UNREACHABLE: the criterion demands evidence that no longer exists in the world.",
-      "retirement_plan": "Rewrite the criterion to assert SHAPE (a lineage of N periods), not a pinned hash; then delete this entry. Mutation proof REQUIRED first: breaking the lineage must turn it red, or the rewrite is just moved goalposts."
+      "retirement_plan": "Rewrite prove_track_nodes_test.js to assert SHAPE (a lineage of N periods) instead of the pinned derived leaf run-0537fb101ecccb5e, then delete the entry recorded-10-period-chain. Target 2026-11-30. Mutation proof REQUIRED first: breaking the lineage must turn it red, or the rewrite is only moved goalposts."
     }
   ]
 }

@@ -332,7 +332,17 @@ function classify(file) {
   }
   for (const d of (DEFERRALS.deferrals || [])) {
     if (d.suite === file) {
-      if (!d.retirement_plan) { return { kind: 'unknown', why: 'deferral ' + d.id + ' has no retirement_plan' }; }
+      /* MACHINE-CHECKABLE, not free text. A non-empty blob would be filled once and
+       * then the gate is dead — the same argument that killed the global allow
+       * switch. Required: non-empty, names its own id, and states a target date. */
+      const plan = d.retirement_plan;
+      const badPlan = !plan || typeof plan !== 'string' || plan.length < 40
+        || plan.indexOf(d.id) === -1 || !/\d{4}-\d{2}-\d{2}/.test(plan);
+      if (badPlan) {
+        return { kind: 'unknown',
+                 why: 'deferral ' + d.id + ': retirement_plan must be machine-checkable — '
+                      + 'non-empty, name ' + d.id + ', and state a target date (YYYY-MM-DD)' };
+      }
       if (d.expiry && Date.parse(d.expiry) < Date.now()) {
         return { kind: 'unknown', why: 'deferral ' + d.id + ' EXPIRED on ' + d.expiry };
       }
@@ -384,7 +394,7 @@ console.log(failed === 0
       : (NEEDS_INPUT.length === 0
           ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
-            + ' held (registered), 0 red'))
+            + ' held (registered), 0 red  [env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
   : 'FAILED — ' + failed + ' red, ' + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered');
 process.exit(failed > 0 ? 1 : (unknown.length > 0 ? 2 : 0));
