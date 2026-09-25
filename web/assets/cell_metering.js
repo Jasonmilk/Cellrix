@@ -88,7 +88,7 @@
      * that is merely applicable to DURATION makes the tok fold partial — the exact
      * false-alarm flood this rule exists to prevent (measured: it happened even while
      * fixing it). `rows` is the UNION, for display; the two folds see only their own. */
-    var list = [], durList = [], naCount = 0;
+    var list = [], durList = [], naCount = 0, tokApplicableFlags = [];
     var tokFold = [], durFold = [];
     for (var i = 0; i < events.length; i++) {
       var applicableTok = applicable(events[i], TOK_APPLICABLE);
@@ -96,17 +96,20 @@
       if (!applicableTok && !applicableDur) { naCount++; continue; }
       list.push(applicableTok ? tokOf(events[i]) : TS.A());
       durList.push(applicableDur ? durOf(events[i]) : TS.A());
+      tokApplicableFlags.push(applicableTok);
       if (applicableTok) { tokFold.push(tokOf(events[i])); }
       if (applicableDur) { durFold.push(durOf(events[i])); }
     }
     var folded = TS.fold(tokFold);
     var acc = TS.start(), seenPMax = false, seenAMax = false, seenAnyNull = false;
-    var displayMax = null;
+    var displayMax = null, tokHasUnmeasured = false;
     var maxDurAcc = TS.A(), seenPDur = false, seenADur = false;
     for (var j = 0; j < list.length; j++) {
-      if (list[j].k === 'p') { seenPMax = true; }
-      if (list[j].k === 'a') { seenAMax = true; }
-      if (list[j].k === 'n') { seenAnyNull = true; }
+      if (list[j].k === 'p' && tokApplicableFlags[j]) { seenPMax = true; }
+      if (list[j].k === 'a' && tokApplicableFlags[j]) { seenAMax = true; }
+      if (list[j].k === 'n' && tokApplicableFlags[j]) { seenAnyNull = true; }
+      if (list[j].k === 'a' && tokApplicableFlags[j]) { tokHasUnmeasured = true; }
+      if (list[j].k === 'n' && tokApplicableFlags[j]) { tokHasUnmeasured = true; }
       if (list[j].k === 'p') { displayMax = (displayMax === null) ? list[j].v
                                                               : Math.max(displayMax, list[j].v); }
       acc = { value: TS.max(acc.value, list[j]), seenP: seenPMax, seenA: seenAMax };
@@ -131,7 +134,10 @@
          * on the strict (poisoned) max was a real bug: it returned unknown instead of
          * the honest ">=200". */
         if (!seenPMax) { return seenAMax ? { k: 'a' } : { k: 'n' }; }
-        return { k: 'p', v: displayMax, bound: (seenAMax || seenAnyNull) ? '>=' : null };
+        /* `>=` ONLY when the TOK dimension itself has unmeasured data: an always-on
+         * marker has the same discriminating power as the 1.2 identity element
+         * (measured: it showed while partial was false). */
+        return { k: 'p', v: displayMax, bound: tokHasUnmeasured ? '>=' : null };
       })(),
       tok: folded.value,
       max: acc.value,
@@ -139,7 +145,8 @@
       partial: folded.partial,
       count: folded.count,
       bound: TS.lowerBound(folded).bound || null,
-      na: naCount
+      na: naCount,
+      tokApplicable: tokApplicableFlags
     };
     /* BARS ARE RETURNED BY project, NOT INDEXED BY THE VIEW (ADR-0048 §50): if the
      * view passed its own index, a filtered/sorted iteration would silently mismatch
@@ -216,7 +223,12 @@
      *   nonFinite    — NaN/Infinity appeared. The gate asserts this must be 0.
      * A detector that counts the normal unknown as positive has specificity 0 — it is
      * not a detector (same family as "8080 answered, so the panel is up"). */
-    var unknownTotal = out.filter(function (x) { return x.value.k !== 'p'; }).length;
+    /* N/A IS A RELATION, NOT A MISSING VALUE: it enters neither counter. Counting it
+     * made legitUnknown ring on every batch (same self-lock as dataUnknowns). */
+    var unknownTotal = 0;
+    for (var q = 0; q < out.length; q++) {
+      if (p.tokApplicable && p.tokApplicable[q] && out[q].value.k !== 'p') { unknownTotal++; }
+    }
     out.legitUnknown = unknownTotal - nonFinite;
     out.nonFinite = nonFinite;
     return out;
