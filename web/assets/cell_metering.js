@@ -28,15 +28,31 @@
     var list = [];
     for (var i = 0; i < events.length; i++) { list.push(tokOf(events[i])); }
     var folded = TS.fold(list);
-    var acc = TS.start(), seenPMax = false, seenAMax = false;
+    var acc = TS.start(), seenPMax = false, seenAMax = false, seenAnyNull = false;
+    var displayMax = null;
     for (var j = 0; j < list.length; j++) {
       if (list[j].k === 'p') { seenPMax = true; }
       if (list[j].k === 'a') { seenAMax = true; }
+      if (list[j].k === 'n') { seenAnyNull = true; }
+      if (list[j].k === 'p') { displayMax = (displayMax === null) ? list[j].v
+                                                              : Math.max(displayMax, list[j].v); }
       acc = { value: TS.max(acc.value, list[j]), seenP: seenPMax, seenA: seenAMax };
     }
     return {
       states: list,
       projected: true,
+      /* MAX HAS TWO USES, ADJUDICATED SEPARATELY (ADR §33):
+       *   as DISPLAY      -> a LOWER BOUND is a true statement (>=200),
+       *                     consistent with B' on the summation side;
+       *   as DENOMINATOR  -> UNKNOWN (a bound in the denominator flips the
+       *                     direction), which is what `max` itself stays. */
+      maxDisplay: (function () {
+        /* The DISPLAY bound must be taken over the MEASURED values only. Judging it
+         * on the strict (poisoned) max was a real bug: it returned unknown instead of
+         * the honest ">=200". */
+        if (!seenPMax) { return seenAMax ? { k: 'a' } : { k: 'n' }; }
+        return { k: 'p', v: displayMax, bound: (seenAMax || seenAnyNull) ? '>=' : null };
+      })(),
       tok: folded.value,
       max: acc.value,
       maxPartial: seenAMax && seenPMax,

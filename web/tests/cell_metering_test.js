@@ -95,6 +95,24 @@ ok('DATA state: all-zero and all-absent produce unknown WITHOUT throwing',
 }());
 ok('PROGRAMMER error still throws (bad input shape is not a data state)',
   (function () { try { M.shares([{tok:1}]); return false; } catch (e) { return true; } }()));
+/* MAX'S TWO USES ARE ADJUDICATED SEPARATELY (ADR §33). [120, null, 200]:
+ * strict (as denominator) would make every bar unknown — but the DISPLAY can still
+ * honestly say ">=200", because a lower bound is a true statement. */
+(function () {
+  const r = M.project([{tok:120},{tok:null},{tok:200}]);
+  ok('max as DENOMINATOR stays unknown (direction flip) on [120,null,200]',
+    r.max.k === 'n' && M.shares(r).every(function (x) { return x.value.k !== 'p'; }));
+  ok('max as DISPLAY is an honest lower bound >=200 on [120,null,200]',
+    r.maxDisplay.k === 'p' && r.maxDisplay.v === 200 && r.maxDisplay.bound === '>=');
+  const clean = M.project([{tok:120},{tok:200}]);
+  ok('max as DISPLAY has NO bound when nothing is unmeasured',
+    clean.maxDisplay.bound === null && clean.maxDisplay.v === 200);
+}());
+ok('a measured-zero denominator yields UNKNOWN, never NaN (div is total)',
+  (function () {
+    const sh = M.shares(M.project([{tok:0},{tok:0}]));
+    return sh.every(function (x) { return x.value.k !== 'p'; }) && sh.nonFinite === 0;
+  }()));
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{tok:120}, A]), M.project([{tok:800}])).value.k === 'n');
   ok('order independence of the projection',
