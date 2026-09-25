@@ -1,0 +1,28 @@
+{
+  "_why": [
+    "TWO KINDS OF ENTRY, NEVER MIXED (putting them in one field would be one-field-two-meanings):",
+    "  requires  = the CAPABILITY is not present; a probe decides, and it releases by itself the day the capability appears.",
+    "  deferrals = the CRITERION is unreachable; only a human rewrite releases it, so a retirement_plan is mandatory.",
+    "UNREGISTERED => unknown => BLOCKING. There is no global 'allow' switch, because a switch that exists will be used once.",
+    "Format note: JSON rather than TOML because the runner is Node and must validate this with zero dependencies;",
+    "the repo's TOML files are hand-parsed by python, and a second hand-parser for a third format is the defect, not the fix."
+  ],
+  "requires": [
+    {
+      "id": "cdp-browser",
+      "probe": "cdp",
+      "reason": "needs a real browser on the CDP port plus the live panel. Decided by PROBE, never by a date: a date is a guess, and 'the instance was never configured' must not read as 'the capability is absent'.",
+      "suites": ["layout_test.js", "measure_test.js", "perf_measure.js", "hit_targets_test.js"]
+    }
+  ],
+  "deferrals": [
+    {
+      "id": "recorded-10-period-chain",
+      "suite": "prove_track_nodes_test.js",
+      "owner": "jason",
+      "expiry": "2026-12-31",
+      "reason": "The criterion pins the DERIVED leaf id run-0537fb101ecccb5e. That recording was lost in the machine migration, and a hash cannot be inverted — so this is not 'not yet proven', it is UNREACHABLE: the criterion demands evidence that no longer exists in the world.",
+      "retirement_plan": "Rewrite the criterion to assert SHAPE (a lineage of N periods), not a pinned hash; then delete this entry. Mutation proof REQUIRED first: breaking the lineage must turn it red, or the rewrite is just moved goalposts."
+    }
+  ]
+}

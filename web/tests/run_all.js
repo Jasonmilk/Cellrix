@@ -295,13 +295,71 @@ for (const [file, what] of SELF_CONTAINED) {
   }
 }
 
+/* ── registered exceptions, and DEFAULT DENY ──────────────────────────────
+ * Every unproven suite is one of: `requires` (a probed capability is absent),
+ * `deferral` (the criterion is unreachable and has a retirement plan), or
+ * `unknown` — and ONLY `unknown` blocks. There is deliberately no global
+ * "allow" flag: a switch that exists gets used once, and then the gate is dead.
+ * A `requires` entry is decided by its PROBE, not by the register: if the
+ * probe says the capability IS here, the suite has no excuse and falls back to
+ * unknown. Probe failure is never read as capability-absent. */
+const DEFERRALS = (function () {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'deferrals.json'), 'utf8')); }
+  catch (e) { return null; }
+})();
+function probeOk(name) {
+  if (name !== 'cdp') { return null; }            // unknown probe => inconclusive
+  try {
+    execFileSync(process.execPath, ['-e',
+      "fetch(process.env.CELLRIX_CDP||'http://127.0.0.1:9222/json/version',"
+      + "{signal:AbortSignal.timeout(1500)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"],
+      { stdio: 'ignore', timeout: 4000 });
+    return true;
+  } catch (e) { return false; }
+}
+function classify(file) {
+  if (!DEFERRALS) { return { kind: 'unknown', why: 'no deferrals.json — nothing is registered' }; }
+  for (const r of (DEFERRALS.requires || [])) {
+    if ((r.suites || []).indexOf(file) > -1) {
+      const cap = probeOk(r.probe);
+      if (cap === true) {
+        return { kind: 'unknown',
+                 why: 'capability ' + r.probe + ' IS present, yet this suite is unproven — that is not an absent capability' };
+      }
+      if (cap === null) { return { kind: 'unknown', why: 'probe ' + r.probe + ' is inconclusive' }; }
+      return { kind: 'requires', why: r.probe + ' absent (probed, not dated)' };
+    }
+  }
+  for (const d of (DEFERRALS.deferrals || [])) {
+    if (d.suite === file) {
+      if (!d.retirement_plan) { return { kind: 'unknown', why: 'deferral ' + d.id + ' has no retirement_plan' }; }
+      if (d.expiry && Date.parse(d.expiry) < Date.now()) {
+        return { kind: 'unknown', why: 'deferral ' + d.id + ' EXPIRED on ' + d.expiry };
+      }
+      return { kind: 'deferral', why: d.id + ' (owner ' + d.owner + ', expires ' + d.expiry + ')' };
+    }
+  }
+  return { kind: 'unknown', why: 'not registered in deferrals.json' };
+}
+const deferred = [], unknown = [];
+for (const [file, why] of NEEDS_INPUT) {
+  const c = classify(file);
+  if (c.kind === 'unknown') { unknown.push([file, why, c.why]); }
+  else { deferred.push([file, c.kind, c.why]); }
+}
+
+
 console.log('regression net');
 for (const [status, file, what] of results) {
   console.log('  ' + status + '  ' + file.padEnd(24) + what);
 }
-for (const [file, why] of NEEDS_INPUT) {
-  console.log('  SKIP  ' + file.padEnd(24) + why);
+for (const [file, kind, why] of deferred) {
+  console.log('  HELD  ' + file.padEnd(24) + '[' + kind + '] ' + why);
 }
+for (const [file, why, kwhy] of unknown) {
+  console.log('  ????  ' + file.padEnd(24) + 'UNREGISTERED/BLOCKING — ' + kwhy);
+}
+
 console.log('');
 /* THREE VERDICTS, not two.
  *
@@ -320,10 +378,13 @@ console.log('');
 const proven = results.filter(function (r) { return r[0] === 'PASS'; }).length;
 const requireAll = process.argv.indexOf('--require-all') > -1;
 console.log(failed === 0
-  ? (NEEDS_INPUT.length === 0
-      ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
-      : (requireAll ? 'AMBIGUOUS — ' : 'NOT FULLY PROVEN — ')
-        + proven + ' proven, ' + NEEDS_INPUT.length + ' unproven, 0 red'
-        + (requireAll ? '' : '  (pass --require-all to treat unproven as blocking)'))
-  : 'FAILED — ' + failed + ' red, ' + proven + ' proven, ' + NEEDS_INPUT.length + ' unproven');
-process.exit(failed > 0 ? 1 : ((requireAll && NEEDS_INPUT.length > 0) ? 2 : 0));
+  ? (unknown.length > 0
+      ? 'BLOCKED — ' + proven + ' proven, ' + deferred.length + ' held (registered), '
+        + unknown.length + ' UNREGISTERED, 0 red'
+      : (NEEDS_INPUT.length === 0
+          ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
+          : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
+            + ' held (registered), 0 red'))
+  : 'FAILED — ' + failed + ' red, ' + proven + ' proven, '
+    + deferred.length + ' held, ' + unknown.length + ' unregistered');
+process.exit(failed > 0 ? 1 : (unknown.length > 0 ? 2 : 0));
