@@ -64,6 +64,23 @@ ok('shares() REFUSES anything that is not a project() result (no second denomina
   }()));
 ok('pipeline is lazy: a caller that needs only the cell value never computes shares',
   typeof M.project([{tok:1}]).projected === 'boolean');
+/* The two classes, asserted separately: a DATA state must NOT take the cell down,
+ * a PROGRAMMER error must. Reading "must be loud" literally into the render path made
+ * three cells crash and disappear — worse than a fake 0.000, because then nothing shows. */
+ok('DATA state: all-zero and all-absent produce unknown WITHOUT throwing',
+  (function () {
+    try {
+      const sh1 = M.shares(M.project([{tok:0},{tok:0}]));
+      const sh2 = M.shares(M.project([{},{}]));
+      return sh1.every(function (x) { return x.value.k !== 'p'; })
+          && sh2.every(function (x) { return x.value.k !== 'p'; });
+    } catch (e) { return false; }
+  }()));
+ok('DATA state is COUNTED (never silent, gate can assert it must be 0)',
+  M.shares(M.project([{tok:0},{tok:0}])).dataUnknowns === 2
+  && M.shares(M.project([{tok:120},{tok:80}])).dataUnknowns === 0);
+ok('PROGRAMMER error still throws (bad input shape is not a data state)',
+  (function () { try { M.shares([{tok:1}]); return false; } catch (e) { return true; } }()));
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{tok:120}, A]), M.project([{tok:800}])).value.k === 'n');
   ok('order independence of the projection',

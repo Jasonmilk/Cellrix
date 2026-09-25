@@ -83,6 +83,13 @@
         out.push({ value: TS.div(num, denom), reason: null });
       }
     }
+    /* TWO CLASSES OF "LOUD" (measured: reading "must be loud" literally into the render
+     * path made THREE cells crash and disappear — worse than showing a fake 0.000):
+     *   PROGRAMMER ERROR  -> throw            (bad input shape; see the brand check)
+     *   DATA STATE        -> renderable unknown + a COUNTING channel
+     * The counter is the same discipline as the pending-overdue WARN: never silent, but
+     * it does not take the interface down. The gate asserts it must be 0. */
+    out.dataUnknowns = out.filter(function (x) { return x.value.k !== 'p'; }).length;
     return out;
   }
   return { tokOf: tokOf, project: project, ratioOf: ratioOf, shares: shares };
