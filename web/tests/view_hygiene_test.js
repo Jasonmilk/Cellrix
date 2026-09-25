@@ -98,8 +98,9 @@ try {
     const fp = path.join(ASSETS, f);
     if (!fs.existsSync(fp)) { continue; }
     const src = fs.readFileSync(fp, 'utf8');
-    (src.match(/window\.(Cx[A-Za-z0-9_]+)\s*=/g) || []).forEach(function (m) {
-      loaded.push(m.replace(/window\./, '').replace(/\s*=$/, ''));
+    (src.match(/(?:window|root)\.(Cx[A-Za-z0-9_]+)\s*=/g) || [])
+      .concat(src.match(/(?:^|\n)\s*var\s+(Cx[A-Za-z0-9_]+)\s*=/g) || []).forEach(function (m) {
+      loaded.push(m.replace(/^(window|root)\./, '').replace(/^\s*var\s+/, '').replace(/\s*=$/, ''));
     });
   }
   (code.match(/\b(Cx[A-Za-z0-9_]+)\s*\./g) || []).forEach(function (m) {
@@ -129,6 +130,8 @@ try {
       membersByGlobal[g] = membersByGlobal[g] || [];
       /* (a) direct assignment: window.CxX = { a: ..., b: ... } */
       const direct = new RegExp('(?:window|root)\\.' + g + '\\s*=\\s*\\{([\\s\\S]*?)\\}').exec(src);
+             || /(?:^|\n)\s*var\s+(Cx[A-Za-z0-9_]+)\s*=/.exec(src)
+             || /function\s+(Cx[A-Za-z0-9_]+)\s*\(/.exec(src);
       if (direct) {
         (direct[1].match(/([A-Za-z_$][\w$]*)\s*:/g) || []).forEach(function (m) {
           membersByGlobal[g].push(m.replace(/\s*:$/, ''));
