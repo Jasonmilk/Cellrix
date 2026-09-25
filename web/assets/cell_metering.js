@@ -39,6 +39,17 @@
    * Merging the two (as three-valued logic does) floods every group with `>=`:
    * inject/tool never carry completion_tokens, so every group would look partial.
    * Inapplicable rows are EXCLUDED at row selection; they never reach the algebra. */
+  /* THE TURN BOUNDARY IS DECLARED, NOT DISCOVERED (ADR-0048 §58.3 / §59.3 — "declaration
+   * over discovery", the EIGHTH time). The view's session objects carry `kind: 'turn'`;
+   * the落盘 events carry `type: 'turn/start'`. Both vocabularies are declared here so
+   * `project` never guesses a grouping key. */
+  var TURN_MARKS = [['/kind', 'turn'], ['/type', 'turn/start']];
+  function isTurnMark(e) {
+    for (var i = 0; i < TURN_MARKS.length; i++) {
+      if (ptrGet(e, TURN_MARKS[i][0]) === TURN_MARKS[i][1]) { return true; }
+    }
+    return false;
+  }
   var TOK_APPLICABLE = ['assistant/usage'];
   var DUR_APPLICABLE = ['tool/result'];
   function eventType(e) { return (e && typeof e.type === 'string') ? e.type : ''; }
@@ -153,6 +164,33 @@
      * bars against events (React: "don't use index as key"). Returning the array makes
      * that misalignment UNREPRESENTABLE — the same move as shares(project(x)). */
     self.bars = list.map(function (_, i) { return barWidth(self, i); });
+    /* ONE TRUTH SOURCE, TWO VIEWS (ADR-0048 §58.3): the summary is TURN-level while the
+     * denominator is SESSION-level. Calling project per turn would change the
+     * denominator and reintroduce the drift the brand removed. Each turn also carries
+     * ITS OWN bars, so a view expanding turn i cannot silently read turn j's bars
+     * (React: "don't use index as key", relocated to the turn axis). */
+    var turns = [], cur = null;
+    for (var m = 0; m < events.length; m++) {
+      if (isTurnMark(events[m])) {
+        cur = { id: (events[m] && events[m].id !== undefined) ? events[m].id : null,
+                states: [], events: [], tok: TS.A(), bars: [] };
+        turns.push(cur);
+        continue;
+      }
+      if (!cur) { continue; }
+      cur.events.push(events[m]);
+      if (applicable(events[m], TOK_APPLICABLE)) { cur.states.push(tokOf(events[m])); }
+    }
+    for (var n = 0; n < turns.length; n++) {
+      var foldedTurn = TS.fold(turns[n].states);
+      turns[n].tok = foldedTurn.value;
+      turns[n].partial = foldedTurn.partial;
+      turns[n].bars = turns[n].events.map(function (e) { return barWidth(self, list.indexOf(e)); });
+    }
+    self.turns = turns;
+    /* ADDITIVITY is the completion invariant (ADR-0048 §59.1): the per-turn sums must
+     * roll up to the session figure, on any batch, without hard-coding a number. */
+    self.sessionTok = folded.value;
     return self;
   }
   /* foldedCell(r) -> text. Formatting is its ONLY job (King: push the burden of proof

@@ -187,6 +187,24 @@ ok('project returns bars, so the view never passes an index',
     M.foldedCell(M.project([{type:'assistant/usage', data:{}, period_id:'P'}])) === '· 无数据'
     && M.foldedCell(M.project([{type:'assistant/usage', data:{completion_tokens:null}, period_id:'P'}])) === '· 未计量');
 }());
+/* §59.1 — THE COMPLETION INVARIANT IS ADDITIVITY, not a hard-coded number. Three times
+ * in a row an expected constant was written before measuring (12 -> 4 -> 8/4); the
+ * invariant is verifiable on ANY batch and needs no guess. (OLAP: additivity — the
+ * roll-up must equal the sum of the base.) */
+(function () {
+  const ev = [{kind:'turn', id:'T1'},
+              {type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
+              {type:'assistant/usage', data:{completion_tokens:7}, period_id:'P'},
+              {kind:'turn', id:'T2'},
+              {type:'assistant/usage', data:{completion_tokens:3}, period_id:'P'}];
+  const r = M.project(ev);
+  const sum = r.turns.reduce(function (acc, t) { return acc + (t.tok.k === 'p' ? t.tok.v : 0); }, 0);
+  ok('ADDITIVITY: sum(turns[i].tok) === sessionTok (any batch, no hard-coded number)',
+    r.turns.length === 2 && sum === r.sessionTok.v && r.sessionTok.v === 15);
+  ok('each turn carries ITS OWN bars (turn 2 cannot read turn 1 bars)',
+    r.turns[0].bars.length === 2 && r.turns[1].bars.length === 1
+    && r.turns[0].bars.length + r.turns[1].bars.length === r.bars.length - 0);
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
