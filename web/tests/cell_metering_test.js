@@ -201,9 +201,12 @@ ok('project returns bars, so the view never passes an index',
   const sum = r.turns.reduce(function (acc, t) { return acc + (t.tok.k === 'p' ? t.tok.v : 0); }, 0);
   ok('ADDITIVITY: sum(turns[i].tok) === sessionTok (any batch, no hard-coded number)',
     r.turns.length === 2 && sum === r.sessionTok.v && r.sessionTok.v === 15);
+  /* EXPECTATION UPDATED WITH A RECORDED REASON (ADR-0048 §78.7): a turn's bars now
+   * include the MARKER EVENT that opens it, so 2/1 became 3/2. The property under test
+   * is unchanged — the two turns carry DISJOINT bars and sum to the whole. */
   ok('each turn carries ITS OWN bars (turn 2 cannot read turn 1 bars)',
-    r.turns[0].bars.length === 2 && r.turns[1].bars.length === 1
-    && r.turns[0].bars.length + r.turns[1].bars.length === r.bars.length - 0);
+    r.turns[0].bars.length === 3 && r.turns[1].bars.length === 2
+    && r.turns[0].bars.length + r.turns[1].bars.length === r.bars.length);
 }());
 /* §60 — A SINGLE-TURN SAMPLE IS THE GROUPING IDENTITY ELEMENT: the wrong variant
  * ("all bars belong to turn[0]") is digit-for-digit identical to the correct one, and

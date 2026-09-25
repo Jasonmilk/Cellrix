@@ -205,19 +205,28 @@
     for (var m = 0; m < events.length; m++) {
       if (isTurnMark(events[m])) {
         cur = { id: (events[m] && events[m].id !== undefined) ? events[m].id : null,
-                states: [], events: [], tok: TS.A(), bars: [] };
+                states: [], events: [], rows: [], tok: TS.A(), bars: [] };
         turns.push(cur);
+        /* THE MARKER BELONGS TO THE TURN IT OPENS (ADR-0048 §78.7): without this the
+         * per-turn bars summed to 14 while self.bars held 15 — two alignments. It
+         * does NOT enter `states` (a marker is not applicable to any dimension), so
+         * the fold is unchanged. */
+        cur.events.push(events[m]);
+        cur.rows.push(rowIndexOf[m]);
         continue;
       }
       if (!cur) { continue; }
       cur.events.push(events[m]);
+      cur.rows.push(rowIndexOf[m]);
       if (applicable(events[m], TOK_APPLICABLE)) { cur.states.push(tokOf(events[m])); }
     }
     for (var n = 0; n < turns.length; n++) {
       var foldedTurn = TS.fold(turns[n].states);
       turns[n].tok = foldedTurn.value;
       turns[n].partial = foldedTurn.partial;
-      turns[n].bars = turns[n].events.map(function (e) { return barWidth(self, list.indexOf(e)); });
+      /* SAME recorded map as self.bars — searching `list` by event returned -1, which is
+       * how the turn-level bars silently became `unknown` (ADR-0048 §78.5). */
+      turns[n].bars = turns[n].rows.map(function (r) { return self.bars[r] ? self.bars[r] : barWidth(self, r); });
     }
     self.turns = turns;
     /* ADDITIVITY is the completion invariant (ADR-0048 §59.1): the per-turn sums must
