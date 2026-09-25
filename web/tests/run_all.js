@@ -423,6 +423,18 @@ if (declLines.length === 0) {
 }
 
 const deferred = [], unknown = [];
+/* XPASS — the semantic of `test.failing()` / `xfail(strict=True)`: a registered
+ * deferral that PASSES means the criterion became reachable again, so the entry
+ * must be retired NOW. A DATE is a heuristic (expiring is not the same as
+ * reachable); XPASS is EVIDENCE (it really ran). This is also the missing
+ * "the door can open" direction for deferrals. */
+const xpass = [];
+for (const d of (DEFERRALS.deferrals || [])) {
+  if (!NEEDS_INPUT.some(function (e) { return e[0] === d.suite; })) {
+    xpass.push(d.suite + ' [' + d.id + ']');
+  }
+}
+
 for (const [file, why] of NEEDS_INPUT) {
   const c = classify(file);
   if (c.kind === 'unknown') { unknown.push([file, why, c.why]); }
@@ -458,10 +470,15 @@ console.log('');
  * (`K12`: "an unattended run stayed red" taught everyone to ignore it). */
 const proven = results.filter(function (r) { return r[0] === 'PASS'; }).length;
 const requireAll = process.argv.indexOf('--require-all') > -1;
+if (xpass.length) {
+  console.log('  XPASS ' + xpass.join(', ')
+    + ' — registered as a deferral but it PASSED. The criterion is reachable again:'
+    + ' retire the entry (a date is a heuristic; this is evidence).');
+}
 if (pendingOverdue.length) {
   console.log('  WARN  own un-done items past due: ' + pendingOverdue.join('; '));
 }
-console.log(failed === 0
+console.log((failed === 0 && xpass.length === 0)
   ? (unknown.length > 0
       ? 'BLOCKED — ' + proven + ' proven, ' + deferred.length + ' held (registered), '
         + unknown.length + ' UNREGISTERED, 0 red'
@@ -469,6 +486,6 @@ console.log(failed === 0
           ? 'OK — ' + proven + ' proven, 0 unproven, 0 red'
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
             + ' held (registered), 0 red  [env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
-  : 'FAILED — ' + failed + ' red, ' + proven + ' proven, '
+  : (xpass.length ? 'XPASS — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered');
-process.exit(failed > 0 ? 1 : (unknown.length > 0 ? 2 : 0));
+process.exit((failed > 0 || xpass.length > 0) ? 1 : (unknown.length > 0 ? 2 : 0));

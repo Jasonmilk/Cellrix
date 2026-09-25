@@ -67,6 +67,30 @@
       "owner": "jason",
       "due": "2026-11-20",
       "retirement_plan": "new-criteria-born-paired: new criteria must be born WITH a known-good counterpart (hard rule); existing ones stay WARN (soft) so historical debt does not turn the gate red. This is the meta-rule that governs every other criterion, so a soft door here is a soft door on all of them."
+    },
+    {
+      "id": "a11y-tree-projection",
+      "owner": "jason",
+      "due": "2026-11-25",
+      "retirement_plan": "a11y-tree-projection: in ADR-0048 require that the semantic grid be projectable as an ACCESSIBILITY TREE. A screen reader is a silicon agent, and WAI-ARIA grid plus roving tabindex is the standardised navigable semantic grid; if the grid cannot project to that tree it is a parallel system beside ARIA and the existing agent tooling (screen readers, automation, a11y tests) cannot use it. aria-busy is also the standard loading representation."
+    },
+    {
+      "id": "readiness-vocabulary-for-probes",
+      "owner": "jason",
+      "due": "2026-10-30",
+      "retirement_plan": "readiness-vocabulary-for-probes: rename and re-scope the probe-family work using Kubernetes liveness vs readiness. The missing concept is READINESS ('alive' is not 'it is the thing and it is usable'); adopting the vocabulary makes the problem family explicit instead of being rediscovered per probe."
+    },
+    {
+      "id": "rust-embed-dev-mode",
+      "owner": "jason",
+      "due": "2027-01-15",
+      "retirement_plan": "rust-embed-dev-mode: replacing the hand-written include_str! embedding with rust-embed (debug reads from disk, release embeds) is a clear gain BUT it touches the verified chain (byte-equivalence plus build-with-the-binary). Register as an independent action item; do NOT do it while ADR-0048 is being written."
+    },
+    {
+      "id": "trusted-types-two-layer",
+      "owner": "jason",
+      "due": "2026-12-10",
+      "retirement_plan": "trusted-types-two-layer: adopt CSP require-trusted-types-for script plus a trustedTypes policy as the RUNTIME half of the innerHTML discipline, but do NOT downgrade the static check to 'assert the header is present'. Trusted Types is enforced only by Chromium engines; Firefox and Safari ignore the directive, so on those engines the runtime half does not exist and the static check remains the cross-engine backstop. Two layers, not a replacement."
     }
   ]
 }
