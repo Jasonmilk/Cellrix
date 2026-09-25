@@ -132,7 +132,7 @@
     for (var i = 0; i < S.session.length; i++) {
       var it = S.session[i];
       if (it.kind !== 'turn') { continue; }
-      var ids = [], tok = 0, dur = 0, failed = 0, anyShown = false;
+      var ids = [], tok = 0, dur = 0, failed = 0, anyShown = false, tokStates = [];
       for (var k = i + 1; k < S.session.length && S.session[k].kind !== 'turn'; k++) {
         var e = S.session[k];
         /* A failure is never folded: it is the one thing a reader must not have
@@ -161,11 +161,17 @@
            * visible whichever way the reader set "Expand all calls". */
           if (e.cls === TOOL_CLS) { anyShown = true; }
           else if (!neverFolded(e.cls)) {
-            ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; } tok += (e.tok || 0);
+            /* M1 (ADR-0048 §71): the token value comes from the SINGLE projection — the
+             * state, not a bare number — so absent/null/present(0) stay distinguishable
+             * here. Interface names are read off the implementation's exports. */
+            ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; }
+            tokStates.push(window.CxCellMetering.tokOf(e));
           }
         } else { anyShown = true; }
       }
-      if (ids.length && !anyShown) { out[it.id] = { ids: ids, tok: tok, dur: dur, failed: failed, turn: it }; }
+      var tokState = tokStates.reduce(function (a, st) { return window.CxThreeState.add(a, st); },
+                                       window.CxThreeState.A());
+      if (ids.length && !anyShown) { out[it.id] = { ids: ids, tok: tokState, dur: dur, failed: failed, turn: it }; }
     }
     return out;
   }
