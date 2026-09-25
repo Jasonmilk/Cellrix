@@ -1301,3 +1301,53 @@ sample: {"type":"context/inject", ... "data":{"chars":800,"injected_chars":0,"no
 - **`legitUnknown = 5` 不是债**（§30.1）。
 
 ⇒ **这一格在真实数据上大概率一片"未知"——那是契约生效的证据,不是接线失败的证据。**
+
+## 39. 真实字段诊断：**两个轴都读错路径**（含"一处还是两处"的答案）
+
+### 39.1 实测（35 个 events 文件，按 type 汇总 `data` 键）
+
+| type | n | `data` 键 |
+|---|---|---|
+| `assistant/usage` | 51 | **`prompt_tokens` · `completion_tokens` · `cached_tokens` · `reasoning_tokens` · `model`** |
+| `tool/result` | 11 | **`duration_ms`** · `index` · `ok` · `outcome` · `outcome_sha` · `tool` |
+| `context/inject` | 35 | `chars` · `injected_chars` · `nodes` · `choice` · `resume_from` |
+| `assistant/reply` | 35 | `chars` · `model` · `text` |
+| `turn/end` | 35 | `done` · `impasse` · `model` · `reply` · `success` · `verdict` |
+
+`any key named dur/duration?` **true**;`any key named tok/token/usage?` **true**。
+
+### 39.2 结论
+
+- **两个轴都存在于真实数据**,但**都嵌套且改了名**：
+  `dur → data.duration_ms`、`tok → data.completion_tokens`;
+- ⇒ **`e.tok` 与 `e.dur`（顶层）从来都不存在** ⇒
+  **当前视图一直在用"缺席的输入"渲染 `0.000` 与 `1.2`** ——**"纸糊"在根部有了解释**;
+- ⇒ **接线是"一处"**：**路径声明那一处**（两个轴共用同一机制）,
+  而不是"tok 一处、dur 另一处"。
+
+### 39.3 设计结论：「声明优于发现」**第六次**
+
+`tokOf` 里的字面量 `'tok'` 就是**散落的发现**。
+⇒ 应为**声明式字段路径**：**每个 cell 声明它读哪条路径**（如
+`{tok: 'data.completion_tokens', dur: 'data.duration_ms'}`）,
+**读不到即 absent**,不猜、不兜底。
+⇒ 这同时把 §38.2 的"读错抽屉"从**个案**变成**结构上不可再犯**。
+
+### 39.4 §31.2 的补充（**防误判**）
+
+**`cell_seen` 的真实样本段预期就是全 `absent`**——
+**那个输出不构成接线失败的证据。**（预先登记;改完看到满屏未知时按此判定。）
+
+### 39.5 收尾判据补一条（**自证 > 看起来对**）
+
+**`legitUnknown` 必须对上"该批中不含 token 路径的事件数"**;
+**若等于该批事件总数 ⇒ 自证"全 absent 是数据事实，不是代码 bug"。**
+
+**并选一个真有值的样本**：`context/inject` 的 `chars` / `nodes` 是**数值**
+⇒ 用它可以验证"**路径读对时三态确实可分**"。
+
+### 39.6 与本轮范围的关系（**如实记，不擅自扩张**）
+
+`dur` 轴按 §36.3 **本轮不修**;但 §39.2 显示**它的路径同样是错的**,
+而修法**与 `tok` 是同一个机制（声明式路径）**。
+⇒ **是否合并为一处修，留给收尾裁定**——本 ADR 只记录事实与张力,**不在实现中顺手扩张**。
