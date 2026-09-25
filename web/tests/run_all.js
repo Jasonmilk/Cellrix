@@ -543,8 +543,28 @@ const requireAll = process.argv.indexOf('--require-all') > -1;
  * Two directions, both asserted, and NEITHER may change the exit code (a permanent
  * red that counted would weld the gate shut). Admission is by DECLARATION only. */
 const SENT = DEFERRALS.sentinels || { red: [], held: [] };
+const SENT_DIR = path.join(__dirname, SENT.dir || 'sentinels');
+/* TWO-WAY JOIN with an INDEPENDENT directory. A declared set alone still lets an
+ * ordinary suite be ADDED here, which would silently absorb a real red (it would
+ * stop counting toward the exit code). Membership must be checkable, not asserted:
+ * every declared name must exist, and every file present must be declared. */
+{
+  const declared = (SENT.red || []).concat(SENT.held || []).slice().sort();
+  let present = [];
+  try { present = fs.readdirSync(SENT_DIR).filter(function (f) { return f.endsWith('.js'); }).sort(); }
+  catch (e) { present = []; }
+  const bad = [];
+  for (const nm of declared) { if (present.indexOf(nm) === -1) { bad.push('declared but absent: ' + nm); } }
+  for (const nm of present) { if (declared.indexOf(nm) === -1) { bad.push('present but UNDECLARED: ' + nm); } }
+  if (bad.length) {
+    console.log('REGISTER ERROR: the sentinel declaration and ' + (SENT.dir || 'sentinels')
+      + '/ disagree — ' + bad.join('; ') + ' (an undeclared suite here stops counting toward'
+      + ' the exit code, so a real red would be silently absorbed)');
+    process.exit(3);
+  }
+}
 function runSentinel(f) {
-  try { execFileSync(process.execPath, [path.join(__dirname, f)], { stdio: 'pipe' }); return 0; }
+  try { execFileSync(process.execPath, [path.join(SENT_DIR, f)], { stdio: 'pipe' }); return 0; }
   catch (e) { return (e && typeof e.status === 'number') ? e.status : -1; }
 }
 const sentProblems = [];

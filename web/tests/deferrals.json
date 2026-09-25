@@ -131,12 +131,13 @@
     }
   ],
   "sentinels": {
+    "dir": "sentinels",
     "red": [
       "sentinel_red.js"
     ],
     "held": [
       "sentinel_held.js"
     ],
-    "_why": "A CLOSED DECLARED SET. 'Not counted' must never be inferable from a name: anyone could then relabel a failing suite as a sentinel to bypass the gate. Declaration is the only admission path, exactly as with `requires`."
+    "_why": "A CLOSED DECLARED SET *AND* AN INDEPENDENT MEMBERSHIP CHECK. The declared set alone fixed the name-convention hole but NOT membership: adding an ordinary suite here would silently absorb a real red. So the set lives in its own directory and is joined BOTH ways with the directory listing. Declaration over discovery, third instance."
   }
 }
