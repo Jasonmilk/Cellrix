@@ -4366,3 +4366,39 @@ const statesOf = (bars) => bars.map(function (b) { return { state: b.value }; })
 ⑤ 全绿后再一次提交（含 helper + 自检计数 + META 变异）
 ```
 ⇒ **⑥ 最后：把 helper 用于全部同形状处（否则 helper 本身是死代码）。**
+
+## 103. 配方**验证通过**：逐字锚点 4/4（凭记忆 1/5）
+
+### 103.1 本轮实测
+
+**同一次改动,两种锚点来源,结果差 4 倍**：
+
+| 锚点来源 | 命中 |
+|---|---|
+| **凭记忆写**（上一轮） | **1 / 5** |
+| **本会话逐字打印的文本**（本轮） | **4 / 4** |
+
+⇒ **本轮 4 处全部命中**：`helper` · `withDur` · `every4` · `projectReturnBars`;
+**判据：只有预期红,`exit=1`,无崩。**
+
+⇒ **§102.4 的配方成立**：**先逐字打印 → 单处替换并断言命中 → 跑判据 → 下一块**。
+
+### 103.2 已落地（③a 的一部分）
+
+```js
+/* ONE SHAPE, ONE HELPER (§102.3)：两处同形状、第二处曾漏定义 ⇒ 同一形状只允许一处定义 */
+const colPctOf = (rows) => M.allocate(rows, { gridCols: 200 }).cols;
+const tickOf   = (rows) => M.allocate(rows, { gridCols: 200 }).tickPct;
+const statesOf = (bars) => bars.map(function (b) { return { state: b.value }; });
+```
+- `withDur` 断言 → `colPctOf([{state:M.A()}])`（**不再经 `barWidth`**）;
+- `.every(pair)` 断言 → `colPctOf([...])`（**同 helper**）;
+- `project returns bars` 断言 → `src` 词表更新为五态 + `colPctOf(statesOf(r.bars))`。
+
+### 103.3 尚未迁完（**下一步一步一块**）
+
+残留：`M.barWidth` / `.wPx` / `M.W_UNIT` / `M.W_RANGE` 仍在若干处（含 §77 那组与
+`MEASURED: … W_FULL …` 那一条）。
+⇒ **按 §102.4 逐块：先打印该块逐字文本,再单处替换。**
+⇒ **迁完后再做**：`__ASSERTS_RUN` 自检计数（§102.1）+ **META 变异**（§102.2）,
+⇒ **然后 ③b 只删源 ⇒ 并存断言红转绿。**

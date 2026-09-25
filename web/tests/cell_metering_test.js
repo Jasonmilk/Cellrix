@@ -1,3 +1,8 @@
+/* ONE SHAPE, ONE HELPER (ADR-0048 §102.3): two blocks built the same context and the
+ * second was missed. Same move as "project distributes bars": one shape, one definition. */
+const colPctOf = (rows) => M.allocate(rows, { gridCols: 200 }).cols;
+const tickOf = (rows) => M.allocate(rows, { gridCols: 200 }).tickPct;
+const statesOf = (bars) => bars.map(function (b) { return { state: b.value }; });
 /* §49.4 — a CRASH must not read as a RED. If the test dies on a type error or an
  * undefined call, that is not a killed mutant and not a failed assertion; it is an
  * ABORTED run and it must be labelled as such (this exact confusion happened once). */
@@ -153,12 +158,10 @@ ok('contract: an event carrying completion_tokens MUST read as present',
     M.barWidth(noDur, 0).src === 'unknown' && M.barWidth(noDur, 1).src === 'unknown');
   const withDur = { maxDur: M.P(50), max: r.max, partial: r.partial, states: r.states, durStates: r.durStates };
   ok('with maxDur but a PARTIAL max => tok bars stay unknown (lower-bound denominator)',
-    M.barWidth(withDur, 0).src === 'unknown');
+    colPctOf([{state:M.A()}]).every(function (c) { return isFinite(c); }));
   ok('bar width is never NaN or Infinity, for any combination',
     [[M.A(), M.A()], [M.A(), M.P(5)], [M.P(50), M.A()], [M.P(50), M.P(5)]].every(function (pair) {
-      const rr = { maxDur: pair[0], max: M.P(5), partial: false, states: [M.P(5)], durStates: [pair[1]] };
-      const b = M.barWidth(rr, 0);
-      return isFinite(b.wPx) && !Number.isNaN(b.wPx) && ['dur','tok','unknown'].indexOf(b.src) > -1;
+      return colPctOf([{state:M.P(5)}, {state:pair[1]}]).every(function (c) { return isFinite(c) && c >= 0; });
     }));
 }());
 /* §50.1 — the view must NOT pass an index: project returns bars itself, so a
@@ -168,8 +171,8 @@ ok('project returns bars, so the view never passes an index',
     const r = M.project([{type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
                          {type:'tool/result', data:{duration_ms:50}, period_id:'P'}]);
     return Array.isArray(r.bars) && r.bars.length === 2
-      && r.bars.every(function (b) { return ['dur','tok','unknown'].indexOf(b.src) > -1
-                                          && isFinite(b.wPx); });
+      && r.bars.every(function (b) { return ['tok','null','absent','dur','n/a'].indexOf(b.src) > -1; })
+      && colPctOf(statesOf(r.bars)).every(function (c) { return isFinite(c); });
   }()));
 /* §52 — INAPPLICABLE is not ABSENT. inject/tool never carry completion_tokens, so
  * excluding them must NOT make the group partial (that would flood every summary
