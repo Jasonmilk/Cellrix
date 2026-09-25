@@ -139,13 +139,15 @@ try {
       (src.match(new RegExp(g + '\\.([A-Za-z_$][\\w$]*)\\s*=', 'g')) || []).forEach(function (m) {
         membersByGlobal[g].push(m.replace(new RegExp('^' + g + '\\.'), '').replace(/\s*=$/, ''));
       });
-      /* (c) factory return { ... } */
-      const ret = /return\s*\{([\s\S]*?)\}\s*;/.exec(src);
-      if (ret) {
-        (ret[1].match(/([A-Za-z_$][\w$]*)\s*:/g) || []).forEach(function (m) {
+      /* (c) EVERY `return { ... }` in the file (not just the first): UMD/IIFE modules
+       * look like `var CxX = (function () { ... return { tokOf: ..., add: ... }; })()`,
+       * so the export object is an inner return. Taking only the first return made this
+       * gate report tokOf/add/A — which all exist — as unknown (a FALSE POSITIVE). */
+      (src.match(/return\s*\{([\s\S]*?)\}\s*;/g) || []).forEach(function (blk) {
+        (blk.match(/([A-Za-z_$][\w$]*)\s*:/g) || []).forEach(function (m) {
           membersByGlobal[g].push(m.replace(/\s*:$/, ''));
         });
-      }
+      });
     }
   }
 } catch (e) { /* handled below */ }
