@@ -4075,3 +4075,33 @@ tick ≤ s × (100 − n × tick)     ⇒     tick ≤ 100 s / (1 + n s)
 **投影侧**：三通道 + tick 规则 + 两个降级分支**已落地并行使**,`cell_metering_test.js` **全绿**;
 **`precommit.sh` ⇒ `PRECOMMIT OK`**。
 **条形侧**：**仍未动**（`b1b-1`）⇒ **判词仍只死一半**（如实）。
+
+## 97. **expand → migrate → contract**（三步走）—— ① 已落
+
+### 97.1 上一轮失败的定性（审查方）
+
+**这次失败的价值高于一次成功**：`precommit.sh` **第一次真正拦下坏提交**（`PRECOMMIT FAILED — do NOT commit`）
+⇒ **门在按设计工作**;回退正确、状态如实（`wPx` 仍 9 处、两套编码并存、判词仍只死一半）。
+**根因**：**一次改太多处 + 写盘先于验证**（§71.6 / §83 **同条,第三次**）。
+
+### 97.2 正确节律（**expand → migrate → contract**）
+
+> **先加新结构（不改行为）→ 再迁调用方 → 最后删旧结构**;每步**可独立发布、可回退**。
+
+```
+① expand   : 加 setGridCols（可测）+ 降级 clamp 到一格     —— **旧编码不动**（本笔）
+② migrate  : 让 §77 那组断言**先测新编码**,并加上
+             "**导出中两套编码不得并存**"——**此时它应红**
+③ contract : 删 wPx / W_UNIT / W_RANGE / barWidth ⇒ **红转绿**（**红→绿本身就是证据,不必另写判据**）
+每步：node --check → 判据 → **precommit.sh ⇒ PRECOMMIT OK 才提交**
+```
+
+### 97.3 ① 已落：两个小项及**出处**
+
+| 项 | 内容 | 出处 |
+|---|---|---|
+| **`setGridCols(n)`** | 设终端实际列数 ⇒ `CELL_PCT = 100/n` | **README：grid of deterministic, semantic cells** 是可核依据;**`200` 只是默认值,须来自实测或终端宽度**（`80` 列 ⇒ `1.25%`） |
+| **降级 clamp 到一格** | `cols = max(CELL_PCT, 100/N)` | **graceful degradation 必须保住核心能力**：等宽窄于一格则不可见,**可见性不能随降级一起消失** |
+
+**实测**：`setGridCols(80)` ⇒ `cellPct = 1.25%`;超预算降级下 `等宽 = 1.250% = 一格` ⇒ **可见 ✓**
+⇒ **本步纯新增**:`wPx` 等旧编码**未动**,判据（除适配取值函数外）**未变**。

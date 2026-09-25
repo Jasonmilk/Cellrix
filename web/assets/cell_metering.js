@@ -357,7 +357,15 @@
    * equal widths + colour: "colors represent system states, never decoration".
    * ─────────────────────────────────────────────────────────────────────────── */
   var TICK_K = 2;
-  var GRID_COLS = 200;                        /* declared grid; derives the cell width */
+  /* PROVENANCE (§94.3/§97.3): README says the terminal is "a grid of deterministic,
+   * semantic cells", so ONE CELL is the minimum visible width. 200 is a DEFAULT that must
+   * come from the real terminal (measure its column count; 80 columns => 1.25%). The
+   * alignment the renderer actually uses must be declared here if it is not cell-aligned. */
+  var GRID_COLS = 200;
+  function setGridCols(n) {
+    if (typeof n === 'number' && n > 0) { GRID_COLS = n; CELL_PCT = 100 / GRID_COLS; }
+    return { gridCols: GRID_COLS, cellPct: CELL_PCT };
+  }
   var CELL_PCT = 100 / GRID_COLS;
   var RESERVE_CAP_PCT = 50;
 
@@ -386,7 +394,10 @@
     if (nUnknown * tick > RESERVE_CAP_PCT) {
       /* DEGRADED: say so in the projection, do not fabricate a proportion. */
       return { state: 'unavailable', reason: 'reserve-over-budget',
-               cols: rows.map(function () { return 100 / rows.length; }), tickPct: tick };
+               /* CLAMP TO ONE CELL (§97.3): equal widths narrower than a cell are
+                * invisible, and a degradation that loses the core capability is not a
+                * degradation but a failure. */
+               cols: rows.map(function () { return Math.max(CELL_PCT, 100 / rows.length); }), tickPct: tick };
     }
     var remaining = 100 - nUnknown * tick, cols = [], p = 0;
     for (i = 0; i < rows.length; i++) {
@@ -420,7 +431,8 @@
     return { wPx: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
   return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, stateText: stateText,
-           allocate: allocate, TICK_K: TICK_K, CELL_PCT: CELL_PCT, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
+           allocate: allocate, setGridCols: setGridCols, GRID_COLS: function () { return GRID_COLS; },
+           TICK_K: TICK_K, CELL_PCT: function () { return CELL_PCT; }, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
            foldedCell: foldedCell,
            W_UNIT: W_UNIT, W_RANGE: W_RANGE, BAR_KEYS: BAR_KEYS,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
