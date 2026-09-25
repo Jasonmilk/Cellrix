@@ -35,6 +35,7 @@ const fs = require('fs');
  * ────────────────────────────────────────────────────────────────────── */
 
 const SELF_CONTAINED = [
+  ['mutation_harness_test.js', 'MUT-0 — the fixture sentinel is armed'],
   ['event_family_test.js', 'T0 — event family contract'],
   ['assembly_test.js', 'T2 — fold primitives and coordinates'],
   ['acceptance_test.js', 'T6 — the 11 acceptance clauses'],
