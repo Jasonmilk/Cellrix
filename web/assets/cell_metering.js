@@ -57,6 +57,7 @@
    * treating it as a ratio gave 242.00 (a 22x unit error); indexing bars by event
    * count gave undefined -> NaNpx back in a new form. None of them crashed, and all
    * of them passed a gate that only checked names and counts. */
+  var BAR_KEYS = ['wPx', 'src', 'reason', 'value'];
   var W_UNIT = 'px';
   var W_RANGE = [MIN_W, W_FULL];
   var TURN_MARKS = [['/kind', 'turn'], ['/type', 'turn/start']];
@@ -116,11 +117,13 @@
      * false-alarm flood this rule exists to prevent (measured: it happened even while
      * fixing it). `rows` is the UNION, for display; the two folds see only their own. */
     var list = [], durList = [], naCount = 0, tokApplicableFlags = [];
+    var rowIndexOf = [], rowCount = 0;   /* event i -> its row (never searched for) */
     var tokFold = [], durFold = [];
     for (var i = 0; i < events.length; i++) {
       var applicableTok = applicable(events[i], TOK_APPLICABLE);
       var applicableDur = applicable(events[i], DUR_APPLICABLE);
       if (!applicableTok && !applicableDur) { naCount++; continue; }
+      rowIndexOf[i] = rowCount++;
       list.push(applicableTok ? tokOf(events[i]) : TS.A());
       durList.push(applicableDur ? durOf(events[i]) : TS.A());
       tokApplicableFlags.push(applicableTok);
@@ -179,7 +182,20 @@
      * view passed its own index, a filtered/sorted iteration would silently mismatch
      * bars against events (React: "don't use index as key"). Returning the array makes
      * that misalignment UNREPRESENTABLE — the same move as shares(project(x)). */
-    self.bars = list.map(function (_, i) { return barWidth(self, i); });
+    /* BARS ARE 1:1 WITH THE SEQUENCE (ADR-0048 §78.3, option 甲): every input event gets
+     * a bar, and inapplicable ones carry src 'n/a' at the minimum width. Returning only
+     * the measurable subset made the count drift (15 -> 4 on the pinned sample) and
+     * silently invalidated the registered expectation that inject rows stay minimum
+     * width. 1:1 keeps ONE sequence, so bar j always means event j.
+     * Each bar also carries ITS OWN state, so the expanded view never re-reads e.tok. */
+    self.bars = events.map(function (e, i) {
+      var appliesTok = applicable(e, TOK_APPLICABLE), appliesDur = applicable(e, DUR_APPLICABLE);
+      var b = (appliesTok || appliesDur)
+        ? barWidth(self, rowIndexOf[i])
+        : { wPx: MIN_W, src: 'n/a', reason: 'inapplicable' };
+      b.value = appliesTok ? tokOf(e) : TS.A();
+      return b;
+    });
     /* ONE TRUTH SOURCE, TWO VIEWS (ADR-0048 §58.3): the summary is TURN-level while the
      * denominator is SESSION-level. Calling project per turn would change the
      * denominator and reintroduce the drift the brand removed. Each turn also carries
@@ -327,7 +343,7 @@
     return { wPx: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
   }
   return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, foldedCell: foldedCell,
-           W_UNIT: W_UNIT, W_RANGE: W_RANGE,
+           W_UNIT: W_UNIT, W_RANGE: W_RANGE, BAR_KEYS: BAR_KEYS,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
            project: project, ratioOf: ratioOf, shares: shares };
 }));

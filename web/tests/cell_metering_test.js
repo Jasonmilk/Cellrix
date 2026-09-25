@@ -250,6 +250,26 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
            return typeof b.wPx === 'number' && b.wPx >= M.W_RANGE[0] && b.wPx <= M.W_RANGE[1];
          });
   }()));
+/* §78.2 — THE RANGE ASSERTION ALONE HAS NO DISCRIMINATING POWER: MIN_W is inside the
+ * declared range, so "everything collapsed to minimum" is legal, and an empty array
+ * makes "out of range = 0" trivially true. These two assertions demand that something
+ * was ACTUALLY MEASURED. */
+(function () {
+  const ev = [{type:'assistant/usage', data:{completion_tokens:5}, period_id:'P'},
+              {type:'context/inject', data:{chars:1}, period_id:'P'},
+              {type:'tool/result', data:{duration_ms:50}, period_id:'P'}];
+  const r = M.project(ev);
+  ok('MEASURED: bars are 1:1 with the sequence (n/a included) and non-empty',
+    r.bars.length === ev.length && r.bars.length > 0
+    && r.bars.filter(function (b) { return b.src === 'n/a'; }).length === 1);
+  ok('MEASURED: the longest duration bar reaches W_FULL exactly (blocks equal shrink)',
+    Math.max.apply(null, r.bars.map(function (b) { return b.wPx; })) === M.W_RANGE[1]);
+  ok('SHAPE: every bar carries exactly the declared keys (a stray .w would read undefined)',
+    r.bars.every(function (b) {
+      const k = Object.keys(b).sort().join(',');
+      return k === M.BAR_KEYS.slice().sort().join(',');
+    }));
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
