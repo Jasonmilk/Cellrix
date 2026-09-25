@@ -169,6 +169,23 @@ console.log((unresolved.length ? '  FAIL ' : '  ok   ')
   + (unresolved.length ? ' (unresolved: ' + unresolved.join(', ') + ')' : ''));
 if (unresolved.length) { bad++; }
 
+/* --emit-sites: print file:line + class for each hit, so the ATTRIBUTION TABLE is
+ * GENERATED, never hand-written (hand-writing can be wrong — same family as
+ * "register the expectation first"). Counts are NOT orthogonal: one line can hit two
+ * classes, so a drop in the total is not a count of fixed sites (ADR-0048 §75.4). */
+if (process.argv.indexOf('--emit-sites') > -1) {
+  code.split('\n').forEach(function (line, n) {
+    const hits = [];
+    if (/[A-Za-z0-9_)\]]\s*\/\s*[A-Za-z0-9_(]/.test(line)) { hits.push('bare-slash'); }
+    if (/\|\|\s*\d/.test(line)) { hits.push('fallback-numeric'); }
+    else if (/\|\|/.test(line)) { hits.push('fallback-other'); }
+    if (/typeof\s+[A-Za-z_$][\w$.]*\s*===?\s*['"]number['"]/.test(line)) { hits.push('typeof-existence'); }
+    if (/(^|[^\w.])(0\.5|1\.2|0\.05)(?![\d])/.test(line)) { hits.push('bare-threshold'); }
+    if (hits.length) { console.log('prove_track.view.js:' + (n + 1) + '\t' + hits.join(',')); }
+  });
+  process.exit(0);
+}
+
 if (process.argv.indexOf('--emit-baseline') > -1) {
   console.log(JSON.stringify(counts));
   process.exit(0);

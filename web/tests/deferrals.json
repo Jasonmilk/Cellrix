@@ -145,19 +145,19 @@
       "id": "view-geometry-fallback-or-1",
       "owner": "jason",
       "due": "2026-12-15",
-      "retirement_plan": "view-geometry-fallback-or-1: :356/:357 in prove_track.view.js. `(maxTok || 1)` and `(maxDur || 1)` collapse an unmeasured denominator into 1, which is how `NaNpx` was produced and why the bar was never drawn. Retires when step b takes the geometry from the projection (which declares MIN_W/W_FULL/TOK_RATIO and returns bars with src)."
+      "retirement_plan": "in `prove_track.view.js` geometry: `(e.tok / (maxTok || 1)) * maxDur * 0.5` and `Math.max(1.2, (v / (maxDur || 1)) * 22)`. Line numbers DRIFT (they were 356/357 when registered, 258/259 after the grouping change) so this entry anchors by CONTENT. These two lines collapse an unmeasured denominator into 1 and are the root of `NaNpx`. Retires in step b1."
     },
     {
       "id": "view-lane-normalizer-fallback-or-1",
       "owner": "jason",
       "due": "2026-12-15",
-      "retirement_plan": "view-lane-normalizer-fallback-or-1: :371 `raw.reduce(...) || 1`. A zero total is turned into 1 instead of being reported as a distinct state; same family as `|| 0` on the share axis. Retires when the lane normalisation reads the projection's totals."
+      "retirement_plan": "in `prove_track.view.js`: `raw.reduce(function (a, b) { return a + b; }, 0) || 1` (line 371 when registered, 273 after). A zero total is turned into 1 instead of being a distinct state. Retires in step b2."
     },
     {
       "id": "duration-axis-three-states",
       "owner": "jason",
       "due": "2026-12-15",
-      "retirement_plan": "duration-axis-three-states: `typeof e.dur === 'number'` (the one remaining typeof-existence) judges presence by TYPE. The duration axis needs the same three states as the share axis (present/null/absent) plus applicability. Retires when the duration axis is projected."
+      "retirement_plan": "in `prove_track.view.js`: `typeof e.dur === 'number'` (line 116). Presence judged by TYPE; the duration axis needs the same states as the share axis plus applicability. Retires when the duration axis is projected."
     }
   ],
   "sentinels": {
