@@ -128,6 +128,12 @@
       "owner": "jason",
       "due": "2026-11-10",
       "retirement_plan": "hash-normalisation: normalise the input hash - sort paths, drop mtime, use relative paths, and prefer CONTENT hashing over name+size (name+size is stable but blind to a same-size edit). A hash containing mtime, traversal order or absolute paths produces FALSE drift, which is worse than no sha at all because it sends you chasing a drift that does not exist. See reproducible-builds.org, git hash-object, Bazel/Nix content addressing."
+    },
+    {
+      "id": "a11y-same-number-criterion",
+      "owner": "jason",
+      "due": "2026-12-20",
+      "retirement_plan": "a11y-same-number-criterion: implement ADR-0048 1.4 - ask the SAME question of the rendered screen and of the semantic grid and require the SAME number. The screen side needs a programmatic carbon proxy, and the only usable one is the CDP Accessibility domain, which is ABSENT in this environment, so this criterion lands HELD (unable to go red) - exactly the class N-012 forbids shipping silently. Register the ASSERTION MEANS together with the criterion (CDP Accessibility domain, or axe-core where CDP is unavailable) and do NOT substitute jsdom: a jsdom approximation would make 'the same number' false while looking green. Prerequisite: the grid must be derived DIRECTLY from the ledger, never via the DOM, or the two sides share a chain and the criterion self-certifies, losing all discriminating power and leaving invariant B (no ghost semantics) untestable."
     }
   ],
   "sentinels": {
