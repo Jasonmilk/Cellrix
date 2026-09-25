@@ -49,16 +49,21 @@ if (process.argv.indexOf('--emit-baseline') > -1) {
 
 let bad = 0;
 const total = Object.keys(counts).reduce(function (a, k) { return a + counts[k]; }, 0);
+const baseTotal = Object.keys(BASELINE).reduce(function (a, k) { return a + BASELINE[k]; }, 0);
+/* THE TARGET IS ZERO, NOT THE BASELINE (ADR-0048 §65.5). Using the baseline as a
+ * tolerance made this very checker green while the cell was 100% broken — the disease
+ * it exists to treat, committed while writing it. N is a RECORDED STARTING POINT; the
+ * criterion is 0, so the gate is RED TODAY and gets greener only by real work. */
 for (const k of Object.keys(counts)) {
-  const want = BASELINE[k];
-  const okNow = counts[k] <= want;
-  console.log((okNow ? '  ok   ' : '  FAIL ') + k + ': ' + counts[k] + ' (baseline ' + want + ')');
+  const okNow = counts[k] === 0;
+  console.log((okNow ? '  ok   ' : '  FAIL ') + k + ': ' + counts[k]
+    + ' (recorded start ' + BASELINE[k] + ', target 0)');
   if (!okNow) { bad++; }
 }
 console.log('  TARGET  ' + path.relative(process.cwd(), TARGET) + '   [' + SCOPE_NOTE + ']');
-console.log('  TOTAL   ' + total + ' (baseline ' + (BASELINE['bare-slash'] + BASELINE['fallback-or']
-  + BASELINE['typeof-existence'] + BASELINE['bare-threshold']) + ')');
+console.log('  TOTAL   ' + total + ' (recorded start ' + baseTotal + ', target 0)');
 console.log(bad === 0
-  ? 'OK — this cell carries no undeclared arithmetic/fallback/type-presence thresholds'
-  : 'FAILED — the target cell still carries ' + total + ' occurrences of the four classes');
+  ? 'OK — M3 REACHED: the target cell carries 0 occurrences of the four classes'
+  : 'FAILED (M0, expected) — the target cell still carries ' + total
+    + ' occurrences; M3 is this reaching 0');
 process.exit(bad === 0 ? 0 : 1);
