@@ -128,11 +128,20 @@
 
   function compactGroupsOf() {
     var out = {};
+    /* M1/c1 (ADR-0048 §72): ONE projection call for the session; each group takes ITS
+     * turn's state BY ID (never by index). The view no longer accumulates tokens, so
+     * the seed bug (`add(0, inapplicable) -> 0`) cannot recur: a segment with no
+     * applicable rows carries the projection's A and renders as no-data, not as 0. */
+    var cellProj = window.CxCellMetering.project(S.session);
+    var cellTurnById = {};
+    for (var ct = 0; ct < cellProj.turns.length; ct++) {
+      cellTurnById[String(cellProj.turns[ct].id)] = cellProj.turns[ct];
+    }
     if (!S.compact) { return out; }
     for (var i = 0; i < S.session.length; i++) {
       var it = S.session[i];
       if (it.kind !== 'turn') { continue; }
-      var ids = [], tok = 0, dur = 0, failed = 0, anyShown = false, tokStates = [];
+      var ids = [], tok = 0, dur = 0, failed = 0, anyShown = false;
       for (var k = i + 1; k < S.session.length && S.session[k].kind !== 'turn'; k++) {
         var e = S.session[k];
         /* A failure is never folded: it is the one thing a reader must not have
@@ -165,13 +174,15 @@
              * state, not a bare number — so absent/null/present(0) stay distinguishable
              * here. Interface names are read off the implementation's exports. */
             ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; }
-            tokStates.push(window.CxCellMetering.tokOf(e));
           }
         } else { anyShown = true; }
       }
-      var tokState = tokStates.reduce(function (a, st) { return window.CxThreeState.add(a, st); },
-                                       window.CxThreeState.A());
-      if (ids.length && !anyShown) { out[it.id] = { ids: ids, tok: tokState, dur: dur, failed: failed, turn: it }; }
+      var cellTurn = cellTurnById[String(it.id)];
+      if (ids.length && !anyShown) {
+        out[it.id] = { ids: ids,
+                       tok: cellTurn ? cellTurn.tok : window.CxThreeState.A(),
+                       dur: dur, failed: failed, turn: it };
+      }
     }
     return out;
   }
@@ -229,7 +240,8 @@
              * That is §2's constraint 3 (unknown must have a type-level
              * representation, not a default) and the same shape as K-105.
              * `0` now prints `0`; only "no measurement" says so. */
-            (typeof g.tok === 'number' ? ' · ' + fmtTok(g.tok) + ' tok' : ' · 未计量') +
+            (g.tok && g.tok.k === 'p' ? ' · ' + fmtTok(g.tok.v) + ' tok'
+                                      : ' · ' + window.CxCellMetering.foldedCell(g)) +
             (g.failed ? ' · ⚠ ' + g.failed + ' failed' : '') + '</span>' +
             '</button></td></tr>' });
         }
