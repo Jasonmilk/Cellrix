@@ -132,18 +132,20 @@
      * turn's state BY ID (never by index). The view no longer accumulates tokens, so
      * the seed bug (`add(0, inapplicable) -> 0`) cannot recur: a segment with no
      * applicable rows carries the projection's A and renders as no-data, not as 0. */
+    /* GROUPING COMES FROM THE PROJECTION (ADR-0048 §74.1): the view no longer decides
+     * which events form a segment — it FILTERS the projection's list. Selection is
+     * downstream of grouping, not part of it (relational algebra / map.filter.reduce),
+     * so "the two sets disagree" is unrepresentable: a turn the projection did not
+     * produce simply cannot appear, and one it did produce cannot vanish silently. */
     var cellProj = window.CxCellMetering.project(S.session);
-    var cellTurnById = {};
-    for (var ct = 0; ct < cellProj.turns.length; ct++) {
-      cellTurnById[String(cellProj.turns[ct].id)] = cellProj.turns[ct];
+    var cellTurnItem = {};
+    for (var ci = 0; ci < S.session.length; ci++) {
+      if (S.session[ci].kind === 'turn') { cellTurnItem[String(S.session[ci].id)] = S.session[ci]; }
     }
     if (!S.compact) { return out; }
-    for (var i = 0; i < S.session.length; i++) {
-      var it = S.session[i];
-      if (it.kind !== 'turn') { continue; }
-      var ids = [], tok = 0, dur = 0, failed = 0, anyShown = false;
-      for (var k = i + 1; k < S.session.length && S.session[k].kind !== 'turn'; k++) {
-        var e = S.session[k];
+    cellProj.turns.forEach(function (t) {
+      var ids = [], dur = 0, failed = 0, anyShown = false;
+      t.events.forEach(function (e) {
         /* A failure is never folded: it is the one thing a reader must not have
          * to open a disclosure to find.
          *
@@ -176,14 +178,12 @@
             ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; }
           }
         } else { anyShown = true; }
-      }
-      var cellTurn = cellTurnById[String(it.id)];
+      });
       if (ids.length && !anyShown) {
-        out[it.id] = { ids: ids,
-                       tok: cellTurn ? cellTurn.tok : window.CxThreeState.A(),
-                       dur: dur, failed: failed, turn: it };
+        out[t.id] = { ids: ids, tok: t.tok, dur: dur, failed: failed,
+                      turn: cellTurnItem[String(t.id)] || t };
       }
-    }
+    });
     return out;
   }
 

@@ -140,6 +140,24 @@
       "owner": "jason",
       "due": "2026-12-05",
       "retirement_plan": "pending-axis-three-states: THREE AXES, NOT TWO (share / duration / pending). `v > PEND_MIN` makes null and undefined both false, so the pending axis collapses exactly like `|| 0` did on the share axis. Give it the same three states, AND move the pending markers (pendIdx) so they are distributed WITH turns[i].bars: today pendIdx holds BATCH indices ([0,3]) while each segment has only its own 0..n, so a marker pointing at index 3 lands on undefined inside a 3-bar segment and misaligns WITHOUT AN ERROR. This is the FIFTH location of the one invariant: two denominator sources -> two groupings -> two sources for one cell -> subset/full set -> pending index."
+    },
+    {
+      "id": "view-geometry-fallback-or-1",
+      "owner": "jason",
+      "due": "2026-12-15",
+      "retirement_plan": "view-geometry-fallback-or-1: :356/:357 in prove_track.view.js. `(maxTok || 1)` and `(maxDur || 1)` collapse an unmeasured denominator into 1, which is how `NaNpx` was produced and why the bar was never drawn. Retires when step b takes the geometry from the projection (which declares MIN_W/W_FULL/TOK_RATIO and returns bars with src)."
+    },
+    {
+      "id": "view-lane-normalizer-fallback-or-1",
+      "owner": "jason",
+      "due": "2026-12-15",
+      "retirement_plan": "view-lane-normalizer-fallback-or-1: :371 `raw.reduce(...) || 1`. A zero total is turned into 1 instead of being reported as a distinct state; same family as `|| 0` on the share axis. Retires when the lane normalisation reads the projection's totals."
+    },
+    {
+      "id": "duration-axis-three-states",
+      "owner": "jason",
+      "due": "2026-12-15",
+      "retirement_plan": "duration-axis-three-states: `typeof e.dur === 'number'` (the one remaining typeof-existence) judges presence by TYPE. The duration axis needs the same three states as the share axis (present/null/absent) plus applicability. Retires when the duration axis is projected."
     }
   ],
   "sentinels": {
