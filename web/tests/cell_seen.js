@@ -25,17 +25,23 @@ function loadReal() {
      * completion criterion (§44.1) could not be satisfied by construction — the
      * "evs 取错" case. Pick the RICHEST file by content: the one that actually
      * carries usage (and note the counts either way). */
-    let f = null, best = -1;
-    for (const cand of files) {
-      const t = fs.readFileSync(path.join(EV, cand), 'utf8');
-      const n = (t.match(/"assistant\/usage"/g) || []).length;
-      const tot = t.trim().split('\n').filter(Boolean).length;
-      const score = n * 1000 + tot;   // usage-bearing first, then size
-      if (score > best) { best = score; f = cand; }
+    /* DECLARED, NOT FILTERED (ADR-0048 §46). Searching for "the file that contains
+     * usage" makes the result depend on the outcome — the HARKing shape — and the
+     * criterion stays green forever. So the sample is PINNED by name AND sha, and its
+     * preconditions are ASSERTED rather than used to select: if the pinned sample
+     * does not meet them, that is a DISCOVERY to record, not a reason to pick another
+     * file. Run ids are hex random strings, so lexicographic order is NOT time order
+     * and "newest" is not even well defined by filename. */
+    const PIN = { name: 'run-1453c697e434ecfa-p006ab547d0000002.events.jsonl', sha256_16: '13bffc1b0a39a9b6' };
+    const f = files.indexOf(PIN.name) > -1 ? PIN.name : null;
+    if (f === null) {
+      console.log('DISCOVERY: the pinned sample ' + PIN.name + ' is not present in .helix/events.');
+      console.log('  That is a fact to record, not a reason to select a different file.');
+      process.exit(3);
     }
     const evs = fs.readFileSync(path.join(EV, f), 'utf8').trim().split('\n')
       .filter(Boolean).map(function (l) { try { return JSON.parse(l); } catch (e) { return {}; } });
-    return { name: f, events: evs };
+    return { name: f, events: evs, pinned: PIN };
   } catch (e) { return null; }
 }
 
@@ -66,13 +72,20 @@ samples.push(['all-absent', [{},{},{}]]);
 console.log('cell_seen — values, not pixels (ADR-0048 §31.2 / §36)');
 console.log(real ? ('real sample: ' + real.name) : 'real sample: unavailable (.helix/events) — using the pre-registered table only');
 if (real) {
+  const pids = Array.from(new Set(real.events.map(function (e) { return e.period_id === undefined ? '' : e.period_id; }))).sort();
   const c = srcCounts(real.events);
+  console.log('pinned sample ' + real.pinned.name + ' (sha256:' + real.pinned.sha256_16 + ')');
+  console.log('period_ids in this sample: ' + JSON.stringify(pids)
+    + (pids.length > 1 ? '  <-- MIXED: project will THROW, and that is a DISCOVERY (ADR-0048 §44.3)' : ''));
+  /* PRECONDITIONS ASSERTED, not used to select. */
+  if (!(c.tokN >= 1)) { console.log('PRECONDITION FAILED: this sample has no assistant/usage event'
+    + ' — the completion criterion cannot be exercised. Record it; do not switch files.'); }
   console.log('src counts (pre-flight, from the events): dur=' + c.durN + ' tok=' + c.tokN
     + ' unknown=' + c.unknownN + '  total=' + real.events.length);
   console.log('  expect after wiring: tok = assistant/usage count (' + c.tokN + '), dur = tool/result count ('
     + c.durN + '), unknown = the rest (' + c.unknownN + ')');
   console.log('  COMPLETION (§44.1): the folded summary tok must become present(<a real number>), NOT absent.'
-    + ' If it stays absent, only the path or the evs selection can be wrong — adjust nothing else.');
+    + ' It is RED RIGHT NOW: tok is absent until the path is fixed.');
 }
 console.log('');
 for (const [label, evs] of samples) {
