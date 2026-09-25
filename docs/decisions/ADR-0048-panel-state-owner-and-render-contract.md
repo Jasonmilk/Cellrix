@@ -1439,3 +1439,66 @@ sample: {"type":"context/inject", ... "data":{"chars":800,"injected_chars":0,"no
 
 `Math.max(1.2, NaN) = NaN`（审查方复核）⇒
 **"这一格在真实数据上根本没被画出来"成立**（§40.2）——`NaNpx` 是无效值。
+
+## 42. 语义裁定：`sum(output_tokens)`（并修正我此前的"三种都合理"）
+
+### 42.1 决定性事实（**联网核实**：OTel GenAI Semantic Conventions，2025 底 stable）
+
+| 标准属性 | 语义 | 本项目字段 |
+|---|---|---|
+| `gen_ai.usage.input_tokens` | **累积快照**：每轮把**完整历史**重新 token 化 | `prompt_tokens` |
+| `gen_ai.usage.output_tokens` | **增量**：仅本次生成 | `completion_tokens` |
+
+实测（审查方 `verify/tokens.js`）：
+
+```
+轮  prompt_tokens(累积)  completion_tokens(增量)
+1   140                  30      … 5   420   30
+sum(completion) = 150   ← "本 period 生成了多少"   有语义
+last(prompt)    = 420   ← "当前上下文多长"         有语义
+sum(prompt)     = 1400  ← O(n²) 重复计费和         计量侧【无语义】
+```
+
+### 42.2 修正我此前的判断
+
+§40.6 我写"`completion_tokens` / `prompt_tokens` / 二者之和——三种都合理而语义不同"。
+**该判断要修正**：**三者里有一个（`sum(input)`）在计量侧根本不成立**——
+它既不是生成总数（150），也不是最终上下文长度（420），而是**每轮重算的累积和**。
+
+### 42.3 **裁定**（决定这一格显示的数字是什么意思）
+
+> **`tok` = `sum(/data/completion_tokens)`** —— **"本 period 生成了多少"。**
+
+理由：本格是 **ProveTrack 的计量格**（CI-144 `assistant/usage` 语境）;
+**每根事件条的增量本身有语义**;**`last(input)` 回答的是另一个问题**（上下文占用）
+⇒ **登记为独立量,不混进这一格。**
+
+### 42.4 字段路径的**成熟形态**（两处，均可抄）
+
+- **语法用标准**：**RFC 6901 JSON Pointer**（`/data/completion_tokens`）,
+  有转义规则（`~0`/`~1`）、有各语言库、**与 JSON Schema 的错误定位互通**——
+  **不自造语法**;
+- **别名用有序候选链**（工业界落地做法）：**顺序即优先级,命中第一个存在的键即止**;
+  **解析不到即 `absent`,不兜底**。
+
+```yaml
+tok: [ /data/completion_tokens, /data/output_tokens ]   # 首选即 OTel 的 output_tokens
+dur: [ /data/duration_ms ]
+```
+
+⇒ 这是「声明优于发现」第六次的**更好形态**：**不是声明"是哪一个",而是声明"按什么顺序找"。**
+
+### 42.5 聚合边界：PromQL 的选择器（**形态对，继续用**）
+
+`metric{period_id="P1"}` = **声明输入范围**;`sum by (…)` = **声明聚合边界**。
+⇒ 本 ADR §41.3 的 `project` 校验 `period_id` 相同,**就是选择器的运行期等价物**。
+
+### 42.6 **外部佐证**：Prometheus staleness（**无数据 ≠ 0**）
+
+> 序列在采样时刻前 5 分钟无样本 ⇒ **不返回任何值,序列从图表上消失**。
+
+⇒ **不是返回 0,是返回"无"**——**正是 `absent` 那一态的工业级实现**。
+运维最佳实践明写「**别把"无数据"当 `0`**」,并用 **`absent()`** 专门探测"到底有没有数据"。
+
+⇒ **本格在真实数据上把"无数据"渲染成 `0.000`,正是该生态反复警告的那个错误。**
+（**外部佐证,不是我们的推断。**）
