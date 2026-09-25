@@ -442,14 +442,19 @@ for (const d of (DEFERRALS.deferrals || [])) {
     xpass.push(d.suite + ' [' + d.id + ']');
   }
 }
-const heldAttempted = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) > -1; });
-const heldNever = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) === -1; });
 
 for (const [file, why] of NEEDS_INPUT) {
   const c = classify(file);
   if (c.kind === 'unknown') { unknown.push([file, why, c.why]); }
   else { deferred.push([file, c.kind, c.why]); }
 }
+
+/* Derived AFTER the loop populates `deferred`. Computing these earlier made every
+ * label vanish while the summary still said "5 held": the gate looked normal and
+ * had silently dropped the information. Order matters. */
+const heldAttempted = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) > -1; });
+const heldNever = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) === -1; });
+
 
 
 console.log('regression net');
