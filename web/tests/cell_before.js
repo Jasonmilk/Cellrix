@@ -64,7 +64,12 @@ function run(events) {
   });
   return { summary, w: w, mt: mt, md: md };
 }
-const kat1 = run([{tok:120, dur:60}, {tok:80}, {tok:200}]);
+/* KAT INPUTS ARE PINNED (ADR-0048 §58.1): the width vector depends on WHERE the
+ * duration sits — dur on the LAST item => 6.600/4.400/22.000; dur on the FIRST
+ * => 22.000/4.400/11.000. Same formula, different input. Without pinning the
+ * input, "both versions are right" recurs forever. */
+const KAT1_INPUT = [{tok:120, dur:60}, {tok:80}, {tok:200}];   /* dur FIRST */
+const kat1 = run(KAT1_INPUT);
 const kat2 = run(evs);
 console.log('KAT-1 (old top-level shape, known answer):');
 console.log('  summary ' + JSON.stringify(kat1.summary) + '   [expect " · 400 tok"]  maxTok=' + kat1.mt + ' maxDur=' + kat1.md);
