@@ -42,18 +42,22 @@
     if (x.k === 'a') { return A(); }
     return P(x.v / y.v);
   }
-  /* fold carries {value, seenP, seenA}; `partial` is DERIVED from the carried
-   * flags, so permuting the input cannot change the result. */
-  function fold(list, op) {
-    var f = op || add;
-    var acc = { k: 'a' }, seenP = false, seenA = false;
-    for (var i = 0; i < list.length; i++) {
-      var it = list[i];
-      if (it.k === 'p') { seenP = true; }
-      if (it.k === 'a') { seenA = true; }
-      acc = f(acc, it);
-    }
-    return { value: acc, partial: seenP && seenA, count: list.length };
+  /* INCREMENTAL STEP: the accumulator carries the flags, so a per-event loop
+   * (which is exactly what 1d does) preserves them. Without this, a mutant that
+   * recomputes `partial` at the end is EXTENSIONALLY EQUAL over a batch fold —
+   * the exemption I granted was scoped to that observation surface alone, which is
+   * not a legitimate exemption: `add`/`step` are the public surface the caller uses. */
+  function step(acc, item) {
+    return { value: add(acc.value, item),
+             seenP: acc.seenP || item.k === 'p',
+             seenA: acc.seenA || item.k === 'a' };
+  }
+  function start() { return { value: A(), seenP: false, seenA: false }; }
+  /* fold is a thin loop over `step`; `partial` is read off the CARRIED flags. */
+  function fold(list) {
+    var acc = start();
+    for (var i = 0; i < list.length; i++) { acc = step(acc, list[i]); }
+    return { value: acc.value, partial: acc.seenP && acc.seenA, count: list.length };
   }
   /* Summation is the ONLY place where a partial result may be shown as a lower
    * bound (ADR-0048 §25.3). A ratio must degrade to explicit unknown instead,
@@ -67,5 +71,6 @@
     return { value: div(a.value, b.value), reason: null };
   }
   return { P: P, N: N, A: A, add: add, max: max, div: div, fold: fold,
+           start: start, step: step,
            lowerBound: lowerBound, ratio: ratio };
 }));
