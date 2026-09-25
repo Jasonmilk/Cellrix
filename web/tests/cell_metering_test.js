@@ -113,6 +113,25 @@ ok('a measured-zero denominator yields UNKNOWN, never NaN (div is total)',
     const sh = M.shares(M.project([{data:{completion_tokens:0}},{data:{completion_tokens:0}}]));
     return sh.every(function (x) { return x.value.k !== 'p'; }) && sh.nonFinite === 0;
   }()));
+/* §47.2 — mutation ③'s target: a PARTIAL max is a LOWER BOUND, so every share must
+ * be unknown even though sum and max are both real numbers. Checking only
+ * max.k==='present' while missing max.partial yields 1.000/1.000/1.000 — fake
+ * exact values, the disease this cell exists to treat. */
+(function () {
+  const ev = [{data:{completion_tokens:5}}, {}];      // present + absent => partial max
+  const r = M.project(ev);
+  ok('a PARTIAL max makes every share unknown (not 1.000)',
+    r.partial === true && r.maxPartial === true
+    && M.shares(r).every(function (x) { return x.value.k !== 'p'; }));
+}());
+/* §47.3 — CONTRACT assertion that permanently prevents the old-fixture failure:
+ * under the old top-level fixtures a CORRECT implementation read nothing and
+ * returned absent,absent, so every "reads a value" criterion was never exercised. */
+ok('contract: an event carrying completion_tokens MUST read as present',
+  M.tokOf({data:{completion_tokens:7}}).k === 'p'
+  && M.tokOf({data:{completion_tokens:0}}).k === 'p'
+  && M.tokOf({data:{completion_tokens:null}}).k === 'n'
+  && M.tokOf({}).k === 'a');
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{data:{completion_tokens:120}}, A]), M.project([{data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
