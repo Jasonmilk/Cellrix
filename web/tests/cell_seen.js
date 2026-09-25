@@ -27,6 +27,22 @@ function loadReal() {
   } catch (e) { return null; }
 }
 
+/* §44.2 — "count first, then judge" (Prometheus `count by` / `absent()`).
+ * These three counts are computed FROM THE EVENTS (pre-flight), because `src` is
+ * not in the projection yet (step b). They are the baseline the completion
+ * criterion compares against: tok should equal the assistant/usage count, dur the
+ * tool/result count, and unknown the rest (inject and friends). */
+function srcCounts(events) {
+  let durN = 0, tokN = 0, unknownN = 0;
+  for (const e of events) {
+    const d = e && e.data;
+    const hasDur = !!(d && Object.prototype.hasOwnProperty.call(d, 'duration_ms'));
+    const hasTok = !!(d && (Object.prototype.hasOwnProperty.call(d, 'completion_tokens')
+                        || Object.prototype.hasOwnProperty.call(d, 'output_tokens')));
+    if (hasDur) { durN++; } else if (hasTok) { tokN++; } else { unknownN++; }
+  }
+  return { durN, tokN, unknownN };
+}
 const real = loadReal();
 const samples = real ? [[real.name, real.events]] : [];
 /* Pre-registered samples from §31.2, always printed so the table is checkable. */
@@ -37,6 +53,15 @@ samples.push(['all-absent', [{},{},{}]]);
 
 console.log('cell_seen — values, not pixels (ADR-0048 §31.2 / §36)');
 console.log(real ? ('real sample: ' + real.name) : 'real sample: unavailable (.helix/events) — using the pre-registered table only');
+if (real) {
+  const c = srcCounts(real.events);
+  console.log('src counts (pre-flight, from the events): dur=' + c.durN + ' tok=' + c.tokN
+    + ' unknown=' + c.unknownN + '  total=' + real.events.length);
+  console.log('  expect after wiring: tok = assistant/usage count (' + c.tokN + '), dur = tool/result count ('
+    + c.durN + '), unknown = the rest (' + c.unknownN + ')');
+  console.log('  COMPLETION (§44.1): the folded summary tok must become present(<a real number>), NOT absent.'
+    + ' If it stays absent, only the path or the evs selection can be wrong — adjust nothing else.');
+}
 console.log('');
 for (const [label, evs] of samples) {
   const r = M.project(evs);

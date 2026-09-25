@@ -1554,3 +1554,34 @@ Prometheus 惯例追加 `_seconds` 后缀）。
 tok: [ /data/completion_tokens, /data/output_tokens ]      # 同为"增量 token 数"
 dur: [ /data/duration_ms ]                                  # 同为毫秒；异单位候选 ⇒ 拒绝
 ```
+
+## 44. 施工期四条（完成定义 / 三计数 / throw 是发现 / 停止规则）
+
+### 44.1 完成定义（**一句话，本轮唯一真有鉴别力的判据**）
+
+> **`cell_seen` 真实样本上，折叠摘要的 `tok` 必须是 `present(<真数>)`,不是 `absent`。**
+
+依据：`assistant/usage` 有 **51** 条带 `completion_tokens` ⇒ **路径一修对,它必然从"无数据"变真数**。
+⇒ **若跑出来仍是 `absent` ⇒ 只可能是"路径没修对"或"`evs` 取错"——不要去调别的。**
+**而 `inject`（35 条）仍是 `1.2` / `unknown`——那是预期,不是失败**（§40.5）。
+
+### 44.2 `cell_seen` 打印 `src` 三计数（**零成本**）
+
+`dur=N1 tok=N2 unknown=N3` ⇒ 一眼可判：**`tok` = usage 条数、`dur` = tool 条数、
+`unknown` = inject 条数** ⇒ 成功;`tok=0` 或 `unknown`=全部 ⇒ **路径没修对**。
+**这就是 §39.5 自证的可执行形态**,`legitUnknown` 应对上它。
+（巨人路径：Prometheus 的 `count by` / `absent()`——**先数清有多少,再判断有没有**。）
+
+### 44.3 ⚠️ 首次运行若 `throw`（`period_id` 不一致）——**那是发现,不是 bug**
+
+`evs` 来自 session 迭代;若一个 session **实跨多 period**,会立刻 `throw` ⇒ 整格崩。
+⇒ **不要放宽不变量**（那正是"**把发现改成静默**"）;
+⇒ **正确动作：停下,回到声明层裁定**——**本格聚合的是 session 还是 period？**
+**裁定完改的是上游分组,不是 `project` 里的校验。**
+**`throw` 说明它抓到了东西。**
+
+### 44.4 停止规则（**timebox**）
+
+a / b / c1 / c2 **任一步卡住 ⇒ 停在原地记账**（不换格子、不加机制）。
+**尤其**：若 `:258` 展开分支**不是 `r.states` 能直接索引的形态,不要当场重构**——
+**退回到"只完成折叠分支"也是一个可见的交付。**
