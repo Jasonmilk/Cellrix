@@ -164,6 +164,12 @@
       "owner": "jason",
       "due": "2026-12-20",
       "retirement_plan": "attribution-within-renderLanes: lines 267/269/275 sit in `renderLanes` but are NOT yet proven to serve THIS cell (the reviewer reads them as another view path). Attribution must come from a scan of who calls them / which DOM node they feed (static slicing by caller, not by shape), not from co-location. Until then they are NEITHER this cell's credit NOR written off; M3 counts only the proven this-cell items (258/259/262/273)."
+    },
+    {
+      "id": "four-src-states-in-grid",
+      "owner": "jason",
+      "due": "2026-12-31",
+      "retirement_plan": "four-src-states-in-grid: bars[j].src now ranges over {dur, tok, unknown, n/a}. Cellrix README says colors represent system states, never decoration, so all FOUR states must be representable in the semantic grid (not only in the render). This is the silicon-side extension of the judgment (M4 reads project(), never infers from the DOM). Registered, NOT part of b1."
     }
   ],
   "sentinels": {
