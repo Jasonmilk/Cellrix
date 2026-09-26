@@ -5491,3 +5491,54 @@ A1-c  ⚠️ **通则⑪在数据层的一次兑现**：**样本里没有计量�
 上轮 §1 提出两个"单一来源"候选:**`chain.json`** 与 **`ports.json`**;
 而审查方在 `Anaphase-Helix` **三个分支上仍读不到 `chain.json`**。
 ⇒ **建议与 A2 的跨仓动作同批裁决**（两者都牵 Anaphase 仓,一趟解决）。
+
+## 121. **A1-a 落地**：文档词表 == 代码词表（双向 + 差集 + 机械抽取 + 声明式 SKIP）
+
+### 121.1 判据（`Cellrix/web/tests/wordlist_parity_test.js`）
+
+| 条 | 内容 | 为什么 |
+|---|---|---|
+| **scope ≥ 11**（两侧各一） | 解析到的条数 | **解析器没匹配上 ⇒ 0 条 ⇒ "相等"** ⇒ 先断言作用域非空（与 A0 立的那条同形） |
+| **`DOC ⊇ CODE`** | 代码有、文档没有 | —— |
+| **`CODE ⊇ DOC`** | 文档有、代码不认 | **单向包含只防一半**;将来文档多写一个类型,单向判据仍绿 |
+| **差集打印** | 失败时列出**缺哪些/多哪些** | **红了说不出哪里红的判据等于没有** |
+| **机械抽取** | 代码侧 `EventType::X => "…"`;文档侧 `§D2` 段内的表格行 | **手工维护第二份清单 = 第二份真相** |
+| **声明式 SKIP** | 兄弟仓缺失 ⇒ `SKIPPED (declared)` + **`exit 4`** | **崩 ≠ 红**（§118.1）;`ANA_ROOT` 为声明输入 |
+
+### 121.2 红是活的,而**红→绿是可证的**
+
+```
+补文档前:  FAIL DOC ⊇ CODE — missing in doc: assistant/usage
+补文档后:  OK — the doc vocabulary equals the code vocabulary        （exit=0）
+变异探针:  缺该行的文档副本 ⇒ MUTATION PROBE … detected (missing: assistant/usage)
+```
+⇒ **变异探针证明"那次红是**缺这一行**造成的,不是解析器坏了**——
+与 ③b 同一纪律：**红→绿本身是证据,但只有"能造出红"才算。**
+
+### 121.3 文档侧的补行（**字段名取自真实样本证据,不编**）
+
+```
+| `assistant/usage` | `{prompt_tokens, completion_tokens, cached_tokens, reasoning_tokens, model}` |
+  上游计量（ADR-0038）；只作披露,永不参与判据；词表 1.1.0（2026-09-15）起
+  —— 该行由 wordlist_parity_test.js 守着
+```
+（`data` 键取自 pinned 真实样本:实测 `['cached_tokens','completion_tokens','model','prompt_tokens','reasoning_tokens']`。）
+
+⇒ **文档里那行还写着"谁守着它"** —— 让后来者知道**改这行会红**。
+
+### 121.4 改动面（规则②点名）
+
+| 仓 | 文件 | 推送 |
+|---|---|---|
+| **Cellrix** | `web/tests/wordlist_parity_test.js`(新增) · 本 ADR | ✅ 推送 |
+| **Anaphase-Helix** | `docs/decisions/ADR-0026-session-event-stream.md`（§D2 补一行） | ⬜ **本地提交,未推送**（跨仓推送等你口令） |
+
+### 121.5 下一步
+
+```
+A1-b  端到端**合取**判据: (该类型输入 N>0) ∧ (装配后 == N) ∧ (rejections() 该类型 == 0)
+      ⇒ 用含 3 条计量行的 **pinned** 样本;并登记适用域（真实样本当前 0 条 ⇒ 只在 pinned 上可行使）
+A2    R2:①事件流声明周期级 mode（Anaphase 写入 + 词表）·②旧文件**显式 absent**（不得默认 Partner）
+      ·③投影出 modeOf() 三态 + DOM 声明 ·④指示器读快照（当下）/读事件（那时）
+─── A2 完成 ⇒ b1b-2 的最后一个硬前置清除 ───
+```
