@@ -5172,3 +5172,44 @@ M3      本格 ASSERTED → 0 + 在场合绿 + **人工查看并操作过**
 
 **不 push（等口令）· 不改 `DNA.md` · 不引 React/构建链 · 不把「证轨」写成「轨迹」·
 未裁决前不扩 CI-144 字节层 · A1/A2 之前不追 `b1b-2` · 一次只动一处。**
+
+## 115. `A0` 的事实底座（跨仓端口普查,我自查）+ 两处新发现
+
+### 115.1 普查结果（`grep` 全生态 6 仓,排除 `target/` 与 `node_modules`）
+
+| 端口 | 声明处（逐条） | 判定 |
+|---|---|---|
+| **`:50051`** | **`Helix-Mind/crates/helix-mind-core/src/config.rs:448` 是 Mind 的出厂默认**;而 `Anaphase-Helix/tests/endpoint_parsing.rs:22` 与 `PROPOSAL-anaphase-tools-and-time.md:140` 把它当 **`tentacle_endpoint`** | ⚠️ **同一端口、两个主人** —— **A0 的靶心** |
+| `:50052` | `Anaphase-Helix/tests/knowledge_seed.rs:10` · `endpoint_parsing.rs:19` | ✅ Mind 的约定端口 |
+| `:50061` | `Cellrix/transport/tests/anaphase_live.rs:11`（`ANAPHASE_ENDPOINT` 默认） | ✅ Anaphase |
+| `:60052` | `Tuck/README.md:94` · `Cellrix/transport/src/tuck_audit_client.rs:139` | ✅ Tuck |
+| `:60054` | `Anaphase-Helix/tests/endpoint_parsing.rs:18` · FlowModus 文档/ADR-0104 | ✅ FlowModus（gRPC） |
+| `:59099` | FlowModus 文档里的 **mock 上游** | 非生态端口（测试替身） |
+| **`Helix-Tentacle`** | **全仓无端口字面量命中** | ⚠️ **"约定"不在 Tentacle 自己仓里** |
+
+⇒ **结论**：**端口表只以散落字面量 + 文档存在,没有单一来源**;而 **Mind 的出厂默认与 Tentacle 撞车**,
+**全靠本地 `config.toml` 手改覆盖**（`Anaphase-Helix/docs/archive/growth/2026-09-14-record-oldest.md:29`）
+——**"人有没有手改"这件事不可测** ⇒ **默认值等于把冲突藏进人的记忆**（Q2 的理由）。
+
+### 115.2 普查中捞到的**新事实**：`scheme` 是命名谎言
+
+`Helix-Mind/docs/helixECO/PROPOSAL-anaphase-tools-and-time.md:122` 明写：
+> `tentacle_endpoint = "http://127.0.0.1:50051"` 的 **scheme 是命名谎言** —— 它**实际是 gRPC**。
+
+⇒ **与"配置值冒充测量值"同族**（本 ADR 反复出现的那一族）:
+**名字说的协议与实际协议不一致,而两边各自自洽 ⇒ 谁都不报错**。
+⇒ **A0 的判据因此要加一条**：**端口表里每个端点的 `scheme` 与其真实协议一致**
+（或明确声明"该字段名为历史遗留,真实协议在 X"）。
+⇒ 这同时是 **§1.2（CI-144 两种口径）** 的一个具体实例:**"血液"在哪一层,取决于端点的真实协议**。
+
+### 115.3 `A0` 的落笔形状（等 ADR 落定后执行,改的是 **Helix-Mind**）
+
+```
+① 端口表成为跨仓单一来源（登记于 helixECO/）
+② Mind 的默认值：**取消默认,缺失即抛**（通则⑩）—— 或对齐生态约定（`:50052`）
+③ scheme 与其真实协议一致（§115.2）
+④ 判据：跨仓端口**两两不等** ∧ 与文档一致 ∧ **scheme-协议一致**;每一条**配变异**
+⑤ 人工查看：**把生态起起来一次**（验证纪律:"打开并操作过"）
+```
+⇒ **本笔是跨仓变更** ⇒ 按防腐化铁律 3(**变更先 ADR**),**先落 `Helix-Mind` 侧 ADR**,
+再改代码;**不在 Cellrix 仓里代替它做决定。**
