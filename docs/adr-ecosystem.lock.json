@@ -1,0 +1,204 @@
+{
+ "generated-from": "sibling checkouts",
+ "sources": {
+  "0001": [
+   "Cellrix",
+   "Helix-MCP-Learner",
+   "HelixECO-Glove",
+   "Tuck",
+   "anaphase-helix",
+   "helix-tentacle",
+   "lodestone-md"
+  ],
+  "0002": [
+   "Cellrix",
+   "Helix-MCP-Learner",
+   "Tuck",
+   "anaphase-helix",
+   "lodestone-md"
+  ],
+  "0003": [
+   "Cellrix",
+   "Helix-MCP-Learner",
+   "Tuck",
+   "anaphase-helix",
+   "lodestone-md"
+  ],
+  "0004": [
+   "Cellrix",
+   "Helix-MCP-Learner",
+   "Tuck",
+   "anaphase-helix"
+  ],
+  "0005": [
+   "Cellrix",
+   "Helix-MCP-Learner",
+   "Tuck",
+   "anaphase-helix"
+  ],
+  "0006": [
+   "Cellrix",
+   "Tuck",
+   "anaphase-helix"
+  ],
+  "0007": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0008": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0009": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0010": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0014": [
+   "Cellrix"
+  ],
+  "0015": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0016": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0017": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0018": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0019": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0020": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0021": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0022": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0044": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0045": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0046": [
+   "Cellrix",
+   "anaphase-helix"
+  ],
+  "0047": [
+   "Cellrix"
+  ],
+  "0048": [
+   "Cellrix"
+  ],
+  "0100": [
+   "FlowModus"
+  ],
+  "0101": [
+   "FlowModus"
+  ],
+  "0102": [
+   "FlowModus"
+  ],
+  "0103": [
+   "FlowModus"
+  ],
+  "0104": [
+   "FlowModus"
+  ],
+  "0011": [
+   "anaphase-helix"
+  ],
+  "0012": [
+   "anaphase-helix"
+  ],
+  "0013": [
+   "anaphase-helix"
+  ],
+  "0023": [
+   "anaphase-helix"
+  ],
+  "0024": [
+   "anaphase-helix"
+  ],
+  "0025": [
+   "anaphase-helix"
+  ],
+  "0026": [
+   "anaphase-helix"
+  ],
+  "0027": [
+   "anaphase-helix"
+  ],
+  "0028": [
+   "anaphase-helix"
+  ],
+  "0029": [
+   "anaphase-helix"
+  ],
+  "0030": [
+   "anaphase-helix"
+  ],
+  "0034": [
+   "anaphase-helix"
+  ],
+  "0035": [
+   "anaphase-helix"
+  ],
+  "0036": [
+   "anaphase-helix"
+  ],
+  "0037": [
+   "anaphase-helix"
+  ],
+  "0038": [
+   "anaphase-helix"
+  ],
+  "0039": [
+   "anaphase-helix"
+  ],
+  "0040": [
+   "anaphase-helix"
+  ],
+  "0041": [
+   "anaphase-helix"
+  ],
+  "0042": [
+   "anaphase-helix",
+   "helix-mind"
+  ],
+  "0043": [
+   "anaphase-helix",
+   "helix-mind"
+  ],
+  "0031": [
+   "helix-mind"
+  ],
+  "0032": [
+   "helix-mind"
+  ],
+  "0033": [
+   "helix-mind"
+  ]
+ },
+ "note": "derived artifact, committed on purpose (ADR-0048 §159)"
+}

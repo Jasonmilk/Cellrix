@@ -61,13 +61,25 @@ function report(label, items) {
  * Derived by looking at which siblings actually carry `docs/decisions/`, not
  * from a list written here: a hardcoded roster is a second, hand-maintained
  * copy of a fact the filesystem already carries. */
-function ecosystem() {
+/* LOCKFILE MODE (ADR-0048 §159). The verdict must not depend on which directories happen
+ * to sit next to the checkout: measured, this check was BLIND on a clean clone (it never saw
+ * an injected dangling reference — mutual information 0.000 bits) and only became sharp when
+ * a sibling happened to exist. Cargo.lock / go.sum solve exactly this: a DERIVED artifact is
+ * committed so resolution works without the registry, and freshness is an EXPLICIT action.
+ *   · the lockfile is the input the verdict is computed from (hermetic, 1 bit everywhere);
+ *   · siblings present ⇒ `--refresh` rewrites it; a diff is a DECLARED stale, not a silent one;
+ *   · neither present ⇒ exit 5 (input source unavailable) — never a silent SKIP. */
+const LOCK = path.join(CELLRIX, 'docs', 'adr-ecosystem.lock.json');
+function scanSiblings() {
   const parent = path.join(CELLRIX, '..');
   const map = {}, roots = [];
   let entries = [];
-  try { entries = fs.readdirSync(parent); } catch (e) { return { map, roots, available: false }; }
+  try { entries = fs.readdirSync(parent); } catch (e) { return { map, roots }; }
+  const selfName = path.basename(CELLRIX);
   for (const name of entries) {
-    if (name.startsWith('.')) continue;
+    if (name.startsWith('.') || name === selfName) continue;   /* SELF IS NOT A SIBLING:
+      * counting it made "no siblings" undetectable (the `roots.length > 1` magic this
+      * replaced), so a missing input never reached exit 5. */
     const dir = path.join(parent, name, 'docs', 'decisions');
     let files = [];
     try { if (!fs.statSync(dir).isDirectory()) continue; files = fs.readdirSync(dir); }
@@ -78,7 +90,32 @@ function ecosystem() {
       if (m) (map[m[1]] = map[m[1]] || []).push(name);
     }
   }
-  return { map, roots, available: roots.length > 1 };
+  return { map, roots };
+}
+function ecosystem() {
+  const live = scanSiblings();
+  if (process.argv.indexOf('--refresh') > -1 && live.roots.length > 0) {
+    const sources = {};
+    Object.keys(live.map).forEach(function (n) { sources[n] = live.map[n].slice().sort(); });
+    fs.writeFileSync(LOCK, JSON.stringify({ 'generated-from': 'sibling checkouts',
+      sources: sources, note: 'derived artifact, committed on purpose (ADR-0048 §159)' }, null, 1) + '\n');
+    console.log('  refreshed ' + LOCK + ' (' + Object.keys(sources).length + ' ADR numbers)');
+  }
+  let locked = null;
+  try { locked = JSON.parse(fs.readFileSync(LOCK, 'utf8')).sources; } catch (e) { locked = null; }
+  if (!locked) {
+    if (live.roots.length === 0) {
+      console.log('  INPUT-SOURCE-UNAVAILABLE: no lockfile and no sibling checkouts —'
+        + ' the reference check cannot be evaluated (exit 5, rule ⑳)');
+      process.exit(5);
+    }
+    return { map: live.map, roots: live.roots, available: true, source: 'siblings (no lockfile yet)' };
+  }
+  const map = {};
+  Object.keys(locked).forEach(function (n) { map[n] = locked[n].slice(); });
+  const stale = live.roots.length > 0
+    && JSON.stringify(Object.keys(live.map).sort()) !== JSON.stringify(Object.keys(locked).sort());
+  return { map: map, roots: live.roots, available: true, source: 'lockfile' + (stale ? ' (STALE vs siblings)' : '') };
 }
 
 /* ── the anchoring table ─────────────────────────────────────────────────── */

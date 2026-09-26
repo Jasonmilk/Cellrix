@@ -26,7 +26,8 @@ try {
 const ADR = 'docs/decisions/ADR-0048-panel-state-owner-and-render-contract.md';
 
 /* The governor: the CONCERN, with the path list as its projection. */
-const GOVERNS = ['web/assets/', 'web/src/', 'web/tests/'];
+const GOVERNS = ['web/assets/', 'web/src/', 'web/tests/', 'tools/',
+  'docs/adr-ecosystem.lock.json'];   /* §13: the boundary's own mechanical check + its input */
 const ADR_PATHS = ['docs/decisions/',
   /* ADR-0048 §13 (amended): the ADR's OWN navigation layer is part of the concern
    * ("本 ADR 自身"). §13 says the path list is only the EXECUTABLE PROJECTION of a
