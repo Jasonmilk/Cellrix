@@ -66,6 +66,11 @@
   function eventType(e) { return (e && typeof e.type === 'string') ? e.type : ''; }
   function applicable(e, list) { return list.indexOf(eventType(e)) > -1; }
   var DUR_PATHS = ['/data/duration_ms'];
+  /* RUN MODE (ADR-0048 §124 / A2): drive | partner | survive — a fact about the PERIOD that
+   * the event stream either DECLARES or does not. Read like any other fact, so an old tape is
+   * N (unmeasured), never a default: defaulting to 'partner' would be a configured value
+   * standing in for a measured one — the exact fault this ADR exists to remove. */
+  var MODE_PATHS = ['/data/mode', '/mode'];
   function readChain(e, paths) {
     for (var i = 0; i < paths.length; i++) {
       var seg = paths[i].slice(1).split('/');
@@ -84,6 +89,7 @@
   }
   function tokOf(e) { return readChain(e, TOK_PATHS); }
   function durOf(e) { return readChain(e, DUR_PATHS); }
+  function modeOf(e) { return readChain(e, MODE_PATHS); }
   /* INPUT SCOPE (ADR-0048 §41/§43): this cell aggregates ONE period.
    * Missing period_id normalises to "" (PromQL: an undefined label matches the
    * empty label value — it is not an error); two DISTINCT non-empty periods is a
@@ -478,7 +484,7 @@
              gridCols: gridCols };
   }
 
-  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber,
+  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf,
            stateText: stateText,
            allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
            TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,

@@ -432,6 +432,24 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
       return r.state === 'ok' ? Math.abs(sum - 100) <= 1e-9 : true;
     });
   }()));
+/* §124 / A2 — THE RUN MODE IS DECLARED OR IT IS UNMEASURED. There is no third option and
+ * no default: `partner` is Helix's native state, which makes it the most tempting value to
+ * fall back to and therefore the most dangerous one (a default standing in for a measurement). */
+(function () {
+  const drive = M.modeOf({ type: 'turn/start', data: { mode: 'drive' } });
+  const absent = M.modeOf({ type: 'turn/start', data: {} });   /* a tape predating the field */
+  const unmeas = M.modeOf({ type: 'turn/start', data: { mode: null } });  /* declared unknown */
+  const none = M.modeOf({ type: 'turn/start' });
+  /* The projection was RIGHT and my first expectation was wrong (same lesson as the "≥"
+   * marker): a field that does not exist is ABSENT, while a field that exists with null is
+   * UNMEASURED. Two different facts, two states — and neither is a default. */
+  ok('§124: a declared mode reads as present', drive.k === 'p' && drive.v === 'drive');
+  ok('§124: an ABSENT mode field is absent, not a default', absent.k === 'a' && absent.v === null);
+  ok('§124: a null mode field is unmeasured, not a default', unmeas.k === 'n' && unmeas.v === null);
+  ok('§124: a row with no mode path at all is absent/inapplicable', none.k === 'a');
+  ok('§124: NONE of the four cases invents a value (no partner fallback anywhere)',
+    [drive, absent, unmeas, none].every(function (r) { return r.k !== 'p' || r.v === 'drive'; }));
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',

@@ -5633,3 +5633,40 @@ FAIL b1b-2 per-turn: every turn matches the oracle
 ```
 值判据: OK（pinned 7/7 + 全语料 29/29）· 变异: 红 · 崩: exit 4 · precommit OK
 ```
+
+## 124. **A2（Cellrix 侧）**：`modeOf()` 三态 —— **运行模式只可能是"声明的"或"未知",绝无默认**
+
+### 124.1 机制：复用 `readChain`（RFC 6901 指针链,first-existing-wins）
+
+```js
+var MODE_PATHS = ['/data/mode', '/mode'];
+function modeOf(e) { return readChain(e, MODE_PATHS); }
+```
+⇒ **不是新造的机制**：与 `tokOf`/`durOf` 同一条链、同一套三态、同一份"首键命中"语义。
+
+### 124.2 四态断言（**而我的第一版预期是错的,投影是对的**）
+
+| 输入 | 代数 | 断言 |
+|---|---|---|
+| `data:{mode:'drive'}` | **`P('drive')`** | ✅ |
+| `data:{}`（字段**不存在**） | **`A`**（absent） | ✅ |
+| `data:{mode:null}`（字段在但为 `null`） | **`N`**（unmeasured） | ✅ |
+| `{}`（连路径都没有） | **`A`** | ✅ |
+| **任一态** | **绝不产出 `partner`** | ✅ |
+
+⚠️ **我又一次把"投影比我的预期更正确"记下来**：我把"老磁带无该字段"写成了 `N`，
+而**代数上它是 `A`**（**不存在** 与 **存在但未知** 是两个事实）。
+⇒ 与 §123.3 的 `≥` 标记是**同一条教训**：**投影的诚实会先把我的判据顶红。**
+
+### 124.3 变异（真该红）
+
+`modeOf` 在 `A`/`N` 时返回 `P('partner')` ⇒ **两条断言红**（"absent, not a default" + "unmeasured, not a default"）,
+`exit=1` ✓
+⇒ **"绝不默认 Partner"因此不是一句承诺,而是一条能红的判据。**
+⇒ 这也正是 §120.2 里"**旧文件不得默认当 Partner**"的落地形态。
+
+### 124.4 仍未做（如实）
+
+- **写入侧（Anaphase 把 `mode` 写进 `turn/start` 的 `data`）**：**跨仓**,本地可做但**未推**;
+- **DOM 声明**（`data-cell-runmode` + 未声明时的状态标记）：**本笔未做**,紧接一笔;
+- **指示器分工**（快照答"现在"、事件答"那时"）：未做。
