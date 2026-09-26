@@ -403,7 +403,10 @@
       var laneState = laneRows[idx] && laneRows[idx].state;
       var stateAttr = (laneState && laneState.k !== window.CxCellMetering.P(0).k)
         ? ' data-cell-state="' + (laneState.k === 'n' ? 'unmeasured' : 'absent') + '"'
-          + ' data-cell-mode="' + laneMode + '"'
+          /* NAME COLLISION AVOIDED (ADR-0048 §120.5): this attribute carries the LANE's
+           * LENGTH-CHANNEL mode (equal|value). The RUN mode (drive|partner|survive) is a
+           * different quantity and must not share the name — one attribute, one quantity. */
+          + ' data-cell-lenmode="' + laneMode + '"'
         : '';
       var wPct = (typeof colPct === 'number') ? colPct + '%' : '';
       var hit = S.q && (e.summary + ' ' + (e.tool || '')).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
