@@ -7163,3 +7163,60 @@ Helix-Mind : 211988a..453f521 (rs-dev)   ✓  ports.json **被跟踪**（在提�
 Anaphase   : 7ee9151..adbd57a (rs·19 提交) ✓  ADR-0026 §D2 的 assistant/usage 行在提交里
 ```
 ⇒ **两条跨仓判据的被测对象现在都在远端** ⇒ 新克隆上可复现（B1/B2 解除）。
+## 154. **我 §151.6 的诊断错了**：它不是崩,是**真红**——而真病是"门读了仓库外的输入"
+
+### 154.1 更正（实测）
+
+| 我 §151.6 写的 | 实测 |
+|---|---|
+| "以 `MODULE_NOT_FOUND` 崩" | ❌ **只 require `fs`/`path`（内置）**,不可能 MODULE_NOT_FOUND |
+| "exit 1 = 崩" | ❌ `exit 1` = **`FAILED — 15 passed, 1 failed`**（**断言失败**） |
+| "该加 `uncaughtException ⇒ exit 4`" | ❌ **修不到它** —— 它根本没崩 |
+
+⇒ 故我计划的那一笔**是空的**。⇒ **这是一次"自称的证据"**:我把**没有核过的机制**写进了 ADR
+（正是我在 §7.8 给证据分级时加的第三级）。⇒ **纪律**:凡"为什么会这样"的句子,必须附**一行可复现的读数**。
+
+### 154.2 真病（审查方实测,我读码确认）:**判定依赖仓库的目录邻居**
+
+```js
+:68  fs.readdirSync(parent)                     // 扫**父目录**当"生态仓"
+:73  if (!fs.statSync(dir).isDirectory()) …
+:75  roots.push(name)                           // 邻居里有 docs/decisions/ 的就算一个"生态仓"
+:81  available: roots.length > 1                // ⇒ 邻居多了 ⇒ fail-closed
+```
+**本机实测**:`ecosystem roots: Cellrix, FlowModus, Helix-MCP-Learner, HelixECO-Glove, Tuck,
+anaphase-helix, helix-mind, helix-tentacle, lodestone-md · 37 distinct ADR numbers referenced`
+⇒ **fail-closed** ⇒ 37 个跨仓引用里有解不出的 ⇒ **红**。
+
+⇒ **数学表述**:现在 `V = f(R, E)`（R=仓库内容,E=目录邻居）,而**我按 `V = f(R)` 记账**。
+⇒ 违反判据的基本要求**可复现**:`∀E₁,E₂, f(R,E₁) = f(R,E₂)`。
+⇒ **且单调性方向是反的:信息越多（邻居越多）⇒ 越容易红。**
+⇒ ⇒ **删掉临时副本会让门变绿,而那次绿不代表任何东西变好** —— **最容易骗自己的一种绿。**
+
+### 154.3 三种输出而**没有分账**（通则⑪ 的老朋友）
+
+```
+① 兄弟仓缺席        ⇒ SKIP (fail-open) ⇒ 绿
+② 在场且完整         ⇒ 绿
+③ 在场但不完整       ⇒ 红      ← 而这条红**不区分**:
+                                 (a) 真的引用了不存在的 ADR ⇒ 该修
+                                 (b) 该有的仓没检出/版本不对 ⇒ 环境问题,不该修
+```
+⇒ **①与②同绿 ⇒ 分不清"没查"与"查过且通过"**;**③的红两种真因输出同一行字** ⇒ 于是我只能猜（我就猜错了）。
+
+### 154.4 修法（采纳 A + ⑳ 的 exit 5;**本笔只记账,下一笔执行**）
+
+```
+A. 兄弟仓名单改为**声明输入**（与 port_table 的 PORTS_ROOT 同手法）:
+   ECO_ROOTS 显式声明（或由 chain.json / ports.json 同一张表派生）
+   ⇒ 未声明 ⇒ 不扫描（**与"无兄弟"同形,但它是声明的**）
+   ⇒ **声明了却不存在的仓 ⇒ 红**（不许静默退化成 SKIP）
+B. 三态分账:①siblings-absent ⇒ **exit 3**;②完整 ⇒ 绿;③不完整 ⇒ **exit 1**,且
+   **消息必须点名"哪个 ADR / 期望在哪个仓 / 是未检出还是无此号"**
+⑳ 扩充:**exit 5 = 输入源未声明或不可用**（"读不到输入"目前伪装成断言失败）
+```
+
+⚠️ **一个必须先解决的前置**:`tools/adr_anchor.js` 在 **`Cellrix/tools/`**,
+而 §13 的可执行投影是 `web/assets/ · web/src/ · web/tests/ · docs/decisions/ · docs/ADR-0048.index.md`
+⇒ **改 `tools/` 会触发 `BOUNDARY VIOLATION`**（§151/§152 的教训:**文档说"这是投影",投影在代码里**）。
+⇒ 因此本笔**不动 `tools/`**;下一笔要么先**显式修订 §13 的投影**并说明理由,要么为它另立 ADR。
