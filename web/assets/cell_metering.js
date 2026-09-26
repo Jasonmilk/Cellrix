@@ -403,6 +403,12 @@
                cols: rows.length ? rows.map(function () { return 100 / rows.length; }) : [],
                tickPct: 0 };
     }
+    /* EMPTY IS ITS OWN REASON, AND IT IS CHECKED FIRST (§118.4): "no rows" is a different
+     * fact from "rows but none measured", and the later `present.length === 0` branch would
+     * otherwise swallow it (measured: allocate([]) returned 'no-present-rows'). */
+    if (rows.length === 0) {
+      return { state: 'unavailable', reason: 'empty', cols: [], tickPct: 0, gridCols: gridCols };
+    }
     /* rows: [{state}] where state is a three-state value. Returns ONE object with the
      * per-column percentages AND the row-level state, from one projection pass. */
     var present = [], i;
@@ -423,9 +429,6 @@
        * review, not by the assertion — the guard, not the code, was the weak link.
        * If every declared quantity is zero the split is EQUAL: an explicitly declared
        * state (`all-zero-declared`), never a `|| 1` fallback (the additive-identity trap). */
-      if (rows.length === 0) {
-        return { state: 'ok', reason: 'all-zero-declared', cols: [], tickPct: 0, gridCols: gridCols };
-      }
       var sumAll = 0, k;
       for (k = 0; k < rows.length; k++) { sumAll += rows[k].state.v; }
       if (sumAll === 0) {

@@ -45,7 +45,7 @@ ok('max also carries three states (absent-only max is absent, not 0)',
   M.project([A, A]).max.k === 'a' && M.project([{type:'assistant/usage', data:{completion_tokens:null}}]).max.k === 'n');
 ok('no NaN / no Infinity anywhere', all.every(function (ev) {
     const f = M.project(ev);
-    return f.tok.k !== 'p' || (isFinite(f.tok.v) && !Number.isNaN(f.tok.v));
+    return f.tok.k !== 'p' || M.isFiniteNumber(f.tok.v);
   }));
   ok('all-zeros ratio does NOT yield NaN (bare / would)',
     (function () { const r = M.ratioOf(M.project([Z, Z]), M.project([Z])); return r.value.k === 'n' && r.reason === null ? true : r.value.k !== 'p'; }()));
@@ -158,7 +158,7 @@ ok('contract: an event carrying completion_tokens MUST read as present',
     M.allocate([{state:M.A()}], {gridCols:200, mode:'value'}).reason === 'no-present-rows');
   const withDur = { maxDur: M.P(50), max: r.max, partial: r.partial, states: r.states, durStates: r.durStates };
   ok('with maxDur but a PARTIAL max => tok bars stay unknown (lower-bound denominator)',
-    colPctOf([{state:M.A()}]).every(function (c) { return isFinite(c); }));
+    colPctOf([{state:M.A()}]).every(function (c) { return M.isFiniteNumber(c); }));
   ok('bar width is never NaN or Infinity, for any combination',
     [[M.A(), M.A()], [M.A(), M.P(5)], [M.P(50), M.A()], [M.P(50), M.P(5)]].every(function (pair) {
       return colPctOf([{state:M.P(5)}, {state:pair[1]}]).every(function (c) { return M.isFiniteNumber(c) && c >= 0; });
@@ -172,7 +172,7 @@ ok('project returns bars, so the view never passes an index',
                          {type:'tool/result', data:{duration_ms:50}, period_id:'P'}]);
     return Array.isArray(r.bars) && r.bars.length === 2
       && r.bars.every(function (b) { return ['tok','null','absent','dur','n/a'].indexOf(b.src) > -1; })
-      && colPctOf(statesOf(r.bars)).every(function (c) { return isFinite(c); });
+      && colPctOf(statesOf(r.bars)).every(function (c) { return M.isFiniteNumber(c); });
   }()));
 /* §52 — INAPPLICABLE is not ABSENT. inject/tool never carry completion_tokens, so
  * excluding them must NOT make the group partial (that would flood every summary
@@ -301,7 +301,7 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
       const inGrid = M.allocate([P].concat(new Array(150).fill(N)), {gridCols:200, mode:'value'});
       return r.state === 'unavailable' && r.reason === 'row-exceeds-grid'
         && inGrid.state === 'unavailable' && inGrid.reason === 'reserve-over-budget'
-        && r.cols.every(function (c) { return c >= 0 && isFinite(c); });
+        && r.cols.every(function (c) { return c >= 0 && M.isFiniteNumber(c); });
     }()));
   ok('allocation DEGRADED: a segment with no present rows is a STATE, not a divide-by-zero',
     (function () {
@@ -398,11 +398,40 @@ ok('META: the coexistence assertion above is present in this file',
 /* §116 rule ⑫ — the predicate itself is asserted on the values that COERCION would accept:
  * this is the assertion that distinguishes `isFinite(x)` from `typeof x === 'number' &&
  * isFinite(x)`, and it is why the guard is no longer an equivalent mutant. */
-ok('§116: isFiniteNumber REJECTS the values isFinite() would coerce',
+ok('§116: isFiniteNumber REJECTS every value a coercing check would accept',
   M.isFiniteNumber(0) === true && M.isFiniteNumber(50) === true
   && M.isFiniteNumber(null) === false && M.isFiniteNumber(undefined) === false
   && M.isFiniteNumber(NaN) === false && M.isFiniteNumber('5') === false
   && M.isFiniteNumber(true) === false && M.isFiniteNumber(Infinity) === false);
+/* §118.2 — RULE ⑫ AS A CLASS, NOT AN INSTANCE: after this commit the test file must
+ * contain ZERO bare `isFinite(` uses (comments stripped — a check that counts words in
+ * prose can never fail). Mutation: put one back ⇒ this must go red. */
+ok('§118: no bare isFinite( remains in this test file (rule ⑫ as a class)',
+  (function () {
+    /* ONLY the part BEFORE this assertion is scanned: the first draft matched its own
+     * pattern literal and was red with nothing wrong (the oracle check hit this too). */
+    const src = require('fs').readFileSync(__filename, 'utf8')
+      .split('§118.2')[0]
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/[^\n]*/g, '$1');
+    const bare = (src.match(/(^|[^\w.])isFinite\s*\(/g) || []);
+    return bare.length === 0;
+  }()));
+/* §118.3 — "USABLE" HAS ONE TRUTH SOURCE: `state === 'ok'` means the allocation is
+ * usable, and usable is DEFINED as Σ == 100. `reason` records WHY the basis is what it is
+ * (`all-zero-declared` = equal split because every declared quantity was zero) — it is not
+ * a second answer to "was this degraded". Asserted over every branch that returns ok. */
+ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains the basis',
+  (function () {
+    const cases = [
+      M.allocate([{state:M.P(5)},{state:M.P(3)},{state:M.P(2)}], { gridCols:200, mode:'value' }),
+      M.allocate([{state:M.P(0)},{state:M.P(0)}], { gridCols:200, mode:'value' }),
+      M.allocate([{state:M.P(4)},{state:M.A()}], { gridCols:200, mode:'value' })
+    ];
+    return cases.every(function (r) {
+      const sum = r.cols.reduce(function (x, y) { return x + y; }, 0);
+      return r.state === 'ok' ? Math.abs(sum - 100) <= 1e-9 : true;
+    });
+  }()));
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',

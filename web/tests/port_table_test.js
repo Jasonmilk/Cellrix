@@ -5,11 +5,29 @@
  */
 const fs = require('fs');
 const path = require('path');
-const ROOT = '/Users/jason/Developer/Jasonmilk';
+/* THE PATH IS A DECLARED INPUT, NOT A HARD-CODED FACT (§118.1): PORTS_ROOT may be set by
+ * the environment; the first draft hard-coded one person's absolute path, so on any other
+ * machine the read threw and the process exited 1 — a CRASH READ AS A RED, the very thing
+ * this repo's own rule forbids. Resolution order: $PORTS_ROOT, then the sibling layout. */
+const ROOT = process.env.PORTS_ROOT || path.join(__dirname, '..', '..', '..');
 const TABLE = path.join(ROOT, 'Helix-Mind', 'docs', 'helixECO', 'ports.json');
 const MIND_CFG = path.join(ROOT, 'Helix-Mind', 'crates', 'helix-mind-core', 'src', 'config.rs');
 
+const SKIP = 4;   /* distinct from FAIL(1): an aborted run must not read as a red */
+
 function load() { return JSON.parse(fs.readFileSync(TABLE, 'utf8')); }
+
+/* A DECLARED SKIP, NOT A SILENT PASS AND NOT A CRASH (§118.1/§1.3): when the sibling repo
+ * (which hosts the single source) is absent, this says so and exits SKIP. The criterion is
+ * that this branch exists and is reachable — mutation: make hasTable() always true ⇒ the
+ * "missing table" path still has to be *declared*, not assumed. */
+function hasTable() { return fs.existsSync(TABLE); }
+if (!hasTable()) {
+  console.log('  SKIPPED (declared): the port table is not present at ' + TABLE);
+  console.log('  This assertion lives in Cellrix but reads the ecosystem SSOT in Helix-Mind;');
+  console.log('  set PORTS_ROOT to that checkout, or fetch the sibling repo. Exit ' + SKIP + '.');
+  process.exit(SKIP);
+}
 
 function check(cfgPath) {
   const t = load();
