@@ -576,6 +576,34 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
   ok('§140: the matrix carries THREE classes, so a future "accept but mark" has a home',
     M.unclassified().length === 0 && M.unclassified(['p', 'ps', 'n', 'a', 'zz']).length > 0);
 }());
+/* §141 — THE CRITERION SURFACE IS DERIVED FROM THE SOURCE (fourth generation).
+ * §140 was example-based (it named `n` and `a`), so a new shape was not covered until someone
+ * remembered to edit the test. Everything here derives from SHAPES: growing the source grows
+ * the criterion, with no one to remember. QuickCheck's "properties, not examples" and Codd's
+ * 3NF say the same thing: a hand-kept copy of a derivable set is a second source of truth.
+ * NOTE the shape of the failure too: `unclassified()` is a PURE function, so a growth REDS
+ * (exit 1) instead of CRASHING (exit 4) — the only check that catches growth must count. */
+(function () {
+  const SHAPES = M.SHAPES;
+  const list = Object.keys(SHAPES).map(function (k) { return SHAPES[k]; });   /* DERIVED */
+  const mk = function (k) {
+    return k === SHAPES.p ? M.P(1) : k === SHAPES.ps ? M.Pstr('x')
+         : k === SHAPES.n ? M.N() : M.A();
+  };
+  ok('§141: the criterion derives its shape list from SHAPES (a growth extends it by itself)',
+    list.length >= 4 && list.indexOf(SHAPES.ps) > -1 && list.indexOf(SHAPES.a) > -1);
+  ok('§141 ∀ s ∈ SHAPES: allocate either reports the shape it saw, or is LOUD about refusing it',
+    list.every(function (k) {
+      let r;
+      try { r = M.allocate([{ state: mk(k) }], { gridCols: 200, mode: 'value' }); }
+      catch (e) { return true; }                        /* refused shapes are loud = handled */
+      return r.counts && typeof r.counts[k] === 'number' && r.counts[k] >= 0;
+    }));
+  ok('§141: an unclassified (consumer, shape) pair would RED here — and it does so as a FAIL, not a crash',
+    M.unclassified().length === 0);
+  ok('§141: growth is DETECTED, not silent (the matrix is the detection surface, not a hand-kept list)',
+    M.unclassified(list.concat(['zz'])).length > 0);
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',

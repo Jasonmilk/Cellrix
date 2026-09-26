@@ -376,7 +376,10 @@
     allocate:  { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] },
     stateText: { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] }
   };
-  var SHAPE_ORDER = [SHAPES.p, SHAPES.ps, SHAPES.n, SHAPES.a];
+  /* DERIVED, NOT DECLARED (ADR-0048 §141 / rule ⑰): this list and `counts` below were
+   * hand-written copies of SHAPES — two more sources of truth, and the growth experiment
+   * showed the cost: adding a shape to SHAPES left BOTH silent. K(system | SHAPES) must be 0. */
+  var SHAPE_ORDER = Object.keys(SHAPES).map(function (k) { return SHAPES[k]; });
 
   /* Returns the pairs a new shape would leave unclassified — empty for today's shape set.
    * Pure, so the growth criterion can exercise it without patching any file. */
@@ -476,7 +479,8 @@
     /* EVERY BRANCH REPORTS WHAT IT SAW, PER SHAPE (ADR-0048 §140). Without this, `n` and `a`
      * were BIT-IDENTICAL on the way out: a handled shape was indistinguishable from an ignored
      * one, so "accept => handled" held literally and failed OBSERVATIONALLY. */
-    var counts = { p: 0, ps: 0, n: 0, a: 0 };
+    var counts = {};                                  /* DERIVED from SHAPES (rule ⑰) */
+    for (var ck0 = 0; ck0 < SHAPE_ORDER.length; ck0++) { counts[SHAPE_ORDER[ck0]] = 0; }
     for (var ci = 0; ci < rows.length; ci++) {
       var ck = rows[ci] && rows[ci].state && rows[ci].state.k;
       if (counts[ck] !== undefined) { counts[ck]++; }
