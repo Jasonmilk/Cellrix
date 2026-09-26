@@ -251,6 +251,13 @@ function checkEngScannerSelfTest() {
 let failed = 0;
 const results = [];
 const failedRoster = [];
+/* EXIT CODES ARE A CONTRACT (ADR-0048 §147 / rule ⑳): 1 = assertion failure (RED),
+ * 2 = environment missing, 3 = declared absent (NEEDS-INPUT, handled above),
+ * 4 = the suite CRASHED (ABORTED — nothing was asserted, so nothing failed).
+ * Measured before this: the SAME gate read "7 red / 18 proven" on a machine without the
+ * sibling repos and jsdom, and "1 red / 31 proven" here — every extra "red" was an
+ * environment absence wearing the word "red". A count is a claim; the classes are the fact. */
+const abortedRoster = [], envMissingRoster = [];
 
 /* 先证明**检查器本身**有效，再用它去判别人。
  * 顺序有意如此：一个失效的扫描器会给出"干净"的结论，而那个结论看起来与真干净一样。 */
@@ -307,7 +314,19 @@ for (const [file, what] of SELF_CONTAINED) {
         why.replace(/^.*NEEDS-INPUT:\s*/, '') + '  — ' + what]);
       continue;
     }
-    failed++; if (typeof file !== "undefined") { failedRoster.push(file + (typeof e !== "undefined" && e && e.status ? " (exit " + e.status + ")" : "")); }
+    if (e.status === 4) {          /* CRASH — an ABORTED run is not a red */
+      abortedRoster.push(file);
+      results.push(['ABORT', file, what]);
+      console.log('  ABORT ' + file + '  — the suite crashed; nothing was asserted (rule ⑳)');
+      continue;
+    }
+    if (e.status === 2) {          /* environment missing (e.g. a module that is not installed) */
+      envMissingRoster.push(file);
+      results.push(['ENV', file, what]);
+      console.log('  ENV   ' + file + '  — environment missing, not a failure (rule ⑳)');
+      continue;
+    }
+    failed++; failedRoster.push(file + (typeof e !== "undefined" && e && e.status ? " (exit " + e.status + ")" : ""));
     results.push(['FAIL', file, what]);
     if (lines.length) { console.log('    ' + lines.pop().trim()); }
   }
@@ -667,7 +686,9 @@ console.log(failed === 0
           : 'NOT FULLY PROVEN — ' + proven + ' proven, ' + deferred.length
             + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' pinned:' + (DEFERRALS.deferrals || []).filter(function (d) { return d.depends_on; }).length + '/' + SELF_CONTAINED.length + ' unpaired-self-declared:' + unpaired + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
   : (xpass.length ? 'LEDGER STALE — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
-    + deferred.length + ' held, ' + unknown.length + ' unregistered');
+    + deferred.length + ' held, ' + unknown.length + ' unregistered'
+    + (abortedRoster.length ? ', ' + abortedRoster.length + ' ABORTED (not red)' : '')
+    + (envMissingRoster.length ? ', ' + envMissingRoster.length + ' env-missing (not red)' : ''));
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
  * ledger". Merging them into exit 1 would guarantee the wrong remedy, so XPASS
  * rides the register channel (3 = the checker's own bookkeeping is stale). */
