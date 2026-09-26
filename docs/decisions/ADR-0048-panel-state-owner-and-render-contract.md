@@ -7472,3 +7472,48 @@ if (!isSelf) { roots.push(name); }   // roots = "有没有兄弟仓"
 ⇒ 现在它有了:`--refresh` **之后必须仍 `OK`**（本笔即按此验证）。
 ⇒ 而"去掉一个输入"这个动作的危险在这里显形:**去掉 self 时,`roots` 对了,`map` 错了** ——
 **同一个变量改了,两个语义只改对一个** ⇒ 与 §149/§150 的"仪器缺陷"同族。
+
+## 161. ⚠️ **lane 值判据写好了,但**跑不动** —— 面板服务的是**未替换占位符**的页面
+
+### 161.1 本笔已落（源码,等能跑）
+
+| 项 | 内容 |
+|---|---|
+| **观测口** | `PT.laneInputs()` 返回 `LANE_OBSERVED` —— **投影自己产出的值**（`cols`/`state`/`rows`），**不参与渲染、不做计算**;注释写明它是 observation port |
+| **判据 B（lane 值）** | 逐块比较 **DOM 解析出的 `flex-basis`** 与**投影的 `cols[i]`**;非量值 ⇒ **不得有数字宽度**且**必须有具名 `data-cell-state`**（§112.4 的活体验证） |
+| **判据 A（写入）** | 已在 `render_test.js`（同数据 0 写入 ∧ 数据变 ≥1 写入） |
+
+⇒ **两级证明的形状**（数学上诚实的组合）:**投影 == 独立手算的 oracle**（`value_criterion_test.js`,已绿）
+**且 DOM == 投影**（本笔）⇒ **合起来才是"值住在投影里"的完整证明**。单有任一级都不够。
+
+### 161.2 ⚠️ 而真跑失败,原因**不在判据**
+
+```
+HARNESS ERROR: TypeError: Cannot read properties of undefined (reading 'allocate')
+  at Object.renderLanes (…:390:43)
+页面自报: CxCellMetering: undefined · CxThreeState: undefined · CxProveTrack: object
+Uncaught [ReferenceError: __THREE_STATE__ is not defined]
+Uncaught [ReferenceError: __CELL_METERING__ is not defined]
+```
+⇒ **面板服务的是**未替换占位符**的 `base.html`** ⇒ 两个全局从未定义 ⇒ 视图里 `window.CxCellMetering.*` 必然炸。
+
+### 161.3 已定位的机制（未修,如实）
+
+```
+占位符替换表在 web/src/boot.rs:230-231（include_str! + ("__THREE_STATE__","three_state.js") …）
+启动器用 start-panel.sh:38  PANEL_BIN="$WS/Cellrix/target/debug/cellrix-web"
+而我跑的 cargo build -p cellrix-web ⇒ **0.24s "Finished"（no-op）**
+```
+⇒ **两个候选因（都未证实,故都列出）**:
+**(a)** 我构建的 target 与实际被服务的产物**不是同一个**（工作区 target 目录/包名差异）;
+**(b)** 服务路径**根本没走替换表**（替换只在 `boot.rs` 的测试里被行使）⇒ **判据守着一个不被运行的分支**。
+⇒ ⇒ **按"不知道就不声称"**:两个都记,下一笔第一动作是**让面板自己说**（例如请求 `/` 时打印它用了哪个资产路径/是否替换）。
+
+### 161.4 这一条的意义（与 T1 的关系）
+
+> **这正是 T1「资产外部化」那条目标线的**实测阻塞****:资产被 `include_str!` 编进二进制 ⇒
+> **"改了源码能不能被观测"取决于一次正确的构建**,而**这次构建没有生效**。
+> ⇒ 于是 **step 3 的行为判据（A/B）在架构上暂时不可行使** —— 不是判据写得不对,是**被测对象没上线**。
+
+⇒ 与 §153 结尾那句同形,但更硬:**`include_str!` 让"改动能被观测"这件事本身成为一条需要判据的链路**
+（源码 → 构建 → 嵌入 → 替换 → 服务 → DOM）。**本笔只证明了这条链路里有一环断了,还没证出是哪一环。**

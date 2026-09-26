@@ -203,6 +203,7 @@
      * projection (`laneAlloc` + `laneRows`) plus the view's declared inputs, so the render is a
      * pure function of what `project`/`allocate` returned. Keyed reuse is preserved per lane. */
     LANE_CELLS = {}, STATS_HTML = '';
+var LANE_OBSERVED = null;   /* the observation port (see PT.laneInputs) */
 var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" and "data changed
                         * ⇒ ≥1 write" cannot be asserted without a counter. Exposed on PT. */
 
@@ -387,6 +388,11 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
     });
     var laneMode = (S.durMode === 'actual') ? 'value' : 'equal';
     var laneAlloc = window.CxCellMetering.allocate(laneRows, { gridCols: 200, mode: laneMode });
+    LANE_OBSERVED = { mode: laneMode, cols: laneAlloc.cols.slice(), allocState: laneAlloc.state,
+      reason: laneAlloc.reason,
+      rows: evs.map(function (e, i) {
+        return { id: e.id, lane: e.lane, k: (laneRows[i] && laneRows[i].state) ? laneRows[i].state.k : null };
+      }) };
 
     /* THE RENDER'S INPUT IS A VALUE SIGNATURE, NOT A RENDERED STRING (ADR-0048 §153 / step 3).
      * Everything that can change the lanes' HTML is listed here as VALUES: the projection's
@@ -735,6 +741,12 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
   /* OBSERVABLE FOR THE CRITERION (ADR-0048 §153): "same data ⇒ 0 writes" and "data changed
    * ⇒ ≥1 write" are both claims about counts, so the count must be reachable from a test. */
   PT.laneWrites = function () { return LANE_WRITES; };
+  /* OBSERVATION PORT (ADR-0048 §161): it returns the values the PROJECTION produced for the
+   * last render, so a criterion can compare them with the PARSED DOM — two channels, not the
+   * view reporting on itself. It is NOT an input to rendering (nothing reads it back), and it
+   * computes nothing: it hands over exactly what `allocate` returned. The projection's own
+   * correctness is proved separately against a hand-computed oracle (value_criterion_test). */
+  PT.laneInputs = function () { return LANE_OBSERVED; };
   PT.renderCertificate = renderCertificate; PT.showTimeline = showTimeline;
   PT.bindTermEdges = bindTermEdges; PT.isModal = isModal; PT.applyModality = applyModality;
   PT.openInsp = openInsp; PT.closeInsp = closeInsp;

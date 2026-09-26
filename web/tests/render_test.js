@@ -213,6 +213,45 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
   }
 
+  console.log("-- lane VALUE criterion: the DOM must show exactly what the projection returned --");
+  {
+    const api = (typeof window !== "undefined" && window.CxProveTrack) || null;
+    const inputs = (api && typeof api.laneInputs === "function") ? api.laneInputs() : null;
+    if (!inputs) {
+      console.log("  SKIP  lane value: laneInputs not exposed (declared skip)");
+    } else {
+      /* TWO CHANNELS: the values the projection produced, and the widths the browser PARSED out
+       * of the rendered attribute. Comparing them is the whole point — a view that computes its
+       * own geometry disagrees here, and a view that shows a wrong number disagrees here too. */
+      const blocks = Array.from(doc.querySelectorAll("#eLaneInput .e-blk, #eLaneModel .e-blk, #eLaneTool .e-blk"))
+        .filter((b) => b.getAttribute("data-e-ev"));
+      const byId = {};
+      inputs.rows.forEach((r, i) => { byId[r.id] = { i: i, k: r.k }; });
+      let mismatched = 0, stateLost = 0, checked = 0;
+      blocks.forEach((b) => {
+        const id = b.getAttribute("data-e-ev");
+        const row = byId[id];
+        if (!row) { return; }
+        checked++;
+        const style = b.getAttribute("style") || "";
+        const m = /flex:\s*0\s+0\s+([-\d.]+)%/.exec(style);
+        const want = inputs.cols[row.i];
+        if (row.k === "p" && typeof want === "number") {
+          if (!m || Math.abs(parseFloat(m[1]) - want) > 1e-9) { mismatched++; }
+        } else {
+          /* not a measured magnitude ⇒ NO numeric width, and the state must be NAMED (§112.4) */
+          if (m) { mismatched++; }
+          if (!b.getAttribute("data-cell-state")) { stateLost++; }
+        }
+      });
+      check("lane value: every block's rendered flex-basis == the projection's col (per block)",
+        checked > 0 && mismatched === 0, `${checked} blocks checked, ${mismatched} mismatched`);
+      check("lane value: a non-magnitude carries a NAMED state instead of a width (absent ≠ 0%)",
+        stateLost === 0, `${stateLost} blocks lost their state`);
+      console.log("    (mode=" + inputs.mode + " allocState=" + inputs.allocState + " rows=" + inputs.rows.length + ")");
+    }
+  }
+
   console.log("-- DOM anchors --");
   for (const id of ["eTblVp", "eLaneInput", "eInsp", "eStats", "eTbody", "eTraj",
                     "eReplayBtn", "eDurBtn", "eCallBtn", "eTurnBtn", "eScrim"]) {
