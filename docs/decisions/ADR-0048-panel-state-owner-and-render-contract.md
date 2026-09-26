@@ -7122,3 +7122,44 @@ BOUNDARY VIOLATION: <files> — outside the governed concern (presentation-layer
 ⇒ 我只改了正文 ⇒ 红照旧（message 依旧指向 §13）⇒ **两处都改才算执行了处方**。
 ⇒ 已补 `docs/ADR-0048.index.md` 进 `GOVERNS`,并注明理由是"本 ADR 自身"。
 ⇒ **教训（第六次"机器教我"）**:**文档说"这是投影"时,投影本身在代码里 —— 改一处等于没改。**
+## 153. **step 3 落地**：缓存装**投影签名**而不是**渲染产物** + 判据 SKIP 的**结构性原因**
+
+### 153.1 源码已落（`LANE_HTML` ⇒ `LANE_CELLS`）
+
+```js
+/* 旧:缓存里装的是渲染出来的 HTML 字符串 —— 产物成了它自己变化检测的输入 = 第二份真相 */
+if (LANE_HTML[k] === html) return;
+/* 新:装的是**值签名**（从 project/allocate 派生 + 视图的声明输入） */
+if (LANE_CELLS[k] === laneCellSig) return;
+LANE_CELLS[k] = laneCellSig; LANE_WRITES++; el.innerHTML = html;
+```
+**签名内容全部是值**（非产物）:`{mode, alloc:{state,reason,cols,counts}, q, sel, rows:[[id,lane,status,state.k,cls,summary]…]}`。
+⇒ 并暴露 **`PT.laneWrites()`** —— 因为"同数据 0 写入 / 数据变 ≥1 写入"**都是关于计数的断言,计数必须可达**。
+
+**实测**:`LANE_HTML` 残留 **0**;`view_hygiene` / `cell_metering` / `value_criterion` **无回归**（全 `exit=0`）。
+
+### 153.2 ⚠️ 而行为判据 **SKIP**,原因是**结构性的**（不是判据写错）
+
+```
+render_test.js ⇒ SKIP step 3: renderLanes/laneWrites not exposed
+```
+⇒ **面板把资产用 `include_str!` 编进二进制** ⇒ 运行中的面板服务的是**构建时嵌入的旧资产**
+⇒ **我改了磁盘上的 `prove_track.view.js`,但运行中的面板看不到它。**
+⇒ ⇒ **这正是 T1「资产外部化（按需加载）」目标线的由来**:它不只是"节能",它还是**"改动能被观测"的前提**。
+
+⇒ **下一笔的确切动作**:`cargo build -p cellrix-web`（重建嵌入资产）⇒ 再起栈跑同一条判据。
+⇒ **在此之前,step 3 只能说"源码已落、结构判据无回归",不能说"行为判据已行使"** —— 如实。
+
+### 153.3 铁律级的一条（本轮第 7 次"机器教我"）
+
+> **凡"改资产"的改动,在资产被 `include_str!` 嵌入的架构下,其可观测性取决于一次重建。**
+> ⇒ 判据要"能红",**先要能看到被测对象** —— 而"看不到"与"没通过"在这次是**同一种 SKIP**。
+> ⇒ 所以 `SKIP (declared)` 是对的,但**必须在下一笔里把它消掉**,否则它会变成"永远跳过"。
+
+### 153.4 跨仓推送已完成（本轮的批准执行）
+
+```
+Helix-Mind : 211988a..453f521 (rs-dev)   ✓  ports.json **被跟踪**（在提交 stat 里）
+Anaphase   : 7ee9151..adbd57a (rs·19 提交) ✓  ADR-0026 §D2 的 assistant/usage 行在提交里
+```
+⇒ **两条跨仓判据的被测对象现在都在远端** ⇒ 新克隆上可复现（B1/B2 解除）。

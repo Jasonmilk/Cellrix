@@ -196,7 +196,15 @@
    * 展开态/滚动位置/焦点全丢（与账本同病）。照 cockpit.js 账本范式做 keyed 复用。
    * ⚠️ 键不含数组下标（教训：下标随追加平移 ⇒ 全部被当新行重建）；
    * ⚠️ "节点有没有被重建"与"它排在哪里"是两件独立的事 —— 两条都要断言。 */
-  var TBL_NODES = {}, TBL_HTML = {}, TBL_EMPTY = false, TBL_LOADING = false, LANE_HTML = {}, STATS_HTML = '';
+  var TBL_NODES = {}, TBL_HTML = {}, TBL_EMPTY = false, TBL_LOADING = false,
+    /* THE CACHE HOLDS THE CELLS, NOT THE PRODUCT (ADR-0048 §153 / step 3). It used to hold the
+     * rendered HTML string, which makes the PRODUCT the input of its own change detection — a
+     * second source of truth (Hickey). The key is now a VALUE signature derived from the
+     * projection (`laneAlloc` + `laneRows`) plus the view's declared inputs, so the render is a
+     * pure function of what `project`/`allocate` returned. Keyed reuse is preserved per lane. */
+    LANE_CELLS = {}, STATS_HTML = '';
+var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" and "data changed
+                        * ⇒ ≥1 write" cannot be asserted without a counter. Exposed on PT. */
 
   function renderTable() {
     var rows = [], COLS = 5;
@@ -379,6 +387,21 @@
     });
     var laneMode = (S.durMode === 'actual') ? 'value' : 'equal';
     var laneAlloc = window.CxCellMetering.allocate(laneRows, { gridCols: 200, mode: laneMode });
+
+    /* THE RENDER'S INPUT IS A VALUE SIGNATURE, NOT A RENDERED STRING (ADR-0048 §153 / step 3).
+     * Everything that can change the lanes' HTML is listed here as VALUES: the projection's
+     * numbers/states plus the view's declared inputs (search, selection, the rows' identity).
+     * If this list is incomplete the lanes go stale — which is why the criterion asserts
+     * "data changed ⇒ writes ≥ 1" rather than trusting the list. */
+    var laneCellSig = JSON.stringify({
+      mode: laneMode,
+      alloc: { s: laneAlloc.state, r: laneAlloc.reason, cols: laneAlloc.cols, counts: laneAlloc.counts },
+      q: S.q, sel: S.sel,
+      rows: evs.map(function (e, i) {
+        var st = laneRows[i] && laneRows[i].state;
+        return [e.id, e.lane, e.status, st ? st.k : null, e.cls, e.summary];
+      })
+    });
     /* THE LEGACY LENGTH PATH IS GONE (ADR-0048 §125 / M3). maxDur/maxTok/raw/PEND_MIN/sum had
      * NO CONSUMER left after step 2 moved the width to the projection's column, so they were
      * dead code that still LOOKED alive — and they carried five of the six registered identity
@@ -437,8 +460,9 @@
       var el = laneEl(k);
       if (!el) return;
       var html = lanes[k].join('');
-      if (LANE_HTML[k] === html) return;
-      LANE_HTML[k] = html;
+      if (LANE_CELLS[k] === laneCellSig) return;   /* same CELLS ⇒ no work (keyed reuse) */
+      LANE_CELLS[k] = laneCellSig;
+      LANE_WRITES++;
       el.innerHTML = html;
     });
     $('eOvNote').textContent = S.durMode === 'actual'
@@ -708,6 +732,9 @@
     renderTable();
   };
   PT.renderStats = renderStats; PT.renderTable = renderTable; PT.renderLanes = renderLanes;
+  /* OBSERVABLE FOR THE CRITERION (ADR-0048 §153): "same data ⇒ 0 writes" and "data changed
+   * ⇒ ≥1 write" are both claims about counts, so the count must be reachable from a test. */
+  PT.laneWrites = function () { return LANE_WRITES; };
   PT.renderCertificate = renderCertificate; PT.showTimeline = showTimeline;
   PT.bindTermEdges = bindTermEdges; PT.isModal = isModal; PT.applyModality = applyModality;
   PT.openInsp = openInsp; PT.closeInsp = closeInsp;

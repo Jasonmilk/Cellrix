@@ -185,6 +185,34 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
   }
 
+  console.log("-- step 3: the lane cache holds CELLS (a projection signature), not the product --");
+  {
+    const api = (typeof window !== "undefined" && window.CxProveTrack) || null;
+    if (!api || typeof api.renderLanes !== "function" || typeof api.laneWrites !== "function") {
+      console.log("  SKIP  step 3: renderLanes/laneWrites not exposed (declared skip)");
+    } else {
+      api.renderLanes();
+      const w1 = api.laneWrites();
+      api.renderLanes();
+      const w2 = api.laneWrites();
+      check("step 3: SAME data ⇒ zero new writes (keyed reuse survives)", w2 === w1, `${w1} → ${w2}`);
+      const q = doc.getElementById("eQ");
+      if (q) {
+        const before = api.laneWrites();
+        q.value = "zzz-no-match-zzz";
+        q.dispatchEvent(new window.Event("input", { bubbles: true }));
+        api.renderLanes();                 /* the view may or may not have rendered on input */
+        const after = api.laneWrites();
+        check("step 3: CHANGED data ⇒ at least one write (never 'never updates')",
+          after > before, `${before} → ${after}`);
+        q.value = "";
+        q.dispatchEvent(new window.Event("input", { bubbles: true }));
+      } else {
+        console.log("  SKIP  step 3: no search input to change the data with");
+      }
+    }
+  }
+
   console.log("-- DOM anchors --");
   for (const id of ["eTblVp", "eLaneInput", "eInsp", "eStats", "eTbody", "eTraj",
                     "eReplayBtn", "eDurBtn", "eCallBtn", "eTurnBtn", "eScrim"]) {
