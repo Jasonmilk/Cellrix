@@ -43,7 +43,7 @@ try {
 if (files.length === 0) {
   console.log('VACUOUS — no changed file to judge, so this run proves nothing about the'
     + ' boundary (a clean tree is expected in CI; it is not a fence result).');
-  process.exit(0);
+  process.exit(3);
 }
 
 const inConcern = function (f) {
