@@ -1,0 +1,6 @@
+{"type":"turn/start","job_id":"fixture-pinned","seq":1,"time":"2026-01-01T00:00:00Z","data":{}}
+{"type":"assistant/usage","job_id":"fixture-pinned","seq":2,"time":"2026-01-01T00:00:01Z","data":{"prompt_tokens":9,"completion_tokens":5,"model":"fixture-model"}}
+{"type":"tool/result","job_id":"fixture-pinned","seq":3,"time":"2026-01-01T00:00:02Z","data":{"tool":"fixture-tool","ok":true,"duration_ms":120}}
+{"type":"assistant/usage","job_id":"fixture-pinned","seq":4,"time":"2026-01-01T00:00:03Z","data":{"prompt_tokens":11,"completion_tokens":7,"model":"fixture-model"}}
+{"type":"assistant/usage","job_id":"fixture-pinned","seq":5,"time":"2026-01-01T00:00:04Z","data":{"prompt_tokens":3,"completion_tokens":null,"model":"fixture-model"}}
+{"type":"turn/end","job_id":"fixture-pinned","seq":6,"time":"2026-01-01T00:00:05Z","data":{"done":true,"success":true}}

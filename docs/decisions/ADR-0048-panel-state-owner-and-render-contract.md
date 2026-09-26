@@ -5807,3 +5807,62 @@ chain declaration: 4 endpoint env(s) derived from chain.json
 | A0 / A1-a / A2（Cellrix 侧） | ✅ 落地并推送（跨仓部分:Helix-Mind `453f521`、Anaphase `adbd57a` **待你口令**） |
 | 待定轴（`pending` 必须以声明状态回来） | ⬜ 未销（§113.4 / §125.4） |
 | 链的两个单一来源（`chain.json` vs `ports.json`） | ⬜ 待裁决（§126.5,已有证据） |
+
+## 128. 审查吸收：**已兑现的判据不在门里**（最重）+ fixture 入版本控制 + 它当场抓到两条
+
+### 128.1 ✅ P0：值判据进网（`SELF_CONTAINED`）+ **物证入版本控制**
+
+| 改动 | 内容 |
+|---|---|
+| `run_all.js` | `value_criterion_test.js` **进入 `SELF_CONTAINED`** ⇒ 整门现在真的执行它 |
+| **新文件** | `web/tests/fixtures/pinned.events.jsonl` —— **合成 fixture（6 行）入版本控制** |
+| `value_criterion_test.js` | **默认读仓内 fixture**;`VALUE_SAMPLE`/`VALUE_CORPUS` 指向真实语料时是**加分项** |
+
+⇒ 理由（审查方 §6）：**运行时语料 `*.jsonl` 按生态规则不进 git** ⇒ 判据在新克隆上会 `SKIP`,
+⇒ **而 M3 自己的收尾判据要求"物证入版本控制"** ⇒ 判词必须**在任何克隆上都能被行使**。
+
+### 128.2 🎯 而 fixture **立刻抓到两条**（这正是它存在的价值）
+
+**① oracle 把"有该字段"与"是 present"混为一个 `carriers`**（已修）
+⇒ 真实语料里 3 条恰好都有值 ⇒ **它此前是"因为错误的原因而绿"**。
+⇒ 现在拆成三个计数：**`measured`（有数）/ `unmeasured`（字段在但为 null）/ `rows`（全部）**,
+断言分别对 **measured**（参与集合）与 **rows − measured**（排除集合）。
+
+**② ⚠️ 一条**未决的语义分歧**（本笔**不擅自修**,登记为预期红）：
+
+```
+fixture: 2 条测得(5+7=12) + 1 条 null
+  project(rows).tok  ⇒  k='n'（"· 未计量"）
+  本 ADR §4.4        ⇒  "≥ 只在 tok 维度有未计量数据时出现" ⇒ 期望 **p + ≥（"12 ≥"）**
+```
+⇒ **投影返回 `n`,而 ADR 的措辞指向 `p` + `≥`** ⇒ **两者不一致,且没有任何测试守着**（真实语料里
+**没有"部分测得"的样本**,所以 `≥` 这条路**从未被行使**）。
+⇒ **这是语义决定（三选一）**：
+  **(a)** 部分测得 ⇒ `p` + `≥`（**下限**语义,与 §4.4 一致）;
+  **(b)** 任一适用行未测 ⇒ 整体 `n`（**保守**语义:合计未知）;
+  **(c)** 两者并存:`state=k='p'` 且带 `lowerBound:true`,由消费方决定显示 `≥`。
+⇒ **不得改预期以迎合输出**（那正是 Q3 里我们否掉的做法）⇒ 本笔**把它登记为预期红**,
+并**在 ADR 里明确"`≥` 路径未行使"** —— 否则它会被读成"已覆盖"。
+
+### 128.3 门的现状（如实）
+
+```
+run_all.js ⇒ FAILED — 2 red, 22 proven, 5 held, 0 unregistered
+  red 1: value_criterion_test.js（3 条,全部由 §128.2-② 这一个未决语义引起）
+  red 2: prove_track_rows_test.js（与本格无关的既有红）
+```
+⇒ **`value_criterion_test.js` 现在**在门里**,而且**红得对**（它指出一处语义不一致）。
+⇒ 按纪律,它**要么被修,要么进 strict 预期红名单并写明原因** ⇒ 本笔采取后者（原因如上）。
+
+### 128.4 仍未做（审查方 §1–§5 的其余部分）
+
+| 条 | 内容 | 状态 |
+|---|---|---|
+| **§1 元断言** | `SELF_CONTAINED ∪ REQUIRES` 必须覆盖**全部** `*_test.js`（漏登记即红 + 变异） | ⬜ |
+| **§1 REQUIRES** | `port_table_test.js`（兄弟仓）· `render_test.js`（jsdom + 面板）声明能力 | ⬜ |
+| **§2 lane 值判据** | 渲染 `flex-basis` == `allocate().cols[i]`（现只有非退化守卫） | ⬜ |
+| **§3** | `blocks.length === 0 ⇒ SKIP` 与最严重失败同形 ⇒ 拆成两条可断言 | ⬜ |
+| **§4 路径成类** | `/Users/` 计数 == 0 元断言（`precommit.sh:8` · `cell_before.js:23` · `pinned_expectation.js:9`） | ⬜ |
+| **§5** | `render_test.js` 崩≠红 + `jsdom` 声明依赖 | ⬜ |
+| **§7 预言机合一** | `pinned_expectation.js` 与 `value_criterion_test.js` 各有一份 ⇒ 应合一 | ⬜ |
+| **§8 教训** | **"面板里存在一类只在检查器打开后才存在的 UI；它们的回归天然活在绿灯之下"** | ✅ 记在此条 |

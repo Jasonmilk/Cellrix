@@ -24,25 +24,41 @@ process.on('uncaughtException', function (e) {
   process.exit(4);
 });
 const ROOT = process.env.PORTS_ROOT || path.join(__dirname, '..', '..', '..');
-const EV = path.join(ROOT, '.helix', 'events');
-/* The sample is a DECLARED input (env override) so a mutation can feed a changed tape
- * and prove the criterion can go red. Default = the pinned real sample. */
-const PINNED = process.env.VALUE_SAMPLE || 'run-1453c697e434ecfa-p006ab547d0000002.events.jsonl';
+/* THE EVIDENCE IS IN VERSION CONTROL (ADR-0048 §128.1). The runtime corpus (`.helix/events`)
+ * is deliberately NOT committed (ecosystem rule), so a criterion that needed it could not be
+ * reproduced from a fresh clone — and M3 requires the evidence to be in version control.
+ * Default = the in-repo synthetic fixture; VALUE_SAMPLE/CORPUS point at the real corpus,
+ * which is then an ADDITION rather than a precondition. */
+const FIXTURE_DIR = path.join(__dirname, 'fixtures');
+const CORPUS_DIR = process.env.VALUE_CORPUS || path.join(ROOT, '.helix', 'events');
+const USE_CORPUS = !!process.env.VALUE_SAMPLE;
+const EV = USE_CORPUS ? CORPUS_DIR : FIXTURE_DIR;
+const PINNED = process.env.VALUE_SAMPLE || 'pinned.events.jsonl';
 
 /* ── ORACLE (independent) ───────────────────────────────────────────────────── */
 function readRows(file) {
   return fs.readFileSync(path.join(EV, file), 'utf8').trim().split('\n')
     .filter(Boolean).map(function (l) { return JSON.parse(l); });
 }
+function readRowsIn(dir, file) {
+  return fs.readFileSync(path.join(dir, file), 'utf8').trim().split('\n')
+    .filter(Boolean).map(function (l) { return JSON.parse(l); });
+}
 function expectedTok(rows) {
-  let sum = 0, carriers = 0;
+  /* THREE DIFFERENT COUNTS, kept apart on purpose (the fixture with a null row caught this):
+   *   measured   — the field exists AND has a number   => a PRESENT row, enters the sum
+   *   unmeasured — the field exists but is null        => the "≥" marker, NOT in the sum
+   *   rows       — every row, including those with no field at all
+   * The first version collapsed the first two into "carriers" and passed only because the real
+   * sample happened to have no null row — i.e. it was green for the wrong reason. */
+  let sum = 0, measured = 0, unmeasured = 0;
   rows.forEach(function (e) {
     const d = e.data;
-    if (d && Object.prototype.hasOwnProperty.call(d, 'completion_tokens') && d.completion_tokens !== null) {
-      sum += d.completion_tokens; carriers++;
-    } else if (d && Object.prototype.hasOwnProperty.call(d, 'completion_tokens')) { carriers++; }
+    if (!d || !Object.prototype.hasOwnProperty.call(d, 'completion_tokens')) { return; }
+    if (d.completion_tokens === null) { unmeasured++; return; }
+    sum += d.completion_tokens; measured++;
   });
-  return { tok: sum, carriers: carriers, rows: rows.length };
+  return { tok: sum, measured: measured, unmeasured: unmeasured, rows: rows.length };
 }
 /* ── end ORACLE ─────────────────────────────────────────────────────────────── */
 
@@ -65,7 +81,7 @@ const rows = readRows(PINNED);
 const oracle = expectedTok(rows);
 
 /* ① SCOPE NON-EMPTY — on a sample with no metering row every comparison is 0 == 0. */
-ok(oracle.carriers > 0, 'scope: the pinned sample carries >= 1 metering row (got ' + oracle.carriers + ')');
+ok(oracle.measured > 0, 'scope: the pinned sample carries >= 1 MEASURED row (got ' + oracle.measured + ')');
 
 /* ② b1b-1: the NUMBER the cell shows == the independently computed number. */
 const proj = M.project(rows);
@@ -91,10 +107,10 @@ ok(proj.tok.k === 'p' && proj.tok.v === oracle.tok,
 /* ③ PARTICIPATION: which rows entered the sum — a zero-filled implementation also gives 12. */
 const present = proj.bars.filter(function (b) { return b.src === 'tok'; }).length;
 const excluded = proj.bars.length - present;
-ok(present === oracle.carriers,
-  'b1b-1 participation: exactly ' + oracle.carriers + ' rows are present (got ' + present + ')');
-ok(excluded === oracle.rows - oracle.carriers,
-  'b1b-1 exclusion: the other ' + (oracle.rows - oracle.carriers) + ' rows are excluded, not counted as 0 (got ' + excluded + ')');
+ok(present === oracle.measured,
+  'b1b-1 participation: exactly ' + oracle.measured + ' MEASURED rows are present (got ' + present + ')');
+ok(excluded === oracle.rows - oracle.measured,
+  'b1b-1 exclusion: the other ' + (oracle.rows - oracle.measured) + ' rows are excluded, not counted as 0 (got ' + excluded + ')');
 
 /* ④ b1b-2: EVERY turn, not just the total (the total can hide a compensating error). */
 let turnBad = 0;
@@ -112,15 +128,19 @@ ok(proj.turns.length > 0 && turnBad === 0,
  * "no metering here" and "metering broke" must not be the same number (rule ⑪). */
 (function () {
   let files = [];
-  try { files = fs.readdirSync(EV).filter(function (f) { return /\.events\.jsonl$/.test(f); }); }
-  catch (e) { ok(false, 'breadth: cannot list ' + EV + ' (' + e.message + ')'); return; }
+  try { files = fs.readdirSync(CORPUS_DIR).filter(function (f) { return /\.events\.jsonl$/.test(f); }); }
+  catch (e) {
+    console.log('  SKIP  breadth: no runtime corpus at ' + CORPUS_DIR
+      + ' (declared skip — the in-repo fixture already exercised the criterion)');
+    return;
+  }
   let withTok = 0, withoutTok = 0, mismatched = 0, totalTurns = 0;
   files.forEach(function (f) {
     let rows;
-    try { rows = readRows(f); } catch (e) { mismatched++; return; }
+    try { rows = readRowsIn(CORPUS_DIR, f); } catch (e) { mismatched++; return; }
     const want = expectedTok(rows);
     const p = M.project(rows);
-    if (want.carriers === 0) { withoutTok++; return; }
+    if (want.measured === 0) { withoutTok++; return; }
     withTok++;
     totalTurns += p.turns.length;
     const got = p.tok.k === 'p' ? p.tok.v : null;
