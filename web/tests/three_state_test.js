@@ -125,4 +125,24 @@ console.log(bad === 0 ? 'OK — three-state algebra holds' : 'FAILED — ' + bad
     }));
 }());
 
+/* §136 — SHARING THE SHAPE IS WHAT MADE THE OUTCOME DEPEND ON THE CONTENT.
+ * Measured before this fix: max(P(5), Pstr('9')) returned P(9) — a STRING beat a real
+ * measurement — and add(Pstr('drive'), P(1)) silently returned N(). Both were silent because
+ * `isFinite` (the function rule ⑫ convicted) was used as the output predicate, so the branch
+ * depended on whether the concatenation LOOKED like a number. Now the shapes are separate
+ * (`p` magnitude / `ps` narrative) and arithmetic refuses `ps` AT THE ENTRY. */
+(function () {
+  const throws = (f) => { try { f(); return false; } catch (e) { return true; } };
+  ok('§136: a NARRATIVE fact cannot enter add (loud, not a silent N)',
+    throws(() => TS.add(TS.Pstr('drive'), TS.P(1))));
+  ok('§136: a NARRATIVE fact cannot enter max (a string never beats a measurement)',
+    throws(() => TS.max(TS.P(5), TS.Pstr('9'))));
+  ok('§136: a NARRATIVE fact cannot enter div',
+    throws(() => TS.div(TS.P(5), TS.Pstr('2'))));
+  ok('§136: the two shapes are DISTINCT (that is what makes the refusal content-independent)',
+    TS.Pstr('x').k !== TS.P(1).k && TS.Pstr('x').k === 'ps');
+  ok('§136: overflow still degrades at the EXIT (a real magnitude outside the domain)',
+    TS.add(TS.P(1e308), TS.P(1e308)).k === 'n');
+}());
+
 process.exit(bad === 0 ? 0 : 1);

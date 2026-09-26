@@ -72,6 +72,13 @@
    * standing in for a measured one — the exact fault this ADR exists to remove. */
   var MODE_PATHS = ['/data/mode', '/mode'];
   function readChain(e, paths, numeric) {
+    /* NO SILENT DEFAULT (rule ⑩, which I had just re-affirmed in `0e`): omitting the flag made
+     * a numeric dimension read as a NARRATIVE one, and a narrative value that reaches `max`
+     * silently wins (ADR-0048 §136). Missing ⇒ throw. */
+    if (numeric === undefined) {
+      throw new Error('readChain: the numeric/narrative choice must be DECLARED'
+        + ' (true for magnitudes, false for narrative facts) — ADR-0048 §136.');
+    }
     for (var i = 0; i < paths.length; i++) {
       var seg = paths[i].slice(1).split('/');
       var cur = e, exists = true;
@@ -105,7 +112,7 @@
   }
   function tokOf(e) { return readChain(e, TOK_PATHS, true); }
   function durOf(e) { return readChain(e, DUR_PATHS, true); }
-  function modeOf(e) { return readChain(e, MODE_PATHS); }
+  function modeOf(e) { return readChain(e, MODE_PATHS, false); }   /* narrative fact */
   /* INPUT SCOPE (ADR-0048 §41/§43): this cell aggregates ONE period.
    * Missing period_id normalises to "" (PromQL: an undefined label matches the
    * empty label value — it is not an error); two DISTINCT non-empty periods is a

@@ -458,7 +458,8 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
   /* The projection was RIGHT and my first expectation was wrong (same lesson as the "≥"
    * marker): a field that does not exist is ABSENT, while a field that exists with null is
    * UNMEASURED. Two different facts, two states — and neither is a default. */
-  ok('§124: a declared mode reads as present', drive.k === 'p' && drive.v === 'drive');
+  ok('§124: a declared mode reads as present (NARRATIVE shape ps, not a magnitude p)',
+    drive.k === 'ps' && drive.v === 'drive');
   /* THIRD TIME THE PROJECTION CORRECTED MY EXPECTATION: A()/N() carry NO `v` key at all —
    * only `present` has one. That is stronger than v:null, which could be confused with a
    * MEASURED null. So the assertion is about the ABSENCE of the key, not about its value. */
@@ -468,7 +469,9 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
     unmeas.k === 'n' && !Object.prototype.hasOwnProperty.call(unmeas, 'v'));
   ok('§124: a row with no mode path at all is absent/inapplicable', none.k === 'a');
   ok('§124: NONE of the four cases invents a value (no partner fallback anywhere)',
-    [drive, absent, unmeas, none].every(function (r) { return r.k !== 'p' || r.v === 'drive'; }));
+    [drive, absent, unmeas, none].every(function (r) {
+      return (r.k !== 'p' && r.k !== 'ps') || r.v === 'drive';
+    }));
 }());
 /* §134 — THE LOWER BOUND'S PREMISE IS NON-NEGATIVITY, SO IT IS DECLARED AND GUARDED.
  * S + u >= S  <=>  u >= 0   (max is unconditional by monotonicity). Tokens / durations /

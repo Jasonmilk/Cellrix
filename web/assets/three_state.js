@@ -33,7 +33,12 @@
    * narrative fact ('drive'), not a magnitude. It gets its OWN constructor so that the two
    * can never be confused: `P` stays a finite-number domain (so `add` can rely on it), and a
    * Pstr fed into `add` still throws loudly (make illegal states unrepresentable). */
-  var Pstr = function (v) { return { k: 'p', v: v }; };
+  /* A NARRATIVE FACT IS NOT A MAGNITUDE, so it gets its OWN SHAPE (`ps`), not just its own
+   * constructor (ADR-0048 §136). Sharing `k:'p'` left the arithmetic blind: measured live,
+   * `max(P(5), Pstr('9'))` returned P(9) — a STRING beat a real measurement — and
+   * `add(Pstr('drive'), P(1))` silently returned N(). Sharing the shape is what made the
+   * outcome depend on the string's CONTENT (via `isFinite`), i.e. on luck. */
+  var Pstr = function (v) { return { k: 'ps', v: v }; };
   var N = function () { return { k: 'n' }; };
   var A = function () { return { k: 'a' }; };
 
@@ -45,7 +50,23 @@
    * ("Judging it on the strict (poisoned) max was a real bug", cell_metering.js).
    * A sum is the ONE aggregation where a lower bound is legitimate; division still poisons,
    * because a lower bound FLIPS DIRECTION under division (§25.3). */
+  /* ARITHMETIC ADMITS MAGNITUDES ONLY (ADR-0048 §136): the guard is at the ENTRY so the
+   * outcome never depends on the operand's content, and a programmer error is LOUD instead
+   * of being routed into a data state. Overflow stays at the EXIT (it is a real magnitude
+   * that leaves the representable domain). */
+  function requireMagnitude(x, who) {
+    if (x && x.k === 'ps') {
+      throw new Error(who + ': a NARRATIVE fact is not an arithmetic operand (k=ps)'
+        + ' — ADR-0048 §136: the shapes are separate so this cannot be silent.');
+    }
+    if (x && x.k === 'p' && (typeof x.v !== 'number' || !isFinite(x.v))) {
+      throw new Error(who + ': a magnitude must be a FINITE NUMBER, got ' + typeof x.v
+        + ' (ADR-0048 §135/§136).');
+    }
+    return x;
+  }
   function add(x, y) {
+    requireMagnitude(x, 'add'); requireMagnitude(y, 'add');
     if (x.k === 'a' && y.k === 'a') { return A(); }          // NOT P(0)
     if (x.k === 'a') { return y; }                           // incl. N(): a lone N stays N
     if (y.k === 'a') { return x; }
@@ -60,6 +81,7 @@
     return isFinite(sum) ? P(sum) : N();
   }
   function max(x, y) {
+    requireMagnitude(x, 'max'); requireMagnitude(y, 'max');
     /* SAME INVARIANT, SAME RULE (the two channels must not disagree). */
     if (x.k === 'a' && y.k === 'a') { return A(); }
     if (x.k === 'a') { return y; }
@@ -71,6 +93,7 @@
   }
   /* Total function: NEVER NaN, NEVER Infinity (ADR-0048 §24.4). */
   function div(x, y) {
+    requireMagnitude(x, 'div'); requireMagnitude(y, 'div');
     if (x.k === 'n' || y.k === 'n') { return N(); }
     if (y.k === 'p' && y.v === 0) { return N(); }            // measured zero denom
     if (x.k === 'a' && y.k === 'a') { return A(); }
