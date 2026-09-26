@@ -397,9 +397,16 @@
        * measured" the moment A2 wires it in. Unlisted ⇒ its OWN name, never a silent absorb. */
       var stateName = null;
       if (laneState && laneState.k !== window.CxCellMetering.P(0).k) {
-        stateName = laneState.k === window.CxCellMetering.N().k ? 'unmeasured'
-                  : laneState.k === window.CxCellMetering.A().k ? 'absent'
-                  : 'narrative';        /* k=ps: a fact, not a magnitude, not "absent" */
+        /* ENUMERATED, NOT A CHAIN WITH A CATCH-ALL (ADR-0048 §138): naming an unknown shape
+         * "narrative" is the same fault as calling it "absent" — it answers a question the
+         * data did not ask. The shape set comes from the projection (one source). */
+        if (laneState.k === window.CxCellMetering.SHAPES.n) { stateName = 'unmeasured'; }
+        else if (laneState.k === window.CxCellMetering.SHAPES.a) { stateName = 'absent'; }
+        else if (laneState.k === window.CxCellMetering.SHAPES.ps) { stateName = 'narrative'; }
+        else {
+          throw new Error('renderLanes: UNKNOWN shape k=' + String(laneState.k)
+            + ' — teach every consumer (ADR-0048 §138).');
+        }
       }
       var stateAttr = stateName
         ? ' data-cell-state="' + stateName + '"'

@@ -358,6 +358,14 @@
    * silently showed "unmeasured" forever. Callers ask; they do not spell state.
    * (Zero-hard-coding: the state vocabulary lives HERE, once.) */
   function isPresent(st) { return !!st && st.k === TS.P(0).k; }
+
+  /* THE SHAPE SET HAS ONE SOURCE (ADR-0048 §138): every consumer asks here instead of
+   * re-spelling the letters. Adding a shape without teaching the consumers makes them RED,
+   * which is the whole point of rule ⑮'s second half. */
+  var SHAPES = { p: TS.P(0).k, ps: TS.Pstr('').k, n: TS.N().k, a: TS.A().k };
+  function isKnownShape(k) {
+    return k === SHAPES.p || k === SHAPES.ps || k === SHAPES.n || k === SHAPES.a;
+  }
   /* "IS A FINITE NUMBER" WITHOUT COERCION (ADR-0048 §116, rule ⑫). `isFinite(null)` is TRUE
    * and `null >= 0` is true, because Number(null) === 0 — a guard written that way cannot
    * see a null in a numeric column. This predicate is the ONE way to ask, and it is tested
@@ -370,9 +378,10 @@
    * the states again. */
   function stateText(st) {
     if (!st) { return '\u00b7 \u65e0\u6570\u636e'; }
-    if (st.k === TS.P(0).k) { return String(st.v); }
-    if (st.k === TS.A().k) { return '\u00b7 \u65e0\u6570\u636e'; }
-    if (st.k === TS.N().k) { return '\u00b7 \u672a\u8ba1\u91cf'; }
+    if (st.k === SHAPES.p) { return String(st.v); }
+    if (st.k === SHAPES.a) { return '\u00b7 \u65e0\u6570\u636e'; }
+    if (st.k === SHAPES.n) { return '\u00b7 \u672a\u8ba1\u91cf'; }
+    if (!isKnownShape(st.k)) { /* falls through to the throw below, made explicit here */ }
     /* EXHAUSTIVE ENUMERATION (ADR-0048 §137 — the second half of rule ⑮). An `else` meaning
      * "everything else is no-data" is the LIMIT CASE of judging by appearance: it does not
      * even look. Before this, a narrative fact (`ps`) rendered as "no data" — the worst
@@ -410,13 +419,20 @@
   var RESERVE_CAP_PCT = 50;
 
   function allocate(rows, opts) {
-    /* MAGNITUDES ONLY (ADR-0048 §137): without this, isPresent('ps') === false would DROP a
-     * narrative row from the allocation SILENTLY. Loud at the entry, like add/max/div. */
+    /* EXHAUSTIVE, NOT A ONE-SHAPE WHITELIST (ADR-0048 §138). The first version refused only
+     * `ps`, so a FIFTH shape reached the allocation as if it were absent — measured:
+     * allocate([{k:'zz'}, P(5)]) gave cols=[0.5, 99.5], state='ok', reason=null, BIT-IDENTICAL
+     * to a real absent row. Rule ⑮ exists to catch the shape someone adds later; a guard that
+     * only knows today's shapes cannot do that. */
     for (var qi = 0; qi < rows.length; qi++) {
       var qs = rows[qi] && rows[qi].state;
-      if (qs && qs.k === TS.Pstr('').k) {
+      if (!qs || !isKnownShape(qs.k)) {
+        throw new Error('allocate: UNKNOWN shape k=' + String(qs && qs.k)
+          + ' — a new shape must be taught to every consumer (ADR-0048 §138).');
+      }
+      if (qs.k === SHAPES.ps) {
         throw new Error('allocate: a NARRATIVE fact (k=ps) cannot be allocated —'
-          + ' ADR-0048 §137 (magnitudes only).');
+          + ' ADR-0048 §138 (magnitudes only).');
       }
     }
     var gridCols = (opts && opts.gridCols > 0) ? opts.gridCols : GRID_COLS_DEFAULT;
@@ -529,6 +545,7 @@
   }
 
   return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf,
+           SHAPES: SHAPES, isKnownShape: isKnownShape,
            stateText: stateText,
            allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
            TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,

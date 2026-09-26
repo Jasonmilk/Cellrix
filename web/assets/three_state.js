@@ -38,7 +38,16 @@
    * `max(P(5), Pstr('9'))` returned P(9) — a STRING beat a real measurement — and
    * `add(Pstr('drive'), P(1))` silently returned N(). Sharing the shape is what made the
    * outcome depend on the string's CONTENT (via `isFinite`), i.e. on luck. */
-  var Pstr = function (v) { return { k: 'ps', v: v }; };
+  var Pstr = function (v) {
+    /* BIDIRECTIONAL DOMAIN (ADR-0048 §138): a narrative fact is a STRING. Without this the
+     * shape said "not a magnitude" while holding one — measured: modeOf({data:{mode:5}}) gave
+     * {k:'ps', v:5}, and any consumer reading `.v` as text would print 5 with nothing wrong. */
+    if (typeof v !== 'string') {
+      throw new Error('Pstr(): a NARRATIVE fact must be a string, got ' + typeof v
+        + ' — ADR-0048 §138 (the shape and the content must agree).');
+    }
+    return { k: 'ps', v: v };
+  };
   var N = function () { return { k: 'n' }; };
   var A = function () { return { k: 'a' }; };
 

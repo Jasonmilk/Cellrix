@@ -507,6 +507,31 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
   ok('§137: allocate refuses a narrative fact at the ENTRY (never a silent drop)',
     throws(() => M.allocate([{ state: M.Pstr('drive') }], { gridCols: 200, mode: 'value' })));
 }());
+/* §138 — THE GATE BEFORE THE WATER: a guard that knows only TODAY'S bad shape cannot catch
+ * the shape someone adds tomorrow, which is rule ⑮'s entire purpose. Measured before this:
+ * allocate([{k:'zz'}, P(5)]) returned cols=[0.5,99.5], state='ok', reason=null — BIT-IDENTICAL
+ * to a real absent row. Now every consumer enumerates, and the shape set has ONE source. */
+(function () {
+  const throws = (f) => { try { f(); return false; } catch (e) { return true; } };
+  const UNKNOWN = ['zz', 'P', 'ps ', '', 'p2', undefined];
+  ok('§138: allocate refuses EVERY unlisted shape, not just the known-bad one',
+    UNKNOWN.every(function (k) {
+      return throws(function () { M.allocate([{ state: { k: k } }], { gridCols: 200, mode: 'value' }); });
+    }));
+  ok('§138: stateText refuses every unlisted shape too',
+    UNKNOWN.every(function (k) { return throws(function () { M.stateText({ k: k }); }); }));
+  ok('§138: the shape set is ONE source, derived from the algebra (never re-spelled)',
+    M.SHAPES.p === M.P(0).k && M.SHAPES.ps === M.Pstr('x').k
+    && M.SHAPES.n === M.N().k && M.SHAPES.a === M.A().k);
+  ok('§138: a narrative fact must be a STRING (the shape and its content agree)',
+    throws(function () { M.Pstr(5); }) && throws(function () { M.Pstr(true); })
+    && M.Pstr('drive').v === 'drive');
+  ok('§138: the known shapes still allocate (the gate did not close the road)',
+    (function () {
+      const r = M.allocate([{ state: M.P(5) }, { state: M.A() }], { gridCols: 200, mode: 'value' });
+      return r.state === 'ok' && r.cols.length === 2;
+    }()));
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
