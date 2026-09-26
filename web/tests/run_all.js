@@ -39,6 +39,7 @@ const SELF_CONTAINED = [
   ['view_hygiene_test.js', 'M0 — the gate points at the TARGET view file'],
   ['value_criterion_test.js', 'THE VALUE CRITERION — the cell shows the number the stream implies (fixture-backed)'],
   ['suite_registry_test.js', 'ABSENCE IS NOT A PASS — applied to the suite list itself'],
+  ['growth_probe_test.js', 'growth is DETECTED — A / C / D perturbe the structure, not the values'],
   ['no_host_paths_test.js', 'host paths are declared inputs — the class, not one site'],
   /* Registered after the coverage criterion pointed them out (§129): these five were run BY
    * HAND every time and were never in the gate — including the projection's own suite. */

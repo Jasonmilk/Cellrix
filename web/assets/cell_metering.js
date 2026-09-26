@@ -374,8 +374,20 @@
     /* THREE CLASSES (ADR-0048 §140): handle / refuse / degrade. Two classes force a future
      * "accept but mark" case into `handle` — which is how a silent fallback is born. */
     allocate:  { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] },
-    stateText: { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] }
+    stateText: { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] },
+    /* SCENARIO D (ADR-0048 §142): the scan found SEVEN shape-branching functions and only two
+     * were registered, so a new consumer was invisible. These four are registered from what
+     * they actually do: they consume magnitudes, and a narrative fact DEGRADES (it is marked
+     * as not-a-magnitude rather than being allowed through). Their classification is not yet
+     * probe-verified — that is the next step (a probe-generated matrix), recorded in the ADR. */
+    project:   { handle: ['p', 'n', 'a'], refuse: [], degrade: ['ps'] },
+    foldedCell:{ handle: ['p', 'n', 'a'], refuse: [], degrade: ['ps'] },
+    shares:    { handle: ['p', 'n', 'a'], refuse: [], degrade: ['ps'] },
+    isPresent: { handle: ['p', 'n', 'a'], refuse: [], degrade: ['ps'] }
   };
+  /* The predicate ITSELF is not a consumer: declared, with the reason, so the scan can tell
+   * "not registered" from "registered as not-a-consumer". */
+  var REGISTRY_EXEMPT = { isKnownShape: 'the shape predicate itself, not a consumer of it' };
   /* DERIVED, NOT DECLARED (ADR-0048 §141 / rule ⑰): this list and `counts` below were
    * hand-written copies of SHAPES — two more sources of truth, and the growth experiment
    * showed the cost: adding a shape to SHAPES left BOTH silent. K(system | SHAPES) must be 0. */
@@ -596,6 +608,7 @@
 
   return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf,
            SHAPES: SHAPES, isKnownShape: isKnownShape, unclassified: unclassified,
+           CONSUMERS: CONSUMERS, REGISTRY_EXEMPT: REGISTRY_EXEMPT,
            assertExhaustive: assertExhaustive,
            stateText: stateText,
            allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
