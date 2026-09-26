@@ -372,7 +372,11 @@
     for (i = 0; i < rows.length; i++) { if (isPresent(rows[i].state)) { present.push(rows[i].state.v); } }
     var nUnknown = rows.length - present.length;
     if (present.length === 0 || nUnknown === 0 && present.length === 0) {
-      return { state: 'unavailable', reason: 'no-present-rows', cols: [], tickPct: 0, gridCols: gridCols };
+      /* EVERY BRANCH RETURNS cols OF THE SAME LENGTH AS rows (ADR-0048 §108): a consumer
+       * that indexes by row must never receive a short array, or it silently reads
+       * undefined (the shape of the failures this cell keeps producing). */
+      return { state: 'unavailable', reason: 'no-present-rows',
+               cols: rows.map(function () { return CELL_PCT; }), tickPct: 0, gridCols: gridCols };
     }
     if (nUnknown === 0) {
       return { state: 'ok', reason: null, cols: rows.map(function () { return null; }), tickPct: 0,

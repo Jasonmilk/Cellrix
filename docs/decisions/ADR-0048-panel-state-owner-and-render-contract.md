@@ -4677,3 +4677,48 @@ M0/M0+ ✅ 门（五项,含 DERIVED-STORE）· ASSERTED 14 · 红色路径自检
 
 （清单里那条 `grep 计数 = 4` 全是**注释里的字**,所以机器断言**必须先剥注释** ——
 与 `view_hygiene_test.js` 早就用的做法一致。）
+
+## 108. 第 2 步的**两个前置**：`cols` 等长（已补）+ **分配量必须声明**（记账,不在本笔补）
+
+### 108.1 第 1 步（接线）**已在早前轮次落地**（读码确认,函数名锚定）
+
+| 位置 | 内容 |
+|---|---|
+| `compactGroupsOf()` | `:140 cellProj = project(S.session)` · `:146 cellProj.turns.forEach(...)` · `:183 out[t.id] = { …, tok: t.tok, … }` |
+| 折叠渲染 | `:243 isPresent(g.tok) ? … + fmtTok(g.tok.v) + ' tok' : '… ' + foldedCell(g)` |
+| 行单元格 | `:276 stateText(cellBarAt(i))`（`cellBarAt` 内 `:361` `project(S.session).bars`） |
+
+⇒ **`out.tok` 与行单元格的值都已同源于投影** ⇒ **第 1 步无需新改动。**
+
+### 108.2 前置 A（**已补**）：`allocate` 的每个分支都必须返回**与 `rows` 等长**的 `cols`
+
+读码发现：`no-present-rows` 分支原来返回 **`cols: []`** ⇒ 视图按行索引取会得 `undefined`
+（**正是这一格反复产生的那类静默形状**）。
+⇒ **已补**：`cols: rows.map(function () { return CELL_PCT; })`。
+**实测三分支**：`no-present` / `over`（251 行）/ `ok` —— **`cols.length === rows.length` 全部成立**;
+投影判据仍 `OK`。
+
+### 108.3 ⚠️ 前置 B（**记账,不在本笔补**）：lane 的"分配量"**必须声明**
+
+第 2 步要把 `wPct` 改取 `allocate` 的输出。但 `allocate` 分配的是 **`{state}` 行**,
+而 lane 现在的输入是**混合量**：
+```js
+var v = e.dur > 0 ? e.dur : (e.tok / (maxTok || 1)) * maxDur * 0.5;   /* 时长优先,否则 tok 份额 */
+```
+⇒ **"按哪个量分配"是一个语义决定**：
+- 按**时长**（`tool/result` 的 `duration_ms`）⇒ 需要**时长轴的三态**（已登记 `duration-axis-three-states`）;
+- 按 **tok 份额** ⇒ 与 `turns[i].tok` 同源,但 lane 现在的刻度是"时长优先",**换掉即语义变更**;
+- 或**按声明的组合**（如"有时长用时长,否则用 tok ⇒ 但这是两种编码混在一列"）。
+
+⇒ **按 Mikado（本 ADR 自己立的规则）：记账,不在本笔顺手替它选。**
+⇒ **要落笔,先声明一行**：**lane 列分配在 `<某个量>` 上,且该量的三态/适用性与 `allocate` 的契约一致。**
+
+### 108.4 本笔的实测（第 2 步**未动视图**,如实）
+
+```
+allocate 三分支 cols 等长   ✅（no-present / over / ok）
+cell_metering_test          OK — cell projection holds (golden master)
+视图                        **一行未改**（仍 raw/PEND_MIN/1.2/wPct 自算）
+```
+⇒ **第 2 步的判据（视图内 grep 无 `toFixed`/`Math.max`/`reduce`）尚未成立**,
+且**在 108.3 声明之前不应成立**——否则就是替"分配量"做了未经声明的选择。
