@@ -25,7 +25,14 @@ const eq = (x, y) => x.k === y.k && x.v === y.v;
 
 ok('all-absent is absent, NOT present(0)  [the || 0 bug]', eq(TS.fold([A(), A()]).value, A()));
 ok('absent contributes nothing', eq(TS.fold([P(5), A()]).value, P(5)));
-ok('null poisons', eq(TS.fold([P(5), N()]).value, N()));
+/* ADR §133: a null does NOT poison an aggregation — the measured part survives and the
+ * result becomes a LOWER BOUND (ISO/IEC 9075: aggregates ignore NULL; interval enclosure
+ * 5 + u ∈ [5, +∞) for u ≥ 0). Only 'nothing measured anywhere' stays unknown. */
+ok('null does NOT poison: the measured part survives', eq(TS.fold([P(5), N()]).value, P(5)));
+ok('[N,N] IS unknown: nothing measured anywhere (the one case that stays unknown)',
+  eq(TS.fold([N(), N()]).value, N()));
+ok('[A,A] is absent, not unknown (applicability and measurement are different facts)',
+  eq(TS.fold([A(), A()]).value, A()));
 ok('closure: every result is p/n/a', [P(0), P(1), N(), A()].every(function (x) {
   return [P(0), P(1), N(), A()].every(function (y) {
     return ['p', 'n', 'a'].indexOf(TS.add(x, y).k) > -1;
@@ -49,7 +56,10 @@ ok('division never yields NaN/Infinity', [P(0), P(5), N(), A()].every(function (
 (function () {
   const a = TS.fold([P(1), N(), P(2)]);
   const b = TS.fold([P(2), P(1), N()]);
-  ok('flag propagates (same flag in both orders)', a.partial === b.partial && a.partial === false && eq(a.value, b.value));
+  /* PROPERTY KEPT, OVERRULED VALUE DROPPED (§133): the flag must travel WITH the value and
+   * be order-independent; `partial === false` was asserting the overruled poisoning rule. */
+  ok('flag propagates with the value, order-independently',
+    a.partial === b.partial && eq(a.value, b.value) && eq(a.value, P(3)));
 }());
 (function () {  /* order independence, all permutations */
   const perm = [[P(120), P(80), N(), P(200)], [N(), P(200), P(120), P(80)],
@@ -71,7 +81,13 @@ ok('division never yields NaN/Infinity', [P(0), P(5), N(), A()].every(function (
   ok('absent => partial => explicit lower bound >=400',
     withAbsent.k === 'p' && withAbsent.v === 400 && withAbsent.bound === '>=');
   const withNull = TS.lowerBound(TS.fold([P(120), P(80), N(), P(200)]));
-  ok('null => poisoned => NO bound (explicit unknown)', withNull.k === 'n' && withNull.bound === undefined);
+  /* THE SAME COGNITIVE SITUATION, THE SAME ANSWER (§133): absent and null both mean 'this row
+   * was not measured', so both must yield the IDENTICAL lower bound — the point of the fix
+   * was that [P,N,P] and [P,A,P] must not disagree. */
+  ok('null => partial => explicit lower bound >=400 (identical to the absent case)',
+    withNull.k === 'p' && withNull.v === 400 && withNull.bound === '>=');
+  ok('absent and null give the SAME bound (no per-state divergence)',
+    withNull.k === withAbsent.k && withNull.v === withAbsent.v && withNull.bound === withAbsent.bound);
 }());
 /* The point where "carry the flag" and "scan for any absent" actually DIFFER:
  * partial requires BOTH an absent AND a present. Scanning for "any absent" makes an

@@ -31,9 +31,11 @@ const A = {type:'assistant/usage'}, N = {type:'assistant/usage', data:{completio
 S('all absent            ', [A, A], 'a');
 S('single present(0)     ', [Z], 'p:0');
 S('present(0)+absent     ', [Z, A], 'p:0 [partial]');
-S('present(0)+null       ', [Z, N], 'n');
+/* ADR §4.2: a null does NOT poison a sum — the measured 0 survives and the total
+ * becomes a LOWER BOUND (partial). This is the same answer the absent case gives. */
+S('present(0)+null       ', [Z, N], 'p:0 [partial]');
 S('[120,80,absent,200]   ', [{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},A,{type:'assistant/usage', data:{completion_tokens:200}}], 'p:400 [partial]');
-S('[120,80,null,200]     ', [{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},N,{type:'assistant/usage', data:{completion_tokens:200}}], 'n');
+S('[120,80,null,200]     ', [{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},N,{type:'assistant/usage', data:{completion_tokens:200}}], 'p:400 [partial]');
 (function () {
   const all = [[A,A],[Z],[Z,A],[Z,N],[{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},A,{type:'assistant/usage', data:{completion_tokens:200}}],[{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:80}},N,{type:'assistant/usage', data:{completion_tokens:200}}]];
   ok('max comes from the SAME pass (no second aggregation path)',
@@ -100,7 +102,9 @@ ok('DATA state: all-zero and all-absent produce unknown WITHOUT throwing',
   /* Note: with a null in the batch the MAX is poisoned, so §28.3's direction-flip
    * rule makes EVERY bar unknown (legit=2). The property under test is that this
    * legitimate state does not turn the gate red — nonFinite stays 0. */
-  ok('a legitimate null does NOT make the gate red (legit=2 because max is poisoned)',
+  /* NUMBER CHANGED, PROPERTY KEPT (§133): the count follows the adjudicated aggregation rule;
+   * what must never change is that a legitimate unknown is not a gate failure. */
+  ok('a legitimate null does NOT make the gate red (legit=' + 2 + ', nonFinite=0)',
     withNull.legitUnknown === 2 && withNull.nonFinite === 0);
   ok('all-zero is legitimate too (legit=2, nonFinite=0)',
     allZero.legitUnknown === 2 && allZero.nonFinite === 0);
@@ -112,8 +116,15 @@ ok('PROGRAMMER error still throws (bad input shape is not a data state)',
  * honestly say ">=200", because a lower bound is a true statement. */
 (function () {
   const r = M.project([{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:null}},{type:'assistant/usage', data:{completion_tokens:200}}]);
-  ok('max as DENOMINATOR stays unknown (direction flip) on [120,null,200]',
-    r.max.k === 'n' && M.shares(r).every(function (x) { return x.value.k !== 'p'; }));
+  /* SPLIT (ADR-0048 §133): this used to be ONE conjunction of an outdated branch and a
+   * correct one. `F ∧ X ≡ F` — while the first stayed red, the second was UNOBSERVABLE, and
+   * it guards exactly the direction-flip rule that broke once already. The two branches are
+   * now separate assertions: the outdated one follows the adjudicated rule, the true one
+   * stands alone and must stay green. */
+  ok('max as DENOMINATOR is a LOWER BOUND (P(200), partial) — not a poisoned unknown',
+    r.max.k === 'p' && r.max.v === 200 && r.maxPartial === true);
+  ok('direction flip HOLDS: a bound in the denominator makes every share unknown',
+    M.shares(r).every(function (x) { return x.value.k !== 'p'; }));
   ok('max as DISPLAY is an honest lower bound >=200 on [120,null,200]',
     r.maxDisplay.k === 'p' && r.maxDisplay.v === 200 && r.maxDisplay.bound === '>=');
   const clean = M.project([{type:'assistant/usage', data:{completion_tokens:120}},{type:'assistant/usage', data:{completion_tokens:200}}]);
@@ -246,8 +257,12 @@ ok('value point: absent reads as "no data"',
 (function () {
   const r = M.project([{type:'assistant/usage', data:{completion_tokens:4}, period_id:'P'},
                        {type:'assistant/usage', data:{completion_tokens:null}, period_id:'P'}]);
-  ok('value point: a null carries the lower bound HERE (and the fold is not a bare number)',
-    r.maxDisplay.bound === '>=' && r.tok.k === 'n' && r.partial === false);
+  /* SPLIT (§133): the display-bound branch was TRUE and must stand alone; the other two
+   * branches encoded the overruled poisoning rule. */
+  ok('value point: the DISPLAY lower bound is present exactly when a null is in the batch',
+    r.maxDisplay.bound === '>=');
+  ok('value point: the fold keeps the measured 4 and declares itself partial (not unknown)',
+    r.tok.k === 'p' && r.tok.v === 4 && r.partial === true);
 }());
 /* §77.3 — THE UNIT IS ASSERTED, not assumed: every width is final pixels inside the
  * declared range, and no ratio-like field exists to be misread by 22x. */
