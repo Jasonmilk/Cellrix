@@ -77,14 +77,17 @@ function scanSiblings() {
   try { entries = fs.readdirSync(parent); } catch (e) { return { map, roots }; }
   const selfName = path.basename(CELLRIX);
   for (const name of entries) {
-    if (name.startsWith('.') || name === selfName) continue;   /* SELF IS NOT A SIBLING:
-      * counting it made "no siblings" undetectable (the `roots.length > 1` magic this
-      * replaced), so a missing input never reached exit 5. */
+    /* SELF IS NOT A *SIBLING* — but its ADRs still RESOLVE, so they must stay in the MAP.
+     * Measured: excluding it from both made `--refresh` drop Cellrix's own ADR-0014/0047/0048,
+     * and the check then failed on its own repo's references (the refresh path had produced a
+     * table that fails). Only the ROOTS list (used for "are siblings present?") excludes self. */
+    if (name.startsWith('.')) continue;
+    const isSelf = (name === selfName);
     const dir = path.join(parent, name, 'docs', 'decisions');
     let files = [];
     try { if (!fs.statSync(dir).isDirectory()) continue; files = fs.readdirSync(dir); }
     catch (e) { continue; }
-    roots.push(name);
+    if (!isSelf) { roots.push(name); }
     for (const f of files) {
       const m = /^ADR-(\d{4})/.exec(f);
       if (m) (map[m[1]] = map[m[1]] || []).push(name);
