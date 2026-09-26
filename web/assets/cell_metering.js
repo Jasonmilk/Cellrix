@@ -371,8 +371,14 @@
   function stateText(st) {
     if (!st) { return '\u00b7 \u65e0\u6570\u636e'; }
     if (st.k === TS.P(0).k) { return String(st.v); }
+    if (st.k === TS.A().k) { return '\u00b7 \u65e0\u6570\u636e'; }
     if (st.k === TS.N().k) { return '\u00b7 \u672a\u8ba1\u91cf'; }
-    return '\u00b7 \u65e0\u6570\u636e';
+    /* EXHAUSTIVE ENUMERATION (ADR-0048 §137 — the second half of rule ⑮). An `else` meaning
+     * "everything else is no-data" is the LIMIT CASE of judging by appearance: it does not
+     * even look. Before this, a narrative fact (`ps`) rendered as "no data" — the worst
+     * failure shape, because it reads as "this machine reported nothing". */
+    throw new Error('stateText: unlisted shape k=' + String(st && st.k)
+      + ' — enumerate it explicitly (ADR-0048 §137).');
   }
   /* The vocabulary is DERIVED from the algebra, never re-spelled: the first draft of
    * this predicate wrote 'P' while the algebra emits 'p', which would have shown
@@ -404,6 +410,15 @@
   var RESERVE_CAP_PCT = 50;
 
   function allocate(rows, opts) {
+    /* MAGNITUDES ONLY (ADR-0048 §137): without this, isPresent('ps') === false would DROP a
+     * narrative row from the allocation SILENTLY. Loud at the entry, like add/max/div. */
+    for (var qi = 0; qi < rows.length; qi++) {
+      var qs = rows[qi] && rows[qi].state;
+      if (qs && qs.k === TS.Pstr('').k) {
+        throw new Error('allocate: a NARRATIVE fact (k=ps) cannot be allocated —'
+          + ' ADR-0048 §137 (magnitudes only).');
+      }
+    }
     var gridCols = (opts && opts.gridCols > 0) ? opts.gridCols : GRID_COLS_DEFAULT;
     var CELL_PCT = cellPctOf(gridCols);
     /* THE LENGTH CHANNEL'S QUANTITY IS DECLARED AT THE CALL SITE (ADR-0048 §110.4/§111.1).
@@ -513,7 +528,7 @@
              gridCols: gridCols };
   }
 
-  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf,
+  return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf,
            stateText: stateText,
            allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
            TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,

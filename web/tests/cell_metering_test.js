@@ -490,6 +490,23 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
   ok('§134: a batch of only negatives has nothing measured (no invented 0, no invented bound)',
     negOnly.tok.k !== 'p' || negOnly.tok.v !== -5);
 }());
+/* §137 — THE SECOND HALF OF RULE ⑮: AN `else` IS "JUDGING WITHOUT LOOKING".
+ * stateText mapped every unlisted shape to "no data", and the view mapped every unlisted shape
+ * to data-cell-state="absent". A narrative fact (`ps`, the run mode A2 is about to wire in)
+ * would therefore have rendered as "this machine reported nothing" — the worst failure shape,
+ * because it invites the wrong conclusion instead of looking broken. */
+(function () {
+  const throws = (f) => { try { f(); return false; } catch (e) { return true; } };
+  ok('§137: stateText is EXHAUSTIVE — a narrative fact does NOT render as "no data"',
+    throws(() => M.stateText(M.Pstr('drive'))));
+  ok('§137: every known shape still has an explicit branch (p / n / a)',
+    M.stateText(M.P(5)) === '5' && String(M.stateText(M.N())).length > 0
+    && String(M.stateText(M.A())).length > 0);
+  ok('§137: unmeasured and absent stay DISTINCT at the text point',
+    M.stateText(M.N()) !== M.stateText(M.A()));
+  ok('§137: allocate refuses a narrative fact at the ENTRY (never a silent drop)',
+    throws(() => M.allocate([{ state: M.Pstr('drive') }], { gridCols: 200, mode: 'value' })));
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',

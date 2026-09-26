@@ -392,8 +392,17 @@
        * DISTINGUISHABLE IN THE DOM (ADR-0048 §112.4); it does not encode the state as 0. */
       var colPct = laneAlloc.cols[idx];
       var laneState = laneRows[idx] && laneRows[idx].state;
-      var stateAttr = (laneState && laneState.k !== window.CxCellMetering.P(0).k)
-        ? ' data-cell-state="' + (laneState.k === 'n' ? 'unmeasured' : 'absent') + '"'
+      /* EXHAUSTIVE, NOT A TERNARY WITH AN `else` (ADR-0048 §137): the old form mapped any
+       * unlisted shape to "absent", so the run mode (`ps`) would have rendered as "not
+       * measured" the moment A2 wires it in. Unlisted ⇒ its OWN name, never a silent absorb. */
+      var stateName = null;
+      if (laneState && laneState.k !== window.CxCellMetering.P(0).k) {
+        stateName = laneState.k === window.CxCellMetering.N().k ? 'unmeasured'
+                  : laneState.k === window.CxCellMetering.A().k ? 'absent'
+                  : 'narrative';        /* k=ps: a fact, not a magnitude, not "absent" */
+      }
+      var stateAttr = stateName
+        ? ' data-cell-state="' + stateName + '"'
           /* NAME COLLISION AVOIDED (ADR-0048 §120.5): this attribute carries the LANE's
            * LENGTH-CHANNEL mode (equal|value). The RUN mode (drive|partner|survive) is a
            * different quantity and must not share the name — one attribute, one quantity. */
