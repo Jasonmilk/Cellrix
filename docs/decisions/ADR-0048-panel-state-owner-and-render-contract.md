@@ -7517,3 +7517,55 @@ Uncaught [ReferenceError: __CELL_METERING__ is not defined]
 
 ⇒ 与 §153 结尾那句同形,但更硬:**`include_str!` 让"改动能被观测"这件事本身成为一条需要判据的链路**
 （源码 → 构建 → 嵌入 → 替换 → 服务 → DOM）。**本笔只证明了这条链路里有一环断了,还没证出是哪一环。**
+
+## 162. 🎯 **面板从未装配成功** —— `boot.json` 缺两片,而"替换表"骗了我（真实缺陷,已修）
+
+### 162.1 缺陷（真实、既有、且解释了此前所有的 SKIP）
+
+```
+服务出来的页面含: <script>__THREE_STATE__</script> · <script>__CELL_METERING__</script>   ← **未被替换**
+base.html:147-148 正是这两行
+boot.rs:230-231 **有**这两条的替换表项   ← 但驱动替换的是 **g.boot.json 的 pieces**
+boot.json: 29 片,**没有** three_state.js / cell_metering.js              ← **真正的原因**
+⇒ assemble()（boot.rs:171）只替换 pieces 里声明的占位符 ⇒ 那两片**永不替换**
+⇒ 浏览器抛 ReferenceError ⇒ **CxCellMetering / CxThreeState 从未定义**
+⇒ **泳道在该架构下从来就不可能工作** —— 这也是 §153/§161 里我读到的那些 SKIP 的真因。
+```
+⇒ **这正是通则⑰ 的又一个位置**:**替换表(Rust)与装配图(JSON)是两张表,而占位符在 base.html 里** ⇒
+**三处声明,只有一处驱动行为** ⇒ 我那两张"有"的表把我骗过去了(它们在,却不起作用)。
+
+### 162.2 修
+
+`boot.json` 补入两片(**顺序**:`three_state` 在 `cell_metering` 之前——`boot.rs:68` 注释:*顺序是接线的一部分*):
+```
+{"id":"three_state","placeholder":"__THREE_STATE__","asset":"three_state.js"}
+{"id":"cell_metering","placeholder":"__CELL_METERING__","asset":"cell_metering.js"}
+```
+**实测（重建 + `up --restart` 后,页内探针）**:
+```
+CxCellMetering: object · CxThreeState: object · CxProveTrack: object
+未替换占位符: [] · 错误: []            ← 此前是 undefined ×2 + 两条 ReferenceError
+```
+
+### 162.3 🎯 两个判据**真被行使了**
+
+```
+PASS  step 3: SAME data ⇒ zero new writes (keyed reuse survives)        [6 → 6]
+PASS  step 3: CHANGED data ⇒ at least one write (never 'never updates') [6 → 9]
+FAIL  lane value: … [0 blocks checked, 0 mismatched]        ← **B 在空转时拒绝通过**（正确）
+PASS  lane value: a non-magnitude carries a NAMED state instead of a width
+      (mode=equal allocState=unavailable rows=0)
+```
+⇒ **A 完成**:**同数据 0 写入 ∧ 数据变 ≥1 写入** 的合取成立。
+⇒ **B 的行为正确但未完成**:`rows=0` ⇒ 视图此刻**没有事件** ⇒ **无块可比较** ⇒
+判据要求 `checked > 0` ⇒ **红** —— **它没有把"0 个块"当成成功**（这正是"空转"与"通过"的分界）。
+
+### 162.4 仍未完成（下一笔唯一目标）
+
+```
+B 需要**先有事件**:harness 里 "event rows rendered [0 rows]" ⇒ 面板此刻只渲染了 1 行（轮次表头）,
+视图的 evs 为空 ⇒ 要么 session 的事件端点没被拉取,要么该 job 的 period 没有 ev 行。
+⇒ 下一笔:让 harness 真的加载一个**有事件**的 period（或修端点）,然后 B 就能逐块比较
+   DOM 的 flex-basis 与投影的 cols[i]。
+```
+⇒ **这是判词在 lane 出口上的最后一块**;而它现在**只差"有数据"这一件事**。

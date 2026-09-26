@@ -10,37 +10,166 @@
     "T1b 将补 lands/opens/dependsOn 并把 base.html 的洞收敛为单一 __SEAT_BOOT__。"
   ],
   "pieces": [
-    { "id": "tokens",              "placeholder": "__TOKENS__",            "asset": "tokens.html" },
-    { "id": "components_core",           "placeholder": "__COMPONENTS_CORE__",   "asset": "components.core.html" },
-    { "id": "components_chat",           "placeholder": "__COMPONENTS_CHAT__",   "asset": "components.chat.html" },
-    { "id": "components_sessions",       "placeholder": "__COMPONENTS_SESSIONS__", "asset": "components.sessions.html" },
-    { "id": "components_track",          "placeholder": "__COMPONENTS_TRACK__",  "asset": "components.track.html" },
-    { "id": "components_degrade",        "placeholder": "__COMPONENTS_DEGRADE__", "asset": "components.degrade.html" },
-    { "id": "cockpit",             "placeholder": "__COCKPIT__",           "asset": "cockpit.html" },
-    { "id": "chat",                "placeholder": "__CHAT__",              "asset": "chat.html" },
-    { "id": "prove_track",         "placeholder": "__PROVE_TRACK__",       "asset": "prove_track.html" },
-    { "id": "prove_track_css",     "placeholder": "__PROVE_TRACK_CSS__",   "asset": "prove_track.css" },
-    { "id": "event_family",        "placeholder": "__EVENT_FAMILY__",      "asset": "event_family.js" },
-    { "id": "period_normalize",    "placeholder": "__NORMALIZE__",         "asset": "period_normalize.js" },
-    { "id": "wayout_words",        "placeholder": "__WAYOUT_WORDS__",      "asset": "wayout.words.js" },
-    { "id": "wayout",              "placeholder": "__WAYOUT__",            "asset": "wayout.js" },
-    { "id": "node_shape",          "placeholder": "__NODE_SHAPE__",        "asset": "node_shape.js" },
-    { "id": "assembly",            "placeholder": "__ASSEMBLY__",          "asset": "assembly.js" },
-    { "id": "prove_track_data",    "placeholder": "__PROVE_TRACK_DATA__",  "asset": "prove_track.data.js" },
-    { "id": "prove_track_render",  "placeholder": "__PROVE_TRACK_RENDER__","asset": "prove_track.render.js" },
-    { "id": "prove_track_node",    "placeholder": "__PROVE_TRACK_NODE__",  "asset": "prove_track.node.js" },
-    { "id": "prove_track_export",  "placeholder": "__PROVE_TRACK_EXPORT__","asset": "prove_track.export.js" },
-    { "id": "prove_track_view",    "placeholder": "__PROVE_TRACK_VIEW__",  "asset": "prove_track.view.js" },
-    { "id": "prove_track_ctrl",    "placeholder": "__PROVE_TRACK_CTRL__",  "asset": "prove_track.js" },
-    { "id": "script",              "placeholder": "__SCRIPT__",            "asset": "script.html" },
-    { "id": "chat_js",             "placeholder": "__CHAT_JS__",           "asset": "chat.js" },
-    { "id": "cockpit_js",          "placeholder": "__COCKPIT_JS__",        "asset": "cockpit.js" },
-    { "id": "session_list",        "placeholder": "__SESSION_LIST__",      "asset": "session_list.js" },
-    { "id": "session",             "placeholder": "__SESSION__",           "asset": "session.html" },
-    { "id": "gleam",               "placeholder": "__GLEAM__",             "asset": "gleam.html" },
-    { "id": "flows",               "placeholder": "__FLOWS__",             "asset": "flows.html" }
+    {
+      "id": "tokens",
+      "placeholder": "__TOKENS__",
+      "asset": "tokens.html"
+    },
+    {
+      "id": "components_core",
+      "placeholder": "__COMPONENTS_CORE__",
+      "asset": "components.core.html"
+    },
+    {
+      "id": "components_chat",
+      "placeholder": "__COMPONENTS_CHAT__",
+      "asset": "components.chat.html"
+    },
+    {
+      "id": "components_sessions",
+      "placeholder": "__COMPONENTS_SESSIONS__",
+      "asset": "components.sessions.html"
+    },
+    {
+      "id": "components_track",
+      "placeholder": "__COMPONENTS_TRACK__",
+      "asset": "components.track.html"
+    },
+    {
+      "id": "components_degrade",
+      "placeholder": "__COMPONENTS_DEGRADE__",
+      "asset": "components.degrade.html"
+    },
+    {
+      "id": "cockpit",
+      "placeholder": "__COCKPIT__",
+      "asset": "cockpit.html"
+    },
+    {
+      "id": "chat",
+      "placeholder": "__CHAT__",
+      "asset": "chat.html"
+    },
+    {
+      "id": "prove_track",
+      "placeholder": "__PROVE_TRACK__",
+      "asset": "prove_track.html"
+    },
+    {
+      "id": "prove_track_css",
+      "placeholder": "__PROVE_TRACK_CSS__",
+      "asset": "prove_track.css"
+    },
+    {
+      "id": "event_family",
+      "placeholder": "__EVENT_FAMILY__",
+      "asset": "event_family.js"
+    },
+    {
+      "id": "three_state",
+      "placeholder": "__THREE_STATE__",
+      "asset": "three_state.js"
+    },
+    {
+      "id": "cell_metering",
+      "placeholder": "__CELL_METERING__",
+      "asset": "cell_metering.js"
+    },
+    {
+      "id": "period_normalize",
+      "placeholder": "__NORMALIZE__",
+      "asset": "period_normalize.js"
+    },
+    {
+      "id": "wayout_words",
+      "placeholder": "__WAYOUT_WORDS__",
+      "asset": "wayout.words.js"
+    },
+    {
+      "id": "wayout",
+      "placeholder": "__WAYOUT__",
+      "asset": "wayout.js"
+    },
+    {
+      "id": "node_shape",
+      "placeholder": "__NODE_SHAPE__",
+      "asset": "node_shape.js"
+    },
+    {
+      "id": "assembly",
+      "placeholder": "__ASSEMBLY__",
+      "asset": "assembly.js"
+    },
+    {
+      "id": "prove_track_data",
+      "placeholder": "__PROVE_TRACK_DATA__",
+      "asset": "prove_track.data.js"
+    },
+    {
+      "id": "prove_track_render",
+      "placeholder": "__PROVE_TRACK_RENDER__",
+      "asset": "prove_track.render.js"
+    },
+    {
+      "id": "prove_track_node",
+      "placeholder": "__PROVE_TRACK_NODE__",
+      "asset": "prove_track.node.js"
+    },
+    {
+      "id": "prove_track_export",
+      "placeholder": "__PROVE_TRACK_EXPORT__",
+      "asset": "prove_track.export.js"
+    },
+    {
+      "id": "prove_track_view",
+      "placeholder": "__PROVE_TRACK_VIEW__",
+      "asset": "prove_track.view.js"
+    },
+    {
+      "id": "prove_track_ctrl",
+      "placeholder": "__PROVE_TRACK_CTRL__",
+      "asset": "prove_track.js"
+    },
+    {
+      "id": "script",
+      "placeholder": "__SCRIPT__",
+      "asset": "script.html"
+    },
+    {
+      "id": "chat_js",
+      "placeholder": "__CHAT_JS__",
+      "asset": "chat.js"
+    },
+    {
+      "id": "cockpit_js",
+      "placeholder": "__COCKPIT_JS__",
+      "asset": "cockpit.js"
+    },
+    {
+      "id": "session_list",
+      "placeholder": "__SESSION_LIST__",
+      "asset": "session_list.js"
+    },
+    {
+      "id": "session",
+      "placeholder": "__SESSION__",
+      "asset": "session.html"
+    },
+    {
+      "id": "gleam",
+      "placeholder": "__GLEAM__",
+      "asset": "gleam.html"
+    },
+    {
+      "id": "flows",
+      "placeholder": "__FLOWS__",
+      "asset": "flows.html"
+    }
   ],
   "derived": [
-    { "placeholder": "__REFRESH__", "source": "refresh_secs" }
+    {
+      "placeholder": "__REFRESH__",
+      "source": "refresh_secs"
+    }
   ]
 }
