@@ -7412,3 +7412,36 @@ zero-assertion test"**只说对了一半**:拒绝一切与放过一切都是 0 b
 
 `tools/` 已进 §13 的可执行投影（理由:governs 条款本就含**"本节边界的机械检查本身"**,而 `adr_anchor.js` 就是它）,
 并**同步** `adr_boundary_test.js` 的 `GOVERNS`（§152.5:两处都改才算执行处方）。
+
+## 160. `STALE` 会说话了 —— 而 `--refresh` **产出了一张让检查失败的表**（如实）
+
+### 160.1 修（3 行,采纳审查方）
+
+`stale` 此前**只进了一个从未被打印的 `source` 字符串** ⇒ 注释说"a diff is a **DECLARED** stale",
+而实测是 **silent** 的（lockfile 与兄弟仓不一致时仍 `OK` 且 exit 0）。
+⇒ 现在:`stale` ⇒ **打印 DECLARED STALE（含 live-only / lockfile-only 计数）+ `exit 3`**（声明状态,通则⑳）。
+⇒ **实测**:不一致 ⇒ **exit 3** ✓;一致 ⇒ `OK`,exit 0 ✓;隔离（只有 lockfile,无兄弟）⇒ 不 stale ✓。
+
+### 160.2 ⚠️ 而 `--refresh` 目前**不可用**（本笔实测,未修）
+
+```
+node tools/adr_anchor.js --refresh  ⇒ 产出的 lockfile 让检查 **FAILED — 15 passed, 1 failed**（exit 1）
+```
+⇒ **刷新路径产出的表与被检查的事实不一致** ⇒ **在本笔修复之前,不得使用 `--refresh`**;
+⇒ 已**恢复**已提交的、经过验证的 lockfile（`git` 里那份）,本机复核 `OK`。
+⇒ **这条比 stale 本身更重要**:一个"看起来很新"的刷新动作,能产出让检查失败的表 ⇒
+**它就是 §159 那条病的镜像**:lockfile 是判据的输入,**而它的生成路径没有被判据守着**。
+⇒ ⇒ **下一笔**:给"生成路径"配判据 —— **`--refresh` 后必须仍然 `OK`**（变异:让刷新写入一张坏表 ⇒ 必须红）。
+
+### 160.3 主线位置（审查方读数,与我一致）
+
+step 3 的**前半已落地**（`LANE_CELLS` 装投影签名 / `LANE_WRITES` 可观测 / 宽度取 `cols[idx]` 无算术 /
+穷尽非 `else` / "同数据零写入"判据已有）。**剩下两块**:
+```
+A 判据「数据变 ⇒ 写入 ≥ 1」（合取:先断言置上台成功）
+B **lane 值判据**:渲染 `flex-basis` == `allocate().cols[i]`,逐块 + **两条变异**
+  ① 把 `allocate` 的 cols 改一位 ⇒ 渲染必须红
+  ② 把比较退回"只看非空" ⇒ 值被改坏时必须红
+```
+⇒ **B 是判词在 lane 出口上的最后一块**;现在那条判据是"非空且非 0" ⇒ **挡得住"全塌",挡不住"错值"**
+—— 与 `isFinite(null)` 同族:**恒绿**。

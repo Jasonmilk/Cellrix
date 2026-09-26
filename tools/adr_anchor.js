@@ -113,9 +113,23 @@ function ecosystem() {
   }
   const map = {};
   Object.keys(locked).forEach(function (n) { map[n] = locked[n].slice(); });
+  /* A COMPUTED `stale` THAT IS NEVER PRINTED IS A SILENT ONE (ADR-0048 §160): the comment
+   * above promises "a diff is a DECLARED stale" while the value only ever reached a `source`
+   * string nobody printed. Measured: with a lockfile deliberately out of step with the
+   * siblings the tool printed OK and exited 0. A drifting lockfile then degrades from
+   * "1 bit everywhere" to "1 bit judging a stale table". Now it SPEAKS and it has a code. */
   const stale = live.roots.length > 0
     && JSON.stringify(Object.keys(live.map).sort()) !== JSON.stringify(Object.keys(locked).sort());
-  return { map: map, roots: live.roots, available: true, source: 'lockfile' + (stale ? ' (STALE vs siblings)' : '') };
+  if (stale) {
+    const missing = Object.keys(live.map).filter(function (n) { return !locked[n]; });
+    const extra = Object.keys(locked).filter(function (n) { return !live.map[n]; });
+    console.log('  DECLARED STALE: the lockfile differs from the sibling checkouts'
+      + ' (live-only: ' + missing.length + ', lockfile-only: ' + extra.length + ')'
+      + ' — run `--refresh` and commit the diff (ADR-0048 §160).');
+    console.log('  exit 3 = declared absent/needs action; this is NOT a red (rule ⑳).');
+    process.exit(3);
+  }
+  return { map: map, roots: live.roots, available: true, source: 'lockfile' };
 }
 
 /* ── the anchoring table ─────────────────────────────────────────────────── */
