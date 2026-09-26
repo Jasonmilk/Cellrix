@@ -557,6 +557,25 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
       return M.unclassified(['p', 'ps', 'n', 'a', 'W']).length > 0;
     }()));
 }());
+/* §140 — "handled" MUST BE OBSERVABLE, not merely present. Theorem 2 gives accept => handled;
+ * that is not enough if handled(x) is indistinguishable from "ignored". Measured before this:
+ * allocate([N()]) and allocate([A()]) were BIT-IDENTICAL (`state:'unavailable'`,
+ * `reason:'no-present-rows'`, same cols) — a handled shape looked exactly like one that fell
+ * through. Every branch now reports what it SAW, per shape. */
+(function () {
+  const n = M.allocate([{ state: M.N() }], { gridCols: 200, mode: 'value' });
+  const a = M.allocate([{ state: M.A() }], { gridCols: 200, mode: 'value' });
+  const okR = M.allocate([{ state: M.P(5) }, { state: M.A() }], { gridCols: 200, mode: 'value' });
+  const emptyR = M.allocate([], { gridCols: 200, mode: 'value' });
+  ok('§140: unmeasured and absent are DISTINGUISHABLE on the way out of allocate',
+    JSON.stringify(n) !== JSON.stringify(a) && n.counts.n === 1 && a.counts.a === 1);
+  ok('§140: EVERY branch reports what it saw (no branch is mute)',
+    [n, a, okR, emptyR].every(function (r) {
+      return r.counts && typeof r.counts.p === 'number' && typeof r.counts.a === 'number';
+    }));
+  ok('§140: the matrix carries THREE classes, so a future "accept but mark" has a home',
+    M.unclassified().length === 0 && M.unclassified(['p', 'ps', 'n', 'a', 'zz']).length > 0);
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',

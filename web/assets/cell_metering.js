@@ -371,8 +371,10 @@
    * pair must be classified as handle or refuse, and an UNCLASSIFIED pair is what a new shape
    * produces — so growth is RED, not silent. */
   var CONSUMERS = {
-    allocate:  { handle: ['p', 'n', 'a'], refuse: ['ps'] },
-    stateText: { handle: ['p', 'n', 'a'], refuse: ['ps'] }
+    /* THREE CLASSES (ADR-0048 §140): handle / refuse / degrade. Two classes force a future
+     * "accept but mark" case into `handle` — which is how a silent fallback is born. */
+    allocate:  { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] },
+    stateText: { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] }
   };
   var SHAPE_ORDER = [SHAPES.p, SHAPES.ps, SHAPES.n, SHAPES.a];
 
@@ -385,8 +387,10 @@
       var cls = CONSUMERS[c];
       list.forEach(function (k) {
         var inH = cls.handle.indexOf(k) > -1, inR = cls.refuse.indexOf(k) > -1;
-        if (inH && inR) { out.push(c + ':' + k + ':both'); }
-        else if (!inH && !inR) { out.push(c + ':' + k + ':unclassified'); }
+        var inD = (cls.degrade || []).indexOf(k) > -1;
+        var nClass = (inH ? 1 : 0) + (inR ? 1 : 0) + (inD ? 1 : 0);
+        if (nClass > 1) { out.push(c + ':' + k + ':multi'); }
+        else if (nClass === 0) { out.push(c + ':' + k + ':unclassified'); }
       });
     });
     return out;
@@ -469,6 +473,14 @@
           + ' ADR-0048 §138 (magnitudes only).');
       }
     }
+    /* EVERY BRANCH REPORTS WHAT IT SAW, PER SHAPE (ADR-0048 §140). Without this, `n` and `a`
+     * were BIT-IDENTICAL on the way out: a handled shape was indistinguishable from an ignored
+     * one, so "accept => handled" held literally and failed OBSERVATIONALLY. */
+    var counts = { p: 0, ps: 0, n: 0, a: 0 };
+    for (var ci = 0; ci < rows.length; ci++) {
+      var ck = rows[ci] && rows[ci].state && rows[ci].state.k;
+      if (counts[ck] !== undefined) { counts[ck]++; }
+    }
     var gridCols = (opts && opts.gridCols > 0) ? opts.gridCols : GRID_COLS_DEFAULT;
     var CELL_PCT = cellPctOf(gridCols);
     /* THE LENGTH CHANNEL'S QUANTITY IS DECLARED AT THE CALL SITE (ADR-0048 §110.4/§111.1).
@@ -498,7 +510,7 @@
       /* BOTH MODES REPORT THE SAME RULER (§112.3): gridCols is USED (not silently ignored)
        * and cellPct is returned, so equal and value cannot drift onto two different scales
        * — separate scales per panel is the cardinal sin of small multiples. */
-      return { state: 'unavailable', reason: 'length-closed', gridCols: gridCols,
+      return { counts: counts, state: 'unavailable', reason: 'length-closed', gridCols: gridCols,
                cellPct: CELL_PCT,
                cols: rows.length ? rows.map(function () { return 100 / rows.length; }) : [],
                tickPct: 0 };
@@ -507,7 +519,7 @@
      * fact from "rows but none measured", and the later `present.length === 0` branch would
      * otherwise swallow it (measured: allocate([]) returned 'no-present-rows'). */
     if (rows.length === 0) {
-      return { state: 'unavailable', reason: 'empty', cols: [], tickPct: 0, gridCols: gridCols };
+      return { counts: counts, state: 'unavailable', reason: 'empty', cols: [], tickPct: 0, gridCols: gridCols };
     }
     /* rows: [{state}] where state is a three-state value. Returns ONE object with the
      * per-column percentages AND the row-level state, from one projection pass. */
@@ -518,7 +530,7 @@
       /* EVERY BRANCH RETURNS cols OF THE SAME LENGTH AS rows (ADR-0048 §108): a consumer
        * that indexes by row must never receive a short array, or it silently reads
        * undefined (the shape of the failures this cell keeps producing). */
-      return { state: 'unavailable', reason: 'no-present-rows',
+      return { counts: counts, state: 'unavailable', reason: 'no-present-rows',
                cols: rows.map(function () { return CELL_PCT; }), tickPct: 0, gridCols: gridCols };
     }
     if (nUnknown === 0) {
@@ -532,11 +544,11 @@
       var sumAll = 0, k;
       for (k = 0; k < rows.length; k++) { sumAll += rows[k].state.v; }
       if (sumAll === 0) {
-        return { state: 'ok', reason: 'all-zero-declared',
+        return { counts: counts, state: 'ok', reason: 'all-zero-declared',
                  cols: rows.map(function () { return 100 / rows.length; }), tickPct: 0,
                  gridCols: gridCols };
       }
-      return { state: 'ok', reason: null,
+      return { counts: counts, state: 'ok', reason: null,
                cols: rows.map(function (r) { return (r.state.v / sumAll) * 100; }), tickPct: 0,
                gridCols: gridCols };
     }
@@ -557,12 +569,12 @@
      * declared state, not a clamped sum. (Windowing itself belongs to the on-demand
      * rendering line.) */
     if (nUnknown > gridCols) {
-      return { state: 'unavailable', reason: 'row-exceeds-grid',
+      return { counts: counts, state: 'unavailable', reason: 'row-exceeds-grid',
                cols: rows.map(function () { return CELL_PCT; }), tickPct: tick, gridCols: gridCols };
     }
     if (nUnknown * tick > RESERVE_CAP_PCT) {
       /* DEGRADED: say so in the projection, do not fabricate a proportion. */
-      return { state: 'unavailable', reason: 'reserve-over-budget',
+      return { counts: counts, state: 'unavailable', reason: 'reserve-over-budget',
                /* CLAMP TO ONE CELL (§97.3): equal widths narrower than a cell are
                 * invisible, and a degradation that loses the core capability is not a
                 * degradation but a failure. */
@@ -574,7 +586,7 @@
         cols.push(sumPresent === 0 ? 0 : (rows[i].state.v / sumPresent) * remaining / 1);
       } else { cols.push(tick); }
     }
-    return { state: 'ok', reason: null, cols: cols, tickPct: tick, remainingPct: remaining,
+    return { counts: counts, state: 'ok', reason: null, cols: cols, tickPct: tick, remainingPct: remaining,
              gridCols: gridCols };
   }
 
