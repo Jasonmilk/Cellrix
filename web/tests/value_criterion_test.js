@@ -16,6 +16,13 @@
  */
 const fs = require('fs');
 const path = require('path');
+/* CRASH != RED (same discipline as port_table_test / the gate): an uncaught error exits 4,
+ * an assertion failure exits 1. A crash that exits 1 is indistinguishable from a red, and
+ * that is exactly how a broken harness gets read as a finding. */
+process.on('uncaughtException', function (e) {
+  console.log('  TEST CRASHED (this is NOT a red and NOT a killed mutant): ' + e.message);
+  process.exit(4);
+});
 const ROOT = process.env.PORTS_ROOT || path.join(__dirname, '..', '..', '..');
 const EV = path.join(ROOT, '.helix', 'events');
 /* The sample is a DECLARED input (env override) so a mutation can feed a changed tape
@@ -66,8 +73,20 @@ const folded = M.foldedCell(proj.turns.length === 1 ? proj.turns[0] : proj);
 ok(proj.tok.k === 'p' && proj.tok.v === oracle.tok,
   'b1b-1 tok outlet: project shows ' + (proj.tok.k === 'p' ? proj.tok.v : proj.tok.k)
   + ' and the oracle says ' + oracle.tok);
-ok(String(folded) === String(oracle.tok),
-  'b1b-1 folded text: "' + folded + '" == oracle "' + oracle.tok + '"');
+/* The projection may declare UNMEASURED data with a "≥" marker (ADR §4.4): the marker must
+ * be present exactly when some carrier row exists but is unmeasured, and the NUMBER must
+ * equal the oracle either way. Comparing raw strings made the projection's extra honesty
+ * look like a mismatch (measured: it showed "8 ≥" where the oracle said "8"). */
+(function () {
+  const txt = String(folded);
+  const num = Number((/(\d+)/.exec(txt) || [])[1]);
+  const unmeasured = proj.bars.filter(function (b) { return b.src === 'unmeasured'; }).length;
+  const hasMarker = txt.indexOf('≥') > -1;
+  ok(num === oracle.tok, 'b1b-1 folded number: "' + txt + '" carries the oracle number ' + oracle.tok);
+  ok(hasMarker === (unmeasured > 0),
+    'b1b-1 declared-unknown marker: "≥" present ⟺ unmeasured rows exist (marker=' + hasMarker
+    + ', unmeasured=' + unmeasured + ')');
+}());
 
 /* ③ PARTICIPATION: which rows entered the sum — a zero-filled implementation also gives 12. */
 const present = proj.bars.filter(function (b) { return b.src === 'tok'; }).length;
@@ -86,6 +105,32 @@ proj.turns.forEach(function (t) {
 });
 ok(proj.turns.length > 0 && turnBad === 0,
   'b1b-2 per-turn: every turn matches the oracle (' + proj.turns.length + ' turn(s))');
+
+/* ── b1b-2 BREADTH: EVERY real sample on disk, not just the pinned one ──────────────
+ * A single sample proves the wiring; the breadth is what makes "值 == 真值" a property of
+ * the system rather than of one file. Files with no metering row are counted SEPARATELY:
+ * "no metering here" and "metering broke" must not be the same number (rule ⑪). */
+(function () {
+  let files = [];
+  try { files = fs.readdirSync(EV).filter(function (f) { return /\.events\.jsonl$/.test(f); }); }
+  catch (e) { ok(false, 'breadth: cannot list ' + EV + ' (' + e.message + ')'); return; }
+  let withTok = 0, withoutTok = 0, mismatched = 0, totalTurns = 0;
+  files.forEach(function (f) {
+    let rows;
+    try { rows = readRows(f); } catch (e) { mismatched++; return; }
+    const want = expectedTok(rows);
+    const p = M.project(rows);
+    if (want.carriers === 0) { withoutTok++; return; }
+    withTok++;
+    totalTurns += p.turns.length;
+    const got = p.tok.k === 'p' ? p.tok.v : null;
+    if (got !== want.tok) { mismatched++; if (mismatched <= 3) console.log('     ' + f + ': got ' + got + ' want ' + want.tok); }
+  });
+  console.log('  --- breadth: ' + files.length + ' sample(s) on disk; ' + withTok + ' carry metering, '
+    + withoutTok + ' carry none (DECLARED, not "broken"), ' + totalTurns + ' turn(s) compared');
+  ok(files.length > 0, 'breadth scope: at least one real sample on disk');
+  ok(mismatched === 0, 'b1b-2 breadth: every metering-bearing sample matches the oracle (' + mismatched + ' mismatch)');
+}());
 
 console.log(bad === 0
   ? 'OK — THE VALUE CRITERION IS EXERCISED: the cell shows the number the event stream implies'
