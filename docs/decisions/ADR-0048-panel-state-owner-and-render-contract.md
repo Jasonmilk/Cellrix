@@ -7115,3 +7115,10 @@ BOUNDARY VIOLATION: <files> — outside the governed concern (presentation-layer
 ### 152.4 更正已执行
 
 §13 的投影**本笔真正补上**了 `docs/ADR-0048.index.md`（并说明它不是越界物）,§151 的标题同时更正。
+
+### 152.5 而红仍在,因为我只改了**文档**没改**可执行投影**
+
+§13 自己写着:*"清单只是它的可执行投影"* —— 而**可执行投影在 `adr_boundary_test.js` 的 `GOVERNS` 列表里**。
+⇒ 我只改了正文 ⇒ 红照旧（message 依旧指向 §13）⇒ **两处都改才算执行了处方**。
+⇒ 已补 `docs/ADR-0048.index.md` 进 `GOVERNS`,并注明理由是"本 ADR 自身"。
+⇒ **教训（第六次"机器教我"）**:**文档说"这是投影"时,投影本身在代码里 —— 改一处等于没改。**

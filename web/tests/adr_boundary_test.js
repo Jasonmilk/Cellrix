@@ -27,7 +27,12 @@ const ADR = 'docs/decisions/ADR-0048-panel-state-owner-and-render-contract.md';
 
 /* The governor: the CONCERN, with the path list as its projection. */
 const GOVERNS = ['web/assets/', 'web/src/', 'web/tests/'];
-const ADR_PATHS = ['docs/decisions/'];
+const ADR_PATHS = ['docs/decisions/',
+  /* ADR-0048 §13 (amended): the ADR's OWN navigation layer is part of the concern
+   * ("本 ADR 自身"). §13 says the path list is only the EXECUTABLE PROJECTION of a
+   * semantic boundary — so amending the prose without amending this projection leaves
+   * the projection wrong, which is exactly what the red kept telling me. */
+  'docs/ADR-0048.index.md'];
 
 let files;
 try {
