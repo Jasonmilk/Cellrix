@@ -444,8 +444,13 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
    * marker): a field that does not exist is ABSENT, while a field that exists with null is
    * UNMEASURED. Two different facts, two states — and neither is a default. */
   ok('§124: a declared mode reads as present', drive.k === 'p' && drive.v === 'drive');
-  ok('§124: an ABSENT mode field is absent, not a default', absent.k === 'a' && absent.v === null);
-  ok('§124: a null mode field is unmeasured, not a default', unmeas.k === 'n' && unmeas.v === null);
+  /* THIRD TIME THE PROJECTION CORRECTED MY EXPECTATION: A()/N() carry NO `v` key at all —
+   * only `present` has one. That is stronger than v:null, which could be confused with a
+   * MEASURED null. So the assertion is about the ABSENCE of the key, not about its value. */
+  ok('§124: an ABSENT mode field is absent, not a default',
+    absent.k === 'a' && !Object.prototype.hasOwnProperty.call(absent, 'v'));
+  ok('§124: a null mode field is unmeasured, not a default',
+    unmeas.k === 'n' && !Object.prototype.hasOwnProperty.call(unmeas, 'v'));
   ok('§124: a row with no mode path at all is absent/inapplicable', none.k === 'a');
   ok('§124: NONE of the four cases invents a value (no partner fallback anywhere)',
     [drive, absent, unmeas, none].every(function (r) { return r.k !== 'p' || r.v === 'drive'; }));
