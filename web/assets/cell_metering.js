@@ -366,6 +366,34 @@
   function allocate(rows, opts) {
     var gridCols = (opts && opts.gridCols > 0) ? opts.gridCols : GRID_COLS_DEFAULT;
     var CELL_PCT = cellPctOf(gridCols);
+    /* THE LENGTH CHANNEL'S QUANTITY IS DECLARED AT THE CALL SITE (ADR-0048 §110.4/§111.1).
+     * allocate never guesses it; the view declares it, and the two declarations are:
+     *   mode 'equal' => the length channel is CLOSED: every cell is equal and only the
+     *                   POSITION channel carries information (this is the view's DEFAULT,
+     *                   S.durMode === 'equal'). 1.2 / PEND_MIN / toFixed have no meaning
+     *                   here — closed, not "converted".
+     *   mode 'value' => the length channel encodes the declared quantity; rows whose state
+     *                   is not present do not enter the allocation.
+     * Anything else is a PROGRAMMER error, not a data state: an undeclared quantity must
+     * never default silently (this cell's whole failure family is silent defaults). */
+    /* NO SILENT DEFAULT: the declaration is mandatory. A defaulted mode is exactly the
+     * silent-default family this cell exists to remove (the first draft defaulted to
+     * 'equal' and turned seven value-mode assertions red — the failure was in MY default,
+     * not in them). */
+    if (!opts || !opts.mode) {
+      throw new Error('allocate: the length-channel mode must be DECLARED'
+        + ' (mode: "equal" | "value", ADR-0048 §110.4).');
+    }
+    var mode = opts.mode;
+    if (mode !== 'equal' && mode !== 'value') {
+      throw new Error("allocate: undeclared length-channel mode '" + mode
+        + "' (ADR-0048 §110.4: the caller declares the quantity).");
+    }
+    if (mode === 'equal') {
+      return { state: 'unavailable', reason: 'length-closed', gridCols: gridCols,
+               cols: rows.length ? rows.map(function () { return 100 / rows.length; }) : [],
+               tickPct: 0 };
+    }
     /* rows: [{state}] where state is a three-state value. Returns ONE object with the
      * per-column percentages AND the row-level state, from one projection pass. */
     var present = [], i;

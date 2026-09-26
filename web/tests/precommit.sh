@@ -28,7 +28,7 @@ node -e "
 const M = require('../assets/cell_metering.js');
 const T = require('../assets/three_state.js');
 const r = M.project([{type:'assistant/usage', data:{completion_tokens:4}, period_id:'P'}]);
-const a = M.allocate([{state:M.P(4)},{state:M.A()}], {gridCols:200});
+const a = M.allocate([{state:M.P(4)},{state:M.A()}], {gridCols:200, mode:'value'});
 if (!r || !r.bars || !a || typeof a.state !== 'string') { throw new Error('smoke: no usable output'); }
 console.log('  ok (project + allocate both ran)');
 " || { echo "  FAIL load smoke"; fail=1; }

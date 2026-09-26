@@ -4890,3 +4890,61 @@ T2（局部渲染）**现在的达成方式是缓存渲染产物**（`LANE_HTML`
 3    `LANE_HTML` → `LANE_CELLS`（`NODES` 类不动）
      判据① 同数据零写入仍绿;② **（先断言置上台成功）∧（数据变 ⇒ 写入 ≥ 1）** + 变异
 ```
+
+## 111. **0e 完成**：长度通道的量在**调用点声明**（两模式 + 缺省即抛）
+
+### 111.1 落地的两行声明（`allocate(rows, opts)`）
+
+| 模式 | 长度通道 | 返回 |
+|---|---|---|
+| **`mode: 'equal'`** | **关闭**（每格等宽,**只剩位置通道**） | `state:'unavailable'` · `reason:'length-closed'` · `cols = 100/N`（等长） |
+| **`mode: 'value'`** | **编码调用点声明的量**;`state` 非 `present` 的行**不进分配** | 原有的 tick 规则与三个 `reason` |
+
+⇒ **`opts.mode` 缺失即抛**（**没有任何静默缺省**）：
+```
+allocate: the length-channel mode must be DECLARED (mode: "equal" | "value", ADR-0048 §110.4).
+```
+⇒ 与规则⑨一致：**声明量由视图在调用点传入,`allocate` 不猜。**
+
+### 111.2 ⚠️ 而初版**我自己犯了静默缺省**（如实记）
+
+初版写的是 `var mode = (opts && opts.mode) ? opts.mode : 'equal';`
+⇒ **默认 `'equal'` 让 7 条 value-mode 断言当场转红** ——
+**失败在我的缺省里,不在它们身上**;而更糟的是：**若那 7 条不存在,这个静默缺省就会一路绿下去。**
+⇒ 改为**缺省即抛**,并让**全部 17 处调用显式声明**。
+
+### 111.3 判据（5 条,全部能变红）
+
+```
+0e: mode=equal 关闭长度通道（等宽、位置通道）                    ok
+0e: mode=value 按声明量分配（present 行分余量）                   ok
+0e: UNDECLARED mode 抛（程序员错误,不是数据状态）                 ok
+0e: 签名接收声明的 opts（不是被猜的量）                           ok
+0e: **MISSING mode 抛（无静默缺省）**                            ok   ← 变异检测点
+```
+**变异**：`if (!opts || !opts.mode)` → `if (false)`
+⇒ **`FAIL 0e: a MISSING mode throws`,exit=1** ✓
+**基线**：`OK — cell projection holds (golden master)`,exit=0 ✓
+
+⚠️ **并记一条方法**：**没有第 5 条断言时,"缺省即抛"是等价变异**（所有调用都已显式声明 ⇒ 去掉守卫不改变任何可观测行为）。
+⇒ **变异的前提是存在能行使该守卫的断言**（这是"基线绿"之外的第二个前提）。
+
+### 111.4 ⚠️ 门**自己**也需要跟上契约（门抓到了我）
+
+`precommit.sh` 的加载冒烟里有 `allocate(…, {gridCols:200})` —— **契约改成"缺省即抛"后它当场抛错**
+⇒ **`PRECOMMIT FAILED — do NOT commit (syntax/red-path)`,而第 1、4 步都显示 `ok`**
+⇒ 定位到 **第 2 步（加载冒烟）** 是 `fail=1` 的来源。
+⇒ **已修**（冒烟补 `mode:'value'`）。
+⇒ **这恰好是门在正确地抓我**：**契约变了,门的代码也要跟**——否则门会以"我坏了"的形式报警,
+而人容易把它读成"门坏了"。
+
+### 111.5 本笔改动面（逐文件点名,规则②）
+
+| 文件 | 改动 |
+|---|---|
+| `web/assets/cell_metering.js` | `allocate` 接 `opts.mode`（两模式 + 缺省即抛） |
+| `web/tests/cell_metering_test.js` | 5 条 0e 判据 + 既有 **17 处调用补显式 `mode`** |
+| `web/tests/precommit.sh` | 加载冒烟补 `mode:'value'` |
+| `docs/decisions/ADR-0048-…md` | 本节 |
+
+⇒ **`prove_track.view.js` 本笔未动**（视图仍未消费 `allocate`;那是第 2 步）。
