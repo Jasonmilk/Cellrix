@@ -5866,3 +5866,101 @@ run_all.js ⇒ FAILED — 2 red, 22 proven, 5 held, 0 unregistered
 | **§5** | `render_test.js` 崩≠红 + `jsdom` 声明依赖 | ⬜ |
 | **§7 预言机合一** | `pinned_expectation.js` 与 `value_criterion_test.js` 各有一份 ⇒ 应合一 | ⬜ |
 | **§8 教训** | **"面板里存在一类只在检查器打开后才存在的 UI；它们的回归天然活在绿灯之下"** | ✅ 记在此条 |
+
+## 129. `run_all.js` 的**目的与价值**：把"缺席"变成可见——而这次的缺席正是**我自己造的**
+
+### 129.1 它的价值（一句话）
+
+> **它自己写着「ABSENCE IS NOT A PASS」:一个从不执行的套件**读起来像覆盖率**。**
+> ⇒ 它的价值不是"跑测试",而是**让"没跑"这件事无法伪装成"跑了"**。
+
+### 129.2 而它在我这里漏了 —— 漏得正好是**要害**
+
+新判据 `suite_registry_test.js` 一上线就把缺席者**点名**出来:
+
+```
+FAIL coverage: every suite is executed or DECLARES its capability
+  — MISSING from the gate: adr_boundary_test.js, **cell_metering_test.js**, chat_model_test.js,
+    port_table_test.js, render_test.js, three_state_test.js, wordlist_parity_test.js
+```
+
+⇒ **`cell_metering_test.js` 是本格的核心套件**（投影的黄金主判据,40+ 条断言）——
+**它从未进过门**,一直靠我**手跑**并写进报告。
+⇒ 也就是说:**"本格门转绿"这句话里,投影那半边一直是**手动的**。**（审查方 §1 指出的是新增三条;
+覆盖判据把范围扩大成**七条**。）
+
+### 129.3 处置：**能跑的一律进网,不能跑的**具名声明****
+
+| 类 | 套件 | 处置 |
+|---|---|---|
+| **纯 Node** | `cell_metering_test.js` · `three_state_test.js` · `wordlist_parity_test.js` · `adr_boundary_test.js` | ✅ **进 `SELF_CONTAINED`**（实测各自 `exit=0`） |
+| **需能力** | `port_table_test.js`（兄弟仓）· `render_test.js`（jsdom+活面板）· **`chat_model_test.js`（活面板地址;实测 `exit=3 NEEDS-INPUT`）** | ⚠️ **在覆盖判据里**具名声明**,附**它需要什么** |
+| **非套件** | `pinned_expectation.js`（**预言机**,是被 require 的库）· `known_bad_reader.js` · `probe_bug.js` · `snapshot*.js` · `cell_before.js`（博物馆件） | 逐个附理由 |
+
+⚠️ **我第一次把 `chat_model_test.js` 放进 `SELF_CONTAINED` 是错的**（它需要活面板,`exit=3`）
+—— 而**门当场以 `UNREGISTERED/BLOCKING` 报出来**。**两次都是门在纠正我。**
+
+### 129.4 门与覆盖的实测
+
+```
+suite_registry_test.js ⇒ OK — the suite registry covers every suite
+  35 suites · 33 listed · 7 declared not-a-suite · 3 declared needs-capability
+整门 ⇒ FAILED — 2 red, **27 proven**, 5 held, 0 unregistered     （proven 22 → 27）
+  red 1: value_criterion_test.js（3 条,全部由 §128.2-② 那个未决语义引起,红得对）
+  red 2: prove_track_rows_test.js（与本格无关的既有红）
+```
+⇒ **新登记的 4 个套件真的在跑** ⇒ **本格的投影判据第一次进网**（此前只是手跑）。
+
+### 129.5 因此"覆盖"这件事现在**会自己报警**
+
+⇒ 下一个新套件**不可能再静默缺席**（覆盖判据 + 变异探针 + 作用域非空三条同时在）。
+⇒ 这正是 `run_all.js` 应有的形态:**不是"我登记了所以它在跑",而是"没登记就红"。**
+## 129. `run_all.js` 的**目的与价值**：让"缺席"可见——而这次的缺席是我自己造的
+
+### 129.1 它的价值（一句话）
+
+> **它自己写着「ABSENCE IS NOT A PASS」：一个从不执行的套件读起来像覆盖率。**
+> ⇒ 它的价值不是"跑测试"，而是让**"没跑"**这件事**无法伪装成"跑了"**。
+
+### 129.2 而它在我这里漏了 —— 漏得正好是要害
+
+新判据 `suite_registry_test.js` 一上线就把缺席者**点名**出来：
+
+```
+FAIL coverage: every suite is executed or DECLARES its capability
+  — MISSING from the gate: adr_boundary_test.js, cell_metering_test.js, chat_model_test.js,
+    port_table_test.js, render_test.js, three_state_test.js, wordlist_parity_test.js
+```
+
+⇒ **`cell_metering_test.js` 是本格的核心套件**（投影的黄金主判据，40+ 条断言）——
+**它从未进过门**，一直靠我**手跑**并写进报告
+⇒ 也就是说：**"本格门转绿"这句话里，投影那半边一直是手动的。**
+（审查方 §1 指出的是新增三条；覆盖判据把范围扩大成**七条**。）
+
+### 129.3 处置：能跑的一律进网，不能跑的**具名声明**
+
+| 类 | 套件 | 处置 |
+|---|---|---|
+| **纯 Node** | `cell_metering_test.js` · `three_state_test.js` · `wordlist_parity_test.js` · `adr_boundary_test.js` | ✅ **进 `SELF_CONTAINED`**（实测各自 `exit=0`） |
+| **需能力** | `port_table_test.js`（兄弟仓）· `render_test.js`（jsdom + 活面板）· **`chat_model_test.js`**（活面板地址；实测 `exit=3 NEEDS-INPUT`） | ⚠️ **在覆盖判据里具名声明**，附它需要什么 |
+| **非套件** | `pinned_expectation.js`（**预言机**，被 require 的库）· `known_bad_reader.js` · `probe_bug.js` · `snapshot*.js` · `cell_before.js`（博物馆件） | 逐个附理由 |
+
+⚠️ **我第一次把 `chat_model_test.js` 放进 `SELF_CONTAINED` 是错的**（它需要活面板，`exit=3`）
+——而**门当场以 `UNREGISTERED/BLOCKING` 报出来**。⇒ **两次都是门在纠正我。**
+
+### 129.4 门与覆盖的实测
+
+```
+suite_registry_test.js ⇒ OK — the suite registry covers every suite
+  35 suites · 32 listed · 7 declared not-a-suite · 3 declared needs-capability
+整门 ⇒ FAILED — 2 red, **27 proven**, 5 held, 0 unregistered     （proven 22 → 27）
+  red 1: value_criterion_test.js（3 条，全部由 §128.2-② 那个未决语义引起，红得对）
+  red 2: prove_track_rows_test.js（与本格无关的既有红）
+```
+
+⇒ **新登记的 4 个套件真的在跑** ⇒ **本格的投影判据第一次进网**（此前只是手跑）。
+
+### 129.5 因此"覆盖"现在**会自己报警**
+
+⇒ 下一个新套件**不可能再静默缺席**（覆盖关系 + 变异探针 + 作用域非空三条同时在）。
+⇒ 这正是 `run_all.js` 应有的形态：**不是"我登记了所以它在跑"，而是"没登记就红"。**
