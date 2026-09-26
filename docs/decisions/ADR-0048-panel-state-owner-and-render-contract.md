@@ -6039,3 +6039,64 @@ cell_metering_test.js  6 条红   ← 标题逐字:"present(0)+null => n" / "[12
 ⇒ `value_criterion_test.js` **转绿**（判据已替我把 bug 抓住并验证修复）;
 ⇒ 红名单变为:`three_state_test.js`(3) + `cell_metering_test.js`(6) + `prove_track_rows_test.js`(既有无关)。
 ⇒ **前两个红是"测试过时",不是"实现回归"** ⇒ 必须写明,否则会被读成我把投影改坏了。
+## 132. **修复的副作用：病从 `add` 搬到了 `maxPartial`**（审查方实测成立）——已修+逐条分类
+
+### 132.1 病没死,它搬了一层（实测）
+
+| 样本 | 修 `add` 之后 | 判定 |
+|---|---|---|
+| **A** `[P5, **N**, P7]` | `maxPartial=false` ⇒ **`shares=[0.714, n, 1.000]` 精确份额** | ❌ **多报** |
+| **B** `[P5, **A**, P7]` | `maxPartial=true` ⇒ `shares=[n, n, n]` 降级 | ✅ |
+
+⇒ **同一认知处境,两个答案** —— **正是刚修好的那个病,只是换了一层:从 `add` 搬到了 `maxPartial`。**
+⇒ 而且**新形态更坏**:旧的**少报**（丢掉已知 12,陈述仍真）;新的**多报**
+（真份额 `≤ 0.714`,显示为 `= 0.714`,**陈述为假**）—— 即 **SQL `AVG` 的隐式过滤偏差**同一族,
+且**违反本 ADR §25.3**（"分母是下界,方向翻转"）,而 §25.3 **未被本次修改触碰**。
+
+### 132.2 根因：**毒化是承重的**,而 `seenAnyNull` 早就算好了却没用在护栏上
+
+`maxPartial: seenAMax && seenPMax` —— **漏了 null**;而 `:140` 的 `seenAnyNull` **已经存在且被赋值**。
+⇒ 所以这不是"没数据",是**同一段代码里只改了一半**。
+
+### 132.3 修（并**枚举该不变量的所有通道**,而不只修看到的那一个）
+
+| 通道 | 原 | 修 |
+|---|---|---|
+| `maxPartial`（tok 分母） | `seenAMax && seenPMax` | **`seenPMax && (seenAMax \|\| seenAnyNull)`** |
+| **`maxDurPartial`（时长分母）** | `seenPDur && seenADur` | **`seenPDur && (seenADur \|\| seenNDur)`**（**新增 `seenNDur`**） |
+
+⇒ **通道清单**（审查方 §6 要求）:`add` · `max` · `div` · `ratio` · `shares` · `lowerBound` ·
+`maxDisplay` · `maxPartial` · `maxDurPartial` · `bars[].src` · DOM `data-cell-state`。
+**本轮核了全部,修了两条通道。**
+
+### 132.4 实测（决定性对照）
+
+```
+A [P5,null,P7]  : maxPartial=true  shares=[n, n, n]
+B [P5,absent,P7]: maxPartial=true  shares=[n, n, n]      ← **A 与 B 现在同答案** ✓
+cell_metering_test 的红: 6 → 4   ← 其中第 6 条"denominator NOT MEASURED ⇒ every share unknown"
+                                   **自然转绿**（红→绿即证据,未改断言一个字）
+```
+
+### 132.5 ⚠️ 剩余 7 条红的**逐条分类**（审查方要求:不能用"过时"一并改掉）
+
+| # | 断言 | 类 | 处置 |
+|---|---|---|---|
+| 1 | `three_state`: "null poisons" | 求和侧 | ⬜ **过时**,改 |
+| 2 | `three_state`: "flag propagates (same flag in both orders)" | 求和侧 | ⬜ **过时**,改 |
+| 3 | `three_state`: "null => poisoned => NO bound" | 求和侧 | ⬜ **过时**,改（应断言 **`12 ≥`**） |
+| 4 | `cell_metering`: "present(0)+null => n" | 求和侧 | ⬜ **过时**,改（应 `p:0 [partial]`） |
+| 5 | `cell_metering`: "[120,80,null,200] => n" | 求和侧 | ⬜ **过时**,改（应 `p:400 [partial]`） |
+| **6** | `cell_metering`: "denominator NOT MEASURED ⇒ every share unknown" | **分母侧** | ✅ **已自然转绿**（探测器,未改） |
+| **7** | `cell_metering`: "max as DENOMINATOR stays unknown (direction flip) on [120,null,200]" | **分母侧** | ⛔ **仍红,且必须留红** |
+| 8 | `cell_metering`: "a legitimate null does NOT make the gate red" | 混合 | ⬜ 改数字不改属性（注释已失效） |
+| 9 | `cell_metering`: "value point: a null carries the lower bound HERE" | 取值点 | ⬜ 逐条核 |
+
+### 132.6 第 7 条为什么**必须留红**（这是本轮最重要的判断）
+
+它测的是**代数层的 `max` 作为分母**。我修的是 `project` 的 `maxPartial` 护栏,
+**但 `bound` 仍然不是一个"长在值上的属性"**（审查方 §3：Minsky「非法状态不可表示」/ King「Parse, don't validate」）。
+⇒ **因此第 7 条红是对的事实**:`div`/`ratio` 在代数层仍可能拿一个"只是下界"的 `max` 去做分母。
+⇒ **它不是我该改掉的过时断言,而是**下一笔（结构性修法）的常设证据**：
+把 `bound` 放进值里,让 `div` 在任一操作数带 `bound` 时**结构上无法**给出精确商。
+⇒ 判据（审查方给的）:**把 `maxPartial` 那一行删掉 ⇒ 第 6、7 条**仍必须红**（因为约束在值上,不在人肉布尔上）。

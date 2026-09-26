@@ -133,7 +133,7 @@
     var folded = TS.fold(tokFold);
     var acc = TS.start(), seenPMax = false, seenAMax = false, seenAnyNull = false;
     var displayMax = null, tokHasUnmeasured = false;
-    var maxDurAcc = TS.A(), seenPDur = false, seenADur = false;
+    var maxDurAcc = TS.A(), seenPDur = false, seenADur = false, seenNDur = false;
     for (var j = 0; j < list.length; j++) {
       if (list[j].k === 'p' && tokApplicableFlags[j]) { seenPMax = true; }
       if (list[j].k === 'a' && tokApplicableFlags[j]) { seenAMax = true; }
@@ -146,13 +146,14 @@
       var dj = durList[j];
       if (dj.k === 'p') { seenPDur = true; }
       if (dj.k === 'a') { seenADur = true; }
+      if (dj.k === 'n') { seenNDur = true; }
       maxDurAcc = TS.max(maxDurAcc, dj);
     }
     var self = {
       states: list,
       durStates: durList,
       maxDur: maxDurAcc,
-      maxDurPartial: seenPDur && seenADur,
+      maxDurPartial: seenPDur && (seenADur || seenNDur),
       projected: true,
       /* MAX HAS TWO USES, ADJUDICATED SEPARATELY (ADR §33):
        *   as DISPLAY      -> a LOWER BOUND is a true statement (>=200),
@@ -171,7 +172,12 @@
       })(),
       tok: folded.value,
       max: acc.value,
-      maxPartial: seenAMax && seenPMax,
+      /* A DENOMINATOR THAT IS ONLY A LOWER BOUND MUST DEGRADE (ADR §25.3). With `max` no
+       * longer poisoned by a null, shares() cannot rely on `max.k !== 'p'`: a null
+       * APPLICABLE row makes the max a lower bound exactly like an absent one does.
+       * Omitting seenAnyNull here is how the same disease moved out of `add` into this
+       * flag (measured: [P5,N,P7] gave an EXACT share while [P5,A,P7] degraded). */
+      maxPartial: seenPMax && (seenAMax || seenAnyNull),
       partial: folded.partial,
       count: folded.count,
       bound: TS.lowerBound(folded).bound || null,
