@@ -96,7 +96,9 @@ ok(proj.tok.k === 'p' && proj.tok.v === oracle.tok,
 (function () {
   const txt = String(folded);
   const num = Number((/(\d+)/.exec(txt) || [])[1]);
-  const unmeasured = proj.bars.filter(function (b) { return b.src === 'unmeasured'; }).length;
+  /* The bar's own vocabulary names a null row `src:'null'` (measured on the projection),
+   * so the marker question is asked of the STATE, not of a guessed src name. */
+  const unmeasured = proj.bars.filter(function (b) { return b.value && b.value.k === 'n'; }).length;
   const hasMarker = txt.indexOf('≥') > -1;
   ok(num === oracle.tok, 'b1b-1 folded number: "' + txt + '" carries the oracle number ' + oracle.tok);
   ok(hasMarker === (unmeasured > 0),

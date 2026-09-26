@@ -5991,3 +5991,51 @@ MUTATION PROBE: 塞一个字面量必被检测（**探针自身用拼装,不作�
 ⇒ 与预言机那次（`note` 字符串）、元断言那次（正则字面量）**同一族**。
 ⇒ 修：**用拼装构造**。⇒ **"检查被自己的文字绊倒"已经出现三次** ⇒ 已具名:
 **凡"扫描文本"的判据,必须把自己构造目标串的方式排除在扫描面之外。**
+## 131. **改判：`null` 毒化是 bug,不是语义分歧**（审查方三条证据全部成立）
+
+### 131.1 三条证据（我逐条核过,全部成立）
+
+| # | 证据 | 结论 |
+|---|---|---|
+| **①** | **ADR §4.2 逐字**:`null`（未测到）**的定义本身就带下界 `≥`**,且"`≥` 只在 tok 维确有未测到时" | 实现返回 `n` **直接违反已裁定的规范** ⇒ **是 bug** |
+| **②** | **同一份代码里的先例**:`cell_metering.js:163` 注释逐字 *"Judging it on the strict (poisoned) max **was a real bug**"*（max 侧已修） | **同一不变量、两条路径、两个相反判断** ⇒ 第 22 个位置,且**首次出现在同一函数内的两个通道之间** |
+| **③** | **实测对照**:`fold([P5,P7,A]) ⇒ P(12) ≥` 而 `fold([P5,P7,N]) ⇒ N()` | **同样的"部分已知",两个答案,其中一个把已测得的 12 扔了** |
+
+⇒ **我此前把它登记为"语义决定 / 预期红"是错的。** ⇒ **这正是审查方 §3 三问要防的**:
+**"用预期红清单收纳真 bug"** —— 而清单会让人以为红的都是合法的。
+
+### 131.2 修法（已完成）
+
+```
+① add：`n` 不再毒化 —— 测得的部分存活;唯一仍为 N 的情形是"一条 present 都没有"
+② max：**同一规则**（两个通道不得互相矛盾）
+③ step/start：**新增 seenN**（原来只有 seenP/seenA ⇒ 下界永远无法在 null 上触发）
+④ fold.partial = seenP && (seenA || seenN)
+⑤ div/ratio：**保持毒化**（比率的下界会翻向,§25.3）—— 不变量,不许我改坏
+```
+
+**实测（fixture:2 条测得 5,7 + 1 条 `null`）**：
+```
+b1b-1 tok outlet: project shows 12 and the oracle says 12          ✅
+b1b-1 folded number: "12 ≥" carries the oracle number 12           ✅  ← 下界复活
+b1b-1 declared-unknown marker: "≥" present ⟺ unmeasured rows (true,1) ✅  ← 标记由**状态**判定
+b1b-1 participation / exclusion                                     ✅
+b1b-2 breadth: 29/29                                                ✅
+⇒ OK — THE VALUE CRITERION IS EXERCISED
+```
+
+### 131.3 ⚠️ 而**两套判据仍在断言旧（被推翻的）规则** —— 如实记,下一笔修
+
+```
+three_state_test.js    3 条红   ← 标题逐字:"null poisons" / "null => poisoned => NO bound"
+cell_metering_test.js  6 条红   ← 标题逐字:"present(0)+null => n" / "[120,80,null,200] => n" / …
+```
+⇒ **这些红不是"实现坏了",而是"测试编码了被推翻的规则"** —— **ADR 是权威,测试是被推翻的那一方。**
+⇒ 但**必须逐条核**：其中若含**比率/分母**类（下界翻向 ⇒ 该仍为未知）,那类断言**是对的,不许改**;
+只有"求和侧仍毒化"的断言才是过时的。⇒ **这是我的下一笔,且必须先分类再改。**
+
+### 131.4 门现状（如实）
+
+⇒ `value_criterion_test.js` **转绿**（判据已替我把 bug 抓住并验证修复）;
+⇒ 红名单变为:`three_state_test.js`(3) + `cell_metering_test.js`(6) + `prove_track_rows_test.js`(既有无关)。
+⇒ **前两个红是"测试过时",不是"实现回归"** ⇒ 必须写明,否则会被读成我把投影改坏了。

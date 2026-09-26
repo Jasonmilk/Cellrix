@@ -19,18 +19,31 @@
   var N = function () { return { k: 'n' }; };
   var A = function () { return { k: 'a' }; };
 
+  /* UNMEASURED DOES NOT POISON A SUM (ADR-0048 §131). The old rule `n || n => N()` DISCARDED
+   * the measured part: fold([P5, P7, N]) returned "unmeasured" while fold([P5, P7, A]) returned
+   * the honest "12 >=". Same partial knowledge, two answers, one of them throwing away what was
+   * measured. The measured part survives; what the N contributes is a LOWER BOUND, which is
+   * carried by `seenN` + `lowerBound` — exactly how the max side was already fixed
+   * ("Judging it on the strict (poisoned) max was a real bug", cell_metering.js).
+   * A sum is the ONE aggregation where a lower bound is legitimate; division still poisons,
+   * because a lower bound FLIPS DIRECTION under division (§25.3). */
   function add(x, y) {
-    if (x.k === 'n' || y.k === 'n') { return N(); }          // poison
     if (x.k === 'a' && y.k === 'a') { return A(); }          // NOT P(0)
-    if (x.k === 'a') { return P(y.v); }
-    if (y.k === 'a') { return P(x.v); }
+    if (x.k === 'a') { return y; }                           // incl. N(): a lone N stays N
+    if (y.k === 'a') { return x; }
+    if (x.k === 'n' && y.k === 'n') { return N(); }          // nothing measured anywhere
+    if (x.k === 'n') { return P(y.v); }                      // the measured part survives
+    if (y.k === 'n') { return P(x.v); }
     return P(x.v + y.v);
   }
   function max(x, y) {
-    if (x.k === 'n' || y.k === 'n') { return N(); }
+    /* SAME INVARIANT, SAME RULE (the two channels must not disagree). */
     if (x.k === 'a' && y.k === 'a') { return A(); }
-    if (x.k === 'a') { return P(y.v); }
-    if (y.k === 'a') { return P(x.v); }
+    if (x.k === 'a') { return y; }
+    if (y.k === 'a') { return x; }
+    if (x.k === 'n' && y.k === 'n') { return N(); }
+    if (x.k === 'n') { return P(y.v); }
+    if (y.k === 'n') { return P(x.v); }
     return P(Math.max(x.v, y.v));
   }
   /* Total function: NEVER NaN, NEVER Infinity (ADR-0048 §24.4). */
@@ -50,14 +63,19 @@
   function step(acc, item) {
     return { value: add(acc.value, item),
              seenP: acc.seenP || item.k === 'p',
-             seenA: acc.seenA || item.k === 'a' };
+             seenA: acc.seenA || item.k === 'a',
+             seenN: acc.seenN || item.k === 'n' };   /* `seenN` was MISSING: without it the
+                                                     * lower bound could never fire on a null. */
   }
-  function start() { return { value: A(), seenP: false, seenA: false }; }
+  function start() { return { value: A(), seenP: false, seenA: false, seenN: false }; }
   /* fold is a thin loop over `step`; `partial` is read off the CARRIED flags. */
   function fold(list) {
     var acc = start();
     for (var i = 0; i < list.length; i++) { acc = step(acc, list[i]); }
-    return { value: acc.value, partial: acc.seenP && acc.seenA, count: list.length };
+    /* PARTIAL = measured + (absent OR unmeasured): both kinds of "not measured here"
+     * make the total a lower bound rather than a total. */
+    return { value: acc.value, partial: acc.seenP && (acc.seenA || acc.seenN),
+             count: list.length };
   }
   /* Summation is the ONLY place where a partial result may be shown as a lower
    * bound (ADR-0048 §25.3). A ratio must degrade to explicit unknown instead,
