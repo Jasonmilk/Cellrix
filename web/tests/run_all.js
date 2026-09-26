@@ -320,6 +320,16 @@ for (const [file, what] of SELF_CONTAINED) {
       console.log('  ABORT ' + file + '  — the suite crashed; nothing was asserted (rule ⑳)');
       continue;
     }
+    if (e.status === 3) {          /* DECLARED ABSENT — nothing to judge / no input given.
+                                    * The NEEDS-INPUT path above only catches suites that SAY so;
+                                    * a suite that reports VACUOUS (nothing changed) exits 3 too,
+                                    * and it was falling through into `failed` — the second red on
+                                    * a CLEAN tree, i.e. a red that only appears after you commit. */
+      envMissingRoster.push(file);
+      results.push(['ABSENT', file, what]);
+      console.log('  ABSENT ' + file + '  — declared absent (nothing to judge); not a red (rule ⑳)');
+      continue;
+    }
     if (e.status === 2) {          /* environment missing (e.g. a module that is not installed) */
       envMissingRoster.push(file);
       results.push(['ENV', file, what]);
