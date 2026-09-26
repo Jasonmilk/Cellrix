@@ -5678,3 +5678,52 @@ function modeOf(e) { return readChain(e, MODE_PATHS); }
 - **写入侧（Anaphase 把 `mode` 写进 `turn/start` 的 `data`）**：**跨仓**,本地可做但**未推**;
 - **DOM 声明**（`data-cell-runmode` + 未声明时的状态标记）：**本笔未做**,紧接一笔;
 - **指示器分工**（快照答"现在"、事件答"那时"）：未做。
+
+## 125. 🎯 **M3 REACHED** —— 本格门 `ASSERTED TOTAL 0`,整门只剩一个**与本格无关**的既有红
+
+### 125.1 本笔做了什么（三刀,每一刀都是"值离开视图"而不是"删断言"）
+
+| 刀 | 内容 | 消除的类 |
+|---|---|---|
+| **① 死代码整块删除** | `maxDur`/`maxTok`/`raw`/`PEND_MIN`/`sum`（**复核:死区外零消费者**） | `fallback-numeric` 3→0 · `bare-threshold` 3→0 · `bare-slash` 一部分 |
+| **② `typeof` 探针 → 投影取值** | `if (typeof e.dur === 'number') dur += e.dur` ⇒ `durOf(e)` + `isPresent` | `typeof-existence` 2→0 |
+| **③ 视图内除法 → 投影列** | 检查器的 `(ev.dur / total) * 100` ⇒ `allocate(...).cols[i]`（**与泳道同一声明量、同一模式**） | `bare-slash` 6→0 |
+
+⇒ **删除的理由不是"数字要降",而是"这些值在 step 2 就已经不住在视图里了"**——
+**本笔只是让视图不再假装计算它们**（审查方 §2 的规则：**无消费者 ⇒ 删除,不是迁移**）。
+
+### 125.2 检测器的一处**精确收紧**（并双向自证不是放水）
+
+`bare-slash` 的正则会把**正则字面量**误判成除法（`:68` 的 `S.q.replace(/[.*+?^${}()|[\]\\]/g, …)`）。
+⇒ **检测器改为：先剥字符串字面量,再用标准的 JS 正则字面量匹配**（`/` 紧跟 `[` 只可能是字符类）。
+⇒ **并加 META 双向断言**（否则这次收紧可能悄悄把检测器弄瞎）：
+```
+ok  META — a REAL division is still counted (the detector was not loosened)
+ok  META — a regex literal is not counted as division
+```
+⚠️ **第一版收紧太弱**（`[^\]]*` 遇到 `\]` 转义就断）,**META 当场抓到**——**这正是 META 存在的意义**。
+
+### 125.3 门与门的实测
+
+```
+bare-slash:       0（起始 7 → 目标 0）      fallback-numeric: 0（3 → 0）
+typeof-existence: 0（起始 1 → 目标 0）      bare-threshold:   0（3 → 0）
+ASSERTED TOTAL 0（目标 0）
+OK — M3 REACHED: no stored derived values, every name resolves, asserted classes at 0
+整门: FAILED — **1 red, 22 proven**, 5 held, 0 unregistered   ← 唯一红 = 与本格无关的既有红
+precommit: PRECOMMIT OK
+```
+
+### 125.4 如实记两笔
+
+1. **`fallback-other` 30 → 31**（**registered, not asserted**）：我加的 `data-cell-*` 拼接增加了一处 `||` 用法。
+   它**不在断言类里**,但**我改了它,就要说**（不许静默变化）。
+2. **待定轴的账未销**：`PEND_MIN` 的"待定保底"**在 step 2 已被绕过、本笔把它的残骸删除** ——
+   但**"待定"这件事现在在视图里完全不可见**。⇒ **`pending` 必须以声明的状态回来**
+   （`data-cell-state="pending"` 或作为 `allocate` 的声明入参）——**这是 §113.4 的账,仍未销**。
+
+### 125.5 M3 还差最后一项：**人工查看**（验证纪律）
+
+*"曾有一次实现通过了四套绿灯,而没有任何人打开过它改的那个界面。"*
+⇒ 本格的具体动作：**切到 `Actual time`,看三条泳道有没有东西**（step 2 的 regression 正是这一类）。
+⇒ 未做,**紧接着做**（优先走已有 CDP 仪器,若不可行则记录为"待人工"而不冒充已完成）。

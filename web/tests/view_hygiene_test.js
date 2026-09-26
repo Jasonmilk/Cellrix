@@ -33,7 +33,12 @@ function stripComments(src) {
 }
 function classOf(line) {
   const hits = [];
-  if (/[A-Za-z0-9_)\]]\s*\/\s*[A-Za-z0-9_(]/.test(line)) { hits.push('bare-slash'); }
+  /* A REGEX LITERAL IS NOT DIVISION (ADR-0048 §125): `/` immediately followed by `[` can only
+   * be a character class, never a divisor (division by an array literal is not a thing we
+   * write). This is precise, not a loosening — and META below asserts BOTH directions. */
+  const noStr = line.replace(/'(?:\\.|[^'\\])*'/g, "''").replace(/"(?:\\.|[^"\\])*"/g, '""');
+  const noRegex = noStr.replace(/\/(?:\\.|\[(?:\\.|[^\]\\])*\]|[^\/\\\n])*\/[a-z]*/g, '');
+  if (/[A-Za-z0-9_)\]]\s*\/\s*[A-Za-z0-9_(]/.test(noRegex)) { hits.push('bare-slash'); }
   if (/\|\|\s*\d/.test(line)) { hits.push('fallback-numeric'); }
   else if (/\|\|/.test(line)) { hits.push('fallback-other'); }
   if (/typeof\s+[A-Za-z_$][\w$.]*\s*===?\s*['"]number['"]/.test(line)) { hits.push('typeof-existence'); }
@@ -65,6 +70,14 @@ const KNOWN_ALL_BROKEN = ['var a = b / c;', 'var d = e || 0;', "typeof f === 'nu
   KNOWN_ALL_BROKEN.forEach(function (line) {
     classOf(line).forEach(function (k) { if (probe[k] !== undefined) { probe[k]++; } });
   });
+  /* BOTH DIRECTIONS, or the "regex is not division" rule could silently blind the detector. */
+  const seesDivision = classOf('var share = a / b;').indexOf('bare-slash') > -1;
+  const ignoresRegex = classOf("var q = S.q.replace(/[.*+?^${}()|[\]\\]/g, 'x');").indexOf('bare-slash') === -1;
+  console.log((seesDivision ? '  ok   ' : '  FAIL ')
+    + 'META — a REAL division is still counted (the detector was not loosened)');
+  console.log((ignoresRegex ? '  ok   ' : '  FAIL ')
+    + 'META — a regex literal is not counted as division');
+  if (!seesDivision || !ignoresRegex) { bad++; }
   const blind = Object.keys(probe).filter(function (k) { return probe[k] === 0; });
   console.log((blind.length ? '  FAIL ' : '  ok   ') + 'META — the detectors see a known all-broken sample'
     + (blind.length ? ' (blind to: ' + blind.join(', ') + ')' : ''));

@@ -175,7 +175,11 @@
             /* M1 (ADR-0048 §71): the token value comes from the SINGLE projection — the
              * state, not a bare number — so absent/null/present(0) stay distinguishable
              * here. Interface names are read off the implementation's exports. */
-            ids.push(e.id); if (typeof e.dur === 'number') { dur += e.dur; }
+            ids.push(e.id);
+            /* the duration comes from the PROJECTION, not from a typeof probe on the row
+             * (ADR-0048 §125 / M3 — the value leaves the view, and the typeof goes with it). */
+            var dcell = window.CxCellMetering.durOf(e);
+            if (window.CxCellMetering.isPresent(dcell)) { dur += dcell.v; }
           }
         } else { anyShown = true; }
       });
@@ -375,26 +379,13 @@
     });
     var laneMode = (S.durMode === 'actual') ? 'value' : 'equal';
     var laneAlloc = window.CxCellMetering.allocate(laneRows, { gridCols: 200, mode: laneMode });
-    var maxDur = 0, maxTok = 0;
-    evs.forEach(function (e) { if (e.dur > maxDur) maxDur = e.dur; if (e.tok > maxTok) maxTok = e.tok; });
-    var raw = evs.map(function (e) {
-      if (S.durMode !== 'actual') return 1;
-      var v = e.dur > 0 ? e.dur : (e.tok / (maxTok || 1)) * maxDur * 0.5;
-      return Math.max(1.2, (v / (maxDur || 1)) * 22);
-    });
-    /* Pending must stay visible: projected by duration, an unbounded wait would collapse to invisible */
-    var PEND_MIN = 0.05, pendIdx = [];
-    evs.forEach(function (e, i) { if (e.status === 'pending') pendIdx.push(i); });
-    if (pendIdx.length) {
-      var restSum = 0, pendSum = 0;
-      raw.forEach(function (v, i) { if (pendIdx.indexOf(i) > -1) pendSum += v; else restSum += v; });
-      var need = (restSum / (1 - PEND_MIN)) * PEND_MIN;
-      if (pendSum > 0 && pendSum < need) {
-        var kk = need / pendSum;
-        pendIdx.forEach(function (i) { raw[i] *= kk; });
-      }
-    }
-    var sum = raw.reduce(function (a, b) { return a + b; }, 0) || 1;
+    /* THE LEGACY LENGTH PATH IS GONE (ADR-0048 §125 / M3). maxDur/maxTok/raw/PEND_MIN/sum had
+     * NO CONSUMER left after step 2 moved the width to the projection's column, so they were
+     * dead code that still LOOKED alive — and they carried five of the six registered identity
+     * elements (1.2, ||1, (maxTok||1), (maxDur||1), reduce(...,0)||1) plus the pending boost.
+     * Deleting dead code is not "getting the count down": the values left the view earlier;
+     * this only stops the view from pretending to compute them. The pending axis must come
+     * back as a DECLARED state (never as a silent width boost) — that remains open (§113.4). */
     evs.forEach(function (e, idx) {
       /* THE WIDTH IS THE PROJECTION'S COLUMN — no arithmetic, no rounding here. A row whose
        * state is not present carries that state in data-* so `absent` and `present(0)` are
@@ -408,7 +399,8 @@
            * different quantity and must not share the name — one attribute, one quantity. */
           + ' data-cell-lenmode="' + laneMode + '"'
         : '';
-      var wPct = (typeof colPct === 'number') ? colPct + '%' : '';
+      /* the STRICT predicate, not `typeof`: rule ⑫ (§116) — a coercing guard cannot see a null. */
+      var wPct = window.CxCellMetering.isFiniteNumber(colPct) ? colPct + '%' : '';
       var hit = S.q && (e.summary + ' ' + (e.tool || '')).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
       var isSel = (S.sel === e.id);
       LANES.forEach(function (k) {
@@ -492,8 +484,17 @@
     S.sel = id;
 
     var st = STATUS[ev.status] || STATUS.done;
-    var total = 0; S.session.forEach(function (e) { if (e.kind === 'ev') total += e.dur; });
-    var pct = total ? ((ev.dur / total) * 100).toFixed(1) : '0';
+    /* THE PERCENTAGE IS THE PROJECTION'S COLUMN, not a division in the view (ADR-0048 §125 / M3).
+     * Same declared quantity and same mode as the lanes, so the inspector and the bars cannot
+     * disagree about what share this event has. */
+    var evsAll = S.session.filter(function (e) { return e.kind === 'ev'; });
+    var iEv = -1;
+    for (var i0 = 0; i0 < evsAll.length; i0++) { if (evsAll[i0].id === ev.id) { iEv = i0; break; } }
+    var inspAlloc = window.CxCellMetering.allocate(
+      evsAll.map(function (e) { return { state: window.CxCellMetering.durOf(e) }; }),
+      { gridCols: 200, mode: (S.durMode === 'actual') ? 'value' : 'equal' });
+    var inspCol = (iEv > -1) ? inspAlloc.cols[iEv] : null;
+    var pct = window.CxCellMetering.isFiniteNumber(inspCol) ? inspCol.toFixed(1) : '0';
     var turnIdx = S.turnIndex[ev.turn] || '?';
 
     $('eInspT').textContent = (ev.tool ? ev.tool + ' · ' : '') + ev.cls;
