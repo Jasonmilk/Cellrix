@@ -5774,3 +5774,36 @@ chain declaration: 4 endpoint env(s) derived from chain.json
 `ports.json` **应当由它派生**（或合并）,否则**"单一来源"本身有两个**——**而两个来源迟早会分叉**。
 ⇒ **并记**：`chain.json` 里 `panel` 的端口就是 **`:50050`** ⇒ **与活面板实测一致** ⇒
 **生态 `HANDOFF*.md` 的 `:8080` 确为陈旧**（§118.5 的驳回由此得到**运行证据**,不只是文档推理）。
+
+## 127. 收口：`renderLanes` **是公开入口**（所以"人工查看"可被驱动）,而**驱动它的那一行没落到 jsdom 上**
+
+### 127.1 两条确证（活代码）
+
+| 事实 | 证据 |
+|---|---|
+| **`renderLanes` 只被 `openInsp`/`closeInsp` 调用** | `prove_track.view.js` 的 `renderLanes` 调用点只有 `:531`（`openInsp`）与 `:539`（`closeInsp`） |
+| **但它同时是声明的公开入口** | `:694` `PT.renderLanes = renderLanes;` ⇒ **测试可以直接驱动它**,不必依赖"用户在不在那条路径上" |
+
+⇒ 而 `#eTraj` **默认 `display:none`**（`prove_track.html:9`）⇒ **泳道在用户打开检查器之前是完全不可见的**
+——**这解释了为什么"三泳道全空"这个 regression 能在四套绿灯下存活**:它需要一个**从未被走到的路径**。
+
+### 127.2 而我的驱动**没生效**（如实）
+
+我在 `render_test.js` 里加了 `PTapi.renderLanes()`（用 `typeof window !== 'undefined' && window.CxProveTrack`），
+**真栈复跑后仍是 `0 blocks` 且落回 `SKIP`** ⇒ **那一行没有落到 jsdom 的 `window` 上**
+（harness 里的 `window` 是它自己 `new JSDOM(...).window` 的绑定,不是 Node 的全局）。
+⇒ **`SKIP` 是诚实的**（判据仍未被行使）,而修法是**一个词**：
+把 `window.CxProveTrack` 换成 harness 已经持有的那个 jsdom window
+（该 harness 已断言 `CxProveTrack namespace exists` ⇒ 命名空间**确实在 jsdom 里**）。
+
+### 127.3 因此本格线的状态（**本轮的终点,不模糊**）
+
+| 项 | 状态 |
+|---|---|
+| 值判据（tok 出口,独立 oracle） | ✅ **已行使**（pinned 7/7 + 全语料 29/29 + 干净的红） |
+| 值判据（lane 出口 = 渲染宽度） | ⚠️ **未行使**（本轮把仪器、前置、公开入口都备好了,**差一行绑定**） |
+| 本格门 `ASSERTED TOTAL 0` | ✅ **M3 REACHED**（整门 1 red,且那红与本格无关） |
+| 人工查看（切到 `Actual time`） | ⚠️ **未行使**（真栈打开过、真渲染跑过,但那一条因绑定问题跳过） |
+| A0 / A1-a / A2（Cellrix 侧） | ✅ 落地并推送（跨仓部分:Helix-Mind `453f521`、Anaphase `adbd57a` **待你口令**） |
+| 待定轴（`pending` 必须以声明状态回来） | ⬜ 未销（§113.4 / §125.4） |
+| 链的两个单一来源（`chain.json` vs `ports.json`） | ⬜ 待裁决（§126.5,已有证据） |

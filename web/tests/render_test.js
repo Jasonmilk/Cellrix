@@ -157,6 +157,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
        * trajectory is on screen. Asking about widths before asserting that produces a FAIL that
        * says nothing about the widths — measured live: "0 blocks" while everything was fine.
        * An empty container here is a DECLARED SKIP, not a red (a red must be about the widths). */
+      /* THE LANES ARE RENDERED BY A DECLARED ENTRY POINT: `CxProveTrack.renderLanes` (exposed at
+       * prove_track.view.js:694). Calling it is not a hack — it is the same function the
+       * inspector path calls, and it removes the "is it on screen yet" accident from the check.
+       * (#eTraj being display:none only hides them; it does not stop them being computed.) */
+      const PTapi = (typeof window !== 'undefined' && window.CxProveTrack) || null;
+      if (PTapi && typeof PTapi.renderLanes === 'function') { PTapi.renderLanes(); }
       const blocks = Array.from(doc.querySelectorAll("#eLaneInput .e-blk, #eLaneModel .e-blk, #eLaneTool .e-blk"));
       if (blocks.length === 0) {
         console.log("  SKIP  Actual time: the trajectory is not on screen for this view state"
