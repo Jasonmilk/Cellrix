@@ -4442,3 +4442,50 @@ const statesOf = (bars) => bars.map(function (b) { return { state: b.value }; })
 precommit 增"预期红清单在文件之外被点数"（§104.2）
 b1b-1 第一发曳光弹（pinned 端到端）
 ```
+
+## 105. **③b 完成**：像素编码删除,**红→绿即证据**（expand → migrate → contract 走完）
+
+### 105.1 三步走完整走通
+
+| 笔 | 内容 | 结果 |
+|---|---|---|
+| **① expand** | `setGridCols`（后改为声明入参）+ 降级 clamp | 旧编码不动 |
+| **② migrate** | 判据迁到新编码 + 加"两套编码不得并存"（**当时应红,已确认红**） | ✅ |
+| **③a** | 只迁测试（helper + 7 处,残留 0） | ✅ **源一行未动** |
+| **③b** | **只删源**（6 行常量 + `barWidth` 整函数 + 导出 + `bars` 映射 + 一处残留调用） | ✅ |
+
+**⇒ `ok EXPECTED-RED until ③: no pixel encoding coexists with the percentage encoding`**
+——**同一条断言由红转绿**;**测试文件未再改动**（这正是 ③a 的目的）。
+**⇒ 判据：`OK — cell projection holds (golden master)`,`exit=0`。**
+
+### 105.2 ③b 的实测
+
+```
+node --check        ok
+加载冒烟            bars: 3 | turns: 1 | turn.bars: 2 | 导出像素编码: 无 ✓
+文本残留            无 ✓（wPx / W_UNIT / W_RANGE / W_FULL / W_TOK / TOK_RATIO / MIN_W）
+barWidth 出现次数   0
+判据                OK,exit=0
+```
+⇒ **`project` 现在只出「测得量 + 状态 + 声明身份」**（`bars[j] = {src, reason, value, idx, eventId}`）,
+**几何由 `allocate` 统一给**（三通道 + 三 reason + 声明入参）——**"值住投影"在这一层成立。**
+
+### 105.3 ⚠️ 第五次"文本手术弄坏文件"（如实,并给出**通则**）
+
+本轮我**先**用「整行 / 整函数 / 逐字锚点」的结构性删除 ⇒ **`barWidth` 与常量一次删净**;
+**后**用**正则删一段多行注释** ⇒ **切进代码、`missing )`**（与 §96 那次同行号 `:76`）。
+⇒ **已恢复并改用**：**注释只改写措辞,不删行**;删除一律**整行 / 整函数 / 逐字锚点**。
+
+**通则（本 ADR 第五次同族,这次写成可执行的话）**：
+> **JS 源码不做正则手术。**
+> **删：整行或整函数（大括号配平）。改：整行替换或逐字锚点。注释：改写措辞,不删行。**
+
+### 105.4 里程碑
+
+```
+M0/M0+ ✅ 门（五项,含 DERIVED-STORE）· ASSERTED 14 · 红色路径自检 · precommit 五步（含加载冒烟）
+投影   ✅ 三通道 allocate（三 reason、声明入参、降级可见）+ bars 只出状态/身份/值
+导出层 ✅ **像素编码已删,红转绿**
+③      ✅ 完成
+下一步 b1b-1 **第一发曳光弹**：视图第一次消费 allocate ⇒ 在 pinned 单样本上端到端跑一次
+```

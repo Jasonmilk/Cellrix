@@ -46,20 +46,14 @@
   /* PROJECTION CONSTANTS (module scope: they belong to the projection, not to a call).
    * The old source had bare 22, a bare 0.5 and a bare 1.2 in the formula, which is why
    * "22 vs 11" looked like an unexplained scale mismatch — 11 was 22 x 0.5, unwritten. */
-  var W_FULL = 22;        /* a duration-carrying bar at the session maximum */
-  var TOK_RATIO = 0.5;    /* a token-share bar, relative to a duration bar */
-  var W_TOK = W_FULL * TOK_RATIO;
-  var MIN_W = 1.2;        /* the geometric identity element: see §36 */
   /* THE UNIT LIVES IN THE NAME (ADR-0048 §77.3, "declaration over discovery" #10).
-   * `wPx` is FINAL PIXELS in [MIN_W, W_FULL]: directly usable, never to be
+   * the DELETED pixel ruler was final pixels: directly usable, never to be
    * re-normalised, never to be treated as a ratio. Measured failure modes of the
    * unnamed version: re-normalising gave the longest bar 6.59 instead of 22.00;
    * treating it as a ratio gave 242.00 (a 22x unit error); indexing bars by event
    * count gave undefined -> NaNpx back in a new form. None of them crashed, and all
    * of them passed a gate that only checked names and counts. */
-  var BAR_KEYS = ['wPx', 'src', 'reason', 'value'];
-  var W_UNIT = 'px';
-  var W_RANGE = [MIN_W, W_FULL];
+  var BAR_KEYS = ['src', 'reason', 'value', 'idx', 'eventId'];
   var TURN_MARKS = [['/kind', 'turn'], ['/type', 'turn/start']];
   function isTurnMark(e) {
     for (var i = 0; i < TURN_MARKS.length; i++) {
@@ -189,12 +183,16 @@
      * width. 1:1 keeps ONE sequence, so bar j always means event j.
      * Each bar also carries ITS OWN state, so the expanded view never re-reads e.tok. */
     self.bars = events.map(function (e, i) {
-      var appliesTok = applicable(e, TOK_APPLICABLE), appliesDur = applicable(e, DUR_APPLICABLE);
-      var b = (appliesTok || appliesDur)
-        ? barWidth(self, rowIndexOf[i])
-        : { wPx: MIN_W, src: 'n/a', reason: 'inapplicable' };
-      b.value = appliesTok ? tokOf(e) : TS.A();
-      return b;
+      /* THE PROJECTION EMITS THE MEASURED QUANTITY AND THE STATE; geometry belongs to the
+       * layout engine (ADR-0048 §100.2). The pixel ruler is GONE, so nothing coexists with
+       * the percentage encoding and §99's expected-red assertion turns green here. */
+      var appliesTok = applicable(e, TOK_APPLICABLE);
+      var st = appliesTok ? tokOf(e) : TS.A();
+      var src = appliesTok
+        ? (st.k === TS.P(0).k ? 'tok' : (st.k === TS.N().k ? 'null' : 'absent'))
+        : (applicable(e, DUR_APPLICABLE) ? 'dur' : 'n/a');
+      return { src: src, reason: null, value: st, idx: i,
+               eventId: (e && e.id !== undefined) ? e.id : null };
     });
     /* ONE TRUTH SOURCE, TWO VIEWS (ADR-0048 §58.3): the summary is TURN-level while the
      * denominator is SESSION-level. Calling project per turn would change the
@@ -226,7 +224,7 @@
       turns[n].partial = foldedTurn.partial;
       /* SAME recorded map as self.bars — searching `list` by event returned -1, which is
        * how the turn-level bars silently became `unknown` (ADR-0048 §78.5). */
-      turns[n].bars = turns[n].rows.map(function (r) { return self.bars[r] ? self.bars[r] : barWidth(self, r); });
+      turns[n].bars = turns[n].rows.map(function (r) { return self.bars[r]; });
     }
     self.turns = turns;
     /* ADDITIVITY is the completion invariant (ADR-0048 §59.1): the per-turn sums must
@@ -417,34 +415,12 @@
     return { state: 'ok', reason: null, cols: cols, tickPct: tick, remainingPct: remaining,
              gridCols: gridCols };
   }
-  function barWidth(r, i) {
-    var scaleDur = W_FULL, scaleTok = W_TOK, minW = MIN_W;
 
-    var scaleDur = W_FULL, scaleTok = W_TOK, minW = MIN_W;
-    var maxDur = r.maxDur, maxTok = r.max;
-    var isPresent = function (n) { return n && n.k === 'p' && Number.isFinite(n.v); };
-    if (!isPresent(maxDur)) {
-      /* Global switch off: no duration anywhere in this batch. A tok share cannot be
-       * scaled without it (its divisor cancels), so the bar carries NO information. */
-      return { wPx: minW, src: 'unknown', reason: 'maxDur-not-measured' };
-    }
-    var durOfEvent = r.durStates[i];
-    if (durOfEvent && isPresent(durOfEvent) && durOfEvent.v > 0) {
-      return { wPx: Math.max(minW, (durOfEvent.v / maxDur.v) * scaleDur), src: 'dur', reason: null };
-    }
-    if (r.partial || !isPresent(maxTok)) {
-      return { wPx: minW, src: 'unknown', reason: 'denominator-not-measured' };
-    }
-    if (maxTok.v === 0) { return { wPx: minW, src: 'unknown', reason: 'denominator-zero' }; }
-    var tokOfEvent = r.states[i];
-    if (!isPresent(tokOfEvent)) { return { wPx: minW, src: 'unknown', reason: 'numerator-not-measured' }; }
-    return { wPx: Math.max(minW, (tokOfEvent.v / maxTok.v) * scaleTok), src: 'tok', reason: null };
-  }
   return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, stateText: stateText,
            allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
            TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
            foldedCell: foldedCell,
-           W_UNIT: W_UNIT, W_RANGE: W_RANGE, BAR_KEYS: BAR_KEYS,
-           tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet, barWidth: barWidth,
+           BAR_KEYS: BAR_KEYS,
+           tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet,
            project: project, ratioOf: ratioOf, shares: shares };
 }));
