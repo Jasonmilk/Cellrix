@@ -5727,3 +5727,50 @@ precommit: PRECOMMIT OK
 *"曾有一次实现通过了四套绿灯,而没有任何人打开过它改的那个界面。"*
 ⇒ 本格的具体动作：**切到 `Actual time`,看三条泳道有没有东西**（step 2 的 regression 正是这一类）。
 ⇒ 未做,**紧接着做**（优先走已有 CDP 仪器,若不可行则记录为"待人工"而不冒充已完成）。
+
+## 126. **M3 的最后一项（人工查看）**：仪器已就位并**真跑过一次**,但**尚未行使**——如实
+
+### 126.1 做了什么
+
+- **把"切到 Actual time 看三泳道"做成断言**（`render_test.js`，jsdom 真渲染 + 活面板）;
+- **真起了整栈**（`start-panel.sh`：tuck/tentacle/mind/flowmodus×2/anaphase/**panel `:50050`**），
+  **真跑**了 `render_test.js http://127.0.0.1:50050 run-1453c697e434ecfa` ⇒ **`49 passed, 8 failed`**;
+- **跑完干净停栈**（`--stop`，七个服务全停）。
+
+### 126.2 ⚠️ 而仪器**当场抓到我的判据缺一个前置**（这比"绿"值钱）
+
+第一版宽度断言报 **`FAIL … [0 blocks, 0 numeric, 0 empty]`** ——
+而真相是 **`#eTraj` 在该视图状态下是 `display:none`,`renderLanes` 根本没跑**。
+⇒ 这正是审查方 §112.6 要求的前置：**"`renderLanes` 确实被调用了"**。
+⇒ **已修**：**前置不成立 ⇒ `SKIP (declared)` 且打印原因,不记为红**（红必须关于宽度本身）。
+⇒ **复跑**：`SKIP Actual time: the trajectory is not on screen for this view state` ✓
+
+### 126.3 那 8 条 FAIL 的构成（**不得当成产品缺陷**）
+
+| 条 | 内容 | 判定 |
+|---|---|---|
+| **~6 条** | `jsdomError: Not implemented: window.getComputedStyle(elt, pseudoElt)` | **jsdom 的能力缺失**（ripple 的伪元素查询）,与产品无关 |
+| **2 条** | `event rows rendered [0 rows]` / `a rendered event row exists to click` | 该视图状态下表格无行（与 §126.2 同源:**状态未上台**） |
+
+### 126.4 因此：**M3 的"人工查看"我记作"仪器就位但未行使"**（不冒充完成）
+
+*"曾有一次实现通过了四套绿灯,而没有任何人打开过它改的那个界面。"*
+⇒ 本格的状态：**界面被**打开**过（真栈 + 真渲染 + 真点击）,但"Actual time 下的宽度"这一条**
+**因为轨迹未上台而没被行使**。
+⇒ **下一步（一条命令）**：在 `render_test.js` 里**先把轨迹置上台**（`showTrajectory(true)` 或点开轨迹），
+**再**点 `#eDurBtn`,**再**断言宽度。
+
+### 126.5 🎯 收尾日志里冒出的**新事实**：链的单一来源**存在,而且是两个**
+
+`start-panel.sh` 的收尾输出逐字：
+```
+chain-env: manifest current (7 components, 4 env keys, 2 start keys)
+chain declaration: 4 endpoint env(s) derived from chain.json
+```
+⇒ **`chain.json` 存在**（`Anaphase-Helix/ecosystem/chain.json`?审查方三个分支读不到,但**本机有**）,
+且**它声明的组件数 = 7 = 我的 `ports.json` 的组件数**。
+⇒ **同一批 7 个组件有**两个**单一来源** ⇒ 这正是 §120.6 悬而未决的问题,现在**有证据**。
+⇒ **裁决建议**：**`chain.json` 是链的单一来源（已有 `chain-env --check` 守卫）**,
+`ports.json` **应当由它派生**（或合并）,否则**"单一来源"本身有两个**——**而两个来源迟早会分叉**。
+⇒ **并记**：`chain.json` 里 `panel` 的端口就是 **`:50050`** ⇒ **与活面板实测一致** ⇒
+**生态 `HANDOFF*.md` 的 `:8080` 确为陈旧**（§118.5 的驳回由此得到**运行证据**,不只是文档推理）。

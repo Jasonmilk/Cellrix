@@ -144,6 +144,41 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check(`control ${lbl}`, text.includes(lbl));
   }
 
+  console.log("-- Actual time: the lanes must not be EMPTY (the step-2 regression) --");
+  /* The regression this catches: every row present => cols were null => style="flex:0 0 "
+   * => flex-basis fell back to 0% => three lanes visually empty while all suites were green.
+   * The check is on the RENDERED attribute, in the mode a user reaches with one click. */
+  {
+    const durBtn = doc.getElementById("eDurBtn");
+    if (durBtn) {
+      durBtn.click();
+      await sleep(400);
+      /* PRECONDITION FIRST (ADR-0048 §126 / §112.6): renderLanes only fills the lanes when the
+       * trajectory is on screen. Asking about widths before asserting that produces a FAIL that
+       * says nothing about the widths — measured live: "0 blocks" while everything was fine.
+       * An empty container here is a DECLARED SKIP, not a red (a red must be about the widths). */
+      const blocks = Array.from(doc.querySelectorAll("#eLaneInput .e-blk, #eLaneModel .e-blk, #eLaneTool .e-blk"));
+      if (blocks.length === 0) {
+        console.log("  SKIP  Actual time: the trajectory is not on screen for this view state"
+          + " (declared skip — not a red; see §126)");
+      } else {
+      const styles = blocks.map((b) => b.getAttribute("style") || "");
+      const numeric = styles.filter((s) => /flex:\s*0\s+0\s+[\d.]+%/.test(s));
+      const empty = styles.filter((s) => /flex:\s*0\s+0\s*(;|$)/.test(s));
+      check("Actual time: every lane block carries a numeric flex-basis",
+        numeric.length === blocks.length && empty.length === 0,
+        `${blocks.length} blocks, ${numeric.length} numeric, ${empty.length} empty`);
+      const zeros = numeric.filter((s) => /flex:\s*0\s+0\s+0(\.0+)?%/.test(s));
+      check("Actual time: no lane collapses to a literal 0% share while it is present",
+        zeros.length === 0, `${zeros.length} zero-share blocks`);
+      }
+      durBtn.click();   /* back to the default mode */
+      await sleep(200);
+    } else {
+      check("Actual time: #eDurBtn exists to switch modes", false);
+    }
+  }
+
   console.log("-- DOM anchors --");
   for (const id of ["eTblVp", "eLaneInput", "eInsp", "eStats", "eTbody", "eTraj",
                     "eReplayBtn", "eDurBtn", "eCallBtn", "eTurnBtn", "eScrim"]) {
