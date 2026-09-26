@@ -363,8 +363,41 @@
    * re-spelling the letters. Adding a shape without teaching the consumers makes them RED,
    * which is the whole point of rule ⑮'s second half. */
   var SHAPES = { p: TS.P(0).k, ps: TS.Pstr('').k, n: TS.N().k, a: TS.A().k };
-  function isKnownShape(k) {
-    return k === SHAPES.p || k === SHAPES.ps || k === SHAPES.n || k === SHAPES.a;
+
+  /* THE CONSUMER x SHAPE MATRIX (ADR-0048 §139). A guard derived from SHAPES alone cannot do
+   * what a compiler does: growing SHAPES would silently WIDEN the gate (`isKnownShape` would
+   * return true for the new member and the row would fall through as "not present"). Rust's
+   * E0004 fails the build instead. The JS equivalent is this table: every (consumer, shape)
+   * pair must be classified as handle or refuse, and an UNCLASSIFIED pair is what a new shape
+   * produces — so growth is RED, not silent. */
+  var CONSUMERS = {
+    allocate:  { handle: ['p', 'n', 'a'], refuse: ['ps'] },
+    stateText: { handle: ['p', 'n', 'a'], refuse: ['ps'] }
+  };
+  var SHAPE_ORDER = [SHAPES.p, SHAPES.ps, SHAPES.n, SHAPES.a];
+
+  /* Returns the pairs a new shape would leave unclassified — empty for today's shape set.
+   * Pure, so the growth criterion can exercise it without patching any file. */
+  function unclassified(shapes) {
+    var list = shapes || SHAPE_ORDER;
+    var out = [];
+    Object.keys(CONSUMERS).forEach(function (c) {
+      var cls = CONSUMERS[c];
+      list.forEach(function (k) {
+        var inH = cls.handle.indexOf(k) > -1, inR = cls.refuse.indexOf(k) > -1;
+        if (inH && inR) { out.push(c + ':' + k + ':both'); }
+        else if (!inH && !inR) { out.push(c + ':' + k + ':unclassified'); }
+      });
+    });
+    return out;
+  }
+  function isKnownShape(k) { return SHAPE_ORDER.indexOf(k) > -1; }
+  function assertExhaustive() {
+    var bad = unclassified();
+    if (bad.length) {
+      throw new Error('consumer/shape matrix is not exhaustive: ' + bad.join(', ')
+        + ' — classify every pair (ADR-0048 §139).');
+    }
   }
   /* "IS A FINITE NUMBER" WITHOUT COERCION (ADR-0048 §116, rule ⑫). `isFinite(null)` is TRUE
    * and `null >= 0` is true, because Number(null) === 0 — a guard written that way cannot
@@ -419,6 +452,7 @@
   var RESERVE_CAP_PCT = 50;
 
   function allocate(rows, opts) {
+    assertExhaustive();   /* a new shape must be classified BEFORE it can reach here */
     /* EXHAUSTIVE, NOT A ONE-SHAPE WHITELIST (ADR-0048 §138). The first version refused only
      * `ps`, so a FIFTH shape reached the allocation as if it were absent — measured:
      * allocate([{k:'zz'}, P(5)]) gave cols=[0.5, 99.5], state='ok', reason=null, BIT-IDENTICAL
@@ -545,7 +579,8 @@
   }
 
   return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf,
-           SHAPES: SHAPES, isKnownShape: isKnownShape,
+           SHAPES: SHAPES, isKnownShape: isKnownShape, unclassified: unclassified,
+           assertExhaustive: assertExhaustive,
            stateText: stateText,
            allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
            TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,

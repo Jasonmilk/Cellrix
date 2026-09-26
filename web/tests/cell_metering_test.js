@@ -532,6 +532,31 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
       return r.state === 'ok' && r.cols.length === 2;
     }()));
 }());
+/* §139 — SIMULATING RUST'S E0004 (the theorems, made executable).
+ * Thm 2: a whitelist derived from the shape set does NOT by itself guarantee
+ *   ∀x, accept(x) => handled(x)   (the safety invariant S)
+ * because growing the set silently WIDENS the gate. Rust fails the BUILD; JS has no compiler,
+ * so the equivalent is a (consumer x shape) matrix where every pair must be classified:
+ * a new shape leaves pairs unclassified => RED. P1 probe / P3 growth / P4 matrix. */
+(function () {
+  const throws = (f) => { try { f(); return false; } catch (e) { return true; } };
+  ok('§139 P4: the consumer/shape matrix is exhaustive today (no unclassified pair)',
+    M.unclassified().length === 0);
+  ok('§139 P3: GROWING the shape set leaves pairs unclassified — growth is RED, not silent',
+    (function () {
+      const grown = ['p', 'ps', 'n', 'a', 'zz'];
+      const u = M.unclassified(grown);
+      return u.length >= 2 && u.join(',').indexOf('zz') > -1;
+    }()));
+  ok('§139 P1: an unknown shape still throws at every consumer (probe)',
+    throws(function () { M.allocate([{ state: { k: 'zz' } }], { gridCols: 200, mode: 'value' }); })
+    && throws(function () { M.stateText({ k: 'zz' }); }));
+  ok('§139: assertExhaustive passes today AND the same function refuses a grown set',
+    (function () {
+      M.assertExhaustive();
+      return M.unclassified(['p', 'ps', 'n', 'a', 'W']).length > 0;
+    }()));
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
