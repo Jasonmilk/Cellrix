@@ -83,6 +83,14 @@
       }
       if (!exists) { continue; }                 /* FIRST EXISTING KEY WINS */
       if (cur === null) { return TS.N(); }        /* explicit null => unmeasured  */
+      /* DOMAIN DECLARATION (ADR-0048 §134): tokens / durations / chars are NON-NEGATIVE by
+       * definition, and the lower bound `>=` DEPENDS on it: S + u >= S requires u >= 0.
+       * A negative here is therefore NOT a measurement of this quantity — it is
+       * INAPPLICABLE, which keeps the enclosure sound (the applicable measured sum is a
+       * true lower bound) and stays VISIBLE as n/a instead of silently poisoning the sum.
+       * Measured counterexample this fixes: [-5, null, 7] used to print "2 >=", a FALSE
+       * statement, because the true sum is 2 + u for an arbitrary real u. */
+      if (typeof cur === 'number' && cur < 0) { return TS.A(); }
       return TS.P(cur);                           /* incl. 0                      */
     }
     return TS.A();                                /* nothing recorded             */

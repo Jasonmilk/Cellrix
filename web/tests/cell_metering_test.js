@@ -470,6 +470,23 @@ ok('§118: state==="ok" ⟺ the columns are usable (Σ == 100); reason explains 
   ok('§124: NONE of the four cases invents a value (no partner fallback anywhere)',
     [drive, absent, unmeas, none].every(function (r) { return r.k !== 'p' || r.v === 'drive'; }));
 }());
+/* §134 — THE LOWER BOUND'S PREMISE IS NON-NEGATIVITY, SO IT IS DECLARED AND GUARDED.
+ * S + u >= S  <=>  u >= 0   (max is unconditional by monotonicity). Tokens / durations /
+ * chars are non-negative BY DEFINITION, so a negative is not a measurement of the quantity:
+ * it is inapplicable. Measured counterexample this fixes: [-5, null, 7] printed "2 >=" — a
+ * FALSE statement, since the true sum is 2 + u for an arbitrary real u. */
+(function () {
+  const neg = M.project([{ type:'assistant/usage', data:{completion_tokens:-5}, period_id:'P' },
+                         { type:'assistant/usage', data:{completion_tokens:null}, period_id:'P' },
+                         { type:'assistant/usage', data:{completion_tokens:7}, period_id:'P' }]);
+  ok('§134: a negative is INAPPLICABLE, so it cannot enter the sum (no false bound)',
+    neg.tok.k === 'p' && neg.tok.v === 7);
+  ok('§134: the remaining lower bound is SOUND (applicable measured sum, unknown >= 0)',
+    String(M.foldedCell(neg)).indexOf('7') === 0 && String(M.foldedCell(neg)).indexOf('≥') > -1);
+  const negOnly = M.project([{ type:'assistant/usage', data:{completion_tokens:-5}, period_id:'P' }]);
+  ok('§134: a batch of only negatives has nothing measured (no invented 0, no invented bound)',
+    negOnly.tok.k !== 'p' || negOnly.tok.v !== -5);
+}());
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',
