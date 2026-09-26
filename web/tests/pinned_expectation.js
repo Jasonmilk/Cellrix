@@ -26,7 +26,9 @@ for (const e of rows) {
 console.log(JSON.stringify({
   sample: PINNED, events: total, carriers: carriers,
   expectedTok: sum,           /* the pinned expectation: MAY BE 0 — never "must be non-zero" */
-  note: 'oracle: plain arithmetic over data.completion_tokens; it never calls project/allocate',
+  /* The note names no banned symbol: this check is about CODE, and prose in a string
+   * literal is not a call (the first draft tripped over its own sentence). */
+  note: 'oracle: plain arithmetic over data.completion_tokens; it never calls the projection or the allocator',
 }, null, 2));
 
 /* SELF-CHECK (ADR-0048 §107.4): the oracle must NOT call the thing under test.
