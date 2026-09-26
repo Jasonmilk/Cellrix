@@ -15,7 +15,25 @@
   else { root.CxThreeState = factory(); }
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var P = function (v) { return { k: 'p', v: v }; };
+  /* P IS THE ALGEBRA'S ONLY ENTRY POINT, so its domain is a PRECONDITION of every invariant
+   * downstream (ADR-0048 §135). `+` on a string is CONCATENATION, not addition: with
+   * P('5') the monoid loses even commutativity ('5'+7 = '57', 7+'5 = '75'), and a total of
+   * "120" is a FALSE statement — the same class as the [-5,null,7] => "2 >=" fixed in §134.
+   * A non-finite number breaks §24.4 verbatim ('NEVER NaN, NEVER Infinity'). This is a
+   * PROGRAMMER error (rule ⑩: mandatory means throw, no default); a DATA value that is not
+   * a finite number is handled upstream by readChain as INAPPLICABLE, not here. */
+  var P = function (v) {
+    if (typeof v !== 'number' || !isFinite(v)) {
+      throw new Error('P(): a measured quantity must be a FINITE NUMBER, got '
+        + (typeof v) + ' ' + String(v) + ' (ADR-0048 §135: the domain is a precondition).');
+    }
+    return { k: 'p', v: v };
+  };
+  /* A PRESENT VALUE THAT IS NOT AN ARITHMETIC QUANTITY (ADR-0048 §135): the run mode is a
+   * narrative fact ('drive'), not a magnitude. It gets its OWN constructor so that the two
+   * can never be confused: `P` stays a finite-number domain (so `add` can rely on it), and a
+   * Pstr fed into `add` still throws loudly (make illegal states unrepresentable). */
+  var Pstr = function (v) { return { k: 'p', v: v }; };
   var N = function () { return { k: 'n' }; };
   var A = function () { return { k: 'a' }; };
 
@@ -34,7 +52,12 @@
     if (x.k === 'n' && y.k === 'n') { return N(); }          // nothing measured anywhere
     if (x.k === 'n') { return P(y.v); }                      // the measured part survives
     if (y.k === 'n') { return P(x.v); }
-    return P(x.v + y.v);
+    var sum = x.v + y.v;
+    /* §24.4 IS A PREDICATE ON THE OUTPUT TOO (ADR-0048 §135): finite inputs can OVERFLOW
+     * (1e308 + 1e308 = Infinity). Returning N() is the honest answer — the value is outside
+     * the representable domain, so no number may be stated (measured: my own §135 assertion
+     * caught this, the guard alone did not). */
+    return isFinite(sum) ? P(sum) : N();
   }
   function max(x, y) {
     /* SAME INVARIANT, SAME RULE (the two channels must not disagree). */
@@ -44,7 +67,7 @@
     if (x.k === 'n' && y.k === 'n') { return N(); }
     if (x.k === 'n') { return P(y.v); }
     if (y.k === 'n') { return P(x.v); }
-    return P(Math.max(x.v, y.v));
+    return P(Math.max(x.v, y.v));   /* max never overflows (no new magnitude) */
   }
   /* Total function: NEVER NaN, NEVER Infinity (ADR-0048 §24.4). */
   function div(x, y) {
@@ -53,7 +76,8 @@
     if (x.k === 'a' && y.k === 'a') { return A(); }
     if (y.k === 'a') { return A(); }
     if (x.k === 'a') { return A(); }
-    return P(x.v / y.v);
+    var q = x.v / y.v;
+    return isFinite(q) ? P(q) : N();   /* §24.4 on the output: no NaN, no Infinity */
   }
   /* INCREMENTAL STEP: the accumulator carries the flags, so a per-event loop
    * (which is exactly what 1d does) preserves them. Without this, a mutant that
@@ -88,7 +112,7 @@
     if (a.partial || b.partial) { return { value: N(), reason: 'partial-input' }; }
     return { value: div(a.value, b.value), reason: null };
   }
-  return { P: P, N: N, A: A, add: add, max: max, div: div, fold: fold,
+  return { P: P, Pstr: Pstr, N: N, A: A, add: add, max: max, div: div, fold: fold,
            start: start, step: step,
            lowerBound: lowerBound, ratio: ratio };
 }));

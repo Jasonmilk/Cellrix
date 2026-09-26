@@ -101,4 +101,28 @@ ok('partial requires BOTH: present-only is NOT partial',
 ok('ratio degrades to null when any input is partial',
   TS.ratio(TS.fold([P(120), A()]), TS.fold([P(800)])).value.k === 'n');
 console.log(bad === 0 ? 'OK — three-state algebra holds' : 'FAILED — ' + bad + ' assertion(s)');
+/* §135 — P() IS THE ALGEBRA'S ONLY ENTRY POINT, SO ITS DOMAIN IS A PRECONDITION.
+ * `+` on a string is CONCATENATION: with P('5'), add(P('5'),P(7)) gives '57' (true sum 12) and
+ * even commutativity fails ('5'+7 vs 7+'5'). A non-finite value breaks §24.4 verbatim
+ * ("NEVER NaN, NEVER Infinity"). Both were reachable because the domain was never asserted —
+ * the same method as §134 ("make the premise an assertion"), applied one level UPSTREAM. */
+(function () {
+  const throws = (f) => { try { f(); return false; } catch (e) { return true; } };
+  ok('§135: P() rejects a string (a string is not a measurement — never coerced)',
+    throws(() => P('5')));
+  ok('§135: P() rejects NaN (§24.4 verbatim: NEVER NaN)',
+    throws(() => P(NaN)));
+  ok('§135: P() rejects Infinity (§24.4 verbatim: NEVER Infinity)',
+    throws(() => P(Infinity)));
+  ok('§135: P() accepts 0 (0 is a measurement); non-negativity lives in the DATA reader,',
+    P(0).v === 0);
+  /* The algebra's outputs stay finite for finite inputs: the closure property, asserted. */
+  const combos = [[P(5), P(7)], [P(0), P(0)], [P(1e308), P(1e308)]];
+  ok('§135: add/max/div stay FINITE (or non-present) for finite inputs',
+    combos.every(function (c) {
+      const a = TS.add(c[0], c[1]), m = TS.max(c[0], c[1]), d = TS.div(c[0], c[1]);
+      return [a, m, d].every(function (r) { return r.k !== 'p' || isFinite(r.v); });
+    }));
+}());
+
 process.exit(bad === 0 ? 0 : 1);

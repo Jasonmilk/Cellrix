@@ -71,7 +71,7 @@
    * N (unmeasured), never a default: defaulting to 'partner' would be a configured value
    * standing in for a measured one — the exact fault this ADR exists to remove. */
   var MODE_PATHS = ['/data/mode', '/mode'];
-  function readChain(e, paths) {
+  function readChain(e, paths, numeric) {
     for (var i = 0; i < paths.length; i++) {
       var seg = paths[i].slice(1).split('/');
       var cur = e, exists = true;
@@ -90,13 +90,21 @@
        * true lower bound) and stays VISIBLE as n/a instead of silently poisoning the sum.
        * Measured counterexample this fixes: [-5, null, 7] used to print "2 >=", a FALSE
        * statement, because the true sum is 2 + u for an arbitrary real u. */
-      if (typeof cur === 'number' && cur < 0) { return TS.A(); }
-      return TS.P(cur);                           /* incl. 0                      */
+      /* NUMERIC DIMENSIONS ONLY (the mode reader shares this function and reads a STRING):
+       * data that is not a finite number, or is negative, is INAPPLICABLE for a non-negative
+       * quantity — visible as n/a, never coerced (a string is not a measurement; turning '5'
+       * into 5 would be assuming for the producer, §134/§135). The `numeric` flag is what keeps
+       * the guard on the dimensions it is true for — my first version put it in the shared path
+       * and the mode reader immediately broke, which the gate caught. */
+      if (numeric && (typeof cur !== 'number' || !isFinite(cur) || cur < 0)) { return TS.A(); }
+      /* NON-NUMERIC READS (the run mode) use the narrative constructor: only the NUMERIC
+       * dimensions may build a magnitude (ADR-0048 §135). */
+      return numeric ? TS.P(cur) : TS.Pstr(cur);   /* incl. 0 for numbers          */
     }
     return TS.A();                                /* nothing recorded             */
   }
-  function tokOf(e) { return readChain(e, TOK_PATHS); }
-  function durOf(e) { return readChain(e, DUR_PATHS); }
+  function tokOf(e) { return readChain(e, TOK_PATHS, true); }
+  function durOf(e) { return readChain(e, DUR_PATHS, true); }
   function modeOf(e) { return readChain(e, MODE_PATHS); }
   /* INPUT SCOPE (ADR-0048 §41/§43): this cell aggregates ONE period.
    * Missing period_id normalises to "" (PromQL: an undefined label matches the
