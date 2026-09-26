@@ -6,7 +6,9 @@
  */
 const fs = require('fs');
 const path = require('path');
-const EV = '/Users/jason/Developer/Jasonmilk/.helix/events';
+/* declared input (ADR-0048 §130) — no host absolute literal */
+const EV = process.env.VALUE_CORPUS
+  || require('path').join(__dirname, '..', '..', '..', '.helix', 'events');
 const PINNED = 'run-1453c697e434ecfa-p006ab547d0000002.events.jsonl';
 
 const rows = fs.readFileSync(path.join(EV, PINNED), 'utf8').trim().split('\n')

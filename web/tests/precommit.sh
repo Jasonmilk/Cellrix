@@ -4,8 +4,9 @@
 # traced to a hand-run order. This script IS the order: syntax -> gate -> RED PATH ->
 # whole gate. Run it before every commit; if any step fails, the commit does not happen.
 set -u
+WS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$(dirname "$0")"
-export NODE_PATH="${NODE_PATH:-/Users/jason/Developer/Jasonmilk/.test-node/node_modules}"
+export NODE_PATH="${NODE_PATH:-${DSH_TEST_NODE:-"$WS/.test-node/node_modules"}}"
 
 fail=0
 step() { printf '\n== %s\n' "$1"; }

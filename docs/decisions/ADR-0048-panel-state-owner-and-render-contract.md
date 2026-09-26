@@ -5964,3 +5964,30 @@ suite_registry_test.js ⇒ OK — the suite registry covers every suite
 
 ⇒ 下一个新套件**不可能再静默缺席**（覆盖关系 + 变异探针 + 作用域非空三条同时在）。
 ⇒ 这正是 `run_all.js` 应有的形态：**不是"我登记了所以它在跑"，而是"没登记就红"。**
+## 130. 主机绝对路径：**从"我改了这一处"变成"这一类不可能再有"**
+
+### 130.1 三处仍在（审查方 §4 实测）+ 已修
+
+| 文件 | 原状 | 改为 |
+|---|---|---|
+| `precommit.sh:8` | `NODE_PATH="${NODE_PATH:-/Users/jason/Developer/Jasonmilk/.test-node/node_modules}"` | **`${DSH_TEST_NODE:-"$WS/.test-node/node_modules"}`**（`WS` 由脚本自身位置推导） |
+| `cell_before.js:23` | `const ROOT = '/Users/jason/Developer/Jasonmilk';` | **`process.env.PORTS_ROOT \|\| path.join(__dirname, '..','..','..')`** |
+| `pinned_expectation.js:9` | `const EV = '/Users/.../.helix/events';` | **`process.env.VALUE_CORPUS \|\| path.join(__dirname, …, '.helix','events')`** |
+
+**实测三个文件仍可用**：`pinned_expectation.js ⇒ expectedTok 12` + 独立性自检 ok;`cell_before.js ⇒ exit 0`;`precommit ⇒ PRECOMMIT OK`。
+
+### 130.2 并加**类级判据** `no_host_paths_test.js`（已进网）
+
+```
+scope: 扫描 >= 20 个文件（实测 52）
+no host-absolute path literal in any test/tool file      ← 剥注释后扫 /Users/ 与 /home/<user>
+MUTATION PROBE: 塞一个字面量必被检测（**探针自身用拼装,不作字面量**）
+```
+**变异实测**：把 `cell_before.js` 改回绝对字面量 ⇒ 判据红、`exit=1` ✓
+
+### 130.3 ⚠️ **第三次自指**（如实记）
+
+探针初版把 `"/Users/x/y"` **写成字面量** ⇒ 判据**扫到了自己**（`no_host_paths_test.js:32`）⇒ 恒红。
+⇒ 与预言机那次（`note` 字符串）、元断言那次（正则字面量）**同一族**。
+⇒ 修：**用拼装构造**。⇒ **"检查被自己的文字绊倒"已经出现三次** ⇒ 已具名:
+**凡"扫描文本"的判据,必须把自己构造目标串的方式排除在扫描面之外。**

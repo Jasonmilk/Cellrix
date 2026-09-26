@@ -20,7 +20,9 @@
  */
 const fs = require('fs');
 const path = require('path');
-const ROOT = '/Users/jason/Developer/Jasonmilk';
+/* A host-absolute path is a DECLARED INPUT, never a literal (ADR-0048 §130): the workspace
+ * root is derived from this file's own location, and PORTS_ROOT may override it. */
+const ROOT = process.env.PORTS_ROOT || path.join(__dirname, '..', '..', '..');
 const EV = path.join(ROOT, '.helix', 'events');
 const PIN = 'run-1453c697e434ecfa-p006ab547d0000002.events.jsonl';
 
