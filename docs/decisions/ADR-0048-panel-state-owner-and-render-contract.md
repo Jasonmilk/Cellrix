@@ -5213,3 +5213,76 @@ M3      本格 ASSERTED → 0 + 在场合绿 + **人工查看并操作过**
 ```
 ⇒ **本笔是跨仓变更** ⇒ 按防腐化铁律 3(**变更先 ADR**),**先落 `Helix-Mind` 侧 ADR**,
 再改代码;**不在 Cellrix 仓里代替它做决定。**
+
+## 116. **step 2 的 regression**（全 present ⇒ 泳道全空）+ 规则⑫（数值守卫不得强制转换）
+
+### 116.1 审查方找到的洞（**我的断言没抓到,是审查抓到的**）
+
+```
+allocate([P(5), P(3), P(2)], {gridCols:200, mode:'value'})
+  → state='ok'  cols=[null, null, null]
+```
+⇒ `nUnknown === 0` 分支返回 `cols: rows.map(() => null)` ⇒ 视图 `typeof null !== 'number'` ⇒ `wPct = ''`
+⇒ `style="flex:0 0 "` ⇒ **`flex-basis` 取 `0%`** ⇒ **切到 "Actual time" 且该 period 内每个事件都有 `dur` 时,三条泳道整体变空。**
+⇒ **这是 step 2 自己带进来的 regression**（step 2 之前 `wPct` 来自 `raw`,任何输入都有非零宽度）。
+
+### 116.2 为什么**没有一条断言抓到它**（本轮最该记的机理）
+
+```js
+colPctOf([...]).every(function (c) { return isFinite(c) && c >= 0; })
+```
+⇒ **`isFinite(null) === true`**（`Number(null) === 0`）且 **`null >= 0` 为真** ⇒ **这条断言在 `[null,null]` 上恒绿。**
+⇒ **三态纪律防住了 `||` 吞掉三态,没有防住 `isFinite` 把 `null` 读成 `0`。**
+
+### 116.3 规则⑫（新增,可检查）
+
+> **数值守卫不得使用会强制转换的写法。**
+> `isFinite(x)` / `x >= 0` / `x || 0` 对 `null` 全部为真 / 为 0。
+> **判"是数"只有一种写法**：`typeof x === 'number' && isFinite(x)`——**且该守卫必须过变异注入**。
+
+**落地**：投影导出**共享谓词** `isFiniteNumber(x)`（`cell_metering.js`），
+判据直接断言它**拒绝 `isFinite` 会接受的那些值**：
+```js
+isFiniteNumber(0) === true && isFiniteNumber(50) === true
+&& isFiniteNumber(null) === false && isFiniteNumber(undefined) === false
+&& isFiniteNumber(NaN) === false && isFiniteNumber('5') === false
+&& isFiniteNumber(true) === false && isFiniteNumber(Infinity) === false
+```
+
+⚠️ **并记一条方法**：**只把测试里的守卫改成 `typeof` 是等价变异**（2-fix-a 修好后 `cols` 再也不是 `null`
+⇒ 该守卫**无从区分** ⇒ 变异 B 起初 `exit=0`）。
+⇒ **真正给它牙齿的是"谓词 + 对可强制转换值的拒绝断言"**——
+⇒ **规则④的加强版**：不是"守卫要能红",而是"**守卫必须在它防的那种输入上被测**"。
+
+### 116.4 修复（两笔,各自能红）
+
+| 笔 | 内容 | 变异 |
+|---|---|---|
+| **2-fix-a** | 全 `present` 分支**按声明量分满 `100`**;`sumAll === 0` ⇒ **显式声明的等分**（`reason:'all-zero-declared'`),**不用 `\|\| 1` 兜**;`rows.length === 0` ⇒ `cols: []` | 改回 `null` ⇒ **两条断言红** ✓ |
+| **2-fix-b** | 守卫改用共享谓词 `M.isFiniteNumber(c)`;谓词体换成 `isFinite` ⇒ **拒绝断言红** ✓ | ✓ |
+
+**实测**：基线 `OK — cell projection holds (golden master)`;
+变异 A `exit=1`（两条红）;变异 B' `FAIL §116: isFiniteNumber REJECTS the values isFinite() would coerce`,`exit=1`;
+`precommit ⇒ PRECOMMIT OK`。
+
+### 116.5 审查方另三条（**记账,不在本笔做**——一次只动一处）
+
+| # | 发现 | 处置 |
+|---|---|---|
+| **§2** | step 2 之后 `maxDur/maxTok/raw/PEND_MIN/sum` **全是死代码**（无消费者）,但门仍在数它们（`ASSERTED 14`,红得对） | **4a 的对照表加一列：「该项当前是否仍有消费者」**;无消费者 ⇒ **直接删除**,不是"迁移到 `allocate`"（它在那里已有对应物） |
+| **§3** | `project()` **每帧被调 `N+1` 次**（`:140` 一次 + `cellBarAt` 每行一次）⇒ 同一帧 `N+1` 次派生 ⇒ **不同行可能读到不同投影（跨行不自洽）** | **step 3 顺手**：`cellBarAt` 收 `bars` 入参;判据 = "一次渲染内 `project` ≤ 1 次"（计数探针）;**变异：改回内部自调 ⇒ 红** |
+| **§4** | `gridCols: 200` **硬编码在视图调用点**（违反铁律 7 与我自己的 §4.5「须来自实测」） | **与 A0 同批**：**端点不许硬编码**与**标尺不许硬编码**是通则⑩的左右两半 |
+
+### 116.6 修订后的次序（`2-fix` 插在最前——它是 regression,不是准备）
+
+```
+2-fix-a / 2-fix-b   ✅ 本笔
+A0   端口单一来源 + 缺失即抛（**分两类**：监听缺失⇒抛;出向缺失⇒抛或显式降级为 absent）
+     + scheme 一致 + 跨仓断言（**作用域非空 ≥5 且配变异**）
+A1   R1：ADR-0026 D2 词表补计量事件
+A2   R2：Drive/Partner/Survive 显式状态面
+step 3  LANE_HTML → LANE_CELLS + 合取判据 + 变异;**并顺手 §116.5 的 §3/§4**
+4a/4b   对照表（**加"是否仍有消费者"列**）→ 表满才删
+b1b-1   tok 出口:值 == 12（允许 0/n-a）      b1b-2  真实数据逐格（A1+A2 之后）
+M3      本格 ASSERTED → 0 + 在场合绿 + **人工查看并操作过**（"切到 Actual time 看一眼"）
+```

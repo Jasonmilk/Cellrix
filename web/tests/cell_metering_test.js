@@ -161,7 +161,7 @@ ok('contract: an event carrying completion_tokens MUST read as present',
     colPctOf([{state:M.A()}]).every(function (c) { return isFinite(c); }));
   ok('bar width is never NaN or Infinity, for any combination',
     [[M.A(), M.A()], [M.A(), M.P(5)], [M.P(50), M.A()], [M.P(50), M.P(5)]].every(function (pair) {
-      return colPctOf([{state:M.P(5)}, {state:pair[1]}]).every(function (c) { return isFinite(c) && c >= 0; });
+      return colPctOf([{state:M.P(5)}, {state:pair[1]}]).every(function (c) { return M.isFiniteNumber(c) && c >= 0; });
     }));
 }());
 /* §50.1 — the view must NOT pass an index: project returns bars itself, so a
@@ -275,7 +275,7 @@ ok('bar widths are FINAL PIXELS inside the declared range (unit is in the name)'
     && r.bars.filter(function (b) { return b.src === 'n/a'; }).length === 1);
   ok('MEASURED: the longest duration bar reaches W_FULL exactly (blocks equal shrink)',
     tickOf(statesOf(r.bars)) <= M.cellPctOf(200)
-      && colPctOf(statesOf(r.bars)).every(function (c) { return isFinite(c) && c >= 0; }));
+      && colPctOf(statesOf(r.bars)).every(function (c) { return M.isFiniteNumber(c) && c >= 0; }));
   ok('SHAPE: every bar carries exactly the declared keys (a stray .w would read undefined)',
     r.bars.every(function (b) {
       const k = Object.keys(b).sort().join(',');
@@ -376,6 +376,33 @@ ok('META: the coexistence assertion above is present in this file',
     (function () { try { M.allocate(rows); return false; }
                    catch (e) { return /must be DECLARED/.test(e.message); } }()));
 }());
+/* §116 — NUMERIC GUARDS MUST NOT COERCE. `isFinite(null) === true` and `null >= 0` is
+ * true (Number(null) === 0), so the old guard was GREEN on an all-null array while every
+ * lane rendered zero-width. The three-state discipline stopped `||`; this stops `isFinite`. */
+(function () {
+  const allPresent = M.allocate([{state:M.P(5)},{state:M.P(3)},{state:M.P(2)}],
+                                { gridCols: 200, mode: 'value' });
+  ok('§116: all-present allocates the WHOLE width by the declared quantity (no null)',
+    allPresent.state === 'ok' && allPresent.cols.every(function (c) { return typeof c === 'number'; })
+    && Math.abs(allPresent.cols.reduce(function (x, y) { return x + y; }, 0) - 100) <= 1e-9);
+  ok('§116: all-present keys the split to the declared ratio (5:3:2)',
+    Math.abs(allPresent.cols[0] - 50) <= 1e-9 && Math.abs(allPresent.cols[1] - 30) <= 1e-9
+    && Math.abs(allPresent.cols[2] - 20) <= 1e-9);
+  ok('§116: all-present-and-all-zero is a DECLARED equal split, not a || 1 fallback',
+    (function () {
+      const r = M.allocate([{state:M.P(0)},{state:M.P(0)}], { gridCols: 200, mode: 'value' });
+      return r.state === 'ok' && r.reason === 'all-zero-declared'
+        && Math.abs(r.cols[0] - 50) <= 1e-9 && Math.abs(r.cols[1] - 50) <= 1e-9;
+    }()));
+}());
+/* §116 rule ⑫ — the predicate itself is asserted on the values that COERCION would accept:
+ * this is the assertion that distinguishes `isFinite(x)` from `typeof x === 'number' &&
+ * isFinite(x)`, and it is why the guard is no longer an equivalent mutant. */
+ok('§116: isFiniteNumber REJECTS the values isFinite() would coerce',
+  M.isFiniteNumber(0) === true && M.isFiniteNumber(50) === true
+  && M.isFiniteNumber(null) === false && M.isFiniteNumber(undefined) === false
+  && M.isFiniteNumber(NaN) === false && M.isFiniteNumber('5') === false
+  && M.isFiniteNumber(true) === false && M.isFiniteNumber(Infinity) === false);
 ok('ratio with a partial input degrades to explicit unknown',
     M.ratioOf(M.project([{type:'assistant/usage', data:{completion_tokens:120}}, A]), M.project([{type:'assistant/usage', data:{completion_tokens:800}}])).value.k === 'n');
   ok('order independence of the projection',

@@ -323,6 +323,11 @@
    * silently showed "unmeasured" forever. Callers ask; they do not spell state.
    * (Zero-hard-coding: the state vocabulary lives HERE, once.) */
   function isPresent(st) { return !!st && st.k === TS.P(0).k; }
+  /* "IS A FINITE NUMBER" WITHOUT COERCION (ADR-0048 §116, rule ⑫). `isFinite(null)` is TRUE
+   * and `null >= 0` is true, because Number(null) === 0 — a guard written that way cannot
+   * see a null in a numeric column. This predicate is the ONE way to ask, and it is tested
+   * on null / undefined / NaN / string / boolean so the difference is observable. */
+  function isFiniteNumber(x) { return typeof x === 'number' && isFinite(x); }
   /* A STATE BECOMES TEXT HERE, ONCE (ADR-0048 §80.1). The view used to pass a STATE
    * into a number formatter, which is the third instance of the same family: the
    * interface changed shape and the CONSUMER did not (barWidthsFor crashed; `k === 'p'`
@@ -411,7 +416,25 @@
                cols: rows.map(function () { return CELL_PCT; }), tickPct: 0, gridCols: gridCols };
     }
     if (nUnknown === 0) {
-      return { state: 'ok', reason: null, cols: rows.map(function () { return null; }), tickPct: 0,
+      /* ALL PRESENT — ALLOCATE THE WHOLE WIDTH BY THE DECLARED QUANTITY, NEVER `null`
+       * (ADR-0048 §116). `null` in a numeric context IS 0, so the previous shape made every
+       * lane zero-width while a `isFinite(c) && c >= 0` guard stayed green
+       * (Number(null) === 0). That was a REGRESSION introduced by step 2 and caught by
+       * review, not by the assertion — the guard, not the code, was the weak link.
+       * If every declared quantity is zero the split is EQUAL: an explicitly declared
+       * state (`all-zero-declared`), never a `|| 1` fallback (the additive-identity trap). */
+      if (rows.length === 0) {
+        return { state: 'ok', reason: 'all-zero-declared', cols: [], tickPct: 0, gridCols: gridCols };
+      }
+      var sumAll = 0, k;
+      for (k = 0; k < rows.length; k++) { sumAll += rows[k].state.v; }
+      if (sumAll === 0) {
+        return { state: 'ok', reason: 'all-zero-declared',
+                 cols: rows.map(function () { return 100 / rows.length; }), tickPct: 0,
+                 gridCols: gridCols };
+      }
+      return { state: 'ok', reason: null,
+               cols: rows.map(function (r) { return (r.state.v / sumAll) * 100; }), tickPct: 0,
                gridCols: gridCols };
     }
     var minPresent = Math.min.apply(null, present), sumPresent = 0;
@@ -452,7 +475,8 @@
              gridCols: gridCols };
   }
 
-  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, stateText: stateText,
+  return { P: TS.P, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber,
+           stateText: stateText,
            allocate: allocate, cellPctOf: cellPctOf, GRID_COLS_DEFAULT: GRID_COLS_DEFAULT,
            TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
            foldedCell: foldedCell,
