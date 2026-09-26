@@ -5286,3 +5286,55 @@ step 3  LANE_HTML → LANE_CELLS + 合取判据 + 变异;**并顺手 §116.5 的
 b1b-1   tok 出口:值 == 12（允许 0/n-a）      b1b-2  真实数据逐格（A1+A2 之后）
 M3      本格 ASSERTED → 0 + 在场合绿 + **人工查看并操作过**（"切到 Actual time 看一眼"）
 ```
+
+## 117. `A0` 落地：**端口表单一来源** + 撞车已消除 + 跨仓断言（自带变异）
+
+### 117.1 单一来源
+
+**`Helix-Mind/docs/helixECO/ports.json`** —— 每个组件的 **端口 / 协议 / 必填类别** 只在这里声明:
+
+| 组件 | 端口 | 协议 | 必填类别 |
+|---|---|---|---|
+| `anaphase` | 50061 | http | listen |
+| `mind` | **50052** | http | listen |
+| `tentacle` | 50051 | **grpc** | listen |
+| `tuck` | 60052 | http | listen |
+| `flowmodus-serve` | 60053 | http | listen |
+| `flowmodus-reason` | 60054 | **grpc** | listen |
+| `panel` | 50050 | http | listen |
+
+**非生态端口**单列:`llama-server:8080` · `mock-llm:59099`（**避免它们被误当生态端口**）。
+
+**两类"必填"分开声明**（审查方 §5.1-1）：**监听地址缺失 ⇒ 抛（fail-closed）**;
+**出向端点缺失 ⇒ 抛 _或_ 显式降级为 `absent` 并在事件流留一条声明** ——
+否则 A0 会把"没配 Mind"从**降级**变成**崩溃**。
+
+### 117.2 撞车已消除
+
+`Helix-Mind/crates/helix-mind-core/src/config.rs` 的原默认 **`50051` 改为 `50052`**（对齐表）,
+并在注释里写明:**旧默认是 Tentacle 的端口,出厂即与另一组件撞车,且没有任何测试守着它**
+——生态此前能跑通**只因有人手改了 `config.toml`**。
+
+### 117.3 跨仓断言（`Cellrix/web/tests/port_table_test.js`,**自带变异**）
+
+五条,每条都能红:
+
+```
+① scope: 表声明 ≥5 个组件            ← **防"裸 grep"**:扫不到 = 0 命中 = 绿,所以先断言作用域非空
+② uniqueness: 两两不等
+③ mind: default == 表
+④ mind: 默认不与任何组件撞车
+⑤ scheme: 每个组件都声明**真实协议**（防"命名谎言"）
+```
+**基线**:全部 `ok`,`OK — the port table is single-source and collision-free`。
+**变异**:把旧 `50051` 塞回一份副本 ⇒ **②③两条红**（含 `collides with tentacle`）⇒ `exit=1` ✓
+
+### 117.4 未做 / 记账
+
+- **未 wire 进默认门**:该断言**依赖兄弟仓存在** ⇒ 进默认门会让"只有 Cellrix 的机器"上恒红。
+  ⇒ 保持**独立入口**;若要进网,须加 **skip-if-absent** 并在输出里**声明跳过**（不得静默跳过）。
+- **`gridCols: 200` 去字面量**（§116.5-§4）：与本笔同源（**端点与标尺都不许硬编码**）,
+  但**改动面不同**（视图）⇒ **随 step 3**。
+- **`scheme` 命名谎言的修复面**（`tentacle_endpoint = "http://…"` 实为 gRPC）：
+  表里已声明 `tentacle: grpc`;改**端点字符串**属 Anaphase/Helix-Mind 的配置层 ⇒ 另立一笔。
+- **`Helix-Mind` 仓的提交**:本地已提交（`config.rs` + `ports.json`）;**未推送**——跨仓推送不在你批准的范围里。
