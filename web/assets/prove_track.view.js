@@ -366,6 +366,15 @@
     var lanes = {}, evs = [];
     LANES.forEach(function (k) { lanes[k] = []; });
     S.session.forEach(function (e) { if (e.kind === 'ev') evs.push(e); });
+    /* STEP 2 (ADR-0048 §113): THE LENGTH CHANNEL'S QUANTITY IS DECLARED HERE, ONCE.
+     * `rows` is built once and only `mode` differs — two branches each assembling their own
+     * rows would be "one cell, two sources". The declared quantity is DURATION (§110.1);
+     * the mode comes from the view's own switch, so allocate never guesses. */
+    var laneRows = evs.map(function (e) {
+      return { state: window.CxCellMetering.durOf(e) };
+    });
+    var laneMode = (S.durMode === 'actual') ? 'value' : 'equal';
+    var laneAlloc = window.CxCellMetering.allocate(laneRows, { gridCols: 200, mode: laneMode });
     var maxDur = 0, maxTok = 0;
     evs.forEach(function (e) { if (e.dur > maxDur) maxDur = e.dur; if (e.tok > maxTok) maxTok = e.tok; });
     var raw = evs.map(function (e) {
@@ -387,7 +396,16 @@
     }
     var sum = raw.reduce(function (a, b) { return a + b; }, 0) || 1;
     evs.forEach(function (e, idx) {
-      var wPct = (raw[idx] / sum * 100).toFixed(4) + '%';
+      /* THE WIDTH IS THE PROJECTION'S COLUMN — no arithmetic, no rounding here. A row whose
+       * state is not present carries that state in data-* so `absent` and `present(0)` are
+       * DISTINGUISHABLE IN THE DOM (ADR-0048 §112.4); it does not encode the state as 0. */
+      var colPct = laneAlloc.cols[idx];
+      var laneState = laneRows[idx] && laneRows[idx].state;
+      var stateAttr = (laneState && laneState.k !== window.CxCellMetering.P(0).k)
+        ? ' data-cell-state="' + (laneState.k === 'n' ? 'unmeasured' : 'absent') + '"'
+          + ' data-cell-mode="' + laneMode + '"'
+        : '';
+      var wPct = (typeof colPct === 'number') ? colPct + '%' : '';
       var hit = S.q && (e.summary + ' ' + (e.tool || '')).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
       var isSel = (S.sel === e.id);
       LANES.forEach(function (k) {
@@ -397,7 +415,7 @@
             (S.q && !hit ? ' dim' : '');
           lanes[k].push('<div class="' + blkCls + '" data-e-ev="' + e.id + '" aria-hidden="true" ' +
             'title="step ' + (idx + 1) + ' · ' + esc(e.cls + ' · ' + e.summary) + '" ' +
-            'style="flex:0 0 ' + wPct + '"></div>');
+            'style="flex:0 0 ' + wPct + '"' + stateAttr + '></div>');
         } else {
           lanes[k].push('<div class="e-blk e-blk-empty" aria-hidden="true" style="flex:0 0 ' + wPct + '"></div>');
         }

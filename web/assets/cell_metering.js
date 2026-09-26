@@ -390,7 +390,11 @@
         + "' (ADR-0048 §110.4: the caller declares the quantity).");
     }
     if (mode === 'equal') {
+      /* BOTH MODES REPORT THE SAME RULER (§112.3): gridCols is USED (not silently ignored)
+       * and cellPct is returned, so equal and value cannot drift onto two different scales
+       * — separate scales per panel is the cardinal sin of small multiples. */
       return { state: 'unavailable', reason: 'length-closed', gridCols: gridCols,
+               cellPct: CELL_PCT,
                cols: rows.length ? rows.map(function () { return 100 / rows.length; }) : [],
                tickPct: 0 };
     }

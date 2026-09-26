@@ -5038,3 +5038,56 @@ lane 出口的期望值**必须另钉**：**`expectedWidth = 由「声明的量�
 | 5 | 断言环境 | **CDP** + 前置断言"`renderLanes` 确实被调用" |
 | 6 | 两分支 `rows` | **只构造一次** + **逐位相同**断言 |
 | 7 | 改动文件 | `web/assets/prove_track.view.js` + **新建** `web/tests/lane_render_test.js`（CDP 判据） + 门的冒烟（两模式） + ADR |
+
+## 113. **step 2 落地**：视图第一次消费 `allocate`（计数判据达成）+ 一处**被静默丢掉的语义**
+
+### 113.1 本笔落地（改动面点名,规则②）
+
+| 文件 | 改动 |
+|---|---|
+| `web/assets/prove_track.view.js` | `renderLanes()`：`laneRows` **构造一次** · `laneMode` 在**调用点**声明 · `wPct` 取 `laneAlloc.cols[idx]` · 非 `present` 行把状态写进 `data-cell-state`/`data-cell-mode` |
+| `web/assets/cell_metering.js` | `equal` 分支**回传 `cellPct`**（§112.3 裁决①：**两模式共享同一把尺**,`gridCols` **被使用**而非静默忽略） |
+
+**调用点的声明**：
+```js
+var laneRows  = evs.map(function (e) { return { state: window.CxCellMetering.durOf(e) }; });
+var laneMode  = (S.durMode === 'actual') ? 'value' : 'equal';
+var laneAlloc = window.CxCellMetering.allocate(laneRows, { gridCols: 200, mode: laneMode });
+```
+⇒ **`rows` 只构造一次,只有 `mode` 不同**（否则"同一格两个来源"）;
+⇒ **声明量 = 时长**（§110.1）,`allocate` **不猜**（规则⑨）。
+
+### 113.2 ✅ 本笔的**计数判据**（§112.9 的硬约束）
+
+```
+视图消费 allocate 的次数 = 1        ← ≥ 1 达成
+```
+⇒ **`prove_track.view.js` 第一次消费 `allocate`** ⇒ 不按 §12.2 判为"准备工作"。
+
+### 113.3 实测
+
+```
+node --check（视图 + 投影）        ok
+投影判据                           OK — cell projection holds (golden master)
+门（DERIVED-STORE / REFERENCE / MEMBER）  ok / ok / ok   ← 三个名字都真实存在
+precommit                          PRECOMMIT OK（2 red 已点名,21 proven）
+```
+
+### 113.4 ⚠️ 一处**被静默丢掉的语义**（如实记,**不顺手补**）
+
+`wPct` 现在**只**来自投影列 ⇒ **`raw` / `sum` / `PEND_MIN` 的重归一（"待定保底"）不再影响宽度**。
+⇒ 即 **pending 行的加宽保底消失了** —— 而它不是"被翻译",是**被绕过**。
+
+**这是 `PEND_MIN` 那一族（待定轴三态）在第 2 步就显形**,比计划预期的更早。
+⇒ **按 Mikado：记账,不在本笔补。**
+⇒ **要落 4b 之前必须先声明**：待定标记**走状态通道**（`data-cell-state="pending"`）还是**作为 `allocate` 的声明入参**（如 `mode` 同级的 `pending` 列表）。
+⇒ **并记**：本笔的宽度因此**比旧路径少了 pending 保底** —— 这是**可见的行为变化**,必须在 4b 前裁决,不得留在"以为没变"的状态里。
+
+### 113.5 仍未做（如实,不冒充）
+
+| 项 | 状态 |
+|---|---|
+| **CDP 断言**（渲染宽度 == `expectedWidth` · `absent ≠ present(0)` 的 DOM · `rows` 逐位相同 · "`renderLanes` 确实被调用"前置） | ⬜ **未做**（需 CDP,后续笔） |
+| **grep 判据**（`renderLanes` 函数体内无 `toFixed`/`Math.max`/`reduce`） | ⬜ **仍红——按设计**（`raw`/`sum` 属 4b 的删除面,**本笔并行保留**） |
+| `lane` 出口的 `expectedWidth` 钉死 | ⬜ 未做 |
+| `absent` 行"不写宽度"的最终形态 | ⬜ 当前写 `flex:0 0 <tick>%` + `data-cell-state`,**已可区分**;是否**完全不写宽度**待 CDP 判据一并裁决 |
