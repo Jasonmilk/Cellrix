@@ -41,6 +41,7 @@ const SELF_CONTAINED = [
   ['suite_registry_test.js', 'ABSENCE IS NOT A PASS — applied to the suite list itself'],
   ['growth_probe_test.js', 'growth is DETECTED — A / C / D perturbe the structure, not the values'],
   ['adr_index_test.js', 'the ADR navigation layer is GENERATED from the ADR (context attention)'],
+  ['adr_layer_budget_test.js', 'the always-loaded layer: policy once, measurement derived, review enforced'],
   ['no_host_paths_test.js', 'host paths are declared inputs — the class, not one site'],
   /* Registered after the coverage criterion pointed them out (§129): these five were run BY
    * HAND every time and were never in the gate — including the projection's own suite. */
