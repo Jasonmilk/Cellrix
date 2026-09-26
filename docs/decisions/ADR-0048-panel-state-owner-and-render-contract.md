@@ -7569,3 +7569,16 @@ B 需要**先有事件**:harness 里 "event rows rendered [0 rows]" ⇒ 面板�
    DOM 的 flex-basis 与投影的 cols[i]。
 ```
 ⇒ **这是判词在 lane 出口上的最后一块**;而它现在**只差"有数据"这一件事**。
+
+## 163. 活面板套件的红已归因（栈起着时才会被纳入门）
+
+```
+all_views_test.js http://127.0.0.1:50050 …  ⇒ RESULT: 107 passed, 2 failed, 4 skipped
+  FAIL  compact folds the completed internal steps        [compact=5 rows / 0 folded vs full=5 rows]
+  FAIL  and turning it off restores every row it folded  [on=5+0 full=5+0 back=5+0]
+```
+⇒ **归因**:**折叠(compact)没有折叠任何行**(`0 folded`)—— 这是**与本笔无关的既有 UI 行为**;
+⇒ 而它**只在本栈起着时才进网**（`run_all` 检测到活面板才纳入 `all_views_test`）⇒ 所以此前的门里没有它。
+⇒ **记账**:记为**独立的一条**（折叠功能的行为缺陷,与泳道/step 3 无关）,不在本笔修;
+⇒ 并记:**"门的成员集合随环境变化"**（栈起/不起）是 §154 那条病在**门的名单**上的又一形态 ——
+它这次是**正确**的（活面板套件本就需要活面板）,但**必须在输出里可读**:`run_all` 已经把它标注为活面板依赖 ✓。
