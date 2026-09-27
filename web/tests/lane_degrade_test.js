@@ -12,6 +12,7 @@ let bad = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) bad++; };
 const cases = [1, 2, 6, 150, 151, 200, 201, 202, 251, 501];
 const rowsFor = (n) => Array.from({ length: n }, (_, i) => ({ state: i === 0 ? CM.P(120) : CM.A() }));
+const allAbsent = (n) => Array.from({ length: n }, () => ({ state: CM.A() }));   /* the REAL path's shape (§172) */
 
 let worst = 0, worstAt = '';
 const reasons = new Set();
@@ -27,6 +28,12 @@ for (const mode of ['value', 'equal']) {
   }
 }
 ok(worst <= 100 + 1e-9, 'Σ cols <= 100 in EVERY branch and mode (worst ' + worst.toFixed(2) + '% at ' + worstAt + ')');
+/* the all-absent case is the one the real path hits (§172) — it must obey the same rule */
+{
+  const a = CM.allocate(allAbsent(251), { gridCols: 200, mode: 'value' });
+  ok(a.cols.reduce((x, y) => x + y, 0) <= 100 + 1e-9,
+    'no-present-rows @251 keeps Σ <= 100 (reason=' + a.reason + ')');
+}
 ok(reasons.has('row-exceeds-grid') && reasons.has('reserve-over-budget'),
   'the degraded branches are still REACHED by this probe (declared, not silently skipped)');
 

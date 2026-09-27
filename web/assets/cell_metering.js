@@ -33,7 +33,12 @@
     }
     return cur;
   }
-  var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens'];
+  /* SHAPE CONTRACT (ADR-0048 §172): `project()` is called with TWO shapes here — raw EVENTS
+ * (API/fixtures) and SESSION ROWS (what the view holds; built by buildSession). Measured:
+ * session rows carry top-level `tok`/`dur` and have NO `/data`, so an events-only chain
+ * made BOTH outlets read absent on the real path — the cell stayed empty while every
+ * value criterion (which fed events) was green. The shape is part of the contract. */
+var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
   /* APPLICABILITY (ADR-0048 §52, Codd's fourth state). A dimension is INAPPLICABLE
    * to an event type that never carries it — that is NOT "unmeasured this time".
    * Merging the two (as three-valued logic does) floods every group with `>=`:
@@ -65,7 +70,7 @@
   var DUR_APPLICABLE = ['tool/result'];
   function eventType(e) { return (e && typeof e.type === 'string') ? e.type : ''; }
   function applicable(e, list) { return list.indexOf(eventType(e)) > -1; }
-  var DUR_PATHS = ['/data/duration_ms'];
+  var DUR_PATHS = ['/data/duration_ms', '/dur'];
   /* RUN MODE (ADR-0048 §124 / A2): drive | partner | survive — a fact about the PERIOD that
    * the event stream either DECLARES or does not. Read like any other fact, so an old tape is
    * N (unmeasured), never a default: defaulting to 'partner' would be a configured value
@@ -546,8 +551,12 @@
       /* EVERY BRANCH RETURNS cols OF THE SAME LENGTH AS rows (ADR-0048 §108): a consumer
        * that indexes by row must never receive a short array, or it silently reads
        * undefined (the shape of the failures this cell keeps producing). */
+      /* THE THIRD OVERFLOW (ADR-0048 §172): `n * CELL_PCT` measured Σ = 100.50% at 201 rows and
+       * 250.50% at 501 — and on the REAL path (session rows) this branch is the NORMAL one, so the
+       * strip genuinely overflowed whenever a period had >200 visible rows. A percentage column
+       * cannot honestly sum past 100; the reason still declares the state. */
       return { counts: counts, state: 'unavailable', reason: 'no-present-rows',
-               cols: rows.map(function () { return CELL_PCT; }), tickPct: 0, gridCols: gridCols };
+               cols: rows.map(function () { return 100 / rows.length; }), tickPct: 0, gridCols: gridCols };
     }
     if (nUnknown === 0) {
       /* ALL PRESENT — ALLOCATE THE WHOLE WIDTH BY THE DECLARED QUANTITY, NEVER `null`
