@@ -443,9 +443,15 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
            * LENGTH-CHANNEL mode (equal|value). The RUN mode (drive|partner|survive) is a
            * different quantity and must not share the name — one attribute, one quantity. */
           + ' data-cell-lenmode="' + laneMode + '"'
+          + (degraded ? ' data-cell-degraded="' + String(laneAlloc.reason || laneAlloc.state) + '"' : '')
         : '';
       /* the STRICT predicate, not `typeof`: rule ⑫ (§116) — a coercing guard cannot see a null. */
-      var wPct = window.CxCellMetering.isFiniteNumber(colPct) ? colPct + '%' : '';
+      /* CONSUME THE DECLARED STATE (ADR-0048 §166): recording a degradation is not acting on it.
+       * When the projection is not usable, the lanes must not pretend to be a proportion — they
+       * carry the reason instead of per-block widths, so "degraded" and "degraded-and-acted-on"
+       * cannot look the same (§㉓ second clause: a claim that is never consumed is decoration). */
+      var degraded = laneAlloc.state && laneAlloc.state !== 'ok';
+      var wPct = (!degraded && window.CxCellMetering.isFiniteNumber(colPct)) ? colPct + '%' : '';
       var hit = S.q && (e.summary + ' ' + (e.tool || '')).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
       var isSel = (S.sel === e.id);
       LANES.forEach(function (k) {

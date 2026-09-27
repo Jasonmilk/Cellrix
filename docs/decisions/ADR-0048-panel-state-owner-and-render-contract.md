@@ -7677,3 +7677,62 @@ GET /api/sessions ⇒ **有 5 个 period 可加载**（含 period_id=run-9e901b9
 ⇒ 所以**不是 R2（Anaphase 无经历）**,更可能是 **harness 选的 job 没有事件**（或该 period 确无计量事件）
 ⇒ 下一笔:让 harness 选一个**有事件的 period**（已可枚举）⇒ B2 即可逐块行使。
 ```
+
+## 166. **声明的降级必须被消费** —— 两处真实溢出（其中一处是新判据当场抓的）
+
+### 166.1 缺口二（审查方实测,我复核一致）:**三个降级状态,没有消费者**
+
+```
+cell_metering 声明: length-closed / reserve-over-budget / row-exceeds-grid
+视图 :391,:404 **记录了**它们（LANE_OBSERVED/签名）——**却从不据它们行动**
+视图 :448 var wPct = isFiniteNumber(colPct) ? colPct+'%' : '';   ← **不看 allocState**
+⇒ **"记录"不等于"消费"** —— 通则㉓ 第一句的同一形状,只是这次是**状态**而不是清单。
+```
+
+**实测（溢出）**:
+```
+n=201 reserve-over-budget Σ=100.50 ✗      ← Math.max(CELL_PCT, 100/n) 在 n=201 时地板效应
+n=251 row-exceeds-grid    Σ=125.50 ✗      ← cols = CELL_PCT/行,Σ = n×0.5
+n=501 row-exceeds-grid    Σ=250.50 ✗
+```
+⇒ 而 `row-exceeds-grid` 的注释逐字写着 *"the honest answer is a **declared state**, not a clamped sum"*
+⇒ **注释对、返回错**（与 `STALE` 那次同形）。
+
+### 166.2 修（三处,均已验证）
+
+| # | 修 | 验证 |
+|---|---|---|
+| **①** | `row-exceeds-grid` ⇒ **等分**（`100/n`,Σ == 100 精确）,状态/reason 不变 | n=251/501/1000 ⇒ Σ=**100.0000** ✓ |
+| **②** | `reserve-over-budget` ⇒ **可缩放 tick**（`min(CELL_PCT, 100/n)`）并**声明缩放**（`tickScaled:true`） | n=201 ⇒ Σ=**100.0000**（**新判据当场抓出的第二处溢出**）✓ |
+| **③** | **视图消费状态**:`laneAlloc.state !== 'ok'` ⇒ **不写逐块宽度** + 写 `data-cell-degraded="<reason>"` | 源码已落;DOM 级判据留作下一笔（§166.4） |
+
+**新增 `web/tests/lane_degrade_test.js`（已进网）**:**Σ cols ≤ 100 在每一支每一模式**（1/2/6/150/151/200/201/202/251/501,两模式）
++ **降级支必须仍被探针触达**（"声明了却从不到达"也会被抓）+ 变异（旧的 `n×0.5` 行为必须被看见）。
+⇒ **实测**:worst = **100.00%**（`value/n=501`）;三条全绿。
+⇒ **它上线第一次运行就红了一次**,抓出 `reserve-over-budget` 那 0.5% —— **判据的价值不在抓到已知。**
+
+### 166.3 通则㉓ 第二句（并入）
+
+> **不仅双向对位,还要与它声称的语义对齐** —— 否则"能红"会变成"红错地方";
+> **且声明的状态必须被消费者**兑现**("记录 ≠ 消费")** —— 否则"声明了降级"与"降级被兑现"长得一样。
+
+### 166.4 仍未完成（审查方 §1,下一笔）
+
+**B1 是投影级的,不是 DOM 级的**:`grep jsdom|document|querySelector lane_value_test.js` ⇒ **0 命中**
+⇒ 判词里的"**显示**"这一半仍只在 live（B2）上,而 live 依赖栈 ⇒ **`V = f(R,E)` 又一次**。
+⇒ 好消息（审查方实测,我复核需 `window` 垫片）:**整条管线 `event_family → node_shape → assembly` 可在纯 Node 跑**
+（用 jsdom 或 global.window 垫片）⇒ **B1 升级为 DOM 级只差最后一段 jsdom**:
+```
+jsdom 空文档 → 按序加载 three_state · cell_metering · event_family · node_shape · assembly · prove_track.*
+⇒ 调**声明入口** CxProveTrack.renderLanes()（不是内部函数）
+⇒ 逐块断言 flex-basis == 算术独立算出的值;并断言降级时**无逐块宽度而有 data-cell-degraded**
+```
+⇒ 两条变异:① 改一位 cols ⇒ 红;② 视图改回自算宽度 ⇒ 红。⇒ **落下后判词第一次在 lane 出口 hermetic 成立。**
+
+### 166.5 一条交下一笔核的问题（不猜）
+
+审查方喂 fixture 进 assembly 得 `rejections: {invalid:assistant/usage ×1, invalid:turn/end ×1}`。
+⇒ `assistant/usage`(seq5) 是那条 `completion_tokens: null`,被拒**看似合理**;
+⇒ 而 **`turn/end` 也被拒** —— 它是 `pinned` 期望的一部分。
+⇒ 我**未能跑通该探针**（资产是浏览器 IIFE,`window` 未定义 ⇒ ReferenceError）⇒ **记为未核**,
+下一笔用 jsdom 垫片跑同一条探针,回答:**`turn/end` 被拒是预期的,还是词表缺字段?**

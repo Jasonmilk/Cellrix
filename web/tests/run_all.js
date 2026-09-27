@@ -44,6 +44,7 @@ const SELF_CONTAINED = [
   ['adr_layer_budget_test.js', 'the always-loaded layer: policy once, measurement derived, review enforced'],
   ['boot_placeholders_test.js', 'three declarations, one behaviour: template / boot.json / boot.rs aligned BOTH ways'],
   ['lane_value_test.js', 'lane widths pinned by ARITHMETIC (hermetic, no live panel needed)'],
+  ['lane_degrade_test.js', 'every degraded branch keeps Σ cols <= 100 (a declared state is still a number)'],
   ['no_host_paths_test.js', 'host paths are declared inputs — the class, not one site'],
   /* Registered after the coverage criterion pointed them out (§129): these five were run BY
    * HAND every time and were never in the gate — including the projection's own suite. */

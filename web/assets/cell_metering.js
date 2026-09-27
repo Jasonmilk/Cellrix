@@ -585,16 +585,26 @@
      * declared state, not a clamped sum. (Windowing itself belongs to the on-demand
      * rendering line.) */
     if (nUnknown > gridCols) {
+      /* THE COMMENT ABOVE WAS RIGHT AND THE RETURN WAS WRONG (ADR-0048 §166): it promised "a
+       * declared state, not a clamped sum" while returning CELL_PCT per row, i.e. n × 0.5 —
+       * measured Σ = 100.50% at 201 rows, 125.50% at 251, 250.50% at 501, and the view wrote
+       * them straight into flex-basis, so the strip overflowed its row. A percentage column
+       * cannot honestly sum past 100; the state carries the degradation, the NUMBERS stay honest. */
+      var even = 100 / rows.length;
       return { counts: counts, state: 'unavailable', reason: 'row-exceeds-grid',
-               cols: rows.map(function () { return CELL_PCT; }), tickPct: tick, gridCols: gridCols };
+               cols: rows.map(function () { return even; }), tickPct: tick, gridCols: gridCols };
     }
     if (nUnknown * tick > RESERVE_CAP_PCT) {
       /* DEGRADED: say so in the projection, do not fabricate a proportion. */
       return { counts: counts, state: 'unavailable', reason: 'reserve-over-budget',
-               /* CLAMP TO ONE CELL (§97.3): equal widths narrower than a cell are
-                * invisible, and a degradation that loses the core capability is not a
-                * degradation but a failure. */
-               cols: rows.map(function () { return Math.max(CELL_PCT, 100 / rows.length); }), tickPct: tick };
+               /* CLAMP TO ONE CELL (§97.3) — BUT THE CLAMP MUST NOT BREAK THE DOMAIN (§166):
+                * `max(CELL_PCT, 100/n) * n` floors at n * CELL_PCT and measured Σ = 100.50% at
+                * 201 rows (the old `Math.max` form). A tick that no longer fits is SCALED rather
+                * than repeated past 100, and the scaling is itself declared (`tickScaled`) so a
+                * consumer can tell "one cell" from "one cell that had to shrink". */
+               cols: rows.map(function () { return Math.min(CELL_PCT, 100 / rows.length); }),
+               tickPct: Math.min(CELL_PCT, 100 / rows.length),
+               tickScaled: (100 / rows.length) < CELL_PCT };
     }
     var remaining = 100 - nUnknown * tick, cols = [], p = 0;
     for (i = 0; i < rows.length; i++) {
