@@ -8194,3 +8194,24 @@ feed 1 × turn/start + 250 × tool/result({tool,ok}) ⇒ nodes **2** · ev 2 · 
 ⇒ 这一笔不是"造新聚合",是"**声明这一格读哪个**":project(会话行) 的 tok 出口 ⟸ derivePeriodUsage().total
   或**显式声明"不适用"**(不许静默 A()) ⇒ 判据:== 32 + 变异(改 total ⇒ 红)
 ```
+
+### 175.5 ✅ 更正:**降级支可达,SKIP 已换成真判据**（§175.2 的结论作废）
+
+```
+我 §175.2 用它自己的探针得出"不可达" —— 而那个探针**喂的事件少了 `ok`** ⇒ `tool/result` 被拒收 ⇒ 结论错。
+实测(判据内打印的读数): 250 × turn/start + 1 × tool/result**{tool,ok,duration_ms}**
+   ⇒ **nodes 501 · ev 251 · measured 1 · rejections 0** ⇒ **`row-exceeds-grid` 命中**
+```
+⇒ **这是同一轮里的第 11 次"自称的证据",而方向相反**:上一次是"没跑就下结论",这次是"**跑错了输入就下结论**"。
+⇒ **判据补全**:"喂了什么"必须包含**形状**,不只是**数量** —— 数量对(251 条)、形状错(缺 `ok`) ⇒ 结论照样反。
+⇒ 于是 §175.3 那条规则再加半句:
+> **凡"不可达/SKIP"的结论,必须附"喂了什么(**含完整形状**)、得到几行"。**
+
+**实测(真判据,4 条全绿)**:
+```
+ok  DEGRADED: the row host names the reason  [row-exceeds-grid]
+ok  AND EVERY BLOCK IS STILL VISIBLE: 251 blocks, min 0.398%, empty widths **0**
+ok  degraded widths still sum to 100  [100.00]
+ok  RECOVERY removes the marker
+```
+⇒ **§166 那笔"消费降级状态"的 DOM 侧第一次真的被行使** —— 而那正是审查方两轮前指出的缺口。

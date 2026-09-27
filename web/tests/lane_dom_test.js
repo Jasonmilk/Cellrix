@@ -88,34 +88,37 @@ const rel = (a, b) => Math.abs(a - b) < 0.01;
   w.close();
 }
 
-/* ── 3. A REAL degradation through the pipeline: NAMED SKIP, WITH ITS READINGS ──
- * RULE (ADR-0048 §175): a conclusion of "unreachable / not applicable / skip" must carry the
- * readings that produced it — "what was fed, how many rows came out". My previous note said
- * "turn/start yields headers, not ev rows"; MEASURED, that is WRONG (250 turn/start ⇒ 250 ev rows,
- * sem all "turn"). What is actually true here:
- *     feed 250 × turn/start + 1 × tool/result  ⇒ nodes 250, ev 250, sem ["turn"], measured 0,
- *                                                 tool/result REJECTED (invalid:tool/result ×1)
- *     feed 1 × turn/start + 250 × tool/result({tool,ok}) ⇒ nodes 2, ev 2, REJECTED ×249
- * ⇒ the assembly coalesces tool results per turn, so >200 APPLICABLE-BUT-UNMEASURED rows
- *   (what `row-exceeds-grid` needs) cannot be produced by this recipe in this pipeline.
- * The projection-level twin (lane_degrade_test) covers that branch; this half says so, and prints
- * the numbers that justify it, instead of asserting a conclusion nobody ran.
+/* ── 3. A REAL degradation through the pipeline (the SKIP is GONE) ──
+ * MEASURED readings that made this reachable (ADR-0048 §176): a `tool/result` must carry the
+ * fixture's shape (`tool`, `ok`, `duration_ms`) — mine first omitted `ok` and was REJECTED, which
+ * is why I wrongly concluded "unreachable". With the right shape:
+ *     250 × turn/start + 1 × tool/result{tool,ok,duration_ms}  ⇒ nodes 501, ev 251, measured 1,
+ *                                                                 rejections 0 ⇒ row-exceeds-grid
+ * §166's "consume the declared state" is therefore exercised in the DOM for the first time.
  */
 {
   const w = build();
   const many = Array.from({ length: 250 }, () => ({ type: 'turn/start', data: {} }))
     .concat([{ type: 'tool/result', data: { tool: 't', ok: true, duration_ms: 120 } }]);
   const primed = prime(w, 'actual', many);
-  if (primed) {
+  if (!primed) { console.log('  SKIP  lane DOM (degraded): view not assembled'); }
+  else {
     const host = w.document.getElementById('eTraj');
-    ok(!host.hasAttribute('data-cell-degraded'),
-      'not degraded here ⇒ no marker, and the reason is now MEASURED (see the readings above)');
-    console.log('    readings: nodes=' + primed.rows.length + ' ev='
-      + primed.rows.filter((r) => r.kind === 'ev').length
-      + ' measured=' + primed.rows.filter((r) => typeof r.dur === 'number').length
+    const marker = host.getAttribute('data-cell-degraded');
+    const got = laneWidths(w, 'eLaneTool');
+    const ev = primed.rows.filter((r) => r.kind === 'ev').length;
+    console.log('    readings: nodes=' + primed.rows.length + ' ev=' + ev + ' measured='
+      + primed.rows.filter((r) => typeof r.dur === 'number').length
       + ' rejections=' + (primed.rejections && primed.rejections.total ? primed.rejections.total : 0));
-    console.log('  SKIP  lane DOM (degraded): reachable only with >200 APPLICABLE-BUT-UNMEASURED rows,'
-      + ' which this pipeline does not produce from that recipe — lane_degrade_test covers the branch (declared)');
+    ok(marker === 'row-exceeds-grid',
+      'DEGRADED: the row host names the reason  [' + marker + ']');
+    ok(got.length > 200 && got.every((v) => typeof v === 'number' && v > 0),
+      'AND EVERY BLOCK IS STILL VISIBLE: ' + got.length + ' blocks, min '
+      + Math.min.apply(null, got).toFixed(3) + '%, empty widths ' + got.filter((v) => v === null).length);
+    ok(rel(got.reduce((a, b) => a + b, 0), 100),
+      'degraded widths still sum to 100  [' + got.reduce((a, b) => a + b, 0).toFixed(2) + ']');
+    prime(w, 'equal');
+    ok(!host.hasAttribute('data-cell-degraded'), 'RECOVERY removes the marker');
   }
   w.close();
 }
