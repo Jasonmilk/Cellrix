@@ -193,9 +193,13 @@
           note: short(n.source || 'a session', 24)
         });
       }
-      var dur = 0;
+      /* 'NO DURATION' IS NOT '0 ms' (ADR-0048 §173): `0` is a MEASUREMENT, and the projection
+       * honestly read it as one and gave the block a 0% width — the block then vanished
+       * (`flex:0 0 ` ⇒ CSS takes 0%). Measured on the real path: durOf(rows) was
+       * [P(0), P(120)] and the TOOL lane rendered ["flex:0 0 ", "flex:0 0 100%"]. */
+      var dur = null;
       if (spec.dur) {
-        dur = n.payload[spec.dur] || 0;
+        dur = (n.payload && typeof n.payload[spec.dur] === 'number') ? n.payload[spec.dur] : null;
       } else if (spec.gap) {
         /* The wait that ENDED at this row, not the wait that follows it.
          *
@@ -209,10 +213,14 @@
          * off the wrong end. */
         var prev = shown[i - 1];
         var a = prev ? Date.parse(prev.ts) : NaN, b = Date.parse(n.ts);
-        dur = (isFinite(a) && isFinite(b)) ? Math.max(0, b - a) : 0;
+        dur = (isFinite(a) && isFinite(b)) ? Math.max(0, b - a) : null;
       }
       out.push({
         kind: 'ev', id: n.node, source: n.source, turn: n.turn, ord: n.ord, ts: n.ts,
+        /* THE SEMANTIC NAME TRAVELS WITH THE ROW (ADR-0048 §173): `kind` on a row means the ROW
+         * kind ('ev'/'turn'), so the node's kind goes on its own key. Without it the
+         * projection has no name to recognise and skips every row. */
+        sem: n.kind,
         cls: EF.classOf(n), lane: R.laneOf(n.kind),
         dur: dur,
         status: R.statusOf(n), summary: R.summarize(n),

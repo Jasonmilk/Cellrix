@@ -8034,3 +8034,60 @@ Testing Library("测试越像使用方式越可信") · 契约式设计(Meyer:�
 · Saltzer & Schroeder("Complete mediation":每个消费点都要查")
 ⇒ 三条同指:**形状是契约的一部分,而这份契约此前不存在。**
 ```
+
+## 173. 🎯 **缺的是"名字"与"一个 0"** —— 这一格从"恒空"到"显示真值"
+
+### 173.1 根因不是聚合,是**适用性判定拿不到名字**（审查方实测,我复核一致）
+
+```
+cell_metering: TOK_APPLICABLE=['assistant/usage'] · DUR_APPLICABLE=['tool/result']
+               function applicable(e,list){ return list.indexOf(eventType(e))>-1; }   ← 只读 `type`
+实测: 会话行 'type' in row ⇒ **全部 false** ⇒ applicable 恒 false ⇒ 每行 continue ⇒ fold([]) ⇒ A()
+三层各自的名字: 协议 assistant/usage → 语义 node.kind='metering' → 渲染 cls='SYSTEM'  **每层换一个且不传递**
+```
+⇒ **类比**:门口只认第一个名字,而送到门口的人报的是第三个 —— **没人说谎、没人报错,只是每一个都被排除在门外**;
+而**所有考试都拿第一个名字的人去考** ⇒ 全过。⇒ 这解释了我上一笔为何"读链修好了仍不行":**我修的取值路径,断的是适用性**。
+
+### 173.2 而真正让块消失的,是**生产代码里那个 `0`**
+
+```
+prove_track.node.js: `var dur = 0; if (spec.dur) { dur = n.payload[spec.dur] || 0; }`
+⇒ "没有时长"被写成 **0** ⇒ 而 **0 是一个测得值** ⇒ 投影诚实地给它 0% 宽度 ⇒ `flex:0 0 ` ⇒ CSS 取 0% ⇒ **块消失**
+修前实测(真实管线+真 jsdom): durOf(会话行) = [a **p:0** p:120];Tool 泳道 ["flex:0 0 ", "flex:0 0 100%"]
+```
+⇒ **这就是"这一格恒 0"的直接成因** —— 而且它正是我在测试里抓到过的那次(复发律第 8 次),**在生产代码里那次没人抓到**。
+
+### 173.3 三处修（均已实测）
+
+| # | 修 | 实测 |
+|---|---|---|
+| **①** | 适用性改按**语义名**:`semOf(e)`（有 `sem` 用 `sem`,否则回退协议名）;`TOK_APPLICABLE/DUR_APPLICABLE` 加 `'metering'`/`'tool'` | 语义行被认出 ✓ |
+| **②** | **语义名随行**:`buildSession` 的行上写 `sem: n.kind`（`kind` 在行上是**行种类**,语义名走自己的键） | ✓ |
+| **③** | **没有时长不写 0**:`dur = null`（含 gap 回退也改 `null`） | `durOf(会话行) = **a n p:120**` ✓ |
+
+**修后实测（真实管线 + 真 jsdom）**:
+```
+Input/Model/Tool 三泳道 모두 ["0.5%", "99.5%"],Tool 泳道 **Σ = 100%** ⇒ 两块都可见,值来自 project()
+```
+⇒ **协议名仍只在边界出现一次**（CI-144 不变）,而下游终于有名字可依。
+
+### 173.4 判据进网（**判词第一次对着"显示"说话**）
+
+`shape_contract_test.js`（**已进网**,7 条全绿,含两条变异）:
+```
+ok  语义行 sem="tool" 被时长通道认出 [p:120]      ok  语义行 sem="metering" 被 token 通道认出 [p:5]
+ok  协议事件 type="assistant/usage" 读数不变 [p:5]  ok  dur=null ⇒ **unmeasured**,不是 "0 ms" [n]
+ok  dur=0 ⇒ **是**测得零（两者必须可分辨）
+ok  MUTATION:读链到不了 /dur ⇒ 第一条失败      ok  MUTATION:把缺失写成 0 ⇒ 会被读成一次测量
+```
+⇒ **门 `proven` 37 → 38**;整门 **2 red**（两条均已具名归因）。
+
+### 173.5 两条诚实的未完成（审查方给的,我采纳）
+
+```
+① **tok 出口在真实路径上仍是 A()**,而这是**结构性**的:metering 节点**不 drawn** ⇒ 不产生行 ⇒
+   逐行 fold 拿不到 tok ⇒ **tok 必须由 period 级聚合提供**（`derivePeriodUsage`,eStats 已在用）
+   ⇒ 另立一笔:**这一格的 tok 读 period 聚合（声明来源）**,或**显式声明不适用** —— 不许静默 A()。
+   ⚠️ 但**不阻塞判词**:判词说的"这一格"是 lane 宽度（dur 通道）,而它本笔已修好并实测(99.5%/0.5%,Σ=100)。
+② `turn/end` 在 assembly 里被判 invalid(而 `turn/start` 带 `job_id/period_id/seq/time` 就接受) ⇒ **仍未核**。
+```

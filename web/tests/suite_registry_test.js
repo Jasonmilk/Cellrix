@@ -19,11 +19,6 @@ const ok = (cond, msg) => { console.log((cond ? '  ok   ' : '  FAIL ') + msg); i
 /* Files that are NOT suites on purpose, each with a reason. A silent exemption list would be
  * the same disease in a new place, so every entry carries its own justification. */
 const NOT_A_SUITE = {
-  /* WIP, DECLARED (ADR-0048 §172): the read chain now accepts the session-row shape
-   * (tokOf(sessionRow) = n p:5 n p:7 n n and the measured row reads 120ms), but project()'s
-   * AGGREGATE still answers `a` for session rows while it answers P(12) for the events that
-   * built them — the difference is in the aggregate's row SELECTION, not in the read chain. */
-  'shape_contract_test.js': 'WIP: project() aggregation differs between the two shapes',
   'pinned_expectation.js': 'the ORACLE (a library the criterion requires), not a suite',
   'known_bad_reader.js': 'a fixture reader used BY suites',
   'probe_bug.js': 'a probe used BY suites',

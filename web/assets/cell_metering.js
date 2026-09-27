@@ -66,10 +66,19 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
     }
     return false;
   }
-  var TOK_APPLICABLE = ['assistant/usage'];
-  var DUR_APPLICABLE = ['tool/result'];
+  /* APPLICABILITY BY SEMANTIC NAME (ADR-0048 §173): the protocol name exists only at the
+   * boundary (CI-144); nodes carry `kind` ('metering'/'tool') and rows now carry it as
+   * `sem`. Measured before: rows have no `type`, so EVERY row was skipped (naCount = all)
+   * and the fold returned A() — the cell read absent on the real path while every
+   * criterion that fed events was green. A predicate with two spellings, no default. */
+  var TOK_APPLICABLE = ['assistant/usage', 'metering'];
+  var DUR_APPLICABLE = ['tool/result', 'tool'];
   function eventType(e) { return (e && typeof e.type === 'string') ? e.type : ''; }
-  function applicable(e, list) { return list.indexOf(eventType(e)) > -1; }
+  function semOf(e) {
+    if (e && typeof e.sem === 'string' && e.sem) { return e.sem; }      /* semantic name */
+    return eventType(e);                                              /* boundary name  */
+  }
+  function applicable(e, list) { return list.indexOf(semOf(e)) > -1; }
   var DUR_PATHS = ['/data/duration_ms', '/dur'];
   /* RUN MODE (ADR-0048 §124 / A2): drive | partner | survive — a fact about the PERIOD that
    * the event stream either DECLARES or does not. Read like any other fact, so an old tape is
