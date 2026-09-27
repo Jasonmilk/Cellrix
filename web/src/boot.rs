@@ -150,6 +150,19 @@ pub fn validate(g: &BootGraph, template: &str) -> Result<(), String> {
             ));
         }
     }
+    /* THE MISSING DIRECTION (ADR-0048 §164). The two checks above walk piece → template; neither
+     * can see a hole in the template that NO piece claims. Measured: exactly that happened —
+     * base.html had <script>__THREE_STATE__</script>, boot.rs's table named it, and boot.json had
+     * no piece for it, so assemble() left the literal on the page and the browser threw
+     * ReferenceError. An orphan hole must fail HERE, at assembly, not in the browser console. */
+    for hole in template_placeholders(template) {
+        if !holders.contains(hole.as_str()) {
+            return Err(format!(
+                "模板 {} 中的占位符 {} 没有任何皮片/派生项认领（装配会把它原样留在页面上）",
+                g.template, hole
+            ));
+        }
+    }
     for d in &g.derived {
         if !holders.insert(d.placeholder.as_str()) {
             return Err(format!("占位符重复: {}", d.placeholder));
@@ -158,6 +171,26 @@ pub fn validate(g: &BootGraph, template: &str) -> Result<(), String> {
         derived_value(&d.source)?;
     }
     Ok(())
+}
+
+/// Every `__NAME__` hole in the template, in order. No regex crate: parse by hand.
+fn template_placeholders(template: &str) -> Vec<String> {
+    let bytes = template.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i + 1 < bytes.len() {
+        if bytes[i] == b'_' && bytes[i + 1] == b'_' {
+            let mut j = i + 2;
+            while j < bytes.len() && (bytes[j].is_ascii_uppercase() || bytes[j].is_ascii_digit() || bytes[j] == b'_') { j += 1; }
+            if j > i + 2 && j + 1 < bytes.len() && bytes[j] == b'_' && bytes[j + 1] == b'_' {
+                out.push(template[i..j + 2].to_string());
+                i = j + 2;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
 }
 
 /// Assemble the page: every piece in graph order, then every derived value over

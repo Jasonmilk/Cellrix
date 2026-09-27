@@ -50,13 +50,14 @@ check("first bytes are <!DOCTYPE html>", page.startswith("<!DOCTYPE html>"),
       page[:15].replace("\n", "\\n"))
 
 print("-- placeholder residue must be zero --")
-for ph in ["__TOKENS__", "__COMPONENTS__", "__COCKPIT__", "__CHAT__",
-           "__PROVE_TRACK__", "__PROVE_TRACK_CSS__", "__PROVE_TRACK_DATA__",
-           "__PROVE_TRACK_RENDER__", "__PROVE_TRACK_NODE__", "__PROVE_TRACK_EXPORT__",
-           "__PROVE_TRACK_VIEW__",
-           "__PROVE_TRACK_CTRL__", "__SCRIPT__",
-           "__SESSION__", "__GLEAM__", "__FLOWS__", "__REFRESH__",
-           "__TUCK_CONFIGURED__"]:
+# THE LIST IS DERIVED, NOT WRITTEN (rule ㉓ / §164): the hand-written version had 18 entries
+# against a template of 32 — 16 holes nobody checked, including __THREE_STATE__ and
+# __CELL_METERING__, i.e. exactly the two that shipped unsubstituted and broke the panel.
+import re as _re, pathlib as _pl
+_tpl = _pl.Path(__file__).resolve().parents[1] / "assets" / "base.html"
+_ph = sorted(set(_re.findall(r"__[A-Z][A-Z0-9_]*__", _tpl.read_text(encoding="utf-8"))))
+check("the placeholder roster is derived from base.html", len(_ph) > 25, f"n={len(_ph)}")
+for ph in _ph:
     check(f"residue {ph} == 0", page.count(ph) == 0, f"count={page.count(ph)}")
 
 # Each asset is wrapped by a distinct pair of host tags in base.html, so the

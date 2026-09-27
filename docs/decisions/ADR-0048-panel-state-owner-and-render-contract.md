@@ -7582,3 +7582,52 @@ all_views_test.js http://127.0.0.1:50050 …  ⇒ RESULT: 107 passed, 2 failed, 
 ⇒ **记账**:记为**独立的一条**（折叠功能的行为缺陷,与泳道/step 3 无关）,不在本笔修;
 ⇒ 并记:**"门的成员集合随环境变化"**（栈起/不起）是 §154 那条病在**门的名单**上的又一形态 ——
 它这次是**正确**的（活面板套件本就需要活面板）,但**必须在输出里可读**:`run_all` 已经把它标注为活面板依赖 ✓。
+
+## 164. **通则㉓**：凡清单,必须**双向对位**,且**两个方向都要有判据**
+
+### 164.1 本该抓住那个 bug 的检查,有 **16 个洞**（审查方实测,我复核一致）
+
+```
+web/tests/verify_live.py:52 逐字写着 "placeholder residue must be zero"   ← **正是为这个 bug 而生**
+实测: base.html 占位符 **32** · 该检查的**手写清单 18** · 死条目 2 · **模板有清单漏 16**
+      漏掉的里面**正好含 `__THREE_STATE__` 与 `__CELL_METERING__`**（就是出事的两个）
+且: grep verify_live 于 run_all.js / suite_registry_test.js ⇒ **0 命中 ⇒ 它根本不在网**
+```
+⇒ **两层保护,两层都失效**:①不在网 ②即使在网,清单也漏了出事的条目。
+⇒ 而"漏"的形状是**手写清单** ⇒ **通则⑰ 的又一次兑现**（`SHAPE_ORDER`/`counts`/`CONSUMERS` 之后第四次）。
+
+### 164.2 而 `validate()` 的三个方向里**只查了两个**
+
+```
+boot.rs:130-152  皮片 → 资产(embedded) ✓   皮片 → 模板(contains) ✓   **模板 → 皮片 ✗**
+实测(审查方): 往 base.html 追加 `__ORPHAN_TEST__` ⇒ 33 vs 32 ⇒ **无任何 Err**
+⇒ **这正是本次 bug 的精确形状**:模板有洞、替换表有名、装配图无片 ⇒ **唯独缺的那一支没查。**
+```
+
+### 164.3 修（三处,均已验证）
+
+| # | 修 | 验证 |
+|---|---|---|
+| **①** | **新增 `web/tests/boot_placeholders_test.js`** —— **三向**双向对位（模板 32 ↔ `boot.json` 认领 ↔ `boot.rs` 替代表）,并**进网** | 绿;**变异:删掉 `boot.json` 里 `cell_metering` 那片 ⇒ `exit=1`（正是本次 bug 的形状）**;另两条纯函数变异也红 |
+| **②** | `web/src/boot.rs` 的 `validate()` **补第三个方向**（模板里每个洞必须被皮片/派生项认领）+ 手写解析器（无 regex 依赖） | **注入 `__GHOST_PROBE__` ⇒ `cargo test -p cellrix-web boot` 1 failed** ✓（恢复后构建干净） |
+| **③** | `verify_live.py` 的清单**从 `base.html` 现场派生**（不再是手写 18 项） | 语法 ok;`check("the placeholder roster is derived from base.html", len>25)` |
+
+⇒ **三处声明现在两两对位**,而**判据在两个方向上都存在**：
+"模板有而图无"（会红,今天就会）与"图有而模板无"（会红）。
+
+### 164.4 通则㉓（并入）
+
+> **凡清单/表/枚举,必须与它描述的对象**双向对位**,且**两个方向都要有判据**。**
+> 单方向只能发现"多了什么";而这一格的病**全都是"漏了什么"**。
+> ⇒ 落地要求:清单**不得手写**（要么派生、要么探针实测）,且**对位判据必须进网**。
+
+### 164.5 顺带：FlowModus **不是**阻断项（可观测输出,非读码猜）
+
+```
+GET /api/flows     ⇒ 真实供应商池:current.supplier_id=agnes-ai, endpoint=https://apihub.agnes-ai.com/v1,
+                     model_id=agnes-video-v2.0, tiers.free[…]**不是 null**
+GET /api/ecosystem ⇒ **六组件全 ok**:tentacle · mind · anaphase · tuck · **flowmodus** · panel
+grep flowmodus_url docs/GROWTH.md ⇒ **0 命中**（§审查引文不在本仓此文件里）
+```
+⇒ 按我们刚立的纪律（**用可观测输出确认,不读代码猜**）:**当前唯一阻断项不是 FlowModus**,而是
+**B 需要"有事件的 period"**（§162.4）⇒ 它仍排在下一笔。
