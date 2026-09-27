@@ -55,6 +55,7 @@ const SELF_CONTAINED = [
   ['agent_loop_skeleton_test.js', 'the EIGHT Agent Loop criteria, written BEFORE the Loop (4 live homes, 4 declared absent with assertion+mutation)'],
   ['agent_loop_probe_test.js', 'THE FOUR PROBES: red until the Loop exists (a declaration with a name, not a disease)'],
   ['zero_report_test.js', 'a zero must carry its n (rule of three) and a verdict must carry its environment E'],
+  ['flake_roster_test.js', 'FLAKY is a third roster: neither red nor proven, with an append-only ledger and K>=3 escalation'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
   ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
@@ -275,6 +276,33 @@ const failedRoster = [];
  * sibling repos and jsdom, and "1 red / 31 proven" here — every extra "red" was an
  * environment absence wearing the word "red". A count is a claim; the classes are the fact. */
 const abortedRoster = [], envMissingRoster = [];
+/* ── A THIRD ROSTER (ADR-0048 §201) ──────────────────────────────────────────────────────
+ * Not red, not green: a suite that was red and then green on an immediate re-run is FILED.
+ * Measured in this repo's history: 'permanently red with no information in the red is worse,
+ * because it trains people to ignore red, and then the real reds go too' (see the note above
+ * the exception table) — so option B (leave it red) is forbidden by this file's own words, and
+ * option A (treat the green as proof) would wash out intermittent REAL defects.
+ * Cross-run aggregation, not a single retry, is the verdict: P(defect | seen flaky)
+ *   K=1 → 0.6238 · K=3 → 0.9994 · K=5 → 1.0000  (measured by the review).
+ * Opt-in (--retry-flaky): the default gate is unchanged, so this cannot change CI silently. */
+const RETRY_FLAKY = process.argv.indexOf('--retry-flaky') > -1;
+const flakyRoster = [];
+const FLAKY_LEDGER = require('path').join(__dirname, '..', '..', 'docs', 'flaky-ledger.jsonl');
+const FLAKY_ESCALATE_AT = 3;    /* declared policy, not a magic number: K≥3 is the verdict */
+function flakyCount(file) {
+  try {
+    return require('fs').readFileSync(FLAKY_LEDGER, 'utf8').split('\n').filter(function (l) {
+      return l.trim() && JSON.parse(l).file === file;
+    }).length;
+  } catch (err) { return 0; }
+}
+function appendFlaky(file, firstExit) {
+  try {
+    require('fs').appendFileSync(FLAKY_LEDGER,
+      JSON.stringify({ file: file, at: new Date().toISOString(), firstExit: firstExit })
+      + '\n');
+  } catch (err) { /* a ledger that cannot be written must not change the verdict */ }
+}
 
 /* 先证明**检查器本身**有效，再用它去判别人。
  * 顺序有意如此：一个失效的扫描器会给出"干净"的结论，而那个结论看起来与真干净一样。 */
@@ -352,6 +380,25 @@ for (const [file, what] of SELF_CONTAINED) {
       results.push(['ENV', file, what]);
       console.log('  ENV   ' + file + '  — environment missing, not a failure (rule ⑳)');
       continue;
+    }
+    /* ONLY exit 1 — never 2/3/4: retrying those would launder an environment absence into
+     * green, which is precisely what the rosters above exist to prevent. */
+    if (RETRY_FLAKY && e.status === 1) {
+      let again = null;
+      try { require('child_process').execFileSync(process.execPath, [require('path').join(__dirname, file)], { stdio: 'pipe' }); again = 0; }
+      catch (e2) { again = e2.status; }
+      if (again === 0) {
+        if (flakyCount(file) >= FLAKY_ESCALATE_AT) {
+          console.log('  ESCALATED ' + file + '  — seen flaky ' + flakyCount(file)
+            + ' time(s) before; K>=' + FLAKY_ESCALATE_AT + ' is the verdict, so this stays RED');
+        } else {
+          flakyRoster.push(file);
+          appendFlaky(file, e.status);
+          results.push(['FLAKY', file, what]);
+          console.log('  FLAKY ' + file + '  — red then green: FILED, not laundered, not proven');
+          continue;
+        }
+      }
     }
     failed++; failedRoster.push(file + (typeof e !== "undefined" && e && e.status ? " (exit " + e.status + ")" : ""));
     results.push(['FAIL', file, what]);
@@ -730,7 +777,8 @@ console.log(failed === 0
     + ' jsdom=' + (function () { try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })()
     + ']'
     + (abortedRoster.length ? ', ' + abortedRoster.length + ' ABORTED (not red)' : '')
-    + (envMissingRoster.length ? ', ' + envMissingRoster.length + ' env-missing (not red)' : ''));
+    + (envMissingRoster.length ? ', ' + envMissingRoster.length + ' env-missing (not red)' : '')
+    + (flakyRoster.length ? ', ' + flakyRoster.length + ' FLAKY (filed, neither red nor proven)' : ''));
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
  * ledger". Merging them into exit 1 would guarantee the wrong remedy, so XPASS
  * rides the register channel (3 = the checker's own bookkeeping is stale). */
