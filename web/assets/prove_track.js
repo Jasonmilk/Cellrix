@@ -175,6 +175,8 @@
     S.session = buildSession(nodes);
     S.usage = derivePeriodUsage(nodes);
     S.usageByTurn = N.usageByTurn(nodes);
+    S.usageByModel = N.usageByModel(nodes);
+    S.modelByTurn = N.modelByTurn(nodes);
     S.turnIds = [];
     S.turnIndex = {};
     S.session.forEach(function (e) {

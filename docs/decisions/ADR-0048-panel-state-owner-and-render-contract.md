@@ -8820,3 +8820,55 @@ Cover & Thomas Thm 2.8.1:若 S → W → U 是马尔可夫链,则 I(S;U) ≤ I(S
    ⇒ **响应必须改变或失败**;若不变 ⇒ 该组件不在因果路径上
    ⇒ 这是**铁律 9（变异注入自证）搬到运行栈**,也是对"在不在链路上"唯一的**直接**证据。
 ```
+
+## 189. **"哪一步用了哪个模型"终于有了出口** —— Agent Loop 的验收事实
+
+### 189.1 审查方实测:记录存在,**消费者为零**（我复核）
+
+```
+实测:`model` 已进 metering 节点（node.payload.model）✓;而
+  prove_track.node.js:53  只有 reply 带 model（metering 不带）
+  usageBySource / usageByTurn / derivePeriodUsage ⇒ 只累加数字,**完全不聚合 model**
+  prove_track.view.js ⇒ **0 处 model**
+⇒ **记录到了,却没有出口** ⇒ 你要验收的"planner 步→强模型 / executor 步→便宜模型"**无法验证** ⇒ I(路由;屏幕)=0
+⇒ 与 §167 zero-render、§186 端到端 0 bit **同一条公式**。
+```
+
+### 189.2 修（同一份 derive,两个新分组 —— 通则⑰）
+
+```
+① usageByModel(nodes)  —— 与 usageBySource/usageByTurn **同形同源**（只换分组键）
+② modelByTurn(nodes)   —— **两个字段都在节点上**（`turn` 与 `payload.model`）⇒ 是分组,**不是猜**;
+                          一个 turn 用了多个模型 ⇒ 报 **`(mixed)`**（声明的状态,绝不静默挑一个）
+③ 贯通:prove_track.js 派生 → 视图投递 → `cell_metering` 的 turns[n].tokModel（读声明输入,不重算）
+④ 显示:计量那一格现在写着 **花了多少 · 谁回答的**（此前只有前者）
+```
+**判据 `usage_by_model_test.js`（已进网,9 条全绿）**:
+```
+ok  两个模型被区分（不是合并）        ok  各自带各自的 token（5 / 7）
+ok  **SELF-CHECK: Σ(按模型) == period** ok  两次调用都被计
+ok  MUTATION 范围:把所有模型并成一个 key ⇒ 只剩 1 组（所以上面那条断言真的是关于**键**的）
+ok  **每轮各自命名自己的模型**:turn0='planner-strong' · turn1='executor-cheap'
+```
+⇒ **门 `proven` 44 → 45**;整门 **2 red**（两条均已具名归因）。
+
+### 189.3 ⚠️ 而我中途写了一个**永远返回 null 的占位** `turnModelOf`（自己抓到自己）
+
+```
+第一版我留了 `function turnModelOf() { … return null; }` 当占位 ⇒ 那正是我一直在记录的病
+（"写下 ≠ 做到"）⇒ **已删除**,改为从声明输入 `modelByTurn[turn.id]` 取值。
+⇒ 教训:**占位符与实现必须可分辨** —— 而它们的可分辨性只能来自判据（本笔的 `每轮各自命名` 正是那条判据）。
+```
+
+### 189.4 仍未完成（Anaphase 侧,下一笔）
+
+```
+① `main.rs:722-754` 有 **6 种终局、3 种是 Noop**:把"选中的适配器"穷尽成一个声明
+   （p1-http / p2-grpc / p2-http / noop-p1-empty / noop-p2-empty / noop-none / **noop-connect-failed**）
+   ⇒ 审查方算得对:3 类 kind 相对 6 态 **丢 1.000 bit**,而那 1 bit 恰是
+     "**没配**" 与 "**配了但连不上**" 的区别（通则⑪;也是用户"之前能用现在不能"的两个候选解释）
+② **连接失败必须进 `/v1/health`**（现在只 `eprintln!` 到 stderr ⇒ 不可观测）
+③ **运行时消融 A/B/C**:停 flowmodus / 端点指死 / 看 health 终局 ⇒
+   静态链能排除 H2,**排除不了 H3（P2 运行期连接失败）**;消融是唯一直接证据（铁律 9 搬到运行栈）
+④ §186 那一行（`script.html` 按 walk 分支）—— Loop 会让 period 涨一个数量级
+```

@@ -149,6 +149,40 @@
    * derivation, two groupings). Without it the projection had to put the PERIOD total into the
    * FIRST turn, which stated "turn A generated 12" (it generated 5) and left turn B — which really
    * generated 7 — showing "· 无数据". */
+  /* PER-MODEL AGGREGATION, SAME DERIVATION (ADR-0048 §189): `model` is already recorded on the
+   * metering node and written into the event stream so "a reader can tell which layer actually
+   * answered" — but nothing consumed it: usageBySource / usageByTurn / derivePeriodUsage add
+   * numbers only, and the view never showed it. The one fact an Agent Loop is accepted on
+   * (which step used which model) therefore had no outlet at all. */
+  /* WHICH MODEL SERVED WHICH TURN (ADR-0048 §189): both facts live on the metering node
+   * (`turn` and `payload.model`), so the answer is a grouping, not a guess. A turn with more
+   * than one model is reported as `(mixed)` — a declared state, never a silent pick. */
+  function modelByTurn(nodes) {
+    var sets = {};
+    (nodes || []).forEach(function (n) {
+      if (n.kind !== 'metering' || !n.turn) { return; }
+      var m = (n.payload && n.payload.model) ? String(n.payload.model) : '(unreported)';
+      (sets[n.turn] = sets[n.turn] || {})[m] = true;
+    });
+    var out = {};
+    Object.keys(sets).forEach(function (t) {
+      var ks = Object.keys(sets[t]);
+      out[t] = (ks.length === 1) ? ks[0] : '(mixed)';
+    });
+    return out;
+  }
+
+  function usageByModel(nodes) {
+    var by = {};
+    (nodes || []).forEach(function (n) {
+      if (n.kind !== 'metering') { return; }
+      var m = (n.payload && n.payload.model) ? String(n.payload.model) : '(unreported)';
+      (by[m] = by[m] || []).push(n);
+    });
+    Object.keys(by).forEach(function (k) { by[k] = derivePeriodUsage(by[k]); });
+    return by;
+  }
+
   function usageByTurn(nodes) {
     var by = {};
     (nodes || []).forEach(function (n) {
@@ -325,6 +359,6 @@
     toolNameOf: toolNameOf, payloadOf: payloadOf, detailOf: detailOf,
     resultIsTerm: resultIsTerm,
     derivePeriodUsage: derivePeriodUsage, usageBySource: usageBySource,
-    buildSession: buildSession, computeRepeats: computeRepeats, usageByTurn: usageByTurn
+    buildSession: buildSession, computeRepeats: computeRepeats, usageByTurn: usageByTurn, usageByModel: usageByModel, modelByTurn: modelByTurn
   };
 })();
