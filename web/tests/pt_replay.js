@@ -144,10 +144,31 @@ console.log('\n=== 2) malformed rows are refused, not guessed ===');
 const mk = function (p, c) {
   return { kind: 'metering', payload: { promptTokens: p, completionTokens: c } };
 };
+/* REFUSED rows are not counted as calls, so an all-illegal input still means "the fact does not
+ * exist" — the old conclusion survives, now for a stated reason (refusal) rather than by accident. */
 check('a non-numeric count is not a measurement', PT.node.derivePeriodUsage([mk('664', 171)]) === null);
 check('a negative count is not a measurement', PT.node.derivePeriodUsage([mk(-1, 5)]) === null);
-check('an overflowing sum withholds the whole aggregate, not a partial one',
-  PT.node.derivePeriodUsage([mk(1e308, 1e308), mk(1e308, 1e308)]) === null);
+/* ORACLE RE-DERIVED, NOT EDITED TO MATCH OUTPUT (ADR-0048 §180 / §4.2). The old expectation was
+ * "an overflowing sum withholds the whole aggregate" and it was expressed as `=== null` — i.e.
+ * INDISTINGUISHABLE from "there is no data", which rule ⑪ forbids. §131 already settled that an
+ * unknown LOWER BOUND is a true statement where a null is not, so the aggregate now DECLARES the
+ * overflow (reason + overRange) instead of returning a bare null. The rule did not change; the
+ * shape that expresses it did. */
+check('an overflowing sum is DECLARED (reason + overRange), never a silent null',
+  (function () {
+    const r = PT.node.derivePeriodUsage([mk(1e308, 1e308), mk(1e308, 1e308)]);
+    return r !== null && r.overflow === true && r.reason === 'overflow-sum' && r.total === null;
+  })());
+check('a LEGAL value above MAX_SAFE_INTEGER is not silently turned into 0',
+  (function () {
+    const r = PT.node.derivePeriodUsage([mk(1e308, 5)]);
+    return r !== null && (r.promptOverRange === true || r.prompt === 1e308);
+  })());
+check('an ILLEGAL row is REFUSED and leaves a trace (refused > 0), and is not counted as a call',
+  (function () {
+    const r = PT.node.derivePeriodUsage([mk(9, 5), mk(-5, 7)]);
+    return r !== null && r.calls === 1 && r.refused === 1 && r.prompt === 9;
+  })());
 check('a malformed row is skipped and the valid one survives',
   (function () {
     const r = PT.node.derivePeriodUsage([mk(664, 171), mk('664', 171)]);

@@ -118,6 +118,14 @@
    *   2. OPTIONAL BUCKETS ARE ALL-OR-NOTHING.
    *   3. ABSENT MEANS OMITTED.
    */
+  /* M measvement · U legal-unreported (null) · R refused (illegal) · B over-range but legal.
+   * `MAX_SAFE_INTEGER` is an INTEGER-PRECISION bound, not an EXISTENCE bound (IEEE 1788): using it
+   * to decide "is this a measurement" recorded a legitimate 1e308 as 0. */
+  function classifyCount(n) {
+    if (n === null || n === undefined) { return 'U'; }
+    if (typeof n !== 'number' || !isFinite(n) || n < 0) { return 'R'; }
+    return (n > Number.MAX_SAFE_INTEGER) ? 'B' : 'M';
+  }
   function safeCount(n) {
     return typeof n === 'number' && isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER;
   }
@@ -142,23 +150,47 @@
      * WHOLE, so prompt read 20 instead of 23, `calls` read 2 instead of 3, and total read
      * 32 while the truth is >= 35 (ISO 9075 aggregates ignore NULL; Moore: 3 + ? = [3,+inf)). */
     var promptPartial = false, completionPartial = false;
+    var promptOverRange = false, completionOverRange = false;
+    var refused = 0;   /* OBSERVABLE (a refusal that leaves no trace is a silent absorption) */
     var cachedSum = 0, cachedAll = true, reasoningSum = 0, reasoningAll = true;
     (nodes || []).forEach(function (n) {
       if (n.kind !== 'metering') { return; }
       var p = n.payload || {};
-      if (safeCount(p.promptTokens)) { prompt += p.promptTokens; } else { promptPartial = true; }
-      if (safeCount(p.completionTokens)) { completion += p.completionTokens; } else { completionPartial = true; }
-      calls++;   /* the call HAPPENED, so it is counted — even when a column is unknown */
+      /* FOUR THINGS WERE LIVING IN ONE `else` (ADR-0048 §180). Measured on this branch:
+       *   null        ⇒ "the upstream did not report it"  = a DATA STATE   ⇒ partial, call counts
+       *   -5 / 'x'    ⇒ NOT A MEASUREMENT (domain/type)    = a CONTRACT VIOLATION ⇒ refuse the row
+       *   1e308       ⇒ a REAL measurement, merely over the SAFE-INTEGER bound ⇒ still a value
+       * and an overflowing SUM ⇒ must be DECLARED, never silently null (rule ⑪).
+       * ISO 9075 keeps NULL and illegal values in different layers: the constraint layer refuses,
+       * the aggregate ignores NULL. Saltzer & Schroeder: illegal input is refused and REPORTED. */
+      var rp = classifyCount(p.promptTokens), rc = classifyCount(p.completionTokens);
+      if (rp === 'R' || rc === 'R') { refused++; return; }      /* refused ⇒ not a measurement, not a call */
+      if (rp === 'B') { promptOverRange = true; }
+      if (rc === 'B') { completionOverRange = true; }
+      if (rp === 'M' || rp === 'B') { prompt += p.promptTokens; } else { promptPartial = true; }
+      if (rc === 'M' || rc === 'B') { completion += p.completionTokens; } else { completionPartial = true; }
+      calls++;   /* the call HAPPENED: a legal unreported column does not un-happen it */
       if (p.cachedTokens == null) { cachedAll = false; } else { cachedSum += p.cachedTokens; }
       if (p.reasoningTokens == null) { reasoningAll = false; } else { reasoningSum += p.reasoningTokens; }
     });
     if (!calls) { return null; }
-    if (!safeCount(prompt) || !safeCount(completion)) { return null; }
+    /* AN OVERFLOWED SUM IS DECLARED, NOT SILENTLY EMPTY (ADR-0048 §180): returning a bare `null`
+     * makes "cannot be computed" indistinguishable from "no data" (rule ⑪) — and §131 already
+     * settled that an unknown LOWER BOUND is a true statement where a null is not. */
+    if (!safeCount(prompt) || !safeCount(completion)) {
+      return { calls: calls, prompt: null, completion: null, overflow: true,
+               reason: 'overflow-sum', refused: refused, promptPartial: promptPartial,
+               completionPartial: completionPartial, promptOverRange: promptOverRange,
+               completionOverRange: completionOverRange, cached: null, reasoning: null,
+               input: null, total: null, totalPartial: true };
+    }
     var cached = (cachedAll && safeCount(cachedSum)) ? cachedSum : null;
     var reasoning = (reasoningAll && safeCount(reasoningSum)) ? reasoningSum : null;
     return {
       calls: calls, prompt: prompt, completion: completion,
       promptPartial: promptPartial, completionPartial: completionPartial,
+      promptOverRange: promptOverRange, completionOverRange: completionOverRange,
+      refused: refused,
       cached: cached, reasoning: reasoning,
       input: (cached == null) ? null : prompt - cached,
       total: prompt + completion,

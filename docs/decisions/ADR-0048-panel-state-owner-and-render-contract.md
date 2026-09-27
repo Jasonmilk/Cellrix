@@ -8406,3 +8406,49 @@ FAIL  a malformed row is skipped and the valid one survives
 ④ 判据:四条 + 变异(把 ① 与 ② 合回同一支 ⇒ 必须红)。
 ```
 ⇒ **在此之前,门的第 3 条红是**正确的**:它正是"两种非量值不可混"的判据在说话。**
+
+## 180. ⚖️ **§179 裁决落地**：三态判别 M/U/R + B —— 那一支 `else` 曾同时装着四种东西
+
+### 180.1 裁决（采纳审查方,依据 ISO 9075 / Saltzer / IEEE 1788 / CI-144 §2-3）
+
+| 类 | 判据 | 处置 | 可观测 |
+|---|---|---|---|
+| **M** 量值 | `typeof n==='number' && isFinite(n) && 0<=n<=MAX_SAFE_INTEGER` | 累加 | — |
+| **U** 合法未上报 | `n === null` | 该列**未知**（下界）,**该行仍算一次调用** | `partial` |
+| **R** 非法 | 其余（负数 / 非数 / `NaN` / `±Inf`） | **整行拒收**:不累加、**不计 calls** | **`refused`（必须可观测）** |
+| **B** 超界但合法 | 有限非负但 `> MAX_SAFE_INTEGER` | **仍是量值** ⇒ 累加并声明 `overRange` | `overRange` |
+
+⇒ **关键界线**:`null` 是**数据状态**（"我不知道"）,非法是**契约违反**（"这不该存在"）;
+⇒ 前者 ⇒ 继续算并声明下界;后者 ⇒ **拒收并留痕**（Saltzer fail-safe + 通则⑩）。
+
+### 180.2 实测（四情形,核审查方表）
+
+```
+① [9,5][11,7][3,null]  ⇒ calls=3 prompt=23 completion=12 total=35 partial ✓（不变,正确）
+② [9,5][-5,7]  负数     ⇒ calls=1 prompt=9 completion=5 **refused=1**（整行拒收,不计 calls）
+③ [9,5]['x',7] 字符串   ⇒ 同上
+④ [1e308,5][1e308,7]   ⇒ **overflow-sum 被声明**（`overflow:true · reason:'overflow-sum' · total:null`）
+⑤ 溢出和               ⇒ 同上
+```
+⇒ ④/⑤ 不再**静默 null**:`null` 与"算不出来"必须可分辨（通则⑪）;而 §131 已确立"未知的**下界**是真陈述"。
+
+### 180.3 `pt_replay` 的四条 oracle:**按其规则重算,不是按输出改**（§4.2 允许的方向）
+
+```
+旧期望 "an overflowing sum withholds the whole aggregate" 写成 `=== null` ⇒ 与"没有数据"**逐位相同** ⇒ 违反通则⑪
+⇒ 重算为:溢出 ⇒ **声明**（`overflow && reason==='overflow-sum' && total===null`）
+⇒ 另补两条:超界合法值**不得被静默归零**;非法行**必须拒收并留痕**(`refused>0` 且不计 calls)
+实测:pt_replay **PASS（全绿）**
+```
+**裁决依据（审查方的"三问",三问全中）**:① §4.2 已有裁定(`null` 带下界) ② §131 有同形已修先例
+③ 旧 oracle **丢**信息（已知的 `prompt=3` 与一次真实调用）⇒ **实现是对的,oracle 是过时方。**
+
+### 180.4 🎯 新发现:**两个都叫 `tok` 的量**（通则⑮,第 25 个位置）
+
+```
+project(原始事件).tok   = **12**  ← value_criterion 的预言机:只对 completion_tokens 求和
+REPLY.tok / TOKENS 统计 = **35**  ← prompt + completion（修后）
+⇒ **同一个名字,两个量**:"生成量" 与 "总量" ⇒ **必须先声明这一格是哪一个**,才谈得上"显示真值"。
+```
+⇒ **本笔的裁决**:这一格的 `tok` = **`completion`（生成量,=12）**;`total` 是另一个量,须**改名或另名**。
+⇒ 而 `tok` 出口仍须由 **period 级聚合**提供（`metering` 不 drawn ⇒ 逐行 fold 恒 A()）⇒ **下一笔**。

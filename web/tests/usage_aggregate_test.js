@@ -42,12 +42,15 @@ ok(u && u.total === 35 && u.totalPartial === true,
   'total reports the LOWER BOUND 35 and says so (totalPartial) [' + (u && u.total)
   + ' partial=' + (u && u.totalPartial) + ']');
 
-/* MUTATION: restoring the whole-node drop must break all three claims above */
+/* MUTATION (re-aimed after §180 introduced the four-way classification): make a LEGAL null be
+ * treated as ILLEGAL (refused) — the exact inversion §176/§177 exist to forbid. The row must then
+ * vanish from the aggregate again (calls=2, prompt=20), which is what the old behaviour looked like. */
 const broken = derive({ 'prove_track.node.js': (src) => src.replace(
-  "if (safeCount(p.promptTokens)) { prompt += p.promptTokens; } else { promptPartial = true; }",
-  "if (!safeCount(p.promptTokens) || !safeCount(p.completionTokens)) { return; } if (safeCount(p.promptTokens)) { prompt += p.promptTokens; }") });
-ok(broken.calls === 2 && broken.prompt === 20,
-  'MUTATION: the old whole-node drop IS caught (calls=2, prompt=20 again)  [' + broken.calls + ', ' + broken.prompt + ']');
+  "if (n === null || n === undefined) { return 'U'; }",
+  "if (n === null || n === undefined) { return 'R'; }") });
+ok(broken.calls === 2 && broken.prompt === 20 && broken.refused === 1,
+  'MUTATION: treating a LEGAL null as ILLEGAL IS caught (calls=2, prompt=20, refused=1)  ['
+  + broken.calls + ', ' + broken.prompt + ', ' + broken.refused + ']');
 console.log(bad === 0 ? 'OK — an unknown column lowers a bound instead of voiding the row'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);
