@@ -8712,3 +8712,62 @@ ok  变异:把环误报成 root ⇒ 被抓
 ② 「无环」作为**图级判据**（不只单次 walk）:整窗口扫一次 ⇒ 有环 ⇒ 红
 ③ 上下文视图（祖先闭包）/ 导航视图（含兄弟全树）分离;引用而非重现
 ```
+
+## 186. 四态诊断**装好了,但装在后备箱里** —— 数据处理不等式:端到端仍是 0 bit
+
+### 186.1 实测（审查方,我复核）
+
+```
+grep -rn "lastWalk\|lastTruncation" web/assets/  ⇒ **只有定义处**（period_normalize.js）;UI 侧 **0 命中**
+而唯一调用方 script.html:151  `if (!ids.length) { ids = [start]; }`
+  ⇒ **`start-absent` 的 `[]` 被就地改写成 `[start]`** ⇒ 之后要么空事件、要么孤立一段,**屏幕上什么都不会说**
+  ⇒ 且 `cycle` 仍返回 `[Q,P]`,调用方**把它当序用** —— 而它不是一个序
+⇒ **"记录 ≠ 消费"第四次,而这次不是没人读,是读了又改回去了。**
+```
+
+### 186.2 数学:**数据处理不等式 —— 整链的判别力 = 最弱一环**
+
+```
+Cover & Thomas Thm 2.8.1:若 S → W → U 是马尔可夫链,则 I(S;U) ≤ I(S;W)
+本格:U（用户看到的）**根本不由 W 决定**
+  I(S;W) = 2.0 bits  ← 本笔新装的仪表（判据内部已满,10 条全绿）
+  I(S;U) = **0.0 bits** ← 端到端
+⇒ **一根管子能流多少水,由最细的那一段决定。**
+⇒ 与 §167 的 **zero-render**、`adr_anchor` 的 **fail-open** 是**同一条公式的三个实例**。
+⇒ **判据的判别力 ≠ 系统的判别力**:中间任何一环不传递,前面装的 bit 全部作废。
+```
+
+### 186.3 另两条实测
+
+```
+① 引用泄漏:`lastWalk()` 返回**活对象** ⇒ 外部改 `d.kind='HACKED'` ⇒ 再读仍是 HACKED
+   ⇒ 诊断可被任何调用方污染（Hickey:隐藏可变状态;通则⑰:第二份真相的宿主）
+② 上限两处:`script.html:145` 硬编码 limit=500,`config.rs:32 SESSIONS_LIMIT_MAX = 500` ⇒ 同一事实两份声明
+```
+
+### 186.4 下一笔（顺序即便宜度）
+
+```
+0 【一行】script.html:151 兜底改为**按 walk 分支**:start-absent ⇒ **用户可见**地说"起点不在窗口";
+  cycle ⇒ **不得把路径当序用**;truncated ⇒ 可见地点名 parent
+1 【判据】"声明必须有消费者":扫描 assets ⇒ lastWalk/lastTruncation 消费者数 ≥ 1
+  + **变异:删掉唯一消费者 ⇒ 必须红**（否则又是"判据绿而系统不传递"）
+2 walk 随路径**返回**（{path, walk}）或声明式返回 —— 模块级全局会被并发轮询覆盖
+3 lastWalk() 返回**副本/冻结**,避免被调用方改写
+4 limit 由一处声明（Rust 下发到 boot,或 JS 只写一处 + 对位判据）
+```
+
+## 187. **flowmodus 通不通?实测:通**（可观测,铁证）
+
+```
+① 生态:六组件全 ok;anaphase 的四盏灯 flowmodus/mind/tentacle/tuck 全 `reachable`
+② 环境:`ps eww` 显示运行中的 anaphase 确有 `ANAPHASE_FLOWMODUS_ENDPOINT=grpc://127.0.0.1:60054`
+③ 传输:TCP **ESTABLISHED** `anaphase(59855) → flowmodus(60054)`（lsof 实测）
+④ **端到端铁证**:POST /v1/chat {"message":"ping"} ⇒ `model:"agnes-2.5-flash"` · reply "pong"
+                POST /v1/chat {"message":"say hi"} ⇒ `model:"agnes-3.0-flash"` · reply "hi"
+   ⇒ **两次请求被分派到两个不同的模型** ⇒ **只有 flowmodus（供应商池 + 路由）能做这件事** ⇒ 它确实被调用了
+⑤ body 契约:字段是 **`message`**（`{"text":…}` ⇒ `{"error":"empty message"}`）
+⇒ 结论:**在"当前运行的这套栈"上,anaphase→flowmodus 是通的。**
+   若用户环境仍失败 ⇒ 请用同一条 curl 比对:若 `model` 恒定不变 ⇒ 说明 flowmodus 被旁路（Noop/直连）
+   （chain.json 的原话:*"a missing endpoint env means a **silent Noop adapter, not an error**"*）。
+```
