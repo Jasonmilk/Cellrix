@@ -89,6 +89,40 @@ CLAIMS.forEach((c) => {
     'claim ' + c.id + ' red-meaning: ' + NAMED[c.id]);
 });
 
+/* ── THE HARDENING THE REVIEW ASKED FOR (ADR-0048 §197) ──
+ * One dimension is not a budget: an agent that respects `steps` can still burn the wallet through
+ * tokens or wall-clock — the same "enumerate every channel" discipline this cell keeps relearning.
+ * And "done" must never be the model's own word: a terminal condition the producer can assert
+ * about itself is not a check, it is a claim.
+ */
+const HARDENING = {
+  budgetDimensions: ['steps', 'toolCalls', 'tokens', 'wallClock', 'cost'],
+  terminalStates: ['success', 'no_progress', 'repetition', 'budget_exceeded',
+    'uncertain', 'error', 'human_abort'],
+  terminalHome: 'absent',
+  terminalAssertion: '每一次运行以一个具名终局结束；7 态两两可分辨（裸 done ⇒ 红）',
+  terminalMutation: '把 budget_exceeded 并回 error ⇒ 必须红',
+  doneRule: 'done 必须是**可检查谓词**（状态/产物/断言），不得由模型自述',
+  budgetDerivation: 'P95 × 1.5（不用固定值）',
+  budgetNoAutoExtend: '预算不得自增（auto-extends is not a budget）',
+  maxStepsDerivation: '不是魔数：由历史步数派生（P95×1.5）；超过阈值 ⇒ 升级 Plan-and-Execute'
+};
+ok(HARDENING.budgetDimensions.length === 5,
+  'the budget has FIVE dimensions [' + HARDENING.budgetDimensions.join(', ') + ']'
+  + ' — guarding one lets the others be bypassed');
+ok(HARDENING.terminalStates.length === 7,
+  'the terminal states are SEVEN [' + HARDENING.terminalStates.join(', ') + ']'
+  + ' — incl. human_abort, which a 6-state set silently merges');
+ok(/可检查谓词/.test(HARDENING.doneRule),
+  'done is a CHECKABLE PREDICATE, never the model\'s own word: ' + HARDENING.doneRule);
+ok(/P95/.test(HARDENING.budgetDerivation) && /P95/.test(HARDENING.maxStepsDerivation),
+  'every budget number is DERIVED (P95 × 1.5), not hand-written: '
+  + HARDENING.budgetDerivation + ' · ' + HARDENING.maxStepsDerivation);
+ok(/auto-extends/.test(HARDENING.budgetNoAutoExtend),
+  'and the budget must NOT auto-extend: ' + HARDENING.budgetNoAutoExtend);
+ok(CLAIMS.filter(function (c) { return c.id === 4; })[0].claim.indexOf('超预算') === 0,
+  'claim 4 (超预算) now points at the five dimensions above rather than one');
+
 console.log(bad === 0
   ? 'OK — 8 criteria for a Loop that does not exist yet: 4 already have live homes, 4 are declared absent with their assertion and mutation'
   : 'FAILED — ' + bad + ' check(s) red');
