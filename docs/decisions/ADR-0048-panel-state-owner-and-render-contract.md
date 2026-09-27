@@ -8452,3 +8452,48 @@ REPLY.tok / TOKENS 统计 = **35**  ← prompt + completion（修后）
 ```
 ⇒ **本笔的裁决**:这一格的 `tok` = **`completion`（生成量,=12）**;`total` 是另一个量,须**改名或另名**。
 ⇒ 而 `tok` 出口仍须由 **period 级聚合**提供（`metering` 不 drawn ⇒ 逐行 fold 恒 A()）⇒ **下一笔**。
+
+## 181. 🎯 tok 出口:**不是 bug,是一份正确的声明没被遵守**
+
+### 181.1 根因（审查方定位到行,我复核）
+
+```
+prove_track.render.js:56   NOT_DRAWN = { metering: 'measured per call, not a step of the cycle' }
+⇒ 这份声明**是对的**:一次调用的度量**不是证轨上的一道工序**
+⇒ 而 buildSession 用 R.SUMMARY 过滤 ⇒ **会话行里永远没有 metering 行** ⇒ TOK_APPLICABLE 零命中
+⇒ 逐行 fold ⇒ A() ⇒ 屏幕 "· 无数据"     而真相 derivePeriodUsage(nodes).completion = **12**（一直存在且正确）
+⇒ **所以这不是"修 bug",是"把已存在的正确事实接到它该去的地方"** —— 错的是**读取点**,不是声明。
+```
+
+### 181.2 修（声明输入 `opts.usage`,**两个宿主都落**）
+
+```js
+/* 通则⑩:无声明即无值;缺失的声明不是缺省 */
+function declaredTok(opts) {
+  var u = (opts && opts.usage) ? opts.usage : null;
+  if (!u || typeof u.completion !== 'number' || !isFinite(u.completion) || u.completion < 0) return null;
+  return { value: TS.P(u.completion), partial: !!u.completionPartial };
+}
+function project(events, opts) { … if (declared) folded = {value: declared.value, partial: declared.partial}; … }
+/* turns[0] 也要落 —— 视图读的是 turns[i].tok（"一个事实两个宿主"通则⑮） */
+if (declared && n === 0) { foldedTurn = { value: declared.value, partial: declared.partial }; }
+```
+**视图**:`S.usage` **早已存在**（`prove_track.js:176 S.usage = derivePeriodUsage(nodes)`）⇒ 两处调用改为
+`project(S.session, { usage: S.usage })` —— **只投一个口,屏幕上仍是"无数据"**(我第一版正是如此)。
+
+**实测（`tok_outlet_test.js`,已进网）**:
+```
+ok  project(rows,{usage}) ⇒ top-level tok == P(12)   ok  **AND turns[0].tok == P(12)**（视图真正读的那个宿主）
+ok  两个宿主一致（一个事实两处宿主不得漂移）        ok  completionPartial ⇒ 折叠标记 partial（下界可见）
+ok  **不传声明 ⇒ 仍是 A()**（通则⑩:无声明即无值）
+ok  MUTATION:改 completion ⇒ 99 被带过去            ok  MUTATION:非法声明(completion:-1) ⇒ 拒绝,不吸收
+```
+⇒ 而"两个宿主"这一课我**第二轮才学到**:第一版只改顶层 ⇒ `project().tok = 12` 而 `turns[0].tok` 仍是 `A()`。
+
+### 181.3 判词的最后一块
+
+```
+lane 出口:§175 已死（逐块值判据 + 缝的变异）
+tok  出口:**本笔**（声明输入 + 两宿主 + 6 条判据含两条变异）
+⇒ **"值住在 project() 里"第一次对两个出口同时成立。**
+```

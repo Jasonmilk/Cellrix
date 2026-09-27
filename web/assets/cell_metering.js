@@ -148,7 +148,18 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
   /* BOTH aggregates the cell needs, from the SAME list, in ONE pass — otherwise the
    * view keeps its own :335 max loop and the cell has TWO aggregation paths, which is
    * guaranteed drift (the "two menus" problem). `max` also carries the three states. */
-  function project(events) {
+  /* THE METER IS NOT A CYCLE STEP (ADR-0048 §181): `prove_track.render.js` declares
+   * NOT_DRAWN: { metering: 'measured per call, not a step of the cycle' } — a CORRECT decision,
+   * and the reason no metering row ever reaches the session. So the per-row fold can never see a
+   * token count while `derivePeriodUsage(nodes).completion` is right there. This is not a bug to
+   * repair but a declared input to accept: `opts.usage` (rule ⑩ — no declaration, no value;
+   * a missing declaration is not a default). */
+  function declaredTok(opts) {
+    var u = (opts && opts.usage) ? opts.usage : null;
+    if (!u || typeof u.completion !== 'number' || !isFinite(u.completion) || u.completion < 0) { return null; }
+    return { value: TS.P(u.completion), partial: !!u.completionPartial };
+  }
+  function project(events, opts) {
     /* EACH DIMENSION SELECTS ITS OWN ROWS. Pushing an A() into the tok list for a row
      * that is merely applicable to DURATION makes the tok fold partial — the exact
      * false-alarm flood this rule exists to prevent (measured: it happened even while
@@ -168,6 +179,8 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
       if (applicableDur) { durFold.push(durOf(events[i])); }
     }
     var folded = TS.fold(tokFold);
+    var declared = declaredTok(opts);
+    if (declared) { folded = { value: declared.value, partial: declared.partial }; }
     var acc = TS.start(), seenPMax = false, seenAMax = false, seenAnyNull = false;
     var displayMax = null, tokHasUnmeasured = false;
     var maxDurAcc = TS.A(), seenPDur = false, seenADur = false, seenNDur = false;
@@ -269,6 +282,10 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
     }
     for (var n = 0; n < turns.length; n++) {
       var foldedTurn = TS.fold(turns[n].states);
+      /* TWO HOSTS, ONE FACT (rule ⑮): the view reads `turns[i].tok`, so the declaration must land
+       * here as well — my first version changed only the top-level `tok` and the screen kept
+       * saying "· 无数据". When the aggregate is period-wide it is stated once, on turn 0. */
+      if (declared && n === 0) { foldedTurn = { value: declared.value, partial: declared.partial }; }
       turns[n].tok = foldedTurn.value;
       turns[n].partial = foldedTurn.partial;
       /* SAME recorded map as self.bars — searching `list` by event returned -1, which is
