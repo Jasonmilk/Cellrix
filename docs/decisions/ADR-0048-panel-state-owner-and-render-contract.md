@@ -9722,3 +9722,87 @@ owner 原话:"js文件未必适用我们的rust项目" ⇒ **已记入文件头*
   `period_normalize`(parent 链),不是 `assembly.js`** ⇒
   **正确的路是改探针,不是让 `assembly.js` 出现协议名来迎合探针。**
 ```
+
+## 205. ⚖️ **裁定:复用 `run_cycle`,不重建 agent loop** —— 承重引文我逐字核过
+
+### 205.1 核验（本地 Anaphase checkout 逐字,非引用）
+
+| # | 审查方的引文 | 我核到的 | 成立 |
+|---|---|---|---|
+| **①** | `run_cycle/mod.rs`:"The caller owns the looping policy — how many periods to run and when to stop is a **caller decision, never an engine property**"（ADR-0016 D1） | 逐字一致 | ✅ |
+| **②** | `states.rs`:"the natural period-step cap (**derived from the enum, not a magic number**)" + `pub const ALL: [HelixState; **7**]` | 逐字一致 | ✅ |
+| **③** | `verdict.rs` 开头:"**Three transports, three judgements.**" + "**one period gets one verdict**" | 逐字一致（并写明后果:一次 impasse 只到 ring buffer） | ✅ |
+| **④** | `EndReason` 四态里**没有 Tuck gate 的位置** | `{Completed, Impasse, UndefinedTransition, CycleCapExhausted}` ✅ 四态,无此支 | ✅ |
+| **⑤** | **两处外层循环**:CLI(`main.rs:621`)与 CI-144(`main.rs:962`) | 两处 `for _ in 0..cap` 均实测存在;**CLI 那支用 `completed: bool`**,CI-144 那支用 `out.done` | ✅ |
+| **⑥** | `PeriodVerdict` 私有字段 + 构造器:"The invariant is not re-derived per consumer — it is imposed here, once, **where it cannot be forgotten**" | 逐字一致 | ✅ |
+
+⇒ **而 ⑤/⑥ 合起来把缺口钉死了**:`PeriodVerdict`（私有 + 构造器)是**已收口**的那一半;
+**CLI 那一支还在用 `CycleOutcome`（`pub done/success/impasse`)—— 公开字段的那个类型** ⇒
+**"两个类型、两处循环、两份判断",而 §205 的裁定正是收敛它们。**
+
+### 205.2 裁定
+
+```
+❌ 重建一个新 agent loop        ⇒ **不要**（k=3 ⇒ 24 个月内不一致概率 **99.7%**）
+⚠️ 解耦 run_cycle             ⇒ **不需要**（ADR-0016 D1 已解耦:**引擎只有 period,循环归 caller**）
+✅ **复用 run_cycle**          ⇒ **正解**
+⇒ 而数学是通则⑰ 的可计算形式:k 份实现 ⇒ k=1 时 P(漂移)=**0.0%**（"漏掉另一份"在只有一份时不存在）。
+```
+
+### 205.3 真正的缺口:**不是"会不会停",是"停的时候说了什么"**
+
+```
+内层停机性**已经良基**（上界 = enum 长度,派生）⇒ **不需要 `max_steps`**（审查方对,代码自己写着）。
+而**外层有两份实现**,其中一份的终止语义是**两态**:
+  CLI(`main.rs:621`):`completed: bool` ⇒ 出口是 "completed successfully" / "did NOT complete within 7 cycles"
+  CI-144(`main.rs:962`):`PeriodVerdict::cap_exhausted()` ⇒ 出口是**具名 reason 令牌**
+⇒ 而 `verdict.rs` 开头**逐字记着这个病已经修好了 2/3**(HTTP + CI-144),**CLI 那一支没修** ——
+  而它正好是**人读的那一支**。
+**更硬的缺口**:`main.rs:625-631` 的 **Tuck 不在岗 ⇒ break** 与 `cycle_cap 耗尽` **共用一句话**:
+```
+| 真因集合 S（5 态） | I(真因;观测) | 判别力 |
+|---|---|---|
+| CLI 现状（2 名） | 0.8813 bits | **60.3%** |
+| EndReason（4 名） | 1.2828 bits | 87.8% |
+| **穷尽命名（5 名）** | **1.4612 bits** | **100%** |
+
+```
+★ **读到"未能在 7 轮内完成"时,真相是 Tuck 不在岗的概率 = 44.4%**
+⇒ 后果具体:人去**调大 `cycle_cap`**,而真相是 Tuck 挂了 ⇒ **把唯一的异常信号调没了**（"把保险丝调大"同形）
+⇒ 而这是 **0 bit 公式的第 N 个实例,这次长在"给人看的那句话"上**。
+```
+
+### 205.4 正解的形状（三步,都很小）+ 5 条判据（此刻全红,即 §204 里"Rust 那一半"）
+
+```
+① 【复用】`run_cycle` 一行不改（它是 **period 原子原语**)
+② 【收敛,不新建】两处 `for _ in 0..cap` 抽成 **`run_until_done(&mut agent, input)`** ⇒ **k: 2 → 1**
+③ 【穷尽命名】`EndReason` 加一支（`TuckGate` 或更一般的 `ExternalGateRefused`）⇒
+   **"没跑"与"跑完了预算"不许同名**
+判据:① 该循环模式全仓只出现 1 次 ② Tuck gate ⇒ reason 令牌 ≠ `cycle-cap-exhausted`
+     ③ 变异:把 gate 的 `break` 改回 `continue` ⇒ ② 必须红
+     ④ CLI 输出的句子**必须含 reason 令牌**（人读的那支也要有名字)
+     ⑤ `attempt` 计数跨 period **单调不减**（`ledger::next_attempt` 已在,加断言)
+```
+
+### 205.5 关于"不用正则扫源码" —— 我接受,并把两侧的正确形式写清
+
+```
+审查方:"正则扫描源码 = 把源码当成数据 = 你在解析一门你没写解析器的语言"
+  ('it is // fine' ⇒ 先剥注释 ⇒ 引号不成对 ⇒ 字面量漏网;'\/' ⇒ 转义剥不干净;模板串/嵌套 ⇒ 原理上做不到)
+⇒ **而我本仓刚刚实测过这个病**:`probe_integrity_test` 的第一版**惩罚了自己的文档**
+  （3 个假阳:两处注释 + 变异自己的字符串字面量,§204.5）⇒ **它是对的。**
+正确形式分两侧:
+  **Rust**:类型系统(`enum EndReason` + 私有字段 + 构造器强制不变量) —— `PeriodVerdict` 已做对;
+  **JS  :运行时拦截**(替换 `ok()` 记账,看它**是否真被调用**) —— 不读文本 ⇒ 免疫一切引号/注释技巧。
+⇒ **共同原则:不要用"看起来像"去判断"是不是";要问,就真的调用它,或者拦住它。**
+```
+
+### 205.6 自省（审查方的第一性原理,我采纳）
+
+```
+本链起点是两个用户问题:① 经历会话顺序混乱 ② 会话是 DAG,选中经历 ⇒ 拉起 DAG ⇒ 选择性继续对话。
+而我们这一路修的是**显示**那一半;`run_cycle` 的终止语义若有三个说法 ⇒
+**写进 DAG 的节点带着错的 EndReason** ⇒ **下一圈显示又错** ⇒ **判据只是在追自己的尾巴。**
+⇒ ⇒ **目的不是"判据齐全",而是"用户能看清 DAG 并选择分叉点";而这个目的的地基是 `run_cycle` 判决的一致性。**
+```
