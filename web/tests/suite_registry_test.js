@@ -19,6 +19,11 @@ const ok = (cond, msg) => { console.log((cond ? '  ok   ' : '  FAIL ') + msg); i
 /* Files that are NOT suites on purpose, each with a reason. A silent exemption list would be
  * the same disease in a new place, so every entry carries its own justification. */
 const NOT_A_SUITE = {
+  /* WIP, DECLARED (ADR-0048 §169): the DOM-level lane criterion is written and its two
+   * assertions already fire, but the test-local assembler cannot yet supply the DERIVED
+   * placeholders (__REFRESH__ …) nor the globals chat.js expects, so the page it builds is
+   * not the page the server serves. Declared here rather than silently absent. */
+  'lane_dom_test.js': 'WIP: needs derived-placeholder substitution + unrelated-asset stubs',
   'pinned_expectation.js': 'the ORACLE (a library the criterion requires), not a suite',
   'known_bad_reader.js': 'a fixture reader used BY suites',
   'probe_bug.js': 'a probe used BY suites',

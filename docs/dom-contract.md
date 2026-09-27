@@ -37,6 +37,7 @@
 | `conn` | base.html, script.html |
 | `cont-banner` | chat.html, session_list.js |
 | `eTbody` | prove_track.html, prove_track.view.js |
+| `eTraj` | prove_track.html, prove_track.view.js |
 | `eco` | base.html, script.html |
 | `.empty` | base.html, chat.html, chat.js, cockpit.html |
 | `entries` | cockpit.html, cockpit.js |
@@ -95,7 +96,6 @@
 | `eOvNote` | prove_track.html |
 | `eStats` | prove_track.html |
 | `eTblVp` | prove_track.html |
-| `eTraj` | prove_track.html |
 | `eTurnBtn` | prove_track.html |
 | `.foot` | base.html |
 | `p-` | — |

@@ -443,7 +443,6 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
            * LENGTH-CHANNEL mode (equal|value). The RUN mode (drive|partner|survive) is a
            * different quantity and must not share the name — one attribute, one quantity. */
           + ' data-cell-lenmode="' + laneMode + '"'
-          + (degraded ? ' data-cell-degraded="' + String(laneAlloc.reason || laneAlloc.state) + '"' : '')
         : '';
       /* the STRICT predicate, not `typeof`: rule ⑫ (§116) — a coercing guard cannot see a null. */
       /* CONSUME THE DECLARED STATE (ADR-0048 §166): recording a degradation is not acting on it.
@@ -458,8 +457,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
        * WIDTH AND DEGRADATION ARE TWO CHANNELS (§4.1): degradation ADDS a marker, it never
        * removes the width. `cell_metering`'s own words: "a degradation that loses the core
        * capability is not a degradation but a failure". */
-      var degraded = laneAlloc.state && laneAlloc.state !== 'ok'
-        && laneAlloc.reason !== 'length-closed';
+      /* (the row-level degradation marker is written ONCE above, on the row host — §169) */
       /* THE FALLBACK COMES FROM THE PROJECTION, NOT FROM ARITHMETIC HERE (ADR-0048 §168):
        * my first version wrote `100 / Math.max(1, evs.length)` — real geometry computed in the
        * view, which `view_hygiene_test`'s bare-slash metric correctly counted as a NEW offence
@@ -487,6 +485,20 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
       });
     });
     /* 变化才写：同数据轮询时一个节点都不碰（与 eStats 同一策略） */
+    /* THE HOISTING TRAP (ADR-0048 §169): `degraded` was USED at :446 and DECLARED at :461, so
+     * `var` hoisting made it `undefined` there — falsy — and `data-cell-degraded` was NEVER
+     * written (measured: 0 such nodes at n=201/251, where the projection IS degraded). It was
+     * also built PER BLOCK while the fact is PER ROW: one fact, N hosts, and the N hosts missed
+     * the present rows entirely. Now: declared before use, written ONCE on the row host, and
+     * REMOVED when the degradation is gone (only-add would make "degraded" and "was degraded"
+     * indistinguishable). */
+    var degraded = !!(laneAlloc.state && laneAlloc.state !== 'ok'
+      && laneAlloc.reason !== 'length-closed');
+    var railHost = document.getElementById('eTraj');
+    if (railHost) {
+      if (degraded) { railHost.setAttribute('data-cell-degraded', String(laneAlloc.reason || laneAlloc.state)); }
+      else { railHost.removeAttribute('data-cell-degraded'); }
+    }
     LANES.forEach(function (k) {
       var el = laneEl(k);
       if (!el) return;
