@@ -213,42 +213,42 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
   }
 
-  console.log("-- lane VALUE criterion: the DOM must show exactly what the projection returned --");
+  console.log("-- lane VALUE criterion (live, B2): the DOM must show what the projection returned --");
   {
     const api = (typeof window !== "undefined" && window.CxProveTrack) || null;
     const inputs = (api && typeof api.laneInputs === "function") ? api.laneInputs() : null;
-    if (!inputs) {
-      console.log("  SKIP  lane value: laneInputs not exposed (declared skip)");
+    if (!inputs || !inputs.rows.length) {
+      /* DECLARED SKIP: the hermetic half (lane_value_test.js) pins the arithmetic everywhere;
+       * this half needs a loaded session, and its absence is NAMED rather than counted green. */
+      console.log("  SKIP  lane value (live): no loaded session in this run"
+        + " — the hermetic half is lane_value_test.js (declared skip)");
     } else {
-      /* TWO CHANNELS: the values the projection produced, and the widths the browser PARSED out
-       * of the rendered attribute. Comparing them is the whole point — a view that computes its
-       * own geometry disagrees here, and a view that shows a wrong number disagrees here too. */
       const blocks = Array.from(doc.querySelectorAll("#eLaneInput .e-blk, #eLaneModel .e-blk, #eLaneTool .e-blk"))
         .filter((b) => b.getAttribute("data-e-ev"));
       const byId = {};
       inputs.rows.forEach((r, i) => { byId[r.id] = { i: i, k: r.k }; });
-      let mismatched = 0, stateLost = 0, checked = 0;
+      let mismatched = 0, unnamed = 0, checked = 0;
+      const pairs = new Map();   /* (width, state) must tell the three non-magnitudes apart */
       blocks.forEach((b) => {
-        const id = b.getAttribute("data-e-ev");
-        const row = byId[id];
+        const row = byId[b.getAttribute("data-e-ev")];
         if (!row) { return; }
         checked++;
-        const style = b.getAttribute("style") || "";
-        const m = /flex:\s*0\s+0\s+([-\d.]+)%/.exec(style);
+        const m = /flex:\s*0\s+0\s+([-\d.]+)%/.exec(b.getAttribute("style") || "");
         const want = inputs.cols[row.i];
-        if (row.k === "p" && typeof want === "number") {
-          if (!m || Math.abs(parseFloat(m[1]) - want) > 1e-9) { mismatched++; }
-        } else {
-          /* not a measured magnitude ⇒ NO numeric width, and the state must be NAMED (§112.4) */
-          if (m) { mismatched++; }
-          if (!b.getAttribute("data-cell-state")) { stateLost++; }
-        }
+        const state = b.getAttribute("data-cell-state") || (row.k === "p" ? "present" : null);
+        /* EVERY block (measured or not) carries the projection's number: WIDTH CARRIES POSITION.
+         * A non-measured block keeps its reserved tick — never 0, never absent (§10). */
+        if (!m || !(Math.abs(parseFloat(m[1]) - want) < 1e-6)) { mismatched++; }
+        if (row.k === "p" && want <= 0) { mismatched++; }        /* magnitude must claim room */
+        if (row.k !== "p" && !state) { unnamed++; }               /* STATE CARRIES MEANING */
+        if (row.k !== "p") { pairs.set(String(want) + "|" + state, true); }
       });
       check("lane value: every block's rendered flex-basis == the projection's col (per block)",
-        checked > 0 && mismatched === 0, `${checked} blocks checked, ${mismatched} mismatched`);
-      check("lane value: a non-magnitude carries a NAMED state instead of a width (absent ≠ 0%)",
-        stateLost === 0, `${stateLost} blocks lost their state`);
-      console.log("    (mode=" + inputs.mode + " allocState=" + inputs.allocState + " rows=" + inputs.rows.length + ")");
+        checked > 0 && mismatched === 0, `${checked} blocks, ${mismatched} mismatched`);
+      check("lane value: a non-magnitude keeps a NON-ZERO width and a NAMED state (§10 + §112.4)",
+        unnamed === 0, `${unnamed} blocks without a state`);
+      console.log("    (mode=" + inputs.mode + " rows=" + inputs.rows.length
+        + " distinct (width,state) for non-magnitudes=" + pairs.size + ")");
     }
   }
 

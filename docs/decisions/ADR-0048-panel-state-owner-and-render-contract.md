@@ -7631,3 +7631,49 @@ grep flowmodus_url docs/GROWTH.md ⇒ **0 命中**（§审查引文不在本仓�
 ```
 ⇒ 按我们刚立的纪律（**用可观测输出确认,不读代码猜**）:**当前唯一阻断项不是 FlowModus**,而是
 **B 需要"有事件的 period"**（§162.4）⇒ 它仍排在下一笔。
+
+## 165. **B 的语义冲突**：`allocate` 对、**判据错** —— 宽度管位置,属性管状态
+
+### 165.1 冲突（审查方实测,我复核数字一致）
+
+```
+fixture(6 行) ⇒ dur 形状: a() a() **p(120)** a() a() a()
+value ⇒ state=ok          cols=[0.50, 0.50, **97.50**, 0.50, 0.50, 0.50]      （tick = 100/gridCols = 0.5）
+equal ⇒ state=unavailable reason=length-closed  cols=[16.67 ×6]
+而我此前的 B 规则:非 present 行**不得有数字宽度** ⇒ **每一行都是数字** ⇒ 一有数据就红,且红得没有道理。
+```
+
+**谁对?`allocate` 对。** 三条依据:
+1. **§10 已裁定**:"时间序缺测**留缺口**…缺失须带 `null_reason` 并**保留维度占位**";
+2. **若非 present 不给宽度** ⇒ `flex:0 0 ` ⇒ 按 CSS 简写规范省略 `flex-basis` ⇒ 取 **0%** ⇒ **该块消失**
+   ⇒ **正是 step 2 修好的那个"三条泳道全空而所有套件绿"的洞** ⇒ **我的规则会把它重新挖开**;
+3. **equal 模式更明显**:该模式语义就是"长度通道关闭、每格等宽"（`reason:'length-closed'`）⇒ **与 `k` 无关**,
+   而我把 value 模式的规则套到了它上面。
+
+⇒ **正解（本笔已落）**:
+```
+宽度管位置(position):**每一块**都带投影的数字(测得行 = 100−(N−1)·tick;缺测行 = tick > 0)
+属性管状态(meaning): `data-cell-state` = absent | unmeasured | narrative（视图已穷尽,非 else）
+equal 模式          : 每块 == 100/N
+判词                : (宽度, 状态) 对必须**两两可分辨**,而不是"没有宽度"
+```
+
+### 165.2 ✅ B1：**hermetic**（今天可跑,任何机器可跑）
+
+新增 `web/tests/lane_value_test.js`（已进网）:用仓内 fixture 喂投影,**期望值由算术独立算出**
+（`97.5 = 100 − 5×0.5`、`16.67 = 100/6`）⇒ **不把 `allocate` 当预言机**（否则恒真）。
+**实测 9 条全绿**,含两条变异:`one col shifted by 1%` 与 `a zeroed tick`（**折叠错误**）都必须被发现。
+⇒ 其中一条判据逐字:`EVERY block keeps a NON-ZERO width — a missing basis would collapse the block (§10)`。
+
+### 165.3 B2：live 半边**声明 SKIP**（不再把"没数据"当绿）
+
+`render_test.js` 的 live 判据改为:**`checked > 0` 为前提**;无会话 ⇒ **具名 SKIP 并指向 B1**。
+⇒ 解决"**B 的判别力是环境的函数**"（与 lockfile 同一个病）:**B1 恒 1 bit,B2 需要活面板**。
+
+### 165.4 而"没事件"的定因（三条 curl,可观测）
+
+```
+GET /api/sessions ⇒ **有 5 个 period 可加载**（含 period_id=run-9e901b96…-p006ab89604000000,preview "你是谁?"）
+⇒ 所以**不是 R2（Anaphase 无经历）**,更可能是 **harness 选的 job 没有事件**（或该 period 确无计量事件）
+⇒ 下一笔:让 harness 选一个**有事件的 period**（已可枚举）⇒ B2 即可逐块行使。
+```
