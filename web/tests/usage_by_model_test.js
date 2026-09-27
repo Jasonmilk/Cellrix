@@ -80,6 +80,49 @@ ok(period.calls === 2, 'both calls counted (' + period.calls + ')');
   w3.close();
 }
 
+/* ── STEP-LEVEL: two steps, two models, inside ONE turn (the Agent Loop's real shape) ── */
+{
+  const w4 = new JSDOM(AP.assemble().html, { runScripts: 'dangerously', url: 'http://127.0.0.1:1/' }).window;
+  const EV = [
+    { type: 'turn/start', data: {} },
+    { type: 'assistant/usage', data: { prompt_tokens: 100, completion_tokens: 20, model: 'planner-strong' } },
+    { type: 'assistant/usage', data: { prompt_tokens: 5, completion_tokens: 7, model: 'executor-cheap' } },
+    { type: 'turn/end', data: { done: true, success: true, impasse: false } }
+  ];
+  const st4 = w4.CxAssembly.create(); st4.register('p', { name: 'p' }); st4.activate('p');
+  st4.feed(EV.map((e, i) => Object.assign(
+    { seq: i + 1, time: '2026-01-01T00:00:0' + i + 'Z', job_id: 'fx3', period_id: 'fx3' }, e)));
+  const N4 = (st4.snapshot() && (st4.snapshot().nodes || st4.snapshot())) || [];
+  const rows4 = w4.CxProveTrack.node.buildSession(N4);
+  const proj4 = w4.CxCellMetering.project(rows4, {
+    usage: w4.CxProveTrack.node.derivePeriodUsage(N4),
+    usageByTurn: w4.CxProveTrack.node.usageByTurn(N4),
+    modelByTurn: w4.CxProveTrack.node.modelByTurn(N4),
+    usageByModel: w4.CxProveTrack.node.usageByModel(N4),
+    stepModels: w4.CxProveTrack.node.stepModels(N4)
+  });
+  const steps = proj4.stepModels || [];
+  ok(steps.length === 2, 'the STEP outlet has one entry per step (' + steps.length + ')');
+  ok(steps.length === 2 && steps[0].model === 'planner-strong' && steps[1].model === 'executor-cheap',
+    'STEP-LEVEL PAIRING: step 0 = planner-strong, step 1 = executor-cheap  ['
+    + steps.map((x) => x.model).join(', ') + ']');
+  ok(steps.reduce((a, x) => a + (x.completion || 0), 0) === (proj4.tok && proj4.tok.v),
+    'SELF-CHECK: Σ(step tokens) == the period total ('
+    + steps.reduce((a, x) => a + (x.completion || 0), 0) + ' == ' + (proj4.tok && proj4.tok.v) + ')');
+  ok(proj4.usageByModel && Object.keys(proj4.usageByModel).length === 2,
+    'AND usageByModel has an OUTLET in the return value (it used to be computed and then dropped)  ['
+    + (proj4.usageByModel ? Object.keys(proj4.usageByModel).length : 0) + ' groups]');
+  /* MUTATION: with no step outlet the same session can only say "(mixed)" */
+  const proj4b = w4.CxCellMetering.project(rows4, {
+    usage: w4.CxProveTrack.node.derivePeriodUsage(N4),
+    modelByTurn: w4.CxProveTrack.node.modelByTurn(N4)
+  });
+  ok((proj4b.stepModels || []).length === 0
+    && (proj4b.turns[0] || {}).tokModel === '(mixed)',
+    'MUTATION: without the step outlet the turn can only report "(mixed)" — which is why step grain is required');
+  w4.close();
+}
+
 console.log(bad === 0 ? 'OK — the step→model assignment has an outlet, and the parts sum to the whole'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);

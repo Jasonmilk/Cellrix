@@ -137,7 +137,7 @@
      * downstream of grouping, not part of it (relational algebra / map.filter.reduce),
      * so "the two sets disagree" is unrepresentable: a turn the projection did not
      * produce simply cannot appear, and one it did produce cannot vanish silently. */
-    var cellProj = window.CxCellMetering.project(S.session, { usage: S.usage, usageByTurn: S.usageByTurn, usageByModel: S.usageByModel, modelByTurn: S.modelByTurn });
+    var cellProj = window.CxCellMetering.project(S.session, { usage: S.usage, usageByTurn: S.usageByTurn, usageByModel: S.usageByModel, modelByTurn: S.modelByTurn, stepModels: S.stepModels });
     var cellTurnItem = {};
     for (var ci = 0; ci < S.session.length; ci++) {
       if (S.session[ci].kind === 'turn') { cellTurnItem[String(S.session[ci].id)] = S.session[ci]; }
@@ -376,7 +376,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
    * into in place — so it is not a value, and caching it is illegitimate. project() is
    * cheap: just compute it. */
   function cellBarAt(i) {
-    var bars = window.CxCellMetering.project(S.session, { usage: S.usage, usageByTurn: S.usageByTurn, usageByModel: S.usageByModel, modelByTurn: S.modelByTurn }).bars;
+    var bars = window.CxCellMetering.project(S.session, { usage: S.usage, usageByTurn: S.usageByTurn, usageByModel: S.usageByModel, modelByTurn: S.modelByTurn, stepModels: S.stepModels }).bars;
     return bars[i] ? bars[i].value : null;
   }
 

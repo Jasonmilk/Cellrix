@@ -221,6 +221,10 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
         return { k: 'p', v: displayMax, bound: tokHasUnmeasured ? '>=' : null };
       })(),
       tok: folded.value,
+      /* THE OUTLETS (ADR-0048 §190): computed upstream, passed in, and previously NOWHERE in
+       * the return value — so the screen could not show them even in principle. */
+      usageByModel: (opts && opts.usageByModel) ? opts.usageByModel : null,
+      stepModels: (opts && opts.stepModels) ? opts.stepModels : [],
       max: acc.value,
       /* A DENOMINATOR THAT IS ONLY A LOWER BOUND MUST DEGRADE (ADR §25.3). With `max` no
        * longer poisoned by a null, shares() cannot rely on `max.k !== 'p'`: a null

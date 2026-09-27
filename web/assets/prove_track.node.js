@@ -157,6 +157,32 @@
   /* WHICH MODEL SERVED WHICH TURN (ADR-0048 §189): both facts live on the metering node
    * (`turn` and `payload.model`), so the answer is a grouping, not a guess. A turn with more
    * than one model is reported as `(mixed)` — a declared state, never a silent pick. */
+  /* STEP-LEVEL PAIRING (ADR-0048 §190): the turn is the WRONG grain for an Agent Loop, which
+   * runs N steps inside ONE turn. Measured: two steps with two models inside one turn produced
+   * `modelByTurn = {"t1": "(mixed)"}` — honest, and useless for the acceptance question "which
+   * step used which model". The pairing is not an inference: every metering node already
+   * carries (turn, ord, lineNo, payload.model), so this is a projection of the nodes. */
+  function stepModels(nodes) {
+    var out = [];
+    (nodes || []).forEach(function (n) {
+      if (n.kind !== 'metering') { return; }
+      var p = n.payload || {};
+      out.push({ turn: n.turn || null, ord: (n.ord === undefined ? null : n.ord),
+        lineNo: (n.lineNo === undefined ? null : n.lineNo),
+        model: p.model ? String(p.model) : '(unreported)',
+        prompt: (typeof p.promptTokens === 'number') ? p.promptTokens : null,
+        completion: (typeof p.completionTokens === 'number') ? p.completionTokens : null });
+    });
+    out.sort(function (a, b) {
+      var t = String(a.turn).localeCompare(String(b.turn));
+      if (t !== 0) { return t; }
+      var ao = (a.ord === null ? -1 : a.ord), bo = (b.ord === null ? -1 : b.ord);
+      if (ao !== bo) { return ao - bo; }
+      return (a.lineNo === null ? -1 : a.lineNo) - (b.lineNo === null ? -1 : b.lineNo);
+    });
+    return out;
+  }
+
   function modelByTurn(nodes) {
     var sets = {};
     (nodes || []).forEach(function (n) {
@@ -359,6 +385,6 @@
     toolNameOf: toolNameOf, payloadOf: payloadOf, detailOf: detailOf,
     resultIsTerm: resultIsTerm,
     derivePeriodUsage: derivePeriodUsage, usageBySource: usageBySource,
-    buildSession: buildSession, computeRepeats: computeRepeats, usageByTurn: usageByTurn, usageByModel: usageByModel, modelByTurn: modelByTurn
+    buildSession: buildSession, computeRepeats: computeRepeats, usageByTurn: usageByTurn, usageByModel: usageByModel, modelByTurn: modelByTurn, stepModels: stepModels
   };
 })();

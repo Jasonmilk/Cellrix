@@ -8872,3 +8872,49 @@ ok  **每轮各自命名自己的模型**:turn0='planner-strong' · turn1='execu
    静态链能排除 H2,**排除不了 H3（P2 运行期连接失败）**;消融是唯一直接证据（铁律 9 搬到运行栈）
 ④ §186 那一行（`script.html` 按 walk 分支）—— Loop 会让 period 涨一个数量级
 ```
+
+## 190. **出口装对了层,装错了粒度** —— 事实在**步**级,而出口在**轮**级
+
+### 190.1 审查方实测（我复核）
+
+```
+Agent Loop 的真实形状（A 方案）:一轮之内多步。真跑:
+  输入 turn/start · usage{planner-strong,100/20} · usage{executor-cheap,5/7} · turn/end
+  实测 modelByTurn = {"t1": "(mixed)"} · turns[0].tokModel = "(mixed)" · 折叠文本 = "27"
+⇒ `(mixed)` 是诚实状态（不静默挑一个 ✓）,但**"哪一步用了哪个模型"仍然 I=0**;
+   而 (ord, lineNo, model) **就在 metering 节点上**,一步一个。
+```
+**数学**:待验事实 A = **步×模型的配对**;已报 R = 一个总量 + 一个 `(mixed)` ⇒
+**已知 R,配对仍可自由排列 ⇒ I(A;R) = 0 bits**;即便补上 `usageByModel`,拿到的是**费用分配**,仍不是**步骤配对**。
+
+### 190.2 第二处:`usageByModel` **算了、传了、而 `project()` 没有出口**
+
+```
+实测 project() 的返回键里**没有任何 model 键**;
+prove_track.js:178 算了 ✓ · view.js 传了 ✓ · cell_metering grep usageByModel ⇒ **0 命中** ✗
+⇒ **"记录 ≠ 消费"第五次,形态最新:不是没人读,是根本没有出口可被人读。**
+```
+
+### 190.3 修（已落）
+
+```
+① node: `stepModels(nodes)` ⇒ [{turn, ord, lineNo, model, prompt, completion}] **按 (turn, ord, lineNo) 稳定排序**
+   ⇒ **是投影/分组,不是推测**（四个字段全在节点上）
+② cell_metering: `project()` 的返回值新增 **`usageByModel`** 与 **`stepModels`** 两个出口
+③ 贯通:prove_track 派生 → 视图投递（两个调用点）
+```
+**判据（`usage_by_model_test`,13 条全绿）**:
+```
+ok  步级出口每步一条（2）                    ok  **步0=planner-strong · 步1=executor-cheap**
+ok  **SELF-CHECK:Σ(步级 token) == period**   ok  **usageByModel 有出口**（2 组;此前算了就丢）
+ok  MUTATION:没有步级出口 ⇒ 轮只能报 "(mixed)" —— 这正是步级粒度为必需的原因
+```
+⇒ **门 `proven` 45 → 46**;整门 **2 red**（两条均已具名归因）。
+
+### 190.4 因果链（三件事现在合成一条）
+
+```
+① flowmodus 在不在链路上 ⇒ 6 态/门铃 3 调 ⇒ **未定**（Anaphase 侧 + 消融）
+② Agent Loop 的验收     ⇒ "planner 强 / executor 便宜" ⇒ **本笔之后可测**（步级出口）
+③ §186 那盏灯           ⇒ script.html:151 仍未改 ⇒ **Loop 会让 period 涨一个数量级** ⇒ 必须同笔
+⇒ **① 的消融只能证明"在不在链路上",证明不了"有没有**按步**分配" —— 后者只有步级出口能证明。**
