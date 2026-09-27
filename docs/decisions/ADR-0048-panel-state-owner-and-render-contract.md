@@ -8215,3 +8215,61 @@ ok  degraded widths still sum to 100  [100.00]
 ok  RECOVERY removes the marker
 ```
 ⇒ **§166 那笔"消费降级状态"的 DOM 侧第一次真的被行使** —— 而那正是审查方两轮前指出的缺口。
+
+## 176. 🔴 **合法的 `null` 被静默丢弃** —— 而注释自己写着这个 bug（R1 的真正余波）
+
+### 176.1 定案（审查方拿到完整样本,我逐字复核）
+
+```
+REJECT = [ {type:'assistant/usage', seq:5, data:{prompt_tokens:3, completion_tokens:null, model:'fixture-model'}},
+           {type:'turn/end',        seq:6, data:{done:true, success:true}} ]
+① turn/end ⇒ **fixture 的错**:DATA_SCHEMA['turn/end'].required 含 **`impasse:boolean`**,而 pinned 缺它
+   (其它套件都写了 impasse:false ⇒ 契约一致,是 fixture 不合规)
+② assistant/usage 的 `completion_tokens: null` ⇒ **活的真 bug,不是 fixture 的错**:
+   event_family.js:271  `required: { prompt_tokens:['number'], completion_tokens:['number'] }`  ← **没有 'null'**
+   而紧挨着 :273-285 的注释**逐字写着这个 bug**:
+     *"`null` IS a value here… omitting `'null'` from the type list did not make the field optional:
+      it made a legal event INVALID and it was **dropped in silence**… `model` next door already
+      declared `'null'`; **these two simply did not**."*
+⇒ **注释是一份从未被执行的 bug 报告。**
+```
+**实测**:
+```
+修前: nodes ["turn","metering","tool","metering"]      · rejections usage:invalid · turn/end:invalid
+修后: nodes ["turn","metering","tool","metering","metering"] · rejections 0
+```
+⇒ **一条合法的计量事件被静默丢弃** ⇒ **这正是 R1 的真正余波**:词表里有 `assistant/usage` ≠ 词表接受它合法的 `null` 形态。
+⇒ 而后果**就是这一格的症状**:上游没上报 completion ⇒ 该次计量被丢 ⇒ tok 出口为空。
+
+### 176.2 类比（与 §172 是同一病的两侧）
+
+> §172:名字**没随行** ⇒ 门口认不出他;§176:**合法的"不知道"被当成非法** ⇒ 门口把他挡回去。
+> ⇒ 而**名单上有他的名字,秤也准** —— 你查名单全对,你看秤全对,**而屋里少了一个人**。
+
+**巨人路径**:CI-144 §2 约束 3(未知必须有**类型级**表示,不得用缺省) · Codd/ISO SQL NULL 的老问题
+("缺失"不是一个值,但"未知"是 ⇒ 用类型系统拒绝"未知" = 强迫生产者造假) · **I6(它自己判过自己)**。
+
+### 176.3 修 + 四条判据（含两条变异）
+
+| 修 | 内容 |
+|---|---|
+| **①** | `event_family.js:271` 的 required 加上 `'null'`（与注释、ADR-0038、`model` 那两行对齐） |
+| **②** | `pinned.events.jsonl` 的 `turn/end` 补 `"impasse":false`（与契约对齐） |
+
+**新增 `event_acceptance_test.js`（已进网,四条全绿）**:
+```
+ok  the pinned fixture is accepted WHOLE (rejections=0)
+ok  both complete usage events became metering nodes (3)
+ok  completion_tokens: null is ACCEPTED  [rejections=0 metering=1]
+ok  MUTATION: 去掉 'null' ⇒ 该事件**被丢**（修被守住）
+ok  a turn/end WITHOUT `impasse` is still REFUSED（**契约的另一侧**,防"放宽"冒充"修正"）
+```
+⇒ 第四条是**故意的两侧断言**:§4.2「不得改预期以迎合输出」的可执行形式。
+⇒ **本笔之前,没有任何一条判据问过"有没有事件被拒"** —— 而 `assembly.rejections()` **一直存在**。
+
+### 176.4 本轮第 12 次"机器教我"的形态
+
+```
+§175:理由没跑 ⇒ 结论碰巧对    ·  §175.5:跑错了输入 ⇒ 结论反
+§176:注释写着 bug 而 required 没改 ⇒ **文档与实现不一致,而无人问**
+⇒ 共同形状:**"写下"不等于"做到"** —— 与本链的"表里有≠行为里有""记录≠消费"是同一条,换了宿主。

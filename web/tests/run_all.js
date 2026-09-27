@@ -45,6 +45,7 @@ const SELF_CONTAINED = [
   ['boot_placeholders_test.js', 'three declarations, one behaviour: template / boot.json / boot.rs aligned BOTH ways'],
   ['assemble_page_test.js', 'the ONE JS assembly rule: no residue, graph order, derived included'],
   ['shape_contract_test.js', 'the projection recognises the VIEW\'s shape (sem + session-row keys), and absence is not zero'],
+  ['event_acceptance_test.js', 'nothing legal is dropped and nothing illegal is admitted (rejections are a fact worth asking about)'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
   ['lane_value_test.js', 'lane widths pinned by ARITHMETIC (hermetic, no live panel needed)'],
   ['lane_degrade_test.js', 'every degraded branch keeps Σ cols <= 100 (a declared state is still a number)'],

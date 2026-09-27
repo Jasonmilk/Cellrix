@@ -268,7 +268,11 @@
       optional: { empty: ['boolean'] }
     },
     'assistant/usage': {
-      required: { prompt_tokens: ['number'], completion_tokens: ['number'] },
+      /* THE COMMENT BELOW WAS A BUG REPORT THAT WAS NEVER ACTED ON (ADR-0048 §176): it says
+       * "model next door already declared 'null'; these two simply did not" — and they
+       * still did not. A legal `null` ("the upstream did not report it", ADR-0038) was
+       * refused, so the event was dropped in silence and the tape lost a metering node. */
+      required: { prompt_tokens: ['number', 'null'], completion_tokens: ['number', 'null'] },
       optional: {
         /* `null` IS a value here, and it means "the upstream did not report it"
          * — distinct from a reported zero (ADR-0038). The emitter writes the key
