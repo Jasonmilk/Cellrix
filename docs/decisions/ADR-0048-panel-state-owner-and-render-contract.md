@@ -9081,3 +9081,60 @@ Cannot read properties of undefined (reading 'k')
 ④ `TURN_MARKS` 的双决定子（本笔证明**会话行上不触发**,但"一个事实两个决定子"仍在）⇒ 收敛到一处
 ⑤ `script.html:151`（§186）· Anaphase 6 态 · 运行时消融 · Agent Loop
 ```
+
+## 194. 🎯 **折叠行的崩溃定案并修好** —— 两个都叫"turn"的对象,字段集不同
+
+### 194.1 探针定案（审查方推定,我实测逐字一致）
+
+```
+g 的键          = ["ids","tokTotal","tokModel","steps","dur","failed","turn"]        ← **没有 tok**
+proj.turns[0] 的键 = ["id","states","events","rows","**tok**","bars","partial","bound","tokModel"]
+g.tok = undefined  ·  proj.turns[0].tok = {"k":"p","v":27}
+而 foldedCell(r) 读的是 `r.tok.k`  ⇒ **组上 undefined ⇒ 崩**（错误逐字:Cannot read properties of undefined (reading 'k')）
+```
+⇒ **这是 §172 那条病的第四次,而这次在两个"都叫 turn"的对象之间**:
+`project().turns[n]` 与 `compactGroups[id]` 是**同一实体的两个形状**,字段集不同,而消费者按前者写。
+
+### 194.2 修:**补齐格子,不给手戴手套**
+
+```js
+/* 组对象补上被声明的三态值（来自 project().turns[n]），而不是给渲染器加兜底 */
+out[t.id] = { ids: ids, tok: t.tok, partial: t.partial, bound: t.bound,
+              tokTotal: (t.tok && t.tok.k === 'p') ? t.tok.v : null,
+              tokModel: t.tokModel, steps: stepList, … };
+```
+⇒ **为什么不加兜底**:兜底会把"形状错"翻译成"· 无数据" ⇒ **同一句静默换了件衣服**
+（数学上:`R ⊄ G` 时,有兜底 ⇒ 渲染空（静默）;无兜底 ⇒ 抛（响）—— **两种后果同一个条件,差别只在有没有人看见**）。
+
+### 194.3 判据（整份重写,走真实渲染路径,11 条全绿）
+
+```
+ok  折叠产出组 · 组含可折步骤 · 组上带步级名牌 · 每步各自命名模型与 token
+ok  **表格渲染不再抛**（此前 `reading 'k'`）
+ok  **组带渲染器读的三态值（g.tok.k 存在）**
+ok  **foldedCell(组) 与投影陈述同一事实**（27）
+ok  **THE STEP PLAQUE REACHES THE SCREEN**（planner-strong + executor-cheap 同时在渲染文本里）
+ok  每步各自带 token 数（planner-strong 20 · executor-cheap 7）
+ok  MUTATION:把 `tok` 从组上删掉 ⇒ **重新抛**（§194 的缺陷）
+ok  MUTATION:保留容器行 ⇒ **每一组被否决**（§192 的缺陷）
+```
+⇒ **Agent Loop 的验收线第一次可测**:**哪一步用了哪个模型、各自花了多少,都在屏幕上。**
+
+### 194.4 三笔连起来的形状（同一路径上的三个缺陷,依次显影）
+
+```
+§192 容器行恒否决   ⇒ compactGroups = {}          （功能从不工作）
+§193 isOpen 闸门    ⇒ 折叠行从不渲染               （与自身注释相反）
+§194 字段集不匹配   ⇒ 一旦渲染就崩 `reading 'k'`    （两个"turn"两个形状）
+⇒ 三者是**串联**的:前一个挡住后一个 ⇒ 于是"0 folded"这一个数字,把三种真因合并成一个 0。
+⇒ ⇒ **通则㉔（并入）:一条路径上的缺陷会串联显影;因此"修好一处"之后必须再跑一次,再看一次读数。**
+```
+
+### 194.5 仍未完成
+
+```
+① `view.js:254` 的 `var open = !!S.foldedTurns[it.id]` ⇒ **恒 false** ⇒ `▾`/`aria-expanded="true"` 不可达
+② `openTurns` 是 `S.session` 的**缓存**（consume 写、reset 不清）⇒ 改派生
+③ `TURN_MARKS` 的双决定子收敛到一处（本笔证明会话行上不触发,但"一个事实两决定子"仍在）
+④ `script.html:151`（§186）· Anaphase 6 态（跨仓）· 运行时消融 · Agent Loop
+```

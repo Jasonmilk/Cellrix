@@ -202,7 +202,16 @@
         }).map(function (x) {
           return x.model + (x.completion === null ? "" : " " + x.completion);
         });
-        out[t.id] = { ids: ids, tokTotal: t.tok, tokModel: t.tokModel, steps: stepList,
+        /* THE GROUP CARRIES THE DECLARED VALUES, NOT ITS OWN ARITHMETIC (ADR-0048 §194).
+         * Measured key sets: the group had [ids,tokTotal,tokModel,steps,dur,failed,turn] while
+         * `foldedCell` reads `r.tok.k` — and `project().turns[n]` HAS `tok` (three-state). So the
+         * folded row threw `reading 'k'` on undefined. The cure is to complete the group from the
+         * single projection, NOT to give the renderer a fallback: a fallback would translate a
+         * wrong SHAPE into "· 无数据" — the same silence in a new costume (§172 graine again, this
+         * time between two objects that are both called "turn"). */
+        out[t.id] = { ids: ids, tok: t.tok, partial: t.partial, bound: t.bound,
+                      tokTotal: (t.tok && t.tok.k === 'p') ? t.tok.v : null,
+                      tokModel: t.tokModel, steps: stepList,
                       dur: dur, failed: failed,
                       turn: cellTurnItem[String(t.id)] || t };
       }
