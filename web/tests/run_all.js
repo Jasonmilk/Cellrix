@@ -52,6 +52,7 @@ const SELF_CONTAINED = [
   ['usage_by_turn_test.js', 'per-turn usage attribution: each turn is told what IT spent, and the parts sum to the whole'],
   ['usage_by_model_test.js', 'the step→model assignment has an outlet (planner vs executor must be verifiable)'],
   ['compact_fold_test.js', 'the fold must be able to happen at all (the container row must not veto it)'],
+  ['agent_loop_skeleton_test.js', 'the EIGHT Agent Loop criteria, written BEFORE the Loop (4 live homes, 4 declared absent with assertion+mutation)'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
   ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
