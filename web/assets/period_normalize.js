@@ -30,7 +30,8 @@
 
   /* A period whose rows do not arrive as a contiguous run cannot be given a
    * stable gseq, so the caller is told rather than left to guess. */
-  var LAST_TRUNCATION = null;   /* observable: the last lineage walk that could not reach the root */
+  var LAST_TRUNCATION = null;   /* compat: set ONLY for a real truncation (§185) */
+  var LAST_WALK = null;         /* the four-state diagnostic of the last walk (§185) */
 
   function checkContiguous(rows) {
     /* The guard is on the INPUT, and it has one known blind spot: because gseq
@@ -250,23 +251,37 @@
      * continues from. The ancestry walk already yields the correct order once
      * reversed — root first, then each period after the one it continues.
      */
-    var path = [], cur = startId, guard = {};
-    while (byId[cur] && !guard[cur]) {
-      guard[cur] = true;
-      path.push(cur);
-      var par = byId[cur].parent;
-      if (!par || !byId[par]) {
-        /* A WINDOW THAT CANNOT REACH THE ROOT MUST SAY SO (ADR-0048 §184): this used to be a
-         * silent `break`, so a truncated read looked exactly like a complete lineage — and the
-         * measured consequence is in routes.rs's own note ("disk held 130 periods and the
-         * panel showed 50"). The path is still returned (a partial answer beats none), but the
-         * truncation is now a DECLARED fact a caller can see.
-         * NOTE: `guard[cur]` ending the loop is a different fact (a cycle), declared separately. */
-        LAST_TRUNCATION = { at: cur, parent: par || null, reason: par ? 'parent-not-in-window' : 'no-parent' };
-        break;
+    /* FOUR ENDINGS, FOUR NAMES (ADR-0048 §185). The previous version declared a truncation but
+     * MEASURED, its discriminating power was 1 of 2 bits: a COMPLETE walk also reported a
+     * truncation (the root legitimately has no parent), while a CYCLE and a MISSING START both
+     * returned null in silence — i.e. the two structural failures were as silent as the defect
+     * this observable was added to remove. Rule ⑮: one `null` may not carry two meanings.
+     *   root         the walk reached a node with no parent            (the normal ending)
+     *   truncated    a parent exists in the data but is outside the window
+     *   cycle        a node repeated                                   (no topological order exists)
+     *   start-absent the requested start is not in the window at all
+     * The state is recomputed on EVERY call (the old module-level value was never reset, so a
+     * stale reading could outlive the walk it described). */
+    var path = [], cur = startId, guard = {}, walk;
+    if (!byId[cur]) {
+      walk = { kind: 'start-absent', at: startId, parent: null, pathLength: 0 };
+      path = [];
+    } else {
+      for (;;) {
+        if (guard[cur]) { walk = { kind: 'cycle', at: cur, parent: null, pathLength: path.length }; break; }
+        guard[cur] = true;
+        path.push(cur);
+        var par = byId[cur].parent;
+        if (!par) { walk = { kind: 'root', at: cur, parent: null, pathLength: path.length }; break; }
+        if (!byId[par]) { walk = { kind: 'truncated', at: cur, parent: par, pathLength: path.length }; break; }
+        cur = par;
       }
-      cur = par;
     }
+    LAST_WALK = walk;
+    /* COMPATIBILITY, NOW CORRECT: this answers ONLY for a real truncation. It used to fire on a
+     * complete walk as well, which is why a caller could not tell success from failure. */
+    LAST_TRUNCATION = (walk && walk.kind === 'truncated')
+      ? { at: walk.at, parent: walk.parent, reason: 'parent-not-in-window' } : null;
     var out = path.reverse();
     return out;
   }
@@ -275,6 +290,8 @@
     /* The caller can ask whether the last walk was truncated (and why) — a silent partial
      * lineage was the defect; this is its observable. */
     lastTruncation: function () { return LAST_TRUNCATION; },
+    /* PREFERRED: the walk's ending, one of root | truncated | cycle | start-absent. */
+    lastWalk: function () { return LAST_WALK; },
     VERSION: VERSION,
     normalize: normalize,
     mergeChain: mergeChain,

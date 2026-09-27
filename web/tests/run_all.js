@@ -51,6 +51,7 @@ const SELF_CONTAINED = [
   ['tok_lower_bound_test.js', 'a lower bound survives to the screen: value, partial and bound are one fact in three slots'],
   ['usage_by_turn_test.js', 'per-turn usage attribution: each turn is told what IT spent, and the parts sum to the whole'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
+  ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
   ['lane_value_test.js', 'lane widths pinned by ARITHMETIC (hermetic, no live panel needed)'],
   ['lane_degrade_test.js', 'every degraded branch keeps Σ cols <= 100 (a declared state is still a number)'],

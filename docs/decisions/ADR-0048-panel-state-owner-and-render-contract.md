@@ -8657,3 +8657,58 @@ ok  MUTATION 范围:first_ts 仍出现在文件里（所以第一条判据针对
 gseq = 数组下标（源码自认:"cannot detect wholesale reordering — reordered rows still produce 0..n-1"）
 ⇒ 同一事件从 A 打开与从 B 打开,gseq 不同 ⇒ **看上去像两个不同的事件** —— 这就是现象级解释。
 ⇒ 而 lineNo + sourceJob **已经补上了不变的那个身份** ⇒ 缺的是**让它成为唯一权威**（下一笔）。
+
+## 185. **四种终局,四个名字** —— 我上一笔的"截断声明"判别力只有 1.0/2.0 bit
+
+### 185.1 实测（审查方,我复核一致）
+
+| 终局 | `chainJobIds` | `lastTruncation()` | 说得对吗 |
+|---|---|---|---|
+| **① 完整（到根）** | `A,B` | `{reason:'no-parent'}` **非 null** | ❌ **成功也报"截断"** |
+| **② 截断（父不在窗口）** | `D` | `{reason:'parent-not-in-window'}` | ✅ |
+| **③ 环** | `Q,P` | **`null`** | ❌ **沉默** |
+| **④ 起点不在窗口** | 空数组 | **`null`** | ❌ **沉默** |
+
+```
+S 四态等概 ⇒ H(S)=2 bits;观察 O 只有两类 ⇒ H(S|O)=1 bit ⇒ **I(S;O)=1.0 bit ⇒ 判别力只剩一半**
+丢失的一半恰好是**两个结构性失败**（环、起点缺失）—— 而"消灭静默"正是这笔要治的病。
+⇒ 且 `:264` 注释逐字写着 "a cycle … declared separately",而**全仓没有 `LAST_CYCLE`** ⇒
+   "写下 ≠ 做到" 第 N 次（与 `STALE`、`required` 缺 `'null'` 同形）。
+```
+
+### 185.2 更要紧:**"无环"是我那条数学的前提,而它从未成为断言**
+
+```
+我上轮说"单亲 ⇒ 森林 ⇒ 路径唯一 ⇒ 可确定性计算" ⇒ **单亲只保证出度 ≤ 1,不保证无环**
+实测环 P→Q→P:从 P 打开 ⇒ order=[Q,P];从 Q 打开 ⇒ order=[P,Q] ⇒ **同一份数据、两个起点、两个相反的序**
+⇒ 有环 ⇒ **拓扑序不存在**,而返回的东西**看起来和正常结果一模一样**
+⇒ 这正是 §134「把前提变成断言」的下一个应用点:**「无环」必须是判据。**
+```
+
+### 185.3 修（已落,判据已进网）
+
+```js
+/* 四态穷尽,每次 walk **重新计算**（旧的模块级值从不重置 ⇒ 残留可活过它所描述的那次 walk） */
+LAST_WALK = { kind: 'root' | 'truncated' | 'cycle' | 'start-absent', at, parent, pathLength }
+CxNormalize.lastWalk()      ← 首选入口
+CxNormalize.lastTruncation() ← **兼容读取,现已正确**（只对真实截断非 null;成功时不再误报）
+LAST_TRUNCATION = (walk && walk.kind === 'truncated') ? … : null   ← 并对 walk 缺失设防
+```
+**判据 `walk_state_test.js`（已进网,10 条全绿）**:
+```
+ok  完整 ⇒ kind='root'（**不再**被当成截断）      ok  兼容读取在成功时为 null
+ok  截断 ⇒ kind='truncated' 且**点名 parent**     ok  起点缺失 ⇒ kind='start-absent'（今天红）
+ok  环   ⇒ kind='cycle'（**今天红**,不再静默）    ok  四种终局**四个名字**（一个 null 不得装两义）
+ok  变异:把环误报成 root ⇒ 被抓
+```
+⇒ **`order_contract_test` 随之更新到四态形状**（更强:它现在断言"四种终局不得共用一个词"）。
+⇒ **门 `proven` 43 → 44**;整门 **2 red**（两条均已具名归因）。
+
+### 185.4 仍未完成（审查方的下一笔,我采纳）
+
+```
+① 诊断应从 `chainJobIds` **返回**（`{path, walk}`）,而不是模块级可变状态
+   ⇒ 两个并发轮询会互相覆盖（Hickey:隐藏的可变状态;**通则⑰:它是"第二份真相"的宿主**）—— 本笔只做到"每次重置"
+② 「无环」作为**图级判据**（不只单次 walk）:整窗口扫一次 ⇒ 有环 ⇒ 红
+③ 上下文视图（祖先闭包）/ 导航视图（含兄弟全树）分离;引用而非重现
+```

@@ -20,14 +20,17 @@ ok(/ORDERING IS STRUCTURAL, NOT TEMPORAL/.test(SRC) && /parent/.test(SRC.slice(S
 ok(/path\.reverse\(\)/.test(SRC), 'the implementation still walks root-ward and reverses');
 
 /* ④ a truncated walk is declared, not silent */
-ok(/LAST_TRUNCATION = \{ at: cur/.test(SRC) && /lastTruncation: function/.test(SRC),
+/* §185 replaced the boolean-ish reading with FOUR NAMED STATES — the assertion follows the
+ * stronger shape (the claim it guards is unchanged: a walk that cannot reach the root must SAY so,
+ * and different failures must not share one word). */
+ok(/LAST_WALK = walk/.test(SRC) && /lastWalk: function/.test(SRC) && /kind: 'truncated'/.test(SRC),
   'a walk that cannot reach the root DECLARES it (observable) instead of breaking silently');
-ok(/'parent-not-in-window'/.test(SRC) && /'no-parent'/.test(SRC),
-  'and it distinguishes "parent outside the window" from "no parent at all" (two facts, two reasons)');
+ok(/'root'/.test(SRC) && /'cycle'/.test(SRC) && /'start-absent'/.test(SRC),
+  'and the endings do not share one word: root / truncated / cycle / start-absent (four facts, four names)');
 
 /* MUTATIONS: both halves must be able to fail */
-ok(/if \(!par \|\| !byId\[par\]\) \{ break; \}/.test(SRC) === false,
-  'MUTATION: the silent break is gone (restoring it would fail the check above)');
+ok(/if \(!byId\[par\]\) \{ walk = \{ kind: 'truncated'/.test(SRC),
+  'MUTATION: the silent break is gone — the truncation path now assigns a NAMED state');
 ok(/first_ts/.test(SRC), 'MUTATION scope: first_ts still appears in the file (so the first check is about the CLAIM, not the absence of the word)');
 console.log(bad === 0 ? 'OK — order is structural, and a partial lineage is a declared fact'
   : 'FAILED — ' + bad + ' check(s) red');
