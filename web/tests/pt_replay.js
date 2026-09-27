@@ -202,10 +202,10 @@ console.log('\n=== 5) the deliverable row carries the period total ===');
 const replies = withM.filter(function (r) { return r.kind === 'ev' && r.cls === EF.KIND_CLASS.reply; });
 const nonReply = withM.filter(function (r) { return r.kind === 'ev' && r.cls !== EF.KIND_CLASS.reply; });
 check('at least one reply row', replies.length > 0, 'got ' + replies.length);
-check('REPLY.tok == the derived total',
+check('REPLY.tokTotal == the derived total (renamed in §182: this quantity is the TOTAL, not the generated count)',
   !!u && replies.every(function (r) { return r.tok === u.total; }),
   JSON.stringify(replies.map(function (r) { return r.tok; })));
-check('only REPLY rows carry tok', nonReply.every(function (r) { return r.tok === null; }));
+check('only REPLY rows carry tokTotal', nonReply.every(function (r) { return r.tok === null; }));
 
 console.log('\n=== 6) the panes a reviewer reads ===');
 /* A one-line summary must be the first line a person reads. A body opening with

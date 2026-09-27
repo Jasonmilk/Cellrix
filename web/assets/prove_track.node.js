@@ -276,7 +276,10 @@
          * Stamping the window total on every reply row made three different
          * answers report the same number — measured: 1129 / 1696 / 1573 became
          * 4398 / 4398 / 4398, which is physically impossible. */
-        tok: (n.kind === 'reply' && perSource[n.source]) ? perSource[n.source].total : null
+        /* ONE WORD, ONE MEANING (ADR-0048 §182 / 通则⑮): `project().tok` is the GENERATED
+         * quantity (completion = 12); this field carried prompt+completion (= 35) under the
+         * same name `tok`. Renamed so the two quantities cannot be confused at a call site. */
+        tokTotal: (n.kind === 'reply' && perSource[n.source]) ? perSource[n.source].total : null
       });
     });
     return out;

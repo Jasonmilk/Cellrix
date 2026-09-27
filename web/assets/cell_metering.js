@@ -288,6 +288,10 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
       if (declared && n === 0) { foldedTurn = { value: declared.value, partial: declared.partial }; }
       turns[n].tok = foldedTurn.value;
       turns[n].partial = foldedTurn.partial;
+      /* THE THIRD SLOT (ADR-0048 §182): `partial` said "not exact" but the BOUND was never
+       * delivered, so a consumer formatting the value itself printed a point estimate for
+       * an interval [12, +∞). Value, partial and bound are one fact in three slots. */
+      turns[n].bound = TS.lowerBound(foldedTurn).bound || null;
       /* SAME recorded map as self.bars — searching `list` by event returned -1, which is
        * how the turn-level bars silently became `unknown` (ADR-0048 §78.5). */
       turns[n].bars = turns[n].rows.map(function (r) { return self.bars[r]; });

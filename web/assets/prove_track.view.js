@@ -184,7 +184,7 @@
         } else { anyShown = true; }
       });
       if (ids.length && !anyShown) {
-        out[t.id] = { ids: ids, tok: t.tok, dur: dur, failed: failed,
+        out[t.id] = { ids: ids, tokTotal: t.tokTotal, dur: dur, failed: failed,
                       turn: cellTurnItem[String(t.id)] || t };
       }
     });
@@ -253,8 +253,9 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
              * That is §2's constraint 3 (unknown must have a type-level
              * representation, not a default) and the same shape as K-105.
              * `0` now prints `0`; only "no measurement" says so. */
-            (window.CxCellMetering.isPresent(g.tok) ? ' · ' + fmtTok(g.tok.v) + ' tok'
-                                      : ' · ' + window.CxCellMetering.foldedCell(g)) +
+            /* ONE OUTLET, NOT TWO (ADR-0048 §182): this row branched on isPresent and printed
+             * `12 tok`, while `foldedCell` printed the honest `12 ≥` for the SAME fact. */
+            ' · ' + window.CxCellMetering.foldedCell(g) + ' tok' +
             (g.failed ? ' · ⚠ ' + g.failed + ' failed' : '') + '</span>' +
             '</button></td></tr>' });
         }
