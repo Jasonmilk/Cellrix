@@ -7917,3 +7917,73 @@ docs/ADR-0048.index.md（索引）· docs/adr-ecosystem.lock.json（检查的输
 ⇒ **三次都是"本 ADR 自己那套检查的产物/输入"被投影漏掉** ⇒ 而每次的处方都由红自己给出。
 ⇒ 通则⑰ 的推论:**"本 ADR 自身的产物与输入"应当作为一类进投影,而不是逐个补。**
 ```
+
+## 171. 🎯 **DOM 判据进网**（三处修:`empty` 不是降级 · 真实管线 · 装配规则唯一）
+
+### 171.1 ① `empty`（健康的空证轨）曾被标成"降级" —— 通则⑪ 在视图层的第一次兑现
+
+```
+实测: 空 evs ⇒ state=unavailable reason='empty' ⇒ 我上一笔的规则(非 ok 且非 length-closed) ⇒ **degraded=true**
+⇒ 面板会把一个**健康的空证轨**写成 `data-cell-degraded="empty"`（"没有数据"与"坏了"再次同形）
+```
+**修**:分类权**交回投影**（单一来源,视图不得就地判）:
+```js
+/* cell_metering.js 导出 */
+REASONS = { empty:1, 'no-present-rows':1, 'length-closed':1, 'all-zero-declared':1,
+            'reserve-over-budget':2, 'row-exceeds-grid':2, 'denominator-zero':1, … };   /* 10 个 */
+DEGRADED_REASONS = ['reserve-over-budget','row-exceeds-grid']   /* 只有这两个是"给不出比例" */
+isDegraded(reason)
+/* 视图 */ var degraded = state !== 'ok' && CM.isDegraded(reason);
+```
+**实测**:`empty` / `no-present-rows` / `length-closed` ⇒ **false**;`reserve-over-budget` / `row-exceeds-grid` ⇒ **true** ✓
+⇒ 于是**新增一个 reason 而忘记分类**时,它既不会静默算"正常",也不会静默算"坏了"（分类表在投影里,受同一份判据管辖）。
+
+### 171.2 ② `lane_dom_test` 的 `prime` **伪造了会话行**（真实管线接上后才有块）
+
+```
+旧: PT.S.session = events.map(...)   ⇒ 实测造出的行**没有 `lane`**（键只有 kind/id/type/job_id/seq/time/data）
+    ⇒ `renderLanes` 按 `e.lane === k` 分块 ⇒ **0 块进泳道** ⇒ 判据在测自己造的坏输入
+新: **真实三段**:``assembly.create() → register/activate/feed(events) → snapshot().nodes → PT.node.buildSession(nodes)``
+    ⇒ **实测:默认模式真的渲染出块**（2 块,50%/50%,每泳道 Σ=100.00%）
+```
+⇒ 顺带修掉**我自己写错的断言**:"每泳道 Σ=100"**只能算该泳道全部块（含占位块）** ——
+只算带 `data-e-ev` 的块**永远到不了 100**（实测 50.00/50.00）⇒ 那是**断言的 bug,不是视图的**。
+
+### 171.3 ③ 装配规则从 **5 份宿主**收回 **1 份 + 判据**
+
+```
+实测: web/src/boot.rs(真的) + all_views_test / nav_state_test / wayout_test / lane_dom_test 各读 base.html 自己装配
+⇒ 而 `assemblePage` 只替换 `pieces`、**不替换 derived** ⇒ 这就是 `__REFRESH__ is not defined` 的真因
+```
+**修**:`web/tests/assemble_page.js`（**唯一 JS 装配器**,含 derived）+ `assemble_page_test.js`（**已进网**）:
+```
+· 装配后 **占位符残留 == 0**（含 derived）
+· 加载顺序 **== boot.json 顺序**（boot.rs:68"顺序是接线的一部分"）
+· three_state 在 cell_metering 之前
+· 变异:跳过 derived ⇒ 残留出现 ⇒ 必须红
+```
+**实测 5 条全绿** ⇒ "装配"从第 5 份变成 **1 份 + 1 条判据**。
+
+### 171.4 🎯 **DOM 判据进网**（本链第一次有机器在看着"显示"）
+
+`lane_dom_test.js`（**已进网**,jsdom + 共享装配器 + 真实管线）实测:
+```
+ok  DOM scope: the default render produced blocks (2)
+ok  **DEFAULT MODE SHOWS SOMETHING: every block has a numeric width > 0**   ← 这条会抓住 §167 的 zero-render
+ok  each lane sums to ~100% across all its blocks [100.00, 100.00, 100.00]
+ok  NOT DEGRADED ⇒ the row host carries NO data-cell-degraded
+SKIP lane DOM (degraded): 合成"经真实管线降级"的会话仍未完成（**具名**,并指向投影级孪生判据 lane_degrade_test）
+ok  RECOVERY removes the marker (degraded vs was-degraded are distinguishable)
+ok  MUTATION (source): wPct 改回 '' 被抓住
+```
+⇒ **门 `proven` 35 → 37**;整门 **2 red**（两条均已具名归因）。
+
+### 171.5 仍未完成（具名,不是"还没做"）
+
+```
+① 合成的降级会话经真实管线（251 条 usage 事件被上游拒收 ⇒ 投影到不了 row-exceeds-grid）
+   ⇒ 投影级孪生已覆盖该分支;DOM 级那一半仍缺
+② `turn/end` 被 assembly 拒收的问题:我这次把 `st.rejections()` 挂在 `w.__probeRejections` 上但**没有打印**
+   ⇒ **仍未核**（下一笔打印它即可回答）
+③ 红名单入库 + 差集脚本（让 §168.3 的纪律有牙齿）—— 仍是下一笔第一项
+```

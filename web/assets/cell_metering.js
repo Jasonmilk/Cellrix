@@ -616,7 +616,18 @@
              gridCols: gridCols };
   }
 
-  return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf,
+  /* THE REASON SET IS A SINGLE SOURCE, AND 'DEGRADED' IS A CLASSIFICATION OF IT (ADR-0048 §171).
+   * Measured: `empty` (a healthy period with no events yet) made the VIEW write
+   * data-cell-degraded="empty" — "nothing to show" and "cannot be shown" collapsed into one word
+   * (rule ⑪ at the view layer). Only these two reasons mean the projection cannot be displayed as
+   * a proportion; everything else is a legitimate state of an honest projection. */
+  var REASONS = { empty: 1, 'no-present-rows': 1, 'length-closed': 1, 'all-zero-declared': 1,
+    'reserve-over-budget': 2, 'row-exceeds-grid': 2, 'denominator-zero': 1,
+    'denominator-not-measured': 1, 'numerator-not-measured': 1, 'non-finite': 1 };
+  var DEGRADED_REASONS = Object.keys(REASONS).filter(function (r) { return REASONS[r] === 2; });
+  function isDegraded(reason) { return DEGRADED_REASONS.indexOf(reason) >= 0; }
+
+  return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf, REASONS: REASONS, DEGRADED_REASONS: DEGRADED_REASONS, isDegraded: isDegraded,
            SHAPES: SHAPES, isKnownShape: isKnownShape, unclassified: unclassified,
            CONSUMERS: CONSUMERS, REGISTRY_EXEMPT: REGISTRY_EXEMPT,
            assertExhaustive: assertExhaustive,

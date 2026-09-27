@@ -492,8 +492,13 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
      * the present rows entirely. Now: declared before use, written ONCE on the row host, and
      * REMOVED when the degradation is gone (only-add would make "degraded" and "was degraded"
      * indistinguishable). */
+    /* ASK THE PROJECTION WHICH REASONS ARE DEGRADATIONS (ADR-0048 §171): the local rule
+     * "state !== 'ok'" also caught `empty` — a period with no events yet — and the panel marked a
+     * healthy empty track as degraded ("empty" vs "cannot be shown" collapsed, rule ⑪ at the view
+     * layer). The classification lives in the projection, so a NEW reason cannot be silently
+     * treated as fine or as broken here. */
     var degraded = !!(laneAlloc.state && laneAlloc.state !== 'ok'
-      && laneAlloc.reason !== 'length-closed');
+      && window.CxCellMetering.isDegraded(laneAlloc.reason));
     var railHost = document.getElementById('eTraj');
     if (railHost) {
       if (degraded) { railHost.setAttribute('data-cell-degraded', String(laneAlloc.reason || laneAlloc.state)); }
