@@ -30,6 +30,8 @@
 
   /* A period whose rows do not arrive as a contiguous run cannot be given a
    * stable gseq, so the caller is told rather than left to guess. */
+  var LAST_TRUNCATION = null;   /* observable: the last lineage walk that could not reach the root */
+
   function checkContiguous(rows) {
     /* The guard is on the INPUT, and it has one known blind spot: because gseq
      * is the array index, it is contiguous by construction, so this cannot
@@ -161,8 +163,12 @@
    * conversation renders in reverse. That failure is silent: everything is
    * accepted, no counter moves, the text is simply backwards.
    *
-   * `seen` terminates on a cycle. Ordering is by first_ts with a job-id
-   * tiebreak, so the same data always yields the same order.
+   * `seen` terminates on a cycle. ORDERING IS STRUCTURAL, NOT TEMPORAL (ADR-0048 §184): the
+   * walk goes root-ward along `parent` and is then reversed, so a period always follows the
+   * one it continues from. Time is NOT used — measured, a resuming period can carry an
+   * EARLIER first_ts than the one it continues, so a timestamp sort would move it in front
+   * of its own ancestor. (This comment used to claim "ordering is by first_ts", which is
+   * the opposite of the implementation; `order_contract_test` now guards the sentence.)
    */
   /* The URL hash is a SERIALISATION OF ONE SELECTION STATE, not a route.
    *
@@ -249,7 +255,16 @@
       guard[cur] = true;
       path.push(cur);
       var par = byId[cur].parent;
-      if (!par || !byId[par]) { break; }
+      if (!par || !byId[par]) {
+        /* A WINDOW THAT CANNOT REACH THE ROOT MUST SAY SO (ADR-0048 §184): this used to be a
+         * silent `break`, so a truncated read looked exactly like a complete lineage — and the
+         * measured consequence is in routes.rs's own note ("disk held 130 periods and the
+         * panel showed 50"). The path is still returned (a partial answer beats none), but the
+         * truncation is now a DECLARED fact a caller can see.
+         * NOTE: `guard[cur]` ending the loop is a different fact (a cycle), declared separately. */
+        LAST_TRUNCATION = { at: cur, parent: par || null, reason: par ? 'parent-not-in-window' : 'no-parent' };
+        break;
+      }
       cur = par;
     }
     var out = path.reverse();
@@ -257,6 +272,9 @@
   }
 
   window.CxNormalize = {
+    /* The caller can ask whether the last walk was truncated (and why) — a silent partial
+     * lineage was the defect; this is its observable. */
+    lastTruncation: function () { return LAST_TRUNCATION; },
     VERSION: VERSION,
     normalize: normalize,
     mergeChain: mergeChain,
