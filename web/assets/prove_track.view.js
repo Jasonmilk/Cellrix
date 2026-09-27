@@ -460,9 +460,17 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
        * capability is not a degradation but a failure". */
       var degraded = laneAlloc.state && laneAlloc.state !== 'ok'
         && laneAlloc.reason !== 'length-closed';
+      /* THE FALLBACK COMES FROM THE PROJECTION, NOT FROM ARITHMETIC HERE (ADR-0048 §168):
+       * my first version wrote `100 / Math.max(1, evs.length)` — real geometry computed in the
+       * view, which `view_hygiene_test`'s bare-slash metric correctly counted as a NEW offence
+       * ("bare-slash: 1 (target 0)"). The projection already publishes the reserved tick
+       * (`tickPct`), so the view needs no division at all: it takes the number like every other
+       * width. An empty basis would collapse the block (§167), and a computed one would put the
+       * geometry back in the view (§4.1: the projection is the only place numbers are made). */
       var wPct = (window.CxCellMetering.isFiniteNumber(colPct) && colPct > 0)
         ? colPct + '%'
-        : (100 / Math.max(1, evs.length)) + '%';   /* never empty: an empty basis collapses the block */
+        : ((window.CxCellMetering.isFiniteNumber(laneAlloc.tickPct) && laneAlloc.tickPct > 0)
+          ? laneAlloc.tickPct + '%' : '');
       var hit = S.q && (e.summary + ' ' + (e.tool || '')).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
       var isSel = (S.sel === e.id);
       LANES.forEach(function (k) {
