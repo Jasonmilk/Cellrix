@@ -450,8 +450,19 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
        * When the projection is not usable, the lanes must not pretend to be a proportion — they
        * carry the reason instead of per-block widths, so "degraded" and "degraded-and-acted-on"
        * cannot look the same (§㉓ second clause: a claim that is never consumed is decoration). */
-      var degraded = laneAlloc.state && laneAlloc.state !== 'ok';
-      var wPct = (!degraded && window.CxCellMetering.isFiniteNumber(colPct)) ? colPct + '%' : '';
+      /* 'length-closed' IS A CHOSEN MODE, NOT A FAULT (ADR-0048 §167): `equal` is the DEFAULT
+       * (S.durMode:'equal') and it returns state:'unavailable' — treating that as a degradation
+       * emptied every block (`flex: 0 0 ` ⇒ CSS omits flex-basis ⇒ 0% ⇒ invisible), i.e. the
+       * default path rendered NOTHING while all suites stayed green. That is the mirror of the
+       * fail-open gate: a render that cannot vary with its input carries 0 bits.
+       * WIDTH AND DEGRADATION ARE TWO CHANNELS (§4.1): degradation ADDS a marker, it never
+       * removes the width. `cell_metering`'s own words: "a degradation that loses the core
+       * capability is not a degradation but a failure". */
+      var degraded = laneAlloc.state && laneAlloc.state !== 'ok'
+        && laneAlloc.reason !== 'length-closed';
+      var wPct = (window.CxCellMetering.isFiniteNumber(colPct) && colPct > 0)
+        ? colPct + '%'
+        : (100 / Math.max(1, evs.length)) + '%';   /* never empty: an empty basis collapses the block */
       var hit = S.q && (e.summary + ' ' + (e.tool || '')).toLowerCase().indexOf(S.q.toLowerCase()) > -1;
       var isSel = (S.sel === e.id);
       LANES.forEach(function (k) {

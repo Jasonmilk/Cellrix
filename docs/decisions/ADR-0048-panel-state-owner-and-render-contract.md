@@ -7736,3 +7736,62 @@ jsdom 空文档 → 按序加载 three_state · cell_metering · event_family ·
 ⇒ 而 **`turn/end` 也被拒** —— 它是 `pinned` 期望的一部分。
 ⇒ 我**未能跑通该探针**（资产是浏览器 IIFE,`window` 未定义 ⇒ ReferenceError）⇒ **记为未核**,
 下一笔用 jsdom 垫片跑同一条探针,回答:**`turn/end` 被拒是预期的,还是词表缺字段?**
+
+## 167. 🔴 **修 ③ 引入的回归**：默认模式（`equal`）泳道全空,而 35 个套件全绿
+
+### 167.1 回归（审查方实测,我复现）
+
+```
+S.durMode 默认 'equal'（view :37）⇒ laneMode='equal' ⇒ allocate ⇒ **state:'unavailable', reason:'length-closed'**
+我修 ③ 的规则: degraded = state && state !== 'ok'  ⇒ **true** ⇒ wPct = ''
+⇒ 渲染实测: value ['0.5%','0.5%','97.5%',…] ；**equal ['', '', '', '', '', '']**   ← 六块全空
+⇒ `flex:0 0 ` 按 CSS 简写规范省略 flex-basis ⇒ **0%** ⇒ **默认模式下泳道不可见**
+```
+⇒ **这正是 step 2 修好的那个 regression 的原样回归**（`render_test.js:148` 的注释逐字写着它的机理:
+*"three lanes visually empty while all suites were green"*）。
+
+### 167.2 为什么 35 个套件全绿（逐条查覆盖,审查方）
+
+```
+lane_value_test  只查**投影级** v.cols/q.cols（grep jsdom|document ⇒ **0**）
+lane_degrade_test 只断言 Σ ≤ 100 与"降级支可达" —— **不查视图渲染**
+render_test       只在点 durBtn **切到 actual** 后查宽度,查完切回 ⇒ **equal 从不查宽度**;且需活栈⇒SKIP
+⇒ **没有任何一条判据在 equal 模式下断言过"块有非零宽度"。**
+```
+
+### 167.3 数学：**渲染成了常数函数**
+
+```
+修前 equal: 6 块 × 16.67% ⇒ 可见总宽 100.00% ⇒ 对输入可分辨
+修后 equal: 6 块 × 0%     ⇒ 可见总宽   0.00% ⇒ **不可分辨** ⇒ I(R;X) = **0 bits**
+```
+⇒ 与上一笔治好的 `adr_anchor` **fail-open 完全同形**:那边 **zero-assertion**,这边 **zero-render** ——
+**输出不随输入变化 ⇒ 0 bits。**
+
+### 167.4 修（两行,已落并验证）
+
+```js
+/* 'length-closed' 是**被选择的模式**,不是故障:equal 就是默认,而等宽就是它的诚实答案 */
+var degraded = laneAlloc.state && laneAlloc.state !== 'ok' && laneAlloc.reason !== 'length-closed';
+/* 宽度**永不为空**:空 ⇒ flex-basis 0% ⇒ 块消失 ⇒ 位置通道归零（§10:缺测留缺口） */
+var wPct = (isFiniteNumber(colPct) && colPct > 0) ? colPct + '%' : (100 / Math.max(1, evs.length)) + '%';
+```
+**复核**:`equal ⇒ degraded=false`,6 块各 **16.67%** ✓;`value` 不变 ✓。
+⇒ **原则由代码自己写下**（`reserve-over-budget` 分支逐字）:*"a degradation that **loses the core capability**
+is not a degradation but a **failure**"* ⇒ **降级"加标记",不"删宽度"**（宽度管位置、`data-cell-degraded` 管状态,§4.1 不借道）。
+
+### 167.5 🎯 **缺口①不是 nice-to-have —— 它就是这次回归的成因**（采纳"提到最前"）
+
+⇒ **投影级判据测不到视图层,而视图层的回归天然活在绿灯下**（与 §四.2"只在检查器打开后才存在的 UI"同族,
+这次是"**只在非默认模式下才被检查的 UI**"）⇒ **DOM 级判据提到最前,不再记为"下一笔"。**
+
+**本笔已把路铺好**:`render_test` 的 jsdom `require` 改为 **try/catch ⇒ `NEEDS-INPUT`（exit 3）**
+（此前裸 require ⇒ 无 jsdom 的机器**崩 ⇒ 被计为红** —— 又是"崩被读成红"）。
+**下一步**：hermetic DOM 套件（jsdom + 按序加载资产 + 调声明入口 `renderLanes()` + 断言 equal 非零宽度、降级"标记且宽度仍在"）+ 变异:viz 改回 `wPct=''` ⇒ **必须红**。
+⚠️ 已知障碍:视图的会话是闭包私有的（`S.session`）⇒ 需要一条**声明的**驱动入口（或经活面板注入 fixture）。
+
+### 167.6 次要观察（采纳记账,不阻塞）
+
+`lane_value_test` 的两条变异（`oneOff`/`collapsed`）都是**测试自建数组**与 `v.cols` 比 ⇒ 证明的是
+**比较函数有判别力**,不是**源码被守着**。⇒ 合法的 non-vacuity 自检,但**不能替代源码注入** ⇒
+补一条真正的源码变异:临时改坏 `allocate` 的一个分支 ⇒ 套件必须红。**记为下一笔。**

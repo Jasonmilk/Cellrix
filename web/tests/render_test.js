@@ -6,7 +6,15 @@
  *
  * Usage: node render_test.js <panel_base_url> <job_id>
  */
-const { JSDOM, VirtualConsole } = require("jsdom");
+/* A MISSING DEPENDENCY IS NOT A FAILURE (ADR-0048 §167 / rule ⑳): a bare require() here made
+ * the whole suite crash on machines without jsdom, and a crash is counted as a red — the same
+ * "crash reads as red" the runner already separates for exit 4. Declared SKIP (exit 3) instead. */
+let JSDOM, VirtualConsole;
+try { ({ JSDOM, VirtualConsole } = require("jsdom")); }
+catch (e) {
+  console.log("NEEDS-INPUT: jsdom 未安装（npm i jsdom / 见 web/tests/README）—— DOM 级判据无法行使");
+  process.exit(3);
+}
 
 const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
 if (!BASE) { console.log('NEEDS-INPUT: 未给面板地址（argv[2] / CELLRIX_PANEL）—— 端口见 chain.json 的 `panel` 条目'); process.exit(3); }
