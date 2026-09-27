@@ -123,6 +123,26 @@ ok(period.calls === 2, 'both calls counted (' + period.calls + ')');
   w4.close();
 }
 
+/* ── DOES ANY OF IT REACH THE SCREEN? ──
+ * SOURCE-LEVEL assertions only, and the reason is MEASURED: priming S.session from the pipeline
+ * and calling renderTable() yields `S.compactGroups = {}` (no groups at all), so this input does
+ * not reach the compact-row path — the FOURTH time "my input cannot reach the code under test"
+ * (§172, §181.4, §190, here). What CAN be checked without that path is that the plaque now has a
+ * nail: the group object writes the field the render reads. The true screen check is declared WIP.
+ */
+{
+  const view = fs.readFileSync(path.join(__dirname, '..', 'assets', 'prove_track.view.js'), 'utf8');
+  ok(/tokModel: t\.tokModel/.test(view),
+    'the compact group WRITES the field the render READS (measured before: E5 false / E6 true, so'
+    + ' "who answered" appeared 0 times)');
+  ok(/\(g\.steps && g\.steps\.length > 1\)/.test(view),
+    'and a multi-step turn lists the STEPS instead of printing "(mixed)"');
+  ok(/var stepList = \(cellProj\.stepModels \|\| \[\]\)/.test(view),
+    'the step list is derived from the step outlet (§190), not recomputed');
+  console.log('  WIP   screen-level: priming S.session + renderTable() leaves S.compactGroups EMPTY'
+    + ' (measured), so the rendered-text assertion cannot be reached from this input — declared, not skipped');
+}
+
 console.log(bad === 0 ? 'OK — the step→model assignment has an outlet, and the parts sum to the whole'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);

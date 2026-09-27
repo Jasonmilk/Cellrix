@@ -184,7 +184,17 @@
         } else { anyShown = true; }
       });
       if (ids.length && !anyShown) {
-        out[t.id] = { ids: ids, tokTotal: t.tokTotal, dur: dur, failed: failed,
+        /* THE NAIL THE PLAQUE WAS NEVER HUNG ON (ADR-0048 §191): the render below reads
+         * `g.tokModel`, and this object NEVER WROTE IT (measured: E5 false / E6 true), so
+         * "who answered" appeared on screen exactly 0 times — including the single-model case.
+         * The step list is the same fact at the grain an Agent Loop needs (§190). */
+        var stepList = (cellProj.stepModels || []).filter(function (x) {
+          return x.turn === t.id;
+        }).map(function (x) {
+          return x.model + (x.completion === null ? "" : " " + x.completion);
+        });
+        out[t.id] = { ids: ids, tokTotal: t.tok, tokModel: t.tokModel, steps: stepList,
+                      dur: dur, failed: failed,
                       turn: cellTurnItem[String(t.id)] || t };
       }
     });
@@ -258,7 +268,11 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
                         /* WHICH MODEL ANSWERED BELONGS NEXT TO THE COST (ADR-0048 §189): the cell said how
              * much was spent but never by whom, so "planner strong / executor cheap" was not
              * verifiable on screen. */
-            (g.tokModel ? ' · ' + g.tokModel : '') +
+            /* MULTI-STEP ⇒ LIST THE STEPS (ADR-0048 §191): one plaque on the door cannot say
+             * which of the five people inside used which door; when the turn has more than one
+             * step the cell lists them in order instead of printing "(mixed)". */
+            ((g.steps && g.steps.length > 1) ? ' · ' + g.steps.join(' · ')
+              : (g.tokModel ? ' · ' + g.tokModel : '')) +
 ' · ' + window.CxCellMetering.foldedCell(g) + ' tok' +
             (g.failed ? ' · ⚠ ' + g.failed + ' failed' : '') + '</span>' +
             '</button></td></tr>' });
