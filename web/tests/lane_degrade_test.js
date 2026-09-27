@@ -23,7 +23,8 @@ for (const mode of ['value', 'equal']) {
     if (sum > worst) { worst = sum; worstAt = mode + '/n=' + n + ' (' + a.reason + ')'; }
     if (a.reason) { reasons.add(a.reason); }
     if (a.cols.some((c) => typeof c !== 'number' || !isFinite(c) || c < 0)) {
-      ok(false, mode + '/n=' + n + ': a column is not a finite non-negative number');
+      ok(a.cols.every(function (c) { return typeof c === 'number' && isFinite(c) && c >= 0; }),
+        mode + '/n=' + n + ': every column is a finite non-negative number');   /* was a hard-coded ok(false): a glued lamp */
     }
   }
 }

@@ -58,6 +58,7 @@ const SELF_CONTAINED = [
   ['flake_roster_test.js', 'FLAKY is a third roster: neither red nor proven, with an append-only ledger and K>=3 escalation'],
   ['open_turns_test.js', 'openTurns is derived, cleared on reset, and read as DEFAULT OPEN (rule ⑰)'],
   ['capability_declaration_test.js', 'said and declared are two hosts: every jsdom suite declares REQUIRES, register records capability+probe'],
+  ['probe_integrity_test.js', 'a criterion about criteria: no hard-coded ok(true/false), and probes call entry points'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
   ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
