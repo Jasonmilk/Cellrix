@@ -46,7 +46,7 @@
     }
     if (tg) {
       var id = tg.dataset.eTurntoggle;
-      S.openTurns[id] = !S.openTurns[id];
+      S.openTurns[id] = !(S.openTurns[id] !== false);   /* explicit state, default open */
       renderTable(); syncTurnBtn();
       return;
     }
@@ -68,7 +68,7 @@
   });
 
   function syncTurnBtn() {
-    var allOpen = S.turnIds.every(function (id) { return S.openTurns[id]; });
+    var allOpen = S.turnIds.every(function (id) { return S.openTurns[id] !== false; });
     $('eTurnBtn').setAttribute('aria-pressed', String(allOpen));
     $('eTurnBtn').textContent = allOpen ? 'Collapse all turns' : 'Expand all turns';
   }
@@ -92,7 +92,7 @@
     renderLanes();
   });
   $('eTurnBtn').addEventListener('click', function () {
-    var allOpen = S.turnIds.every(function (id) { return S.openTurns[id]; });
+    var allOpen = S.turnIds.every(function (id) { return S.openTurns[id] !== false; });
     var target = !allOpen;
     S.turnIds.forEach(function (id) { S.openTurns[id] = target; });
     renderTable(); syncTurnBtn();
@@ -221,6 +221,10 @@
     stopReplay();
     if (S.sel) closeInsp();
     S.session = []; S.turnIds = []; S.turnIndex = {}; S.usage = null;
+    /* DERIVED, NOT STORED (ADR-0048 §202): `openTurns` is "which turns the human closed", a
+     * default-open DERIVATION of `turnIds`. Writing it in consume() and never clearing it left
+     * residues pointing at ids that no longer exist (rule ⑰: a stored derived value). */
+    S.openTurns = {};
     S.q = ''; $('eQ').value = '';
     showTrajectory(false);
     $('eEmpty').style.display = '';

@@ -243,7 +243,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
       if (it.kind === 'turn') {
         var cnt = 0, tl = 0;
         for (var k = i + 1; k < S.session.length && S.session[k].kind !== 'turn'; k++) { cnt++; tl += S.session[k].dur; }
-        var isOpen = !!S.openTurns[it.id];
+        var isOpen = S.openTurns[it.id] !== false;   /* default OPEN (§202): only an explicit `false` closes */
         rows.push({ key: 't:' + it.id, html: '<tr class="e-turn-hd"><td colspan="' + COLS + '">' +
           '<button type="button" class="e-turn-btn" data-e-turntoggle="' + it.id + '" aria-expanded="' + isOpen + '">' +
           '<span style="display:inline-block;width:14px" aria-hidden="true">' + (isOpen ? '▾' : '▸') + '</span>' +
@@ -304,7 +304,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
         }
         continue;
       }
-      if (!S.openTurns[it.turn]) continue;
+      if (S.openTurns[it.turn] === false) continue;   /* default OPEN (§202) */
       var grp = S.compactGroups[it.turn];
       /* Folded means folded: the step stays inside the disclosure even when the
        * turn itself is open, because compact mode is what the reader asked for.

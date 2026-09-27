@@ -56,6 +56,7 @@ const SELF_CONTAINED = [
   ['agent_loop_probe_test.js', 'THE FOUR PROBES: red until the Loop exists (a declaration with a name, not a disease)'],
   ['zero_report_test.js', 'a zero must carry its n (rule of three) and a verdict must carry its environment E'],
   ['flake_roster_test.js', 'FLAKY is a third roster: neither red nor proven, with an append-only ledger and K>=3 escalation'],
+  ['open_turns_test.js', 'openTurns is derived, cleared on reset, and read as DEFAULT OPEN (rule ⑰)'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
   ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
