@@ -9,6 +9,11 @@
  * This criterion drives the real render path and asserts the shape contract, the single statement,
  * and the screen text that an Agent Loop is accepted on.
  */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 const fs = require('fs'), path = require('path');
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }

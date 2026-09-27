@@ -8,6 +8,11 @@
  * The four checks below are two-sided: relaxing the schema must not be indistinguishable from
  * fixing it, so the other side (a turn/end missing `impasse` must still be REFUSED) is asserted too.
  */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 const fs = require('fs'), path = require('path');
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }

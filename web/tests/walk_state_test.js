@@ -5,6 +5,11 @@
  * returned an empty array and null. The two structural failures were exactly as silent as the
  * defect the observable was added to remove. Rule ⑮: one `null` may not carry two meanings.
  */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 const fs = require('fs'), path = require('path');
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }

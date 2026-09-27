@@ -9,6 +9,11 @@
 /* A MISSING DEPENDENCY IS NOT A FAILURE (ADR-0048 §167 / rule ⑳): a bare require() here made
  * the whole suite crash on machines without jsdom, and a crash is counted as a red — the same
  * "crash reads as red" the runner already separates for exit 4. Declared SKIP (exit 3) instead. */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 let JSDOM, VirtualConsole;
 try { ({ JSDOM, VirtualConsole } = require("jsdom")); }
 catch (e) {

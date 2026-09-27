@@ -9587,3 +9587,72 @@ Pareto:前 50%(26 个)= 64.7% 墙钟 · median 158ms · max 683ms(dom_contract_t
 ⬜ 3 清障仅剩:`var open` 写字面 false + 注明;`TURN_MARKS` 记风险登记
 ⬜ 4 **然后写 Loop**（4 条探针逐条转绿）
 ```
+
+## 203. **"说了"与"声明了"是两个宿主** —— 13 个套件印了中文,而账本读的是机器语言
+
+### 203.1 真因（审查方实跑,我核到同类计数 10 个）
+
+```
+人读宿主:`console.log('NEEDS-INPUT: jsdom 未安装')`   ← 套件**全都写了** ✓
+机读宿主:`const REQUIRES = 'jsdom';`                 ← 套件**全都没写** ✗
+⇒ 账本读机读宿主 ⇒ `unknown` ⇒ **UNREGISTERED/BLOCKING**
+⇒ **而账本没有错**:`deferrals.json` 明写 *"UNREGISTERED => unknown => BLOCKING"*,
+  且 *"fabricating a NEW capability name is already blocked — an unimplemented probe returns null…
+  classifies as UNKNOWN and blocks"* ⇒ **它拒绝一个没有探针的能力名,那正是它该做的。**
+⇒ **错的是声明只做了一半。**
+⇒ 与 §172（名字不随行）· §186（状态无消费者）· §190（出口无消费者）**同一条**:**写下 ≠ 做到**。
+```
+
+### 203.2 三处修（**必须同笔**,只做 ①②③ 中前两个仍会 BLOCKING）—— 已落
+
+```
+① **10 个套件**加 `const REQUIRES = 'jsdom';`（人读那句保留 ⇒ **两个宿主都在**）
+   实测加的是:agent_loop_probe · compact_fold · event_acceptance · lane_dom · render ·
+             tok_outlet · usage_aggregate · usage_by_model · usage_by_turn · walk_state
+   （我仓计数 **10**,审查方沙盒 **13** —— 差异是 E:各仓依赖 jsdom 的套件集合不同）
+② `deferrals.json` 增 `{id: 'jsdom-dom', probe: 'jsdom', reason: …}`（**只记能力与探针,不记套件名**）
+③ `run_all.js` 的 `probeOk` 增 **jsdom 探针**（`require.resolve('jsdom')`）
+```
+
+### 203.3 缺陷 ②(最严重):`--retry-flaky` 的**重试没带参数** ⇒ 洗掉真红
+
+```
+:389 重试调用缺 `...extra` ⇒ 实测量到的后果:
+  需要地址参数的套件:第一次(带参数) ⇒ exit 1;**重试(无参数) ⇒ exit 0** ⇒ **判为 FLAKY**
+⇒ **真红被洗掉** ⇒ 这正是 **A 方案(转绿即除名)的复活**,而 §201 已明确否决 A。
+⇒ 而且:不带同样参数的"重试"**不是重试,是另一次别的实验**。
+✅ **已修**:`execFileSync(node, [target, ...extra])` —— **重试必须跑同一个实验**。
+```
+
+### 203.4 缺陷 ③:能力探测**可缓存** ⇒ 省 11.2% 墙钟
+
+```
+实测:平均 spawn 一个套件 168.2ms · 平均一次能力探测 163.8ms
+     13 个套件 spawn 合计 2186ms ⇒ 改为 **1 次探测 + 0 spawn** = 164ms ⇒ 省 2022ms = 整门 18109ms 的 **11.2%**
+⇒ 而 `run_all.js` 早有正确先例:`PANEL_UP` / `CDP_UP` —— **探一次,决定一批**。
+✅ **已修**:`PROBE_CACHE` —— **一趟门内同一 capability 只 probe 一次**。
+⇒ 且**不违反**文件头那句(*"a suite that quietly did not run is indistinguishable from one that passes"*):
+  因为**能力结论是被声明的**（`REQUIRES` + probe + HELD),不是静默不跑。
+```
+
+### 203.5 判据（`capability_declaration_test.js`,已进网,8 条全绿）
+
+```
+ok  jsdom 依赖套件数量 ✓ · **每一个"说了"的套件都"声明了"** [n/n] · 人读宿主仍在（两个宿主不能互相取代）
+ok  账本记的是**能力 + 探针**,不是套件名单 · 且 deferrals **不点套件名**
+ok  run_all 有 jsdom 探针（没有探针的能力名仍是 UNKNOWN ⇒ 阻塞）
+ok  **探测被记忆化**（一趟门一次）· ok  **FLAKY 重试带同样参数**
+```
+⇒ **门 `proven` 49 → 51**;整门 `2 red, 51 proven, 5 held, 0 unregistered [E: panel=down siblings=3/3 jsdom=yes], 1 env-missing`。
+
+### 203.6 仍未完成（审查方交还给我的那 4 个 —— **register 的内容是我的决定**）
+
+```
+它们的形状与 jsdom 完全相同(缺 capability + probe),只是缺的东西不同:
+  `adr_boundary_test.js`   ⇒ git repo（`git rev-parse`）
+  `chain_wiring_test.js`   ⇒ 兄弟仓 `anaphase-helix/ecosystem/chain.json`
+  `proto_contract_test.js` ⇒ 兄弟仓的 `flowmodus.proto`
+  `chain_legs_test.js`     ⇒ 真实事件文件 `.helix/events/*.jsonl`
+⇒ **下一笔按同一手法补齐:每个 capability 一个 probe;声明在套件里,能力在 register 里。**
+⇒ 而这次我**不再"替你填"**:这四条是**我仓的能力面**,由我落;审查方说得对 —— 它不该替我决定。
+```

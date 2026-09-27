@@ -12,6 +12,11 @@
  * The review also corrected its own earlier suggestion: re-classifying "unimplemented" into another
  * exit code buys 0 bits (red only merges two states). What buys bits is asserting the proposition.
  */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 const fs = require('fs'), path = require('path');
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }

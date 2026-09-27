@@ -8,6 +8,11 @@
  * prompt=3 and the call count with it. §131 fixed exactly this poisoning inside `add`; the
  * aggregation path was never enumerated when the invariant's channels were listed.
  */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 const path = require('path');
 const fs = require('fs');
 let JSDOM;

@@ -13,6 +13,11 @@
       "probe": "cdp",
       "reason": "needs a real browser on the CDP port plus the live panel. Decided by PROBE, never by a date: a date is a guess, and 'the instance was never configured' must not read as 'the capability is absent'. NOTE (measured): fabricating a NEW capability name is already blocked — an unimplemented probe returns null, which classifies as UNKNOWN and blocks. What is NOT blocked is filing a suite here that does not need this capability, which is why an owner is now mandatory. The suite list is GONE on purpose: attaching a suite from here is exactly how a suite would be hidden. A `suites` key is now a REGISTER ERROR.",
       "owner": "jason"
+    },
+    {
+      "id": "jsdom-dom",
+      "probe": "jsdom",
+      "reason": "DOM-level suites need jsdom. Decided by PROBE, never by a date, and `REQUIRES` in each suite names it — the register only records the capability and its probe (ADR-0048 §203)."
     }
   ],
   "deferrals": [

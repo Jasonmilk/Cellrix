@@ -6,6 +6,11 @@
  * is accepted on exactly that fact (planner ⇒ strong model, executor ⇒ cheap one), so with no
  * outlet the acceptance criterion is unmeasurable: I(assignment ; screen) = 0 bits.
  */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 const fs = require('fs'), path = require('path');
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }

@@ -6,6 +6,11 @@
  * `derivePeriodUsage(nodes).completion` was 12 all along. The fix is not to draw a row: it is to
  * accept the declared input — and to accept it in BOTH hosts, because the view reads `turns[i].tok`.
  */
+/* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
+ * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
+ * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
+const REQUIRES = 'jsdom';
+
 const path = require('path');
 const CM = require(path.join(__dirname, '..', 'assets', 'cell_metering.js'));
 

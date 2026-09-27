@@ -57,6 +57,7 @@ const SELF_CONTAINED = [
   ['zero_report_test.js', 'a zero must carry its n (rule of three) and a verdict must carry its environment E'],
   ['flake_roster_test.js', 'FLAKY is a third roster: neither red nor proven, with an append-only ledger and K>=3 escalation'],
   ['open_turns_test.js', 'openTurns is derived, cleared on reset, and read as DEFAULT OPEN (rule ⑰)'],
+  ['capability_declaration_test.js', 'said and declared are two hosts: every jsdom suite declares REQUIRES, register records capability+probe'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
   ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
@@ -386,7 +387,10 @@ for (const [file, what] of SELF_CONTAINED) {
      * green, which is precisely what the rosters above exist to prevent. */
     if (RETRY_FLAKY && e.status === 1) {
       let again = null;
-      try { require('child_process').execFileSync(process.execPath, [require('path').join(__dirname, file)], { stdio: 'pipe' }); again = 0; }
+      /* THE RETRY MUST RUN THE SAME EXPERIMENT (ADR-0048 §203): without `...extra` a suite that
+       * needs an address arg fails on the first run and PASSES on the retry — measured — so a
+       * real red would be filed as FLAKY. That is option A (wash the evidence) resurrected. */
+      try { require('child_process').execFileSync(process.execPath, [require('path').join(__dirname, file), ...extra], { stdio: 'pipe' }); again = 0; }
       catch (e2) { again = e2.status; }
       if (again === 0) {
         if (flakyCount(file) >= FLAKY_ESCALATE_AT) {
@@ -419,15 +423,29 @@ const DEFERRALS = (function () {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'deferrals.json'), 'utf8')); }
   catch (e) { return null; }
 })();
+/* ONE PROBE PER CAPABILITY PER GATE RUN (ADR-0048 §203): measured, 10+ suites each spawned a
+ * process to discover the same fact (jsdom absent), ~164ms apiece — 11% of the gate spent
+ * repeatedly learning one thing. The file already had the right precedent (`PANEL_UP`): probe
+ * once, decide a batch. Caching does NOT violate the header's rule, because the capability
+ * conclusion is DECLARED (REQUIRES + probe + HELD), not silently skipped. */
+const PROBE_CACHE = {};
 function probeOk(name) {
-  if (name !== 'cdp') { return null; }            // unknown probe => inconclusive
+  if (Object.prototype.hasOwnProperty.call(PROBE_CACHE, name)) { return PROBE_CACHE[name]; }
+  if (name === 'jsdom') {
+    let okJsdom = false;
+    try { require.resolve('jsdom'); okJsdom = true; } catch (e) { okJsdom = false; }
+    PROBE_CACHE[name] = okJsdom;
+    return okJsdom;
+  }
+  if (name !== 'cdp') { PROBE_CACHE[name] = null; return null; }   // unknown probe => inconclusive
   try {
     execFileSync(process.execPath, ['-e',
       "fetch(process.env.CELLRIX_CDP||'http://127.0.0.1:9222/json/version',"
       + "{signal:AbortSignal.timeout(1500)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"],
       { stdio: 'ignore', timeout: 4000 });
+    PROBE_CACHE[name] = true;
     return true;
-  } catch (e) { return false; }
+  } catch (e) { PROBE_CACHE[name] = false; return false; }
 }
 function declaredRequires(file) {
   /* The SUITE says what it needs; the register cannot attach one. */
