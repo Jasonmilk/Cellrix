@@ -88,19 +88,34 @@ const rel = (a, b) => Math.abs(a - b) < 0.01;
   w.close();
 }
 
-/* ── 3. A REAL degradation through the pipeline: NAMED SKIP (still open) ──
- * The reviewer's recipe (250 × turn/start + 1 × tool/result) yields 251 ROWS in their build, but
- * measured here it yields TURN HEADERS (2 ev rows total), so `row-exceeds-grid` is not reached.
- * The projection-level twin (lane_degrade_test) covers that branch; this DOM half says so instead
- * of pretending, and the marker/recovery assertions below still exercise the surviving paths. */
+/* ── 3. A REAL degradation through the pipeline: NAMED SKIP, WITH ITS READINGS ──
+ * RULE (ADR-0048 §175): a conclusion of "unreachable / not applicable / skip" must carry the
+ * readings that produced it — "what was fed, how many rows came out". My previous note said
+ * "turn/start yields headers, not ev rows"; MEASURED, that is WRONG (250 turn/start ⇒ 250 ev rows,
+ * sem all "turn"). What is actually true here:
+ *     feed 250 × turn/start + 1 × tool/result  ⇒ nodes 250, ev 250, sem ["turn"], measured 0,
+ *                                                 tool/result REJECTED (invalid:tool/result ×1)
+ *     feed 1 × turn/start + 250 × tool/result({tool,ok}) ⇒ nodes 2, ev 2, REJECTED ×249
+ * ⇒ the assembly coalesces tool results per turn, so >200 APPLICABLE-BUT-UNMEASURED rows
+ *   (what `row-exceeds-grid` needs) cannot be produced by this recipe in this pipeline.
+ * The projection-level twin (lane_degrade_test) covers that branch; this half says so, and prints
+ * the numbers that justify it, instead of asserting a conclusion nobody ran.
+ */
 {
   const w = build();
-  const primed = prime(w, 'actual');
+  const many = Array.from({ length: 250 }, () => ({ type: 'turn/start', data: {} }))
+    .concat([{ type: 'tool/result', data: { tool: 't', ok: true, duration_ms: 120 } }]);
+  const primed = prime(w, 'actual', many);
   if (primed) {
     const host = w.document.getElementById('eTraj');
-    ok(!host.hasAttribute('data-cell-degraded'), 'not degraded ⇒ no marker (marker path exercised)');
-    console.log('  SKIP  lane DOM (degraded): could not synthesise a degrading session through THIS'
-      + ' pipeline (turn/start yields headers, not ev rows) — lane_degrade_test covers the branch (declared)');
+    ok(!host.hasAttribute('data-cell-degraded'),
+      'not degraded here ⇒ no marker, and the reason is now MEASURED (see the readings above)');
+    console.log('    readings: nodes=' + primed.rows.length + ' ev='
+      + primed.rows.filter((r) => r.kind === 'ev').length
+      + ' measured=' + primed.rows.filter((r) => typeof r.dur === 'number').length
+      + ' rejections=' + (primed.rejections && primed.rejections.total ? primed.rejections.total : 0));
+    console.log('  SKIP  lane DOM (degraded): reachable only with >200 APPLICABLE-BUT-UNMEASURED rows,'
+      + ' which this pipeline does not produce from that recipe — lane_degrade_test covers the branch (declared)');
   }
   w.close();
 }

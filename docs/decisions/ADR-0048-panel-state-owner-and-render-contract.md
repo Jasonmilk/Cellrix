@@ -8154,3 +8154,43 @@ SKIP 降级支（具名:本管线下 turn/start 产 header 而非 ev 行 ⇒ row
 > **前四代**:①某个值正确 ②accept⇒handled ③⇒与相邻成员可分辨 ④判据面由来源生成（∀）
 > **第五代**:**判据必须打在"判词所说的那个量"上 —— 逐块、期望值独立可算,并配一条**视图级**变异守那条缝。**
 > ⇒ 前四代讲"判据要更全",第五代讲"**判据要对准对象**"。
+
+## 175. **SKIP 必须附"喂了什么、得到几行"** —— "自称的证据"第 10 次
+
+### 175.1 审查方的更正**对**（我实测复核）
+
+```
+我写在 §174 里的理由: "turn/start yields headers, not ev rows"  ⇒ **错**
+实测: feed 250 × turn/start ⇒ **EVROWS n = 250**,sem 全为 "turn" ⇒ **turn/start 确实产 ev 行**(头与行都产)
+```
+⇒ 而这也解释了为何"配方没喂进去"那条指控**不成立**:`prime(w,'actual',many)` 我确实传了第三个参数。
+⇒ 但**结论(不可达)仍然成立,只是理由错了** —— 这是本轮第 10 次"**把一个没跑过的结论写进 ADR**",
+   而这次的形式是:**理由没跑,结论碰巧对**。
+
+### 175.2 实测的真读数（本笔把它写进判据）
+
+```
+feed 250 × turn/start + 1 × tool/result        ⇒ nodes 250 · ev 250 · sem ["turn"] · **measured 0**
+                                                 · tool/result **被拒收**(invalid:tool/result ×1)
+feed 1 × turn/start + 250 × tool/result({tool,ok}) ⇒ nodes **2** · ev 2 · **拒收 ×249**
+⇒ 装配把 tool/result **按 turn 合并** ⇒ **>200 个"适用但未测得"的行(row-exceeds-grid 所需)**
+  在本管线里**无法由该配方产生**。
+```
+
+### 175.3 新判据（采纳审查方建议,并入通则）
+
+> **凡"不可达 / 不适用 / SKIP"的结论,必须附一行读数:"喂了什么、得到几行"。**
+> ⇒ 因为**"没跑到"与"跑到了但没有"在输出上同形** —— 与 §154「未声明的输入 ⇒ 不可识别」同族,
+> 只是这次未声明的是**"我到底喂了什么"**。
+⇒ **本笔已落**:`lane_dom_test` 的降级支在 SKIP 旁打印 `nodes / ev / measured / rejections` 四个读数,
+并**更正了那句错理由**(印在源码注释里,不删)。
+
+### 175.4 顺带:tok 出口的真相**已在,只差接上**（采纳,记为下一笔）
+
+```
+实测: NODES ["turn","metering","tool","metering"] · usageBySource {"run":{calls:2,completion:12,…}}
+      derivePeriodUsage.total = **32** · 会话行 tok 全 null ⇒ project(会话行).tok = A()
+⇒ metering 不 drawn(无行) ⇒ 逐行 fold 拿不到 tok ⇒ **结构性**;而 period 级聚合**已存在且正确**
+⇒ 这一笔不是"造新聚合",是"**声明这一格读哪个**":project(会话行) 的 tok 出口 ⟸ derivePeriodUsage().total
+  或**显式声明"不适用"**(不许静默 A()) ⇒ 判据:== 32 + 变异(改 total ⇒ 红)
+```
