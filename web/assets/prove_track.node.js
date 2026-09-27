@@ -137,14 +137,18 @@
 
   function derivePeriodUsage(nodes) {
     var calls = 0, prompt = 0, completion = 0;
+    /* A LOWER BOUND IS NOT AN ERROR (ADR-0048 §177): one column's unknown must not void
+     * another column's KNOWN. Measured: a node [prompt 3, completion null] was dropped
+     * WHOLE, so prompt read 20 instead of 23, `calls` read 2 instead of 3, and total read
+     * 32 while the truth is >= 35 (ISO 9075 aggregates ignore NULL; Moore: 3 + ? = [3,+inf)). */
+    var promptPartial = false, completionPartial = false;
     var cachedSum = 0, cachedAll = true, reasoningSum = 0, reasoningAll = true;
     (nodes || []).forEach(function (n) {
       if (n.kind !== 'metering') { return; }
       var p = n.payload || {};
-      if (!safeCount(p.promptTokens) || !safeCount(p.completionTokens)) { return; }
-      calls++;
-      prompt += p.promptTokens;
-      completion += p.completionTokens;
+      if (safeCount(p.promptTokens)) { prompt += p.promptTokens; } else { promptPartial = true; }
+      if (safeCount(p.completionTokens)) { completion += p.completionTokens; } else { completionPartial = true; }
+      calls++;   /* the call HAPPENED, so it is counted — even when a column is unknown */
       if (p.cachedTokens == null) { cachedAll = false; } else { cachedSum += p.cachedTokens; }
       if (p.reasoningTokens == null) { reasoningAll = false; } else { reasoningSum += p.reasoningTokens; }
     });
@@ -154,9 +158,12 @@
     var reasoning = (reasoningAll && safeCount(reasoningSum)) ? reasoningSum : null;
     return {
       calls: calls, prompt: prompt, completion: completion,
+      promptPartial: promptPartial, completionPartial: completionPartial,
       cached: cached, reasoning: reasoning,
       input: (cached == null) ? null : prompt - cached,
-      total: prompt + completion
+      total: prompt + completion,
+      /* `totalPartial` says "the number above is a LOWER BOUND", so a consumer can print `>=`. */
+      totalPartial: (promptPartial || completionPartial)
     };
   }
 

@@ -8273,3 +8273,61 @@ ok  a turn/end WITHOUT `impasse` is still REFUSED（**契约的另一侧**,防"�
 §175:理由没跑 ⇒ 结论碰巧对    ·  §175.5:跑错了输入 ⇒ 结论反
 §176:注释写着 bug 而 required 没改 ⇒ **文档与实现不一致,而无人问**
 ⇒ 共同形状:**"写下"不等于"做到"** —— 与本链的"表里有≠行为里有""记录≠消费"是同一条,换了宿主。
+
+## 177. **一列的未知不得作废另一列的已知** —— "假数"比"无数"更糟
+
+### 177.1 实测（审查方,我逐字复核）
+
+```
+metering 节点 [9,5] · [11,7] · **[3, null]**
+显示值   calls=2  prompt=20  completion=12  total=32
+真值     calls=3  prompt=23  completion=12（下界）  total **≥ 35**
+⇒ 第三个节点因**一列未知**被**整节点丢弃** ⇒ 它**已知的 prompt=3** 与**调用计数**一起消失。
+```
+**丢弃点**（`prove_track.node.js`）:
+```js
+if (!safeCount(p.promptTokens) || !safeCount(p.completionTokens)) { return; }   // ← 整节点作废
+```
+⇒ **这正是 §131 那条 null 毒化在聚合层的另一个通道** —— 我在 `add`/`max` 上修好了它,
+**枚举通道时只枚举了 `cell_metering` 的,没有枚举 `prove_track.node` 的。**
+
+### 177.2 巨人路径（三条同指一列）
+
+```
+ISO/IEC 9075: `SUM(col)` 忽略 NULL,但**不因另一列为 NULL 就丢掉整行**
+IEEE 1788 / Moore 区间: `3 + ? = [3, +∞)` ⇒ prompt 精确 23,total **≥35** ⇒ 报 32 是**包围圈失效**
+CI-144 §2 约束 3 / I6: 未知必须有类型级表示 ⇒ `null` 进门了,而**聚合侧又把它当成"整行作废"**
+```
+⇒ **且这不是理论边界**:`completion_tokens: null` 在上游**是常态**（注释自己写着 *"the upstream did not report it"*）。
+
+### 177.3 修 + 判据（已落,含变异）
+
+```js
+if (safeCount(p.promptTokens))     { prompt += p.promptTokens; }     else { promptPartial = true; }
+if (safeCount(p.completionTokens)) { completion += p.completionTokens; } else { completionPartial = true; }
+calls++;                       /* 调用发生了就数它 —— 即使某列未知 */
+return { …, promptPartial, completionPartial, totalPartial: (promptPartial || completionPartial) };
+```
+**新增 `usage_aggregate_test.js`（已进网,5 条全绿）**:
+```
+ok  all three calls are counted (3)          ok  prompt == 23（未知列旁边的已知 3 幸存）
+ok  completion == 12 **且 flags partial**     ok  total 报**下界 35** 并说明是下界（totalPartial）
+ok  MUTATION: 恢复"整节点 return" ⇒ 立刻回到 calls=2 / prompt=20（被抓）
+```
+
+### 177.4 仍未完成:① **tok 出口在屏幕上说"无数据"而真相是 12**（下一笔,唯一目标）
+
+```
+project(原始事件).tok        = 12          ← value_criterion 测的（全绿）
+project(会话行).tok          = {"k":"a"}    ← 视图跑的
+foldedCell(turns[0])         = "· 无数据"   ← **屏幕上显示的字**
+而真相已存在且正确: derivePeriodUsage(nodes).completion = **12**
+```
+⇒ **"· 无数据"是 `A()`（不适用）那一支,而真相是"适用且测到 12"** ⇒ **它不是"少信息",是假陈述**;
+⇒ 而**假陈述比空更糟**:空会引发怀疑,**"无数据"不会**。
+
+**⚠️ 更正审查方上一轮的建议(它们自己本轮也更正了)**:tok 出口要读 **`completion`（=12）**,**不是 `total`（=32）**。
+**下一笔的形状**:`project(会话行)` 的 tok 出口 **⟸ 声明读 period 级聚合的 `completion`**（并带 `partial` 标记）,
+或**显式声明"本格不适用"并注明理由** —— **不许静默 A()**。
+**判据**:`project(真实会话行).tok == 12`（与预言机同源）+ 变异（改 completion ⇒ 红 / 改回逐行 fold ⇒ 红）。
+⇒ **必须与 ② 同源**:两笔分开会各自造一份"这一格的 tok 从哪来"。
