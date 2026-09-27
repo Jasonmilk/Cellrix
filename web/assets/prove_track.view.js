@@ -164,6 +164,15 @@
          * requests and the fold must not overrule that. Anything unsettled or
          * unrecognised blocks too: assuming foldability is the direction that
          * hides work. */
+        /* THE CONTAINER IS NOT A STEP (ADR-0048 §192). The turn-title row carries neither `cls`
+         * nor `status`, so it fell through to the final `else` and set anyShown — i.e. EVERY
+         * group was vetoed by a member that can never be judged, and the fold never happened in
+         * production (measured: with the row `compactGroups = {}`; without it
+         * `{"t1": ["run#1","run#5"]}`). The lesson generalises: when enumerating the inputs of a
+         * decision, "does the input set contain a member that can never decide?" is its own
+         * assertion. (Its absence was then mis-read as "this turn contains a FAILURE" by an
+         * escape hatch in all_views_test — two causes, one sentence, rule ⑮ again.) */
+        if (!e.cls && !e.status) { return; }
         if (e.status === 'fail') { anyShown = true; failed++; }
         else if (e.status === 'pending') { anyShown = true; }
         else if (e.status === 'ok' || e.status === 'done') {

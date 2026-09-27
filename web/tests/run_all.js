@@ -51,6 +51,7 @@ const SELF_CONTAINED = [
   ['tok_lower_bound_test.js', 'a lower bound survives to the screen: value, partial and bound are one fact in three slots'],
   ['usage_by_turn_test.js', 'per-turn usage attribution: each turn is told what IT spent, and the parts sum to the whole'],
   ['usage_by_model_test.js', 'the step→model assignment has an outlet (planner vs executor must be verifiable)'],
+  ['compact_fold_test.js', 'the fold must be able to happen at all (the container row must not veto it)'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
   ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],

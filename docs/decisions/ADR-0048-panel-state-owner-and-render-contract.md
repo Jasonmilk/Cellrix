@@ -8980,3 +8980,50 @@ grep ".stepModels" web/assets/*.js ⇒ 只有三处:① 塞进返回值 ② prov
 ② `script.html:151` 仍未改（§186）—— Loop 会让 period 涨一个数量级
 ③ Anaphase 6 态声明 + 连接失败进 /v1/health（跨仓）;④ 运行时消融 A/B/C
 ```
+
+## 192. 🎯 **`compactGroups` 为空不是"我灌错了",是一个真 bug**：容器行恒否决
+
+### 192.1 真因（审查方实测,我复核逐字）
+
+```
+project().turns[i].events 里**含那一轮的标题行自己**（`{id:'t1'}`,**无 cls、无 status**）
+⇒ 它落进 compactGroupsOf 的最后一个 `else { anyShown = true; }`
+⇒ **每一组都被一个"永远无法被判定"的成员否决** ⇒ `compactGroups` 恒为 `{}`
+实测对照:A 含容器行 ⇒ `{}`;A 剔除 ⇒ `{"t1": ["run#1","run#5"]}`
+⇒ **这一行决定了整个 compact（折叠）功能是否曾经工作过 —— 而它从未工作过。**
+```
+⇒ **这不是"我的输入到不了被测代码"（第 4 次那个说法）,而是那条分支在生产里也从来走不到** ——
+   **同一件事的第 4 次显影,只是这次它长在产品里。**
+
+### 192.2 修（一行 + 判据）
+
+```js
+if (!e.cls && !e.status) { return; }   /* 容器不是一步：它是容器 */
+```
+**新增 `compact_fold_test.js`（已进网,走真实 `renderTable()`）**:
+```
+ok  the fold PRODUCES a group for a real session  [1 group]
+ok  and the group contains foldable steps  [2]
+ok  **AND the step plaque is on the group: ["planner-strong 20","executor-cheap 7"]**   ← 名牌第一次挂上
+ok  每一步各自命名模型与 token
+ok  **MUTATION:保留容器行 ⇒ 每一组都被否决**（这就是那个 bug）
+```
+⇒ **门 `proven` 45 → 46**。
+
+### 192.3 ⚠️ 而 live 面板的读数**变化了**,这是真信息（不是噪声）
+
+```
+修前（未重建）: all_views_test  `compact=15 rows / 0 folded vs full=15 rows`
+修后（**重建 + 重启**后）: `compact=0 rows / 0 folded vs full=5 rows`
+⇒ **折叠现在真的发生了**（0 folded 的含义变了）,但**折叠后的渲染没有产出行** ⇒
+  **新症状:折叠组没有画出它的行**（组对象有了 `steps` 与 `ids`,而渲染那一支没走）
+⇒ 且注意:**资产被 `include_str!` 编入二进制 ⇒ 必须重建才对 live 可见**（§153/§162 的同一课;
+  我第一次读数没变正是因为这个 —— 而那次"没变"曾被读成"修无效"）。
+```
+**归因（具名,不再"与本次无关"）**:`all_views_test` 的 compact 那条**此前被 §163 记为"既有 UI 行为、独立记账",
+而它其实就是同一个 bug**;如今 bug 修了,**它的读数随之改变** ⇒ 那条断言需要按**新语义**重判:
+```
+"compact folds the completed internal steps" 应该问:折叠组**存在** ∧ 其行**被折叠**（不是"行数为 0"）
+⇒ 且折叠为 0 必须能**点名原因**（FAILURE / tool-request / 组未生成）—— 三因三名（审查方 §3）
+```
+⇒ **这是下一笔**,而它现在有了**每一步的读数**（15/0 → 0/0 → ?）。
