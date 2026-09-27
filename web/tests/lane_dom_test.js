@@ -1,147 +1,142 @@
-/* lane_dom_test — THE DOM-LEVEL CRITERION (ADR-0048 §169). It exists because three regressions in
- * a row survived 35 green suites: the lanes rendered nothing in the default mode, the empty-width
- * fallback came back, and a degradation attribute was never written at all. Every one of them was
- * a VIEW-layer defect that no projection-level criterion could see — the word in the sentence is
- * "shows", and nothing was watching what the panel shows.
+/* lane_dom_test — THE CRITERION IS AIMED AT THE QUANTITY THE JUDGEMENT NAMES (ADR-0048 §174).
  *
- * Hermetic: the page is assembled in jsdom from the repo's own assets (boot.json order) and the
- * session is injected through the view's PUBLIC entry (`PT.S`, exported at :751). No server.
+ * Measured (reviewer, reproduced): reversing the view's width order —
+ *     var colPct = laneAlloc.cols[idx]  ⇒  cols[cols.length - 1 - idx]
+ * leaves Σ=100, every block > 0 and every suite green. Five suites measured FUNCTIONALS of the
+ * rendered value (non-null, > 0, Σ=100) and none measured the value itself: the criteria were a
+ * SURROGATE ENDPOINT (CAST 1989 — the drug suppressed the arrhythmia and the patients died).
+ * This file asserts the value PER BLOCK against arithmetic computed HERE, and it carries a
+ * view-level mutation, because the seam between projection and pixel is where six regressions
+ * have lived (missing boot pieces · wPct='' · var hoisting · shape mismatch · dur=0 · reversal).
  */
 const fs = require('fs'), path = require('path');
 let JSDOM;
 try { ({ JSDOM } = require('jsdom')); }
 catch (e) { console.log('NEEDS-INPUT: jsdom 未安装 — DOM 级判据无法行使'); process.exit(3); }
+const AP = require('./assemble_page.js');
 
-const ROOT = path.join(__dirname, '..', '..');
-const A = (p) => fs.readFileSync(path.join(ROOT, 'web', 'assets', p), 'utf8');
+const GRID = 200, TICK = 100 / GRID;             /* gridCols=200 is the view's own constant */
 const events = fs.readFileSync(path.join(__dirname, 'fixtures', 'pinned.events.jsonl'), 'utf8')
   .trim().split('\n').map((l) => JSON.parse(l));
 
 let bad = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) bad++; };
 
-/* THE ASSEMBLY RULE IS SHARED, NOT COPIED (ADR-0048 §171): `assemble_page.js` is the one JS
- * implementation, guarded by `assemble_page_test`. My own copy replaced `pieces` but not the
- * DERIVED placeholders, which is why the page died on `__REFRESH__`. */
-const AP = require('./assemble_page.js');
-function build(assetOverrides) {
-  const dom = new JSDOM(AP.assemble(assetOverrides).html,
+function build(overrides) {
+  const dom = new JSDOM(AP.assemble(overrides).html,
     { runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://127.0.0.1:1/' });
-  return { dom, w: dom.window };
+  return dom.window;
 }
-function laneBlocks(w) {
-  return Array.from(w.document.querySelectorAll('#eLaneInput .e-blk, #eLaneModel .e-blk, #eLaneTool .e-blk'))
-    .filter((b) => b.getAttribute('data-e-ev'));
-}
-function widths(blocks) {
-  return blocks.map((b) => { const m = /flex:\s*0\s+0\s+([-\d.]+)%/.exec(b.getAttribute('style') || ''); return m ? parseFloat(m[1]) : null; });
-}
-function prime(w, durMode, eventsOverride) {
+function prime(w, durMode, evs) {
   const PT = w.CxProveTrack;
-  if (!PT || !PT.S || !PT.node || typeof PT.node.buildSession !== 'function') { return false; }
-  /* THE REAL PATH, NOT A HAND-BUILT SESSION (ADR-0048 §171): the previous version fed raw EVENTS
-   * in as if they were session rows, and measured, those rows have no `lane` — `renderLanes`
-   * branches on `e.lane === k`, so zero blocks entered the lanes and the criterion was testing
-   * its own bad input. Now: assembly.feed → snapshot nodes → buildSession, the same three stages
-   * the panel runs. (Its `rejections()` also answers the open `turn/end` question.) */
+  if (!PT || !PT.S || !PT.node) { return null; }
   const st = (w.CxAssembly && w.CxAssembly.create) ? w.CxAssembly.create() : null;
-  if (!st) { return false; }
-  st.register('probe', { name: 'probe' });
-  st.activate('probe');
-  const evs = eventsOverride || events;
-  st.feed(evs.map((e, i) => Object.assign({ seq: i, time: '2026-01-01T00:00:0' + (i % 10) + 'Z', job_id: 'p' }, e)));
+  if (!st) { return null; }
+  st.register('probe', { name: 'probe' }); st.activate('probe');
+  const src = evs || events;
+  st.feed(src.map((e, i) => Object.assign(
+    { seq: i + 1, time: '2026-01-01T00:00:0' + (i % 10) + 'Z', job_id: 'fx', period_id: 'fx' }, e)));
   const snap = st.snapshot();
-  const nodes = (snap && (snap.nodes || snap)) || [];
-  PT.S.session = PT.node.buildSession(nodes);
-  PT.S.durMode = durMode;
-  PT.S.q = ''; PT.S.sel = null;
-  w.__probeRejections = (typeof st.rejections === 'function') ? st.rejections() : null;
-  return true;
+  PT.S.session = PT.node.buildSession((snap && (snap.nodes || snap)) || []);
+  PT.S.durMode = durMode; PT.S.q = ''; PT.S.sel = null;
+  PT.renderLanes();
+  return { rows: PT.S.session, rejections: (typeof st.rejections === 'function') ? st.rejections() : null };
 }
+const LANES = ['eLaneInput', 'eLaneModel', 'eLaneTool'];
+const laneWidths = (w, id) => Array.from(w.document.querySelectorAll('#' + id + ' .e-blk'))
+  .map((b) => { const m = /flex:\s*0\s+0\s+([-\d.]+)%/.exec(b.getAttribute('style') || ''); return m ? parseFloat(m[1]) : null; });
+const rel = (a, b) => Math.abs(a - b) < 0.01;
 
-
-/* ── the default mode must SHOW something ── */
+/* ── 1. THE VALUE, PER BLOCK, AGAINST ARITHMETIC COMPUTED HERE (not against allocate()) ── */
 {
-  const { w } = build();
-  const PT = w.CxProveTrack;
-  if (!PT || typeof PT.renderLanes !== 'function' || !prime(w, 'equal')) {
-    console.log('  SKIP  lane DOM: the view could not be assembled in jsdom (declared skip)');
-  } else {
-    PT.renderLanes();
-    const blocks = laneBlocks(w), ws = widths(blocks);
-    ok(blocks.length > 0, 'DOM scope: the default render produced blocks (' + blocks.length + ')');
-    ok(ws.length > 0 && ws.every((x) => typeof x === 'number' && x > 0),
-      'DEFAULT MODE SHOWS SOMETHING: every block has a numeric width > 0 [' + ws.slice(0, 3).join(', ') + '…]');
-    /* SUM EVERY BLOCK OF THE LANE, spacers included: a lane holds one block per SESSION ROW (its
-     * own rows carry data-e-ev, the others are placeholders), so summing only the id-bearing ones
-     * can never reach 100 — that was my assertion's bug, not the view's (measured 50.00/50.00 on a
-     * two-row session where each lane owns one row). */
-    const sums = ['eLaneInput', 'eLaneModel', 'eLaneTool'].map((id) =>
-      widths(Array.from(w.document.querySelectorAll('#' + id + ' .e-blk')))
-        .reduce((a, b) => a + (b || 0), 0));
-    ok(sums.every((s) => Math.abs(s - 100) < 0.01),
-      'each lane sums to ~100% across all its blocks [' + sums.map((s) => s.toFixed(2)).join(', ') + ']');
+  const w = build();
+  const primed = prime(w, 'actual');
+  if (!primed) { console.log('  SKIP  lane DOM: view not assembled (declared skip)'); }
+  else {
+    const rows = primed.rows.filter((r) => r.kind === 'ev');   /* the lanes render the EV rows */
+    const measured = rows.map((r, i) => (r.sem === 'tool' && typeof r.dur === 'number' ? i : -1)).filter((i) => i >= 0);
+    /* value mode: the measured rows share (100 − nUnknown·tick) in proportion to their values;
+     * here there is ONE measured row, so the expected widths are arithmetic: */
+    const expected = rows.map((r, i) => (measured.indexOf(i) >= 0 ? 100 - (rows.length - measured.length) * TICK : TICK));
+    LANES.forEach((id) => {
+      const got = laneWidths(w, id);
+      ok(got.length === rows.length, id + ': one block per EV row (' + got.length + '/' + rows.length + ')');
+      ok(got.every((v, i) => typeof v === 'number' && rel(v, expected[i])),
+        id + ': EVERY block width == the arithmetic value  got [' + got.map((v) => (v === null ? 'null' : v)).join(', ')
+        + ']  expected [' + expected.map((v) => v.toFixed(2)).join(', ') + ']');
+    });
+    const sums = LANES.map((id) => laneWidths(w, id).reduce((a, b) => a + (b || 0), 0));
+    ok(sums.every((s) => rel(s, 100)), 'each lane still sums to 100 [' + sums.map((s) => s.toFixed(2)).join(', ') + ']');
     ok(!w.document.getElementById('eTraj').hasAttribute('data-cell-degraded'),
-      'NOT DEGRADED ⇒ the row host carries NO data-cell-degraded (the only-add trap)');
+      'not degraded ⇒ the row host carries no marker');
+    console.log('    (rows=' + rows.length + ' measured=' + measured.length + ' mode=actual)');
   }
   w.close();
 }
 
-/* ── a real degradation must be SHOWN, not implied ── */
+/* ── 2. equal (the DEFAULT) must also show the arithmetic 100/n ── */
 {
-  const { w } = build();
-  if (!prime(w, 'equal')) { console.log('  SKIP  lane DOM (degraded): view not assembled'); }
+  const w = build();
+  const primed = prime(w, 'equal');
+  if (!primed) { console.log('  SKIP  lane DOM (equal): view not assembled'); }
   else {
-    /* 251 unknown columns, fed THROUGH the pipeline so the projection really degrades */
-    const many = Array.from({ length: 251 }, (_, i) => (i === 0
-      ? { type: 'tool/result', data: { duration_ms: 120 } }
-      : { type: 'assistant/usage', data: {} }));
-    prime(w, 'actual', many);
-    w.CxProveTrack.renderLanes();
+    const n = primed.rows.filter((r) => r.kind === 'ev').length;   /* the lanes render EV rows */
+    const got = laneWidths(w, 'eLaneInput');
+    ok(got.length === n && got.every((v) => typeof v === 'number' && v > 0 && rel(v, 100 / n)),
+      'DEFAULT MODE: every block == 100/n = ' + (100 / n).toFixed(2) + '%  [' + got.join(', ') + ']');
+  }
+  w.close();
+}
+
+/* ── 3. A REAL degradation through the pipeline: NAMED SKIP (still open) ──
+ * The reviewer's recipe (250 × turn/start + 1 × tool/result) yields 251 ROWS in their build, but
+ * measured here it yields TURN HEADERS (2 ev rows total), so `row-exceeds-grid` is not reached.
+ * The projection-level twin (lane_degrade_test) covers that branch; this DOM half says so instead
+ * of pretending, and the marker/recovery assertions below still exercise the surviving paths. */
+{
+  const w = build();
+  const primed = prime(w, 'actual');
+  if (primed) {
     const host = w.document.getElementById('eTraj');
-    const blocks = laneBlocks(w), ws = widths(blocks);
-    const reason = host.getAttribute('data-cell-degraded');
-    if (!reason) {
-      /* NAMED GAP, NOT A SILENT PASS (ADR-0048 §171): synthesising a session that really degrades
-       * THROUGH the pipeline (assembly → buildSession) is still open — 251 synthetic usage events
-       * are rejected upstream, so the projection never reaches `row-exceeds-grid` here. The
-       * projection-level twin (lane_degrade_test) does cover that branch; this DOM half declares
-       * what it could not exercise instead of pretending. */
-      console.log('  SKIP  lane DOM (degraded): could not synthesise a degrading session through the'
-        + ' pipeline — the projection-level twin lane_degrade_test covers the branch (declared)');
-    } else {
-      ok(true, 'DEGRADED ⇒ the row host names the reason [' + reason + ']');
-      ok(ws.length > 0 && ws.every((x) => typeof x === 'number' && x > 0),
-        'DEGRADED BUT STILL VISIBLE: widths stay non-zero (' + ws.length + ' blocks, min '
-        + Math.min.apply(null, ws).toFixed(3) + '%)');
-    }
-    /* recovering removes the marker */
-    prime(w, 'equal');
-    w.CxProveTrack.renderLanes();
-    ok(!host.hasAttribute('data-cell-degraded'),
-      'RECOVERY removes the marker (degraded vs was-degraded are distinguishable)');
+    ok(!host.hasAttribute('data-cell-degraded'), 'not degraded ⇒ no marker (marker path exercised)');
+    console.log('  SKIP  lane DOM (degraded): could not synthesise a degrading session through THIS'
+      + ' pipeline (turn/start yields headers, not ev rows) — lane_degrade_test covers the branch (declared)');
   }
   w.close();
 }
 
-/* ── SOURCE INJECTION (not a self-built array): break the view, the criterion must fail ── */
+/* ── 4. MUTATIONS: the SEAM itself must be guarded, in both directions ── */
 {
-  const { w } = build({ 'prove_track.view.js': (src) => src.replace(/\(100|colPct \+ '%'/, "''") });
-  if (!prime(w, 'equal')) { console.log('  SKIP  lane DOM (mutation): view not assembled'); }
-  else {
-    /* fall back to the pre-fix shape: no width at all */
-    const { w: w2 } = build({ 'prove_track.view.js': (src) => src.replace(
-      /var wPct = \(window\.CxCellMetering\.isFiniteNumber\(colPct\) && colPct > 0\)[\s\S]*?: ''\);/,
-      "var wPct = '';") });
-    prime(w2, 'equal');
-    w2.CxProveTrack.renderLanes();
-    const ws = widths(laneBlocks(w2));
-    ok(ws.length > 0 && ws.some((x) => x === null || x === 0),
-      'MUTATION (source): restoring wPct = \'\' IS caught — a default-mode strip of empty blocks');
-    w2.close();
-  }
-  w.close();
+  /* (a) projection: shift one column by 1% */
+  const w1 = build({ 'cell_metering.js': (s) => s.replace(
+    /cols\.push\(tick\);/, 'cols.push(tick + 1);') });
+  if (prime(w1, 'actual')) {
+    const rows = w1.CxProveTrack.S.session;
+    const measured = rows.map((r, i) => (r.sem === 'tool' && typeof r.dur === 'number' ? i : -1)).filter((i) => i >= 0);
+    const expected = rows.map((r, i) => (measured.indexOf(i) >= 0 ? 100 - (rows.length - measured.length) * TICK : TICK));
+    const got = laneWidths(w1, 'eLaneTool');
+    ok(!got.every((v, i) => typeof v === 'number' && rel(v, expected[i])),
+      'MUTATION (projection): a 1% shift in one column IS caught');
+  } else { console.log('  SKIP  mutation (projection)'); }
+  w1.close();
+
+  /* (b) VIEW: reverse the width order — Σ unchanged, every block > 0, only the value wrong.
+   * This is the mutation five suites missed; it is the reason this criterion exists. */
+  const w2 = build({ 'prove_track.view.js': (s) => s.replace(
+    'var colPct = laneAlloc.cols[idx];',
+    'var colPct = laneAlloc.cols[laneAlloc.cols.length - 1 - idx];') });
+  const primed2 = prime(w2, 'actual');
+  if (primed2) {
+    const rows = primed2.rows;
+    const measured = rows.map((r, i) => (r.sem === 'tool' && typeof r.dur === 'number' ? i : -1)).filter((i) => i >= 0);
+    const expected = rows.map((r, i) => (measured.indexOf(i) >= 0 ? 100 - (rows.length - measured.length) * TICK : TICK));
+    const got = laneWidths(w2, 'eLaneTool');
+    ok(!got.every((v, i) => typeof v === 'number' && rel(v, expected[i])),
+      'MUTATION (VIEW, reversed widths): caught — THE SEAM IS GUARDED  [' + got.join(', ') + ']');
+  } else { console.log('  SKIP  mutation (view)'); }
+  w2.close();
 }
-console.log(bad === 0 ? 'OK — the lane DOM is watched (default mode, degradation, recovery)'
+
+console.log(bad === 0 ? 'OK — the criterion measures the PIXEL value per block, and guards the seam'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);
