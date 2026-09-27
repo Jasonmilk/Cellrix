@@ -258,7 +258,14 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
          * too. Measured: collapsing all turns left 0 event rows and 5 fold rows
          * still on screen — the disclosure was bypassed. */
         var g = S.compactGroups[it.id];
-        if (g && isOpen && !S.foldedTurns[it.id] && !S.q) {
+        /* THE CODE CONTRADICTED ITS OWN COMMENT (ADR-0048 §193): the paragraph above says
+         * "It does NOT depend on whether the turn is open … gating on a closed turn meant compact
+         * folded nothing at all (measured: 59 rows, 0 folded)" — and this line gated on exactly
+         * that. Measured: with a real session the group EXISTS (g true) but `openTurns = {}` ⇒
+         * `isOpen` false ⇒ the folded row never rendered (`compact = 0 rows`). The stand-in still
+         * follows the turn being CLOSED (`foldedTurns`) and the search box, which is what the
+         * comment promises. */
+        if (g && !S.foldedTurns[it.id] && !S.q) {
           var open = !!S.foldedTurns[it.id];
           rows.push({ key: 'c:' + it.id, html: '<tr class="e-compact-hd"><td colspan="' + COLS + '">' +
             '<button type="button" class="e-turn-btn e-compact-btn" data-e-compacttoggle="' + it.id + '" ' +

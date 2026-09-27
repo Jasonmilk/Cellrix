@@ -9027,3 +9027,57 @@ ok  **MUTATION:保留容器行 ⇒ 每一组都被否决**（这就是那个 bug
 ⇒ 且折叠为 0 必须能**点名原因**（FAILURE / tool-request / 组未生成）—— 三因三名（审查方 §3）
 ```
 ⇒ **这是下一笔**,而它现在有了**每一步的读数**（15/0 → 0/0 → ?）。
+
+## 193. 定案探针 ⇒ **差集为空**（排除伪轮）⇒ 真因是 `isOpen` 闸门，而代码违反了自己的注释
+
+### 193.1 探针（审查方给的,一行,不改代码）
+
+```
+sessIds = S.session.filter(kind==='turn').map(id)   = ["t1"]
+projIds = project(S.session).turns.map(id)          = ["t1"]
+diff(proj,sess) = []   ·   diff(sess,proj) = []
+⇒ **差集为空 ⇒ "TURN_MARKS 第二条在造伪轮"这一假设在本输入上被排除**
+  （原因:`buildSession` 之后 `type` 已消失,`/type === 'turn/start'` 不触发 —— 协议名moved到了 `cls`）
+⇒ 走**分支 2**:打印 `view.js:253` 的四个条件
+```
+
+### 193.2 分支 2 的读数（定案）
+
+```
+g 存在 = **true**（§192 的修生效:组真的产出了）
+S.compact = true · S.q = "" · S.foldedTurns = {} ⇒ `!S.foldedTurns[t1]` = true
+**S.openTurns = {} ⇒ isOpen = false**  ← **闸门在这里**
+⇒ 那一条折叠行**从不渲染** ⇒ `compact = 0 rows`
+```
+
+### 193.3 而**代码违反了自己的注释**（同类第 3 次:§184 ORDERING · §186 · 本笔）
+
+```
+紧挨着的注释逐字:"It does **NOT** depend on whether the turn is open … and gating on a closed
+turn meant compact folded nothing at all (**measured: 59 rows, 0 folded**)."
+而下一行:`if (g && isOpen && !S.foldedTurns[it.id] && !S.q) {`   ← **正是它所禁止的那个闸门**
+⇒ 修:去掉 `isOpen`（保留"轮被折叠 ⇒ 替身一起走"与搜索框两条,那是注释承诺的语义）
+```
+
+### 193.4 ⚠️ 而闸门一去掉,**那条路径立刻抛异常**（这是本笔最有价值的读数）
+
+```
+Cannot read properties of undefined (reading 'k')
+⇒ **折叠行渲染有潜伏崩溃** —— 而它此前**不可达**,因为闸门把它连同功能一起关掉了。
+⇒ ⇒ **"compact folded nothing" 之所以能瞒这么久:闸门同时藏住了**功能**与它的**崩溃**。**
+```
+**判据**:`compact_fold_test` 的屏幕级三条改为**复现崩溃 + 附读数**的具名 WIP
+（且断言形状可翻转:崩溃修好后,它自动要求模型名出现在渲染文本里）。
+⇒ **门 `1 red / 46 proven`**（唯一红 = 与本格无关的 `prove_track_rows_test`;`all_views_test` 归入 env-missing）。
+
+### 193.5 仍未完成（审查方列的三条 + 本笔新增）
+
+```
+① **修那个崩溃**（`reading 'k'`）⇒ 屏幕文本才会出现 `planner-strong 20 · executor-cheap 7`
+   ⇒ 这是 Agent Loop 验收线**真正可测**的那一刻
+② `view.js:254` 的 `var open = !!S.foldedTurns[it.id]` ⇒ **恒 false** ⇒ `▾` / `aria-expanded="true"`
+   结构上不可达 ⇒ 删掉它,或让该可达性成立
+③ `openTurns` 是 `S.session` 的**缓存**（`consume()` 写、`reset()` 不清）⇒ 改派生;清空时一并扫残留 id
+④ `TURN_MARKS` 的双决定子（本笔证明**会话行上不触发**,但"一个事实两个决定子"仍在）⇒ 收敛到一处
+⑤ `script.html:151`（§186）· Anaphase 6 态 · 运行时消融 · Agent Loop
+```

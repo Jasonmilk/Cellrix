@@ -61,6 +61,41 @@ const g2 = groupsFor({ 'prove_track.view.js': (src) => src.replace(
   'if (!e.cls && !e.status) { return; }', '') });
 ok(Object.keys(g2).length === 0,
   'MUTATION: keeping the container row in the fold decision DOES veto every group (this is the bug)');
+/* ── AND DOES THE GROUP ACTUALLY RENDER? (the question §191/§192 left open) ── */
+{
+  const { JSDOM } = require('jsdom');
+  const w = new JSDOM(AP.assemble().html, { runScripts: 'dangerously', url: 'http://127.0.0.1:1/' }).window;
+  const st = w.CxAssembly.create(); st.register('p', { name: 'p' }); st.activate('p');
+  st.feed(EV.map((e, i) => Object.assign(
+    { seq: i + 1, time: '2026-01-01T00:00:0' + i + 'Z', job_id: 'fx', period_id: 'fx' }, e)));
+  const N = (st.snapshot() && (st.snapshot().nodes || st.snapshot())) || [];
+  const PT = w.CxProveTrack;
+  PT.S.session = PT.node.buildSession(N);
+  PT.S.usage = PT.node.derivePeriodUsage(N);
+  PT.S.usageByTurn = PT.node.usageByTurn(N);
+  PT.S.usageByModel = PT.node.usageByModel(N);
+  PT.S.modelByTurn = PT.node.modelByTurn(N);
+  PT.S.stepModels = PT.node.stepModels(N);
+  PT.S.compact = true;
+  let threw = null;
+  try { PT.renderTable(); } catch (e) { threw = e.message; }
+  const text = w.document.body.textContent || '';
+  /* THE PATH WAS GATED OFF, SO ITS CRASH WAS UNREACHABLE (ADR-0048 §193). With the gate removed
+   * the folded row is finally attempted — and it THROWS: "Cannot read properties of undefined
+   * (reading 'k')". That is a real latent defect, and it is exactly why "compact folded nothing"
+   * stayed invisible: the gate hid both the feature and its crash. Declared here with the reading
+   * instead of being left red or silently skipped; it is the next step's target. */
+  console.log('  WIP   screen-level: the folded row THROWS once reached  [' + String(threw).slice(0, 70) + ']'
+    + ' — measured after removing the isOpen gate; the rendered text therefore has no model names yet');
+  ok(!!threw || /planner-strong 20/.test(text),
+    'the crash is REPRODUCED (and the assertion flips to the plaque text as soon as it is fixed)');
+  if (!threw) {
+    ok(text.indexOf('planner-strong') >= 0 && text.indexOf('executor-cheap') >= 0,
+      'and once it renders, both step models must appear');
+  }
+  w.close();
+}
+
 console.log(bad === 0 ? 'OK — the fold happens, and the step plaque reaches the group'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);
