@@ -8567,3 +8567,44 @@ reply 行上的那个字段      = **35**（prompt + completion）   ← 曾**�
 ⇒ 两者都已在 suite_registry_test **具名声明**（附原因）,pt_replay 暂撤出网。
 ⇒ **第 14 次"机器教我"**:同一形态（我的输入够不到被测代码）**连中三次** ⇒
    **"合成输入必须先证明它能到达被测分支"应当成为写判据的第一步,而不是事后的发现。**
+
+## 183. **聚合的粒度必须与断言的粒度一致** —— 我自己的补丁在多轮上造了两个假陈述
+
+### 183.1 审查方实测,我复核（这是我的补丁的错）
+
+```
+我给 §181 的补丁是 `n === 0 && declaredUsage`（只投第一个 turn）⇒ **单轮正确,多轮造假**:
+fixture: turn A [usage 5] · turn B [usage 7]   （period completion = 12）
+  turn[0].tok = P(12) ⇒ 显示 "12 tok"      ← **而 turn A 只生成了 5**（12 里含 B 的 7）
+  turn[1].tok = A()   ⇒ 显示 "· 无数据"     ← **而 turn B 生成了 7**
+⇒ **两个都是假陈述**,而且是**刚被消灭的那个症状在第二个 turn 上回归**。
+⇒ **根因:通道枚举漏了"多 turn"这一支** —— 我给补丁时没有问"如果有多个 turn 会怎样"（复发律在我自己身上）。
+```
+
+### 183.2 而归属信息**一直都在**（所以修法是干净的,不用猜）
+
+```
+metering 节点带 `turn`（实测: {kind:'metering', turn:'t1', …} · {kind:'metering', turn:'t2', …}）
+而 turns[n].id = n.turn ⇒ **按号分组即可对上**
+⇒ `usageByTurn(nodes)` 与 `usageBySource(nodes)` **同形同源**（同一份 derivePeriodUsage,只换分组键,通则⑰）
+```
+
+### 183.3 修（已落,判据已进网）
+
+```
+① prove_track.node.js : usageByTurn(nodes)（同一份 derive,按 n.turn 分组）+ 导出
+② cell_metering.js    : turns[n].tok ⟸ opts.usageByTurn[turns[n].id]（有则 P(v)=.+partial）
+                        ⇒ **取消 `n===0` 特例**;仅在**完全没传 usageByTurn** 时保留单轮回退
+③ 视图 + prove_track  : S.usageByTurn 派生并投递（两处调用）
+```
+**实测（`usage_by_turn_test.js`,已进网,7 条全绿）**:
+```
+ok  the session really has two turns (2)
+ok  **turn A shows ITS OWN 5**, not the period total
+ok  **turn B shows ITS OWN 7** instead of "· 无数据"
+ok  the period total stays 12
+ok  **SELF-CHECK: Σ(per-turn) == period (5 + 7 == 12)**
+ok  MUTATION: 不传 usageByTurn ⇒ turn A 吸收 12、B 显示"无数据" —— **正是那个 bug**（被抓）
+```
+⇒ **巨人路径**:ISO 9075 `GROUP BY`（period 粒度正确 ≠ turn 粒度正确）· Kimball **可加事实**
+（`completion` 可加 ⇒ 按 turn 分组合法 ⇒ 于是"**Σ(每轮)==总量**"成了一条**自检**）。

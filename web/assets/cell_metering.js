@@ -285,7 +285,17 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
       /* TWO HOSTS, ONE FACT (rule ⑮): the view reads `turns[i].tok`, so the declaration must land
        * here as well — my first version changed only the top-level `tok` and the screen kept
        * saying "· 无数据". When the aggregate is period-wide it is stated once, on turn 0. */
-      if (declared && n === 0) { foldedTurn = { value: declared.value, partial: declared.partial }; }
+      /* PER-TURN LANDING, NOT "THE FIRST TURN ABSORBS THE PERIOD" (ADR-0048 §183): `n === 0` was my
+       * own special case and it stated two falsehoods on any multi-turn session — turn 0 was shown
+       * the WHOLE period total (including later turns) and every later turn showed "· 无数据" while
+       * really holding a value. The attribution was never missing: metering nodes carry `turn`. */
+      var perTurn = (opts && opts.usageByTurn) ? opts.usageByTurn[turns[n].id] : null;
+      if (perTurn && typeof perTurn.completion === 'number' && isFinite(perTurn.completion)
+          && perTurn.completion >= 0) {
+        foldedTurn = { value: TS.P(perTurn.completion), partial: !!perTurn.completionPartial };
+      } else if (declared && n === 0 && !opts.usageByTurn) {
+        foldedTurn = { value: declared.value, partial: declared.partial };   /* single-turn fallback */
+      }
       turns[n].tok = foldedTurn.value;
       turns[n].partial = foldedTurn.partial;
       /* THE THIRD SLOT (ADR-0048 §182): `partial` said "not exact" but the BOUND was never

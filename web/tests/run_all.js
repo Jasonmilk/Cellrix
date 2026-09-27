@@ -49,6 +49,7 @@ const SELF_CONTAINED = [
   ['usage_aggregate_test.js', 'one unknown column must not void another known column — a lower bound is not an error'],
   ['tok_outlet_test.js', 'the declared period meter reaches BOTH tok hosts, and only when declared'],
   ['tok_lower_bound_test.js', 'a lower bound survives to the screen: value, partial and bound are one fact in three slots'],
+  ['usage_by_turn_test.js', 'per-turn usage attribution: each turn is told what IT spent, and the parts sum to the whole'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
   ['lane_value_test.js', 'lane widths pinned by ARITHMETIC (hermetic, no live panel needed)'],
   ['lane_degrade_test.js', 'every degraded branch keeps Σ cols <= 100 (a declared state is still a number)'],

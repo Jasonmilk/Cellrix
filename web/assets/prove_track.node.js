@@ -143,6 +143,22 @@
     return by;
   }
 
+  /* PER-TURN AGGREGATION, SAME DERIVATION (ADR-0048 §183): a metering node carries its `turn`, so
+   * "how much did THIS turn cost" is computable — no guessing, no upstream change. Grouping is the
+   * only difference from `usageBySource`, so it reuses the same `derivePeriodUsage` (rule ⑰: one
+   * derivation, two groupings). Without it the projection had to put the PERIOD total into the
+   * FIRST turn, which stated "turn A generated 12" (it generated 5) and left turn B — which really
+   * generated 7 — showing "· 无数据". */
+  function usageByTurn(nodes) {
+    var by = {};
+    (nodes || []).forEach(function (n) {
+      if (n.kind !== 'metering' || !n.turn) { return; }
+      (by[n.turn] = by[n.turn] || []).push(n);
+    });
+    Object.keys(by).forEach(function (k) { by[k] = derivePeriodUsage(by[k]); });
+    return by;
+  }
+
   function derivePeriodUsage(nodes) {
     var calls = 0, prompt = 0, completion = 0;
     /* A LOWER BOUND IS NOT AN ERROR (ADR-0048 §177): one column's unknown must not void
@@ -309,6 +325,6 @@
     toolNameOf: toolNameOf, payloadOf: payloadOf, detailOf: detailOf,
     resultIsTerm: resultIsTerm,
     derivePeriodUsage: derivePeriodUsage, usageBySource: usageBySource,
-    buildSession: buildSession, computeRepeats: computeRepeats
+    buildSession: buildSession, computeRepeats: computeRepeats, usageByTurn: usageByTurn
   };
 })();

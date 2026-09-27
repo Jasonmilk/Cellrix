@@ -174,6 +174,7 @@
   function consume(nodes) {
     S.session = buildSession(nodes);
     S.usage = derivePeriodUsage(nodes);
+    S.usageByTurn = N.usageByTurn(nodes);
     S.turnIds = [];
     S.turnIndex = {};
     S.session.forEach(function (e) {
