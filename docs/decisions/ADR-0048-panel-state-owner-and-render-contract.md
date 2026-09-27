@@ -8771,3 +8771,52 @@ Cover & Thomas Thm 2.8.1:若 S → W → U 是马尔可夫链,则 I(S;U) ≤ I(S
    若用户环境仍失败 ⇒ 请用同一条 curl 比对:若 `model` 恒定不变 ⇒ 说明 flowmodus 被旁路（Noop/直连）
    （chain.json 的原话:*"a missing endpoint env means a **silent Noop adapter, not an error**"*）。
 ```
+
+## 188. **flowmodus 到底在不在推理链路上** —— 我的论据是肯定后件,而静态链给出了真答案
+
+### 188.1 先认错:§187 的"铁证"**不是铁证**（审查方判得对）
+
+```
+我的论据:"两次请求分派到两个不同模型 ⇒ 只有 flowmodus 做得到"
+审查方:**肯定后件** —— Priority 1 的 `apihub.agnes-ai.com/v1` **本身就是一个 hub**,它也能换模型
+⇒ H1（flowmodus 路由）与 H2（hub 自己路由）对"两次不同 model"的预测**相同** ⇒ **I(H;Q) = 0 bit**
+⇒ **与 §167 zero-render、adr_anchor fail-open、§186 端到端 0 bit 是同一条公式的第四个实例**
+   —— 而这次它**长在论据上,不是代码上**:一条不能区分竞争假设的观测,读起来仍然很像铁证。
+```
+
+### 188.2 静态链（逐字,可复核）:本部署下 **Priority 2 命中** ⇒ flowmodus **在**链路上
+
+```
+决定分支的代码（anaphase/src/main.rs:722-733 逐字）:
+  if let Some(endpoint) = &config.anaphase.reasoning_endpoint {        // Priority 1
+      if endpoint.is_empty() { Noop } else { HttpReasoningAdapter }
+  } else if let Some(endpoint) = &config.anaphase.flowmodus_endpoint { // Priority 2
+      … GrpcFlowModusAdapter::new(endpoint, …) …
+  }
+而本部署实测:
+  · config.rs:316/:420 `reasoning_endpoint: None`（**默认就是 None**）
+  · config.toml **没有** `reasoning_endpoint`
+  · 运行中 anaphase 的环境（ps eww）**没有** `ANAPHASE_REASONING_ENDPOINT`
+⇒ `reasoning_endpoint` 为 **None** ⇒ **Priority 1 不命中** ⇒ **走 `else if` ⇒ GrpcFlowModusAdapter(grpc://127.0.0.1:60054)**
+⇒ **flowmodus 就是这台 anaphase 的推理适配器**（与 lsof 的 ESTABLISHED 一致）。
+```
+⇒ **审查方引的归档文档那句（"`reasoning_endpoint` 非空 ⇒ Priority 1 恒命中 ⇒ Priority 2 永不执行"）
+  在本部署下前提不成立**（这里它是 None）——**但那句话本身是对的**,且它正是用户症状的最可能解释 ↓
+
+### 188.3 用户的症状（"之前能用、现在 flowmodus 无法被调用"）:最可能是 **Priority 1 被设过**
+
+```
+若某时刻设了 `ANAPHASE_REASONING_ENDPOINT`（或 config 里写了 `reasoning_endpoint`）:
+  ⇒ Priority 1 命中 ⇒ **flowmodus 被完全旁路** ⇒ 而**没有任何可观测的东西说这件事发生了**
+⇒ 与 chain.json 的原话同族:*"a missing endpoint env means a **silent Noop adapter, not an error**"*
+⇒ ⇒ **要修的是"哪一条优先级赢了"必须成为可观测事实**,而不是靠读代码或靠"模型变了"来推断。
+```
+**下一笔（廉价,判据明确）**:
+```
+① /v1/health 增一项:`reasoning_adapter = {kind: 'http'|'grpc-flowmodus'|'noop', endpoint, priority}`（可观测）
+② 判据:设 ANAPHASE_REASONING_ENDPOINT ⇒ 该项变 http 且 **flowmodus 项不再是服务者**（变异:删掉该字段 ⇒ 红）
+③ 出向端点缺失 ⇒ **声明式降级**（reason + 可观测）,不许静默 Noop（通则⑩:必填即抛）
+④ 运行时消融（审查方的 A/B/C）:停 flowmodus 或清 reasoning_endpoint 再发同一条请求
+   ⇒ **响应必须改变或失败**;若不变 ⇒ 该组件不在因果路径上
+   ⇒ 这是**铁律 9（变异注入自证）搬到运行栈**,也是对"在不在链路上"唯一的**直接**证据。
+```
