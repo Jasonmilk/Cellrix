@@ -54,6 +54,7 @@ const SELF_CONTAINED = [
   ['compact_fold_test.js', 'the fold must be able to happen at all (the container row must not veto it)'],
   ['agent_loop_skeleton_test.js', 'the EIGHT Agent Loop criteria, written BEFORE the Loop (4 live homes, 4 declared absent with assertion+mutation)'],
   ['agent_loop_probe_test.js', 'THE FOUR PROBES: red until the Loop exists (a declaration with a name, not a disease)'],
+  ['zero_report_test.js', 'a zero must carry its n (rule of three) and a verdict must carry its environment E'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
   ['walk_state_test.js', 'the lineage walk has four named endings (root / truncated / cycle / start-absent), recomputed each call'],
   ['lane_dom_test.js', 'THE DOM CRITERION: the default mode must SHOW non-zero blocks (hermetic jsdom)'],
@@ -713,6 +714,21 @@ console.log(failed === 0
             + ' held (registered), 0 red  [in:' + DEFERRAL_INPUTS.join(' ') + ' pinned:' + (DEFERRALS.deferrals || []).filter(function (d) { return d.depends_on; }).length + '/' + SELF_CONTAINED.length + ' unpaired-self-declared:' + unpaired + ' env: cdp=' + (probeOk('cdp') ? 'present' : 'absent') + ']'))
   : (xpass.length ? 'LEDGER STALE — ' + xpass.length + ' registered deferral(s) PASSED, ' : 'FAILED — ' + failed + ' red, ') + proven + ' proven, '
     + deferred.length + ' held, ' + unknown.length + ' unregistered'
+    /* E IS PART OF THE VERDICT (ADR-0048 §200): the same commit reads differently depending on
+     * whether the panel is up and the sibling repos are present — measured spans: proven 44/45/47,
+     * unregistered 0/1/5/8, env-missing 0/1/5. A count without its environment is not comparable
+     * across commits. */
+    + '  [E: panel=' + (probeOk('cdp') ? 'up' : 'down')
+    + ' siblings=' + (function () {
+        /* MEASURE THE RIGHT THING (ADR-0048 §200): SELF_CONTAINED holds SUITE names, not
+         * capabilities — probing them yields a meaningless 0/52. E must report the ENVIRONMENT
+         * facts the verdict actually depends on: are the sibling checkouts present? */
+        var fsx = require('fs'), px = require('path'), root = px.join(__dirname, '..', '..', '..');
+        var names = ['Helix-Mind', 'Anaphase-Helix', 'FlowModus'];
+        return names.filter(function (n) { return fsx.existsSync(px.join(root, n)); }).length + '/' + names.length;
+      })()
+    + ' jsdom=' + (function () { try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })()
+    + ']'
     + (abortedRoster.length ? ', ' + abortedRoster.length + ' ABORTED (not red)' : '')
     + (envMissingRoster.length ? ', ' + envMissingRoster.length + ' env-missing (not red)' : ''));
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
