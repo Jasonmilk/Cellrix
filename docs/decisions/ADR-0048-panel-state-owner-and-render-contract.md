@@ -11038,3 +11038,55 @@ live 判据立刻红:
 ③ 最后**才**让旧卡片路径退休（退休是**删减**,必须与 ② 同笔:判据先绿,代码再删)。
 ⇒ 判据顺序:**合约(1) → 可用性(2) → 删减(3)**。我这次把顺序倒过来做,于是先丢了可用性。
 ```
+
+
+## 244. 🧭 **目标与原计划的对账表**（所有者要求:先把目标整理清楚,问题留 TODO 回头处理）
+
+### 244.1 目标（所有者原话,存进计划本体 `goal` 字段,不只在对话里）
+
+```
+**让 Cellrix 的 Panel 具备 DSH 的导航逻辑与「事实按需局部渲染」，为 llama.cpp 等支持 react / agent Loop
+的界面提供同样的使用逻辑与效果 —— 整体使用逻辑可以一样，只是 DSH 的「轨迹」用我们自己的「证轨」，
+并兼容 Anaphase-Helix 的三种运行模式。**
+
+DSH 给的是:符合用户习惯的操作（导航→点开→就地看事实）· 直观/实时响应 · **局部渲染**（按需加载/按需驱动）·
+           **像活的一样**（同一份事实，界面原地更新）
+我们自己的是:**「证轨」而非「轨迹」**（DAG + 具名终局 + 可追溯的拒绝/未测量/无数据）· 三模式的声明式呈现 ·
+           主题解耦/UI 个性化（后期）· 不照抄专有名称,只借巨人实践作灵感
+不变量:**I(内部;屏幕) ≤ I(内部;输出)**,等号只在输出有消费者时成立;凡"安静的输出"必先问它合并了几种真因
+三模式:`drive` Anaphase Only（harness)· `partner` 带记忆的伙伴（须 Helix-mind)·
+       `survive` 生存模式（**enum reserved:已声明、未实现,如实呈现,不假装**）
+```
+
+### 244.2 计划 ↔ 目标（五条工作流,节点已打 `stream` 标签)
+
+```
+【A 显示/证轨面板（目标本体）】**12 / 14 done**
+   done: tree · assets · render · mount · fetch · rows · default · alive · nav_signal · nav_bind ·
+         empty_reply_named（空回复具名）· cards_group（会话分组)
+   待办: **panel.one_surface**（侧栏唯一化:合约→可用性→删减)· panel.e2e_live（最后一公里:浏览器 DOM）
+【B Agent Loop（屏幕先等着 Loop）】1 / 5 done
+   done: loop.ui.steps（步边界:一轮三步各成一行)· 待办: branch（重试=分支)· budget（预算终局具名)·
+         loop.ui（父节点)· **loop.impl**（Loop 本体:四条探针逐条转绿）
+【C 闸门与能力（"产生"的一半）】9 / 15 done
+   done: sec.ablation（消融实测)· sec.lists（一份词表+声明角色视图)· **sec.gate_wire 四子步全部**·
+         capability.registry（类由声明决定,请求无法影响）
+   待办: capability.wire · sec.capability · **sec.flowmodus_yield**（空产出 ⇒ 非空或具名终局)·
+         sec.noop_fail_open（Noop 不得报成功)· gate.refusal_skip（拒绝不杀整轮)· gate.env_class（活套件登记入门）
+【D 链路审计】1 / 1 done —— chain.audit_4q（四问四答,全是活体探针)
+【E 卫生与所有者审查】1 / 2 done —— owner.report_3rd_conversation（已在记录里复现)·
+   待办: hygiene.backlog（241 行非英文注释）
+```
+
+### 244.3 所有者报的四件事 → 节点 → 状态（`owner_todos`,回头处理的入口）
+
+```
+① **flowmodus 像玄学、时有时无?** ⇒ **已答:不是随机,是确定性空产出**
+   证据:同一请求连发三次**逐字相同**;错觉来自卡片列表 18/52 无回复 vs 34/52 有内容
+   节点:chain.audit_4q(done) · **sec.flowmodus_yield**(待办) · sec.noop_fail_open(待办)
+② **链条通到 Helix-mind 了吗?** ⇒ **已答:通了**（`/v1/health`:tentacle · mind · flowmodus · tuck 全 reachable)
+③ **tentacle 能正常被调用吗?** ⇒ **已答:可达**;它是 **gRPC**（HTTP 探得 000 = 在听但不说 HTTP,**不等于不可达**)
+④ **经历卡片依然混乱!** ⇒ **未完成**（本轮我"让位"的修法被活判据证伪并已回退)
+   节点:**panel.one_surface**,配方 = **合约(1) → 可用性(2) → 删减(3)**
+   当前你看到的状态:**旧卡片与树并存** —— 这是已知状态,不是你看错,也不是你理解错
+```
