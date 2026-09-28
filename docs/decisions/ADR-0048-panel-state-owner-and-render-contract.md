@@ -10030,3 +10030,70 @@ because the absence would stop being visible."*
 ⇒ 修法(下一次起):**提交信息一律经 `python3 - <<'PY'`（引号 heredoc)写入文件,再 `git commit -F`**;
   且**每次提交后回读 `git log -1 --format=%B`** 确认无损。
 ```
+
+
+## 212. 🔴 **我上一笔的"宣告"是一句假话** —— 而真正的门是一份黑名单
+
+### 212.1 审查方的实测（我逐条核过,全部属实）—— ① 那句是假的
+
+```
+我 §211 落的 `gate_declaration` 说:*"…there is no door; **every tool call executes UNGATED**."*
+而 `pipeline/mod.rs:198-212` **实测**在 `security_gate = None` 时:
+  `None => HITLApprover::is_high_risk(&call.tool).then(|| "no security gate configured, and {:?} is
+   high-risk: **absence is not approval (B7)**…")` ⇒ 命中则**写 `blocked` 记录并 Err**
+⇒ **high-risk 调用是被拦下的** ⇒ **我那句为假。**
+⇒ 而缺席**早已被宣告**:`pipeline/mod.rs:173` 的 `gate_presence()` **每次工具调用**发一条 `gate` 事件（I7 §13.3)
+⇒ ⇒ **我那句是同一事实的第三个宿主,而新宿主内容错、且零消费者 ⇒ 最坏组合**
+数学:真值两态、观测一态 ⇒ **H = 0.8595,I = 0.0000 bits** ⇒ **治疗动作自己成了病例**（与 §207 同形,复发律 R 第 N 次）
+```
+**处置（已落）**:**删除** `gate_declaration` 及其两条测试;保留 `HardOverride`/`Pass` 可分辨那条（那是真发现）。
+
+### 212.2 ② 真正的门是**黑名单**,而 1975 年就写了它的失效方向
+
+```
+Saltzer & Schroeder（逐字）:*"Access decisions should be based on **permission rather than exclusion**…
+ mechanisms that identify conditions under which access should be **refused** present the wrong
+ psychological base."* 以及 UCSD CSE127 的推论:*"a mistake in a mechanism that explicitly excludes
+ access tends to fail by **ALLOWING** access… may go unnoticed in normal use."* ⇒ **Whitelists are better.**
+实测 `hitl.rs:35-63`:三个黑名单（WRITE/NETWORK/CREDENTIAL）按**词**匹配 ⇒
+  **`bash` · `sh` · `python3` · `node` · `perl` · `ruby` · `eval` · `exec` · `sudo` · `docker` ·
+    `kubectl` · `terraform` · `pip` · `npm` · `crontab` … 全部不在名单里**
+⇒ **名字轴 28.3% · 能力轴 0.0%** ⇒ **拦住了"叫这个名字的危险工具",放过了"什么都能做"的那些**
+  （`bash` 能做完被禁清单里的全部三件事）
+⇒ 而注释自认:*"it is the **weakest** judgement… so it **under-blocks**"* ⇒ **刻意 under-block 的策略,
+  恰好 under 掉了能力最大的一类。**
+```
+
+### 212.3 我的裁决（审查方问我:白名单 vs 黑名单+能力维）
+
+```
+**正解是白名单（permission-based）** —— S&S 逐字如此,不容含糊。
+**而本轮先落"能力维"**（审查方推荐 B,我同意）:因为它**今天就能红**
+  （判据"bash 类 ⇒ high-risk"）,而白名单化是**结构性一步**（工具注册表**按允许列出**,而非按禁止列出）,
+  它需要先有"允许"的声明处 —— 那与 Agent Loop 的工具注册表是同一件工作。
+⇒ **所以顺序是:能力维（本笔）⇒ 白名单（随工具注册表一起）。**
+```
+
+### 212.4 本笔已落（Anaphase `02af11b`)
+
+```
+① **删除**假陈述 + 其两条测试（`security::` 3 条通过,`hitl::` 5 条通过）
+② `hitl.rs` 新增 **`EXECUTION` 能力维**（shell / 解释器 / 特权 / 容器 / 编排 / 包管理器 / 构建工具）,
+   匹配即 high-risk;测试断言 **17 个 bash 类必须 high-risk**,而 `ls/cat/grep/read_file` 等
+   **真正低风险的仍放行**（否则分类器变成噪声 —— 那会让"红"贬值,§199/§212 同一条）
+```
+
+### 212.5 仍未完成（审查方第三处,我具名）
+
+```
+③ **`dropped` 分种类计数**:环是进程级共享、有界（cap=1024）,写满后**静默拒绝**,只进一个共享 `dropped`:
+   实测 N=73 ⇒ 保留 365/365（100%）· N=100 ⇒ 124/500（**24.8%**）· N=200 ⇒ 0/1000（**0.0%**）
+   ⇒ ⇒ **Loop 让 period 涨一个数量级 ⇒ "这一次是无门执行的"这条记录在 N≈100 后开始消失**
+   ⇒ 与 §210「拒绝必须进 DAG」同条:**"发生过"这件事必须有地方留下**;**而"丢弃了多少、丢的是哪一类"必须分开计**
+④ `HardOverride` 进 ledger（"放行的例外也要留痕"）
+⑤ 工具调用层**未检查事件数**被计数并宣告（"不是 0 就说 0"）
+```
+⇒ **而本笔最该记住的一条是**:*"我说了"不等于"我说的是真的"* ——
+**我上一笔为了让缺席可见,写下了一句比原来更糟的话（假陈述）。**
+⇒ ⇒ 纪律补一句:**宣告必须与被宣告的实现逐行对照一次**（§211 的宣告**没有**去看 `pipeline/mod.rs:198-212`,
+  而它就在同一个仓里、就在同一条路径上）。
