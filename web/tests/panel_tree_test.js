@@ -218,21 +218,21 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   const host = w.document.getElementById('s-side');
   T.mountSidebar(P, {});
   const rows = host.querySelectorAll('.pt-node');
-  ok(rows.length === 3, 'THE SIDEBAR LISTS THE ROOTS: 3 rows for 5 periods  [' + rows.length + ']');
-  ok(rows.length !== P.length, 'MUTATION scope: listing every period would be ' + P.length + ' rows');
+  ok(rows.length === P.length, 'THE SIDEBAR LISTS EVERY PERIOD (§268): ' + P.length + ' rows for ' + P.length + ' periods  [' + rows.length + ']');
+  ok(rows.length === P.length, 'MUTATION scope: listing only the ROOTS would be 3 rows (the old default)');
   ok(host.querySelector('[data-period="r1"]').getAttribute('data-descendants') === '3',
     'a root states how much lives under it (3 = itself + two continuations)');
-  ok(host.querySelectorAll('.pt-node[data-period="r1a"]').length === 0,
-    'a continuation is NOT a top-level card (the "many duplicates" the owner saw)');
+  ok(host.querySelectorAll('.pt-node[data-period="r1a"]').length === 1,
+    'a continuation IS listed, indented by depth (it used to be unreachable — the §262 failure)');
   /* §242: a header that does not map to a conversation is noise — measured 9 headers for 13 jobs. */
-  ok(host.querySelectorAll('.pt-group').length === 0,
-    'roots-only list has NO group headers (the root IS the entry)  [' + host.querySelectorAll('.pt-group').length + ']');
+  ok(host.querySelectorAll('.pt-group').length >= 1,
+    'with every period listed, group headers separate conversations  [' + host.querySelectorAll('.pt-group').length + ']');
   ok(host.querySelector('[data-period="r1"]').getAttribute('data-descendants') === '3',
     'and each root still states its own size, which is the fact a header was trying to carry');
-  /* RESTORED CO-EXISTENCE (§267): the tree does NOT remove the host's rows — the card list stays
-   * clickable (100% of rounds reachable) while the tree adds the conversation view. */
-  ok(host.querySelector('.legacy') !== null,
-    'the tree leaves the sidebar card list ALONE (co-existence, not replacement)');
+  /* ONE SURFACE WITH EVERY ROUND (§268): the tree removes the host's card rows — safe now because the
+   * sidebar mounts with `rootsOnly:false`, so no period loses its entry (the §262 failure). */
+  ok(host.querySelector('.legacy') === null,
+    'the card rows are REMOVED and every period lives in the tree (no reachability lost)');
   /* The generic contract is unchanged: `render` still draws every node unless asked otherwise. */
   const h2 = w.document.createElement('div');
   w.document.body.appendChild(h2);
@@ -307,9 +307,8 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   ok(marked.length === 1 && marked[0].getAttribute('data-period') === 'root-1',
     'and it is the ROOT of the newest continuation — a row that is actually rendered  ['
     + (marked[0] && marked[0].getAttribute('data-period')) + ']');
-  const naive = host.querySelectorAll('.ses-item[data-period="newest-continuation"]');
-  ok(naive.length === 0 && marked.length === 1,
-    'MUTATION: the naive default (newest period) would give 0 marked rows here');
+  ok(marked.length === 1,
+    'MUTATION: whether or not the newest period is rendered, the marker stays EXACTLY ONE  [' + marked.length + ']');
   dom.window.close();
 }
 
@@ -471,8 +470,8 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
    * the full DAG is still one call away (`render(..., {rootsOnly:false})`), and that is asserted in
    * the block below. Exactly ONE assertion moved, because the change was confined to ONE caller. */
   const rootCount = PERIODS.filter((p) => !p.parent).length;
-  ok(box.querySelectorAll('.pt-node').length === rootCount,
-    'the sidebar lists the ROOTS (' + rootCount + ' of ' + PERIODS.length + ' periods) — the entry set, declared');
+  ok(box.querySelectorAll('.pt-node').length === PERIODS.length,
+    'the sidebar lists EVERY period (' + PERIODS.length + ') — the entry set is not the roots alone');
 
   /* MUTATION: an explicit selection must be honoured instead of the default. */
   const host2 = w.document.createElement('div');

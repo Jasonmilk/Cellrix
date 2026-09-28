@@ -166,8 +166,15 @@
          * this module's own. */
         /* THE MARKER IS A PAIR: the legacy card carried BOTH the `sel` class and `aria-current="true"`,
          * and the live criteria count that pair. */
-        if (el.getAttribute('data-period') === id) { el.setAttribute('aria-current', 'true'); }
-        else { el.removeAttribute('aria-current'); }
+        /* THE MARKER IS A PAIR: the live criteria count `.ses-item` carrying `sel`, and N-019 reads
+         * `aria-current`. The sweep is DOCUMENT-WIDE so exactly one row can win. */
+        if (el.getAttribute('data-period') === id) {
+          el.setAttribute('aria-current', 'true');
+          if (el.className.indexOf('sel') < 0) { el.className = el.className + ' sel'; }
+        } else {
+          el.removeAttribute('aria-current');
+          el.className = el.className.replace(/\s*sel\b/, '');
+        }
       });
       return s;
     }
@@ -211,6 +218,7 @@
        *   `data-job`   — the identity, exactly as the legacy card carried it. */
       row.className = 'pt-node ses-item';
       row.setAttribute('data-period', id);
+      if (n.depth != null) { row.style.paddingLeft = (8 + n.depth * 14) + 'px'; }
       row.setAttribute('data-job', id);   /* the contract's identity: period_id, as the legacy card had it */
       if (conv) { row.setAttribute('data-conversation', conv); }
       /* The fact that separates "one conversation" from "34 near-identical cards" — without drawing
@@ -400,6 +408,14 @@
     /* ONE SURFACE (§240.2): the sidebar already had a flat card list, and mounting a tree INTO the
      * same host left BOTH visible — the owner's "still duplicated and messy". The legacy children are
      * hidden here; the tree takes the surface. Deleting them outright is a separate step. */
+    /* ONE SURFACE, AND EVERY ROUND IS IN IT (ADR-0048 §268). The earlier retirement failed because it
+     * removed rows while the tree listed only the ROOTS — reachability fell 100% -> 55%. The sidebar now
+     * mounts with `rootsOnly:false`, so the tree covers every period; only THEN are the legacy rows
+     * removed. Removal (not hiding) is required: a hidden `.ses-item` still counts as a marked row when
+     * `session_list.js` runs before this file loads. */
+    Array.prototype.forEach.call(Array.prototype.slice.call(host.children), function (el) {
+      if (!el.hasAttribute('data-panel-tree')) { el.remove(); }
+    });
     var box = host.querySelector('[data-panel-tree]');
     if (!box) {
       box = document.createElement('div');
@@ -408,7 +424,11 @@
       host.appendChild(box);
     }
     /* The sidebar asks for the ROOTS explicitly (44 of 52 measured) — its entry set, declared. */
-    var view = render(box, periods, Object.assign({}, opts, { rootsOnly: opts.rootsOnly !== false }));
+    /* EVERY ROUND IS AN ENTRY (ADR-0048 §268): the sidebar used to pass `rootsOnly !== false`, i.e.
+     * roots only, which is why retiring the cards dropped reachability 100% -> 55%. The default is now
+     * ALL periods (the tree indents by depth, so the chain is visible); a caller can still ask for
+     * `rootsOnly: true` explicitly. */
+    var view = render(box, periods, Object.assign({}, opts, { rootsOnly: opts.rootsOnly === true }));
     return view;
   }
 
