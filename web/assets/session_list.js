@@ -134,13 +134,8 @@
     }
   }
 
-  function treeOwnsSidebar() {
-    return !!(window.CxPanelTree && window.CxPanelTree.mountSidebar);
-  }
-
   function rerenderSides() {
     if (!LAST) return;
-    if (treeOwnsSidebar()) { return; }   /* one writer: the tree owns this surface (§262) */
     /* REVERTED (§243.3): standing this down removed the rows that CARRY THE SELECTION CONTRACT
      * (`data-job`, used to drive the prove-track view) — measured live as "sidebar rows available to
      * drive prove-track [0 rows]". The tree must inherit that contract BEFORE this path can retire. */
@@ -158,7 +153,6 @@
    * 同时留一条非颜色通道（aria-current）：选中目前只体现为颜色，而 N-019 要求状态
    * 变化不靠颜色也能辨。 */
   function moveSelection() {
-    if (typeof treeOwnsSidebar === 'function' && treeOwnsSidebar()) { return; }  /* the tree marks (§262) */
     var want = nav().period || null;
     HOSTS.forEach(function (id) {
       var box = document.getElementById(id);
