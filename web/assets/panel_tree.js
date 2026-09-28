@@ -157,15 +157,22 @@
           if (typeof opts.onRows === 'function') { opts.onRows(box, got, id); }
         }
       }
-      Array.prototype.forEach.call(list.children, function (el) {
+      Array.prototype.forEach.call(doc.querySelectorAll('.ses-item'), function (el) {
         el.setAttribute('aria-selected', el.getAttribute('data-period') === id ? 'true' : 'false');
         /* THE APP'S MARKER IS `aria-current` (§248): the live contract asks for exactly ONE row with
          * `aria-current="true"` — "the selection is discernible without colour" (N-019) and "the chosen
          * period is marked in the sidebar" (N-004). The tree only spoke `aria-selected`, so retiring the
          * legacy path left three live criteria red with `[0 marked]`. Both are set now: the app's name and
          * this module's own. */
-        if (el.getAttribute('data-period') === id) { el.setAttribute('aria-current', 'true'); }
-        else { el.removeAttribute('aria-current'); }
+        /* THE MARKER IS A PAIR: the legacy card carried BOTH the `sel` class and `aria-current="true"`,
+         * and the live criteria count that pair. */
+        if (el.getAttribute('data-period') === id) {
+          el.setAttribute('aria-current', 'true');
+          if (el.className.indexOf('sel') < 0) { el.className = el.className + ' sel'; }
+        } else {
+          el.removeAttribute('aria-current');
+          el.className = el.className.replace(/\s*sel\b/, '');
+        }
       });
       return s;
     }
@@ -385,8 +392,13 @@
     /* ONE SURFACE (§240.2): the sidebar already had a flat card list, and mounting a tree INTO the
      * same host left BOTH visible — the owner's "still duplicated and messy". The legacy children are
      * hidden here; the tree takes the surface. Deleting them outright is a separate step. */
-    Array.prototype.forEach.call(host.children, function (el) {
-      if (!el.hasAttribute('data-panel-tree')) { el.hidden = true; el.setAttribute('data-superseded-by-tree', '1'); }
+    /* RETIREMENT MEANS REMOVAL, NOT HIDING (§262). Measured: the criterion counts `.ses-item` rows that
+     * carry the `sel` class, and `hidden` rows still count. `session_list.js` can run BEFORE
+     * `panel_tree.js` is loaded (script order), render the legacy cards, and only then does the tree
+     * mount — so the legacy rows stayed in the DOM and their marker read as a second selection
+     * (`[2 marked]`). Removing them makes the tree the only writer, which is what "one surface" means. */
+    Array.prototype.forEach.call(Array.prototype.slice.call(host.children), function (el) {
+      if (!el.hasAttribute('data-panel-tree')) { el.remove(); }
     });
     var box = host.querySelector('[data-panel-tree]');
     if (!box) {

@@ -229,9 +229,10 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
     'roots-only list has NO group headers (the root IS the entry)  [' + host.querySelectorAll('.pt-group').length + ']');
   ok(host.querySelector('[data-period="r1"]').getAttribute('data-descendants') === '3',
     'and each root still states its own size, which is the fact a header was trying to carry');
-  ok(host.querySelector('.legacy').hidden === true
-    && host.querySelector('.legacy').getAttribute('data-superseded-by-tree') === '1',
-    'ONE SURFACE: the legacy flat list is hidden when the tree mounts');
+  /* RETIREMENT MEANS REMOVAL (§262): hiding was the truce that produced `[2 marked]`, because a hidden
+   * `.ses-item` still counted. The criterion follows the new semantics: the legacy child is GONE. */
+  ok(host.querySelector('.legacy') === null,
+    'ONE SURFACE: the legacy flat list is REMOVED when the tree mounts (hiding left a counting row)');
   /* The generic contract is unchanged: `render` still draws every node unless asked otherwise. */
   const h2 = w.document.createElement('div');
   w.document.body.appendChild(h2);

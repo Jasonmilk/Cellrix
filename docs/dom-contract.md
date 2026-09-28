@@ -54,6 +54,7 @@
 | `s-side` | base.html, prove_track.view.js, session.html |
 | `.ses-edit` | session_list.js |
 | `.ses-head` | session_list.js |
+| `.ses-item` | panel_tree.js |
 | `sub` | base.html, flows.html, script.html |
 | `.t` | base.html, prove_track.html, session_list.js |
 | `.tbl-scroll` | cockpit.html, gleam.html |
