@@ -1,8 +1,8 @@
 /* panel_tree — DAG NAVIGATION, ON DEMAND (ADR-0048 §227).
  *
  * The goal it serves: the panel must let a reader SEE the experience DAG, click a node, and read
- * that node's facts locally — instead of a monolithic dashboard (the "泳道/网格" shape this cell
- * started with). DSH's trajectory is the reference; what we add is the proof-track's own facts:
+ * that node's facts locally — instead of a monolithic dashboard (the lane/grid shape this cell
+ * started with). The reference trajectory UI is the model; what we add is the proof-track's facts:
  * three-state metering, per-step model/token, walk's four end states, and DECLARED ABSENCE.
  *
  * Three rules this module is built on, all of them earned in this cell:

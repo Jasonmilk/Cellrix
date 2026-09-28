@@ -46,6 +46,8 @@ const EMBEDDED: &[(&str, &str)] = &[
     ("prove_track.css", include_str!("../assets/prove_track.css")),
     ("event_family.js", include_str!("../assets/event_family.js")),
     ("period_normalize.js", include_str!("../assets/period_normalize.js")),
+    /* §227 DAG navigation core: the tree view reads the same session payload the list does. */
+    ("panel_tree.js", include_str!("../assets/panel_tree.js")),
     ("wayout.words.js", include_str!("../assets/wayout.words.js")),
     ("wayout.js", include_str!("../assets/wayout.js")),
     ("node_shape.js", include_str!("../assets/node_shape.js")),

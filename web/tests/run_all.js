@@ -54,6 +54,7 @@ const SELF_CONTAINED = [
   ['compact_fold_test.js', 'the fold must be able to happen at all (the container row must not veto it)'],
   ['agent_loop_skeleton_test.js', 'the EIGHT Agent Loop criteria, written BEFORE the Loop (4 live homes, 4 declared absent with assertion+mutation)'],
   ['panel_tree_test.js', 'DAG navigation core: edges == parents, structural closures, three NAMED modes'],
+  ['code_language_test.js', 'code and comments are English: declared-clean files asserted, backlog counted, detector mutates'],
   ['agent_loop_probe_test.js', 'THE FOUR PROBES: red until the Loop exists (a declaration with a name, not a disease)'],
   ['zero_report_test.js', 'a zero must carry its n (rule of three) and a verdict must carry its environment E'],
   ['flake_roster_test.js', 'FLAKY is a third roster: neither red nor proven, with an append-only ledger and K>=3 escalation'],

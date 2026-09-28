@@ -81,6 +81,11 @@
       "asset": "period_normalize.js"
     },
     {
+      "id": "panel_tree",
+      "placeholder": "__PANEL_TREE__",
+      "asset": "panel_tree.js"
+    },
+    {
       "id": "wayout_words",
       "placeholder": "__WAYOUT_WORDS__",
       "asset": "wayout.words.js"
