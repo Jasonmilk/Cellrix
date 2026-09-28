@@ -11354,3 +11354,41 @@ F2/§246.1③ 的 tier 在本轮第一次真的起作用:
 ⇒ 旧数据**不迁移**(所有者指示:开发期,手动新建经历即可),所以历史里的 4 条 job id 与 1 条散文**保持原样**,
   它们会被解析器继续拒绝 —— 这正是"历史是追加写的"应有的行为。
 ```
+
+
+## 253. 🔬 **所有者两问的实测答案:显示**没解决**;flowmodus **有 key 但在给视频模型**
+
+### 253.1 显示:没有解决（而且原因是可核的）
+
+```
+核实:活面板服务的页面里 **`treeOwnsSidebar` 命中 0 次** ⇒ "旧卡片路径让位"的开关**根本不在** ⇒
+  **旧卡片列表仍是侧栏的渲染者**,树只是挂在旁边 ⇒ 所有者看到的"两套并存"是**真实现状**。
+⇒ 根因:第 ④ 步 `panel.retire_legacy` **三次尝试、三次回退**,且第三次的失败明细**被我自己的自动回退吞掉**(§249.2)。
+⇒ 所以"显示没解决"这句话是准确的,不是错觉。
+```
+
+### 253.2 flowmodus:有 key、有供应商,但把**视频模型**放在文本推理的位置上
+
+```
+实测 `curl :60053/api/status`:
+    "current": { "supplier_id":"agnes-ai", "endpoint_url":"https://apihub.agnes-ai.com/v1",
+                 "model_id":"**agnes-video-v2.0**" }
+实测 `curl :60053/api/suppliers`:`api_key_set: true`（key 在),供应商里**有文本模型**
+    （agnes-2.5-pro-alpha · agnes-3.0-flash · …)
+⇒ 而 `/api/status` 的那个 `current` 是**视频模型** ⇒ 文本推理没有可用的答案 ⇒ 回空
+⇒ 于是 anaphase 记录 `reply: ""` · `model: null` · `impasse`（与既有实测逐字一致)
+⇒ 而 `flowmodus grpc --port 60054`（reason 侧)与 `serve --port 60053` 是**两个进程**;
+    `grpc_cmd.rs` 里**没有读 `current`/供应商状态**的痕迹,HTTP 也**没有"切换当前模型"的路由**
+    （只有 `/api/status` · `/api/suppliers` · `/api/suppliers/probe` · `/healthz`)
+⇒ ⇒ 结论:**不是"没连上",而是"连上了但没有可用的文本模型被交给它"** —— 与 §230"在链路上 ≠ 有产出"同一族。
+```
+
+### 253.3 决策
+
+```
+① 新增节点 **`flowmodus.current_model`**:判据 = 同一请求返回 **非空 reply 且非空 model**
+   （今天两者皆空;实测的 current 是视频模型)
+② `panel.retire_legacy` 的阻塞原因**具名为"未知的三条"**,并加了流程纪律:
+   任何"试验—回退"必须**先落盘失败明细**（否则回滚的不只是代码,还有信息)。
+③ 两条都**不再靠推断**:一条有页面命中数(0),一条有 `/api/status` 的逐字读数。
+```
