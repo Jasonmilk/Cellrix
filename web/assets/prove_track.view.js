@@ -274,7 +274,13 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
          * `isOpen` false ⇒ the folded row never rendered (`compact = 0 rows`). The stand-in still
          * follows the turn being CLOSED (`foldedTurns`) and the search box, which is what the
          * comment promises. */
-        if (g && !S.foldedTurns[it.id] && !S.q) {
+        /* THE STAND-IN AND THE ROWS ARE ONE COUPLING (ADR-0048 §241, caught by the live suite):
+         * `a collapsed turn takes its folded stand-in with it` failed with "0 rows + 1 folded" —
+         * §193 removed the open test entirely, which fixed the never-rendering bug but dropped the
+         * other half of the rule: a stand-in must not outlive the rows it stands in for. The correct
+         * test is §202's DEFAULT-OPEN semantics (`!== false`), not the always-false `!!` it replaced. */
+        var isTurnOpen = S.openTurns[it.id] !== false;
+        if (g && isTurnOpen && !S.foldedTurns[it.id] && !S.q) {
           var open = !!S.foldedTurns[it.id];
           rows.push({ key: 'c:' + it.id, html: '<tr class="e-compact-hd"><td colspan="' + COLS + '">' +
             '<button type="button" class="e-turn-btn e-compact-btn" data-e-compacttoggle="' + it.id + '" ' +

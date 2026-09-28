@@ -22,8 +22,8 @@ ok(Math.abs(zeroBound(376) - 3 / 376) < 1e-9, 'and per criterion-run (8 × 47 = 
 ok(zeroBound(0) === null, 'n = 0 has NO bound — an unqualified zero is not even computable');
 
 /* the verdict must carry the environment (E), or counts are not comparable across commits */
-ok(/\[E: panel=/.test(SRC) && /siblings=/.test(SRC) && /jsdom=/.test(SRC),
-  'the verdict line carries E (panel up/down · siblings present · jsdom) — §200');
+ok(/\[E: cdp=/.test(SRC) && /siblings=/.test(SRC) && /jsdom=/.test(SRC),
+  'the verdict line carries E (cdp up/down · siblings present · jsdom) — §200 (§241 corrected the label: the probe is the CDP port, not the panel)');
 ok(/E IS PART OF THE VERDICT/.test(SRC), 'and says why (measured spans 44/45/47 proven)');
 
 /* MUTATION: dropping E from the verdict must be visible to this criterion */

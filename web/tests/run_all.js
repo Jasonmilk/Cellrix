@@ -788,7 +788,7 @@ console.log(failed === 0
      * whether the panel is up and the sibling repos are present — measured spans: proven 44/45/47,
      * unregistered 0/1/5/8, env-missing 0/1/5. A count without its environment is not comparable
      * across commits. */
-    + '  [E: panel=' + (probeOk('cdp') ? 'up' : 'down')
+    + '  [E: cdp=' + (probeOk('cdp') ? 'up' : 'down')
     + ' siblings=' + (function () {
         /* MEASURE THE RIGHT THING (ADR-0048 §200): SELF_CONTAINED holds SUITE names, not
          * capabilities — probing them yields a meaningless 0/52. E must report the ENVIRONMENT
