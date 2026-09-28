@@ -211,5 +211,32 @@ L.renderSides(['s-side'], [p('pa'), p('pb')], EMPTY);
 check('旧容器同数据再渲 = 零新建（判据数得出复用）', divs === 0, '新建 ' + divs + ' 个');
 
 console.log('');
+/* ── A LABEL MUST DISTINGUISH (ADR-0048 §255) ──
+ * Measured on the live payload: every period's `name` is null and a conversation's rounds share a
+ * timestamp TO THE MINUTE, so the old fallback ("经历 <date> <time>") labelled every card identically.
+ * The fixture therefore uses the SAME timestamp and different previews: the old code makes both labels
+ * equal (this goes red), the new code labels each by the user's own words. */
+{
+  const dom4 = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w4 = dom4.window;
+  w4.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'session_list.js'), 'utf8'));
+  const A = { period_id: 'run-aa-p0000000000000001', first_ts: '2026-09-29T01:00:00Z', preview: '很高兴再见!!!' };
+  const B = { period_id: 'run-bb-p0000000000000002', first_ts: '2026-09-29T01:00:00Z', preview: '你好,明天见' };
+  w4.CxSessionList.renderSides(['s-side'], [A, B], EMPTY);
+  const host4 = w4.document.getElementById('s-side');
+  const labels = Array.prototype.map.call(host4.querySelectorAll('[data-job]'),
+    function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); });
+  check('two periods in the SAME MINUTE with different previews get DIFFERENT labels  [' + labels.join(' | ') + ']',
+    labels.length === 2 && labels[0] !== labels[1]);
+  check('and the label is the user own words, not a raw id  [' + (labels[0] || '') + ']',
+    (labels[0] || '').indexOf('很高兴再见') >= 0);
+  check('MUTATION: the old fallback (经历 + timestamp) made both labels EQUAL — the fixture uses one timestamp',
+    A.first_ts === B.first_ts);
+  /* A missing count must read as ABSENT, never as the word `undefined` (§255). */
+  check('a period with no count says 未计量, not undefined  [' + (labels[0] || '') + ']',
+    (labels[0] || '').indexOf('undefined') < 0 && (labels[0] || '').indexOf('未计量') >= 0);
+  dom4.window.close();
+}
+
 console.log((fail ? 'FAILED' : 'OK') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

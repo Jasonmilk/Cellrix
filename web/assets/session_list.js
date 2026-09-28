@@ -39,8 +39,17 @@
    * reported. Seconds are the cheapest discriminator that stays human-readable;
    * the job-id fragment stays in the row for the case where even a second
    * collides (rapid scripted writes). */
+  /* WHAT A HUMAN RECOGNISES (ADR-0048 §255). Measured on the live payload: every period's `name` is
+   * null, so this fell back to "经历 <date> <time>" — and because a conversation's rounds share a
+   * timestamp to the minute, EVERY card read the same. The distinguishing fact was already in the
+   * payload and unused: `preview`, the user's own first words. So the order is now
+   *   name → the user's first words → time (the last resort, which at least stays honest).
+   * This is the same rule the sidebar grouping needed: two entries a reader cannot tell apart ARE a
+   * duplicate as far as the reader is concerned. */
   function autoName(p) {
     if (p.name) return p.name;
+    var said = (p.preview || '').replace(/\s+/g, ' ').trim();
+    if (said) { return said.length > 24 ? said.slice(0, 24) + '…' : said; }
     var when = stamp(p.first_ts);
     return '经历 ' + when.date + ' ' + when.time + (when.secs ? ':' + when.secs : '');
   }
@@ -165,7 +174,12 @@
     /* No continuation marker: there is no continuation tier. */
     var tag = '';
     return '<div class="nm">' + tag + esc(nm) + '</div>' +
-      '<div class="t">' + esc(disp) + ' · ' + p.count + ' 事件 · <span class="tid">' + esc(p.period_id.slice(0, 12)) + '</span>' + mdl +
+      /* THE COUNT HAS THREE STATES TOO (§255): a missing count printed the literal `undefined 事件`
+       * (seen in a fixture), which reads as a fact. Absent is `· 未计量`, the same discipline the
+       * metering readers use — an absent number must never be rendered as a word. */
+      '<div class="t">' + esc(disp) + ' · '
+        + (p.count == null ? '未计量' : p.count + ' 事件')
+        + ' · <span class="tid">' + esc(p.period_id.slice(0, 12)) + '</span>' + mdl +
       '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.period_id) + '" title="重命名">✎</button></span></div>' +
       preview + reply;
   }
@@ -177,7 +191,7 @@
       Cx.setNav({ period: p.period_id, meta: { job_id: p.job_id, period_id: p.period_id, name: p.name, preview: p.preview } });
       moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
       loadPeriodToChat(p.period_id);
-      setBanner('续接经历 <span class="tid">' + esc(p.period_id) + '</span> —— 下一句话延续这段对话');
+      setBanner('续接经历「' + esc(autoName(p)) + '」<span class="tid">' + esc(p.period_id.slice(-6)) + '</span> —— 下一句话延续这段对话');
       document.getElementById('chat-text').focus();
     };
     var rn = div.querySelector('[data-ren]');
@@ -496,7 +510,10 @@
     fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
       var periods = (j.periods || []).slice(0, 8);
       list.innerHTML = periods.map(function (p) {
-        return '<div class="resume-opt" data-job="' + esc(p.period_id) + '">' + esc(autoName(p)) + ' <span class="dim">' + esc(p.period_id.slice(0, 20)) + '</span></div>';
+        /* The label leads and the id is a SUFFIX OF A FEW CHARACTERS: a 20-character id as the visible
+         * text made every option look like every other one (§255). */
+        return '<div class="resume-opt" data-job="' + esc(p.period_id) + '">' + esc(autoName(p))
+          + ' <span class="dim">' + esc(p.period_id.slice(-6)) + '</span></div>';
       }).join('') || '<div class="empty">尚无经历</div>';
       list.style.display = '';
       list.querySelectorAll('.resume-opt').forEach(function (el) {
@@ -504,7 +521,7 @@
           var job = el.getAttribute('data-job');
           list.style.display = 'none';
           Cx.setNav({ period: job });
-          setBanner('续接经历 <span class="tid">' + esc(job) + '</span> —— 下一句话延续这段对话');
+          setBanner('续接经历<span class="tid">' + esc(String(job).slice(-6)) + '</span> —— 下一句话延续这段对话');
           loadPeriodToChat(job);
           document.getElementById('chat-text').focus();
         };
