@@ -10,6 +10,13 @@
  */
 const { JSDOM, VirtualConsole } = require("jsdom");
 
+/* TODO(gate.env_class): declare `const REQUIRES = 'panel-http';` here so the runner decides by PROBE
+ * and hands over the address. MEASURED 2026-09-28: with that declaration in place the runner still
+ * spawned the suite WITHOUT the address at a second site (`:397`, the flaky-retry path), so the probe
+ * said "capability IS present, yet this suite is unproven" and the gate went red for the wrong reason.
+ * The capability, the probe (reading the DECLARED component in chain.json components[panel]) and the
+ * registration (owner+probe) are all landed; what remains is passing the address at EVERY spawn site,
+ * then re-adding this line. Half a door is worse than a marked one. */
 const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
 /* NO literal default: the port is declared once (`panel` in
  * anaphase-helix/ecosystem/chain.json) and passed in by the runner. An absent

@@ -18,6 +18,12 @@
       "id": "jsdom-dom",
       "probe": "jsdom",
       "reason": "DOM-level suites need jsdom. Decided by PROBE, never by a date, and `REQUIRES` in each suite names it — the register only records the capability and its probe (ADR-0048 §203)."
+    },
+    {
+      "id": "panel-http",
+      "probe": "panel",
+      "why": "运行器的面板套件需要**可达的面板**。地址必须被**声明**（chain.json 的 panel 条目 / CELLRIX_PANEL),不由代码猜(0 硬编码)。探针 HTTP 问面板本身;可行时运行器把地址交给套件。",
+      "owner": "jason"
     }
   ],
   "deferrals": [

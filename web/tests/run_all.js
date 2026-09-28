@@ -354,6 +354,11 @@ for (const [file, what] of SELF_CONTAINED) {
     : (file === 'layout_test.js' || file === 'measure_test.js'
        || file === 'perf_measure.js' || file === 'hit_targets_test.js') ? [PANEL, CDP] : [];
   try {
+    /* TODO(gate.env_class): hand the panel address to `all_views_test.js` here — and at EVERY spawn
+     * site (`:397`, the flaky-retry path, spawns too). MEASURED: passing it at one site only left the
+     * suite unproven at the other, and the probe then said "capability IS present, yet this suite is
+     * unproven" — a red for the wrong reason. Landed already: the capability, the probe (which reads
+     * the DECLARED panel component in chain.json), and the register entry with owner+probe. */
     execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' });
     results.push(['PASS', file, what]);
   } catch (e) {
@@ -433,6 +438,37 @@ const DEFERRALS = (function () {
  * once, decide a batch. Caching does NOT violate the header's rule, because the capability
  * conclusion is DECLARED (REQUIRES + probe + HELD), not silently skipped. */
 const PROBE_CACHE = {};
+/* ONE HOST FOR "WHERE IS THE PANEL" (§245): the probe and the argument passed to the panel suite
+ * both ask this function, so they can never disagree about the address. Reads chain.json; env wins. */
+function panelUrl() {
+  if (process.env.CELLRIX_PANEL) { return process.env.CELLRIX_PANEL; }
+  for (const cand of [path.join(__dirname, '..', '..', 'chain.json'),
+                      path.join(__dirname, '..', '..', '..', 'chain.json'),
+                      /* MEASURED: the declaration lives here, and its `panel` entry is currently NULL
+                       * — so the honest reading is "the panel's address is not declared", not a guessed
+                       * port (0 hardcoding). Filling that entry is a config change, not a code change. */
+                      path.join(__dirname, '..', '..', '..', 'anaphase-helix', 'ecosystem', 'chain.json'),
+                      path.join(__dirname, '..', '..', '..', '..', 'anaphase-helix', 'ecosystem', 'chain.json')]) {
+    try {
+      const c = JSON.parse(fs.readFileSync(cand, 'utf8'));
+      /* THE DECLARATION IS A COMPONENT, NOT A TOP-LEVEL KEY (measured): chain.json lists the panel
+       * among `components` — {"name":"panel","kind":"http","port":50050,…}. Reading only a top-level
+       * `panel` key made the address look undeclared while it was declared all along. */
+      const list = Array.isArray(c.components) ? c.components : [];
+      const comp = list.filter(function (x) { return x && x.name === 'panel'; })[0];
+      if (comp) {
+        if (comp.url || comp.base) { return comp.url || comp.base; }
+        if (comp.port) { return 'http://127.0.0.1:' + comp.port; }
+      }
+      const e = c.panel || c.cellrix_panel;
+      if (typeof e === 'string') { return e; }
+      if (e && (e.url || e.base)) { return e.url || e.base; }
+      if (e && e.port) { return 'http://127.0.0.1:' + e.port; }
+    } catch (err) { /* next candidate */ }
+  }
+  return null;
+}
+
 function probeOk(name) {
   if (Object.prototype.hasOwnProperty.call(PROBE_CACHE, name)) { return PROBE_CACHE[name]; }
   if (name === 'jsdom') {
@@ -440,6 +476,19 @@ function probeOk(name) {
     try { require.resolve('jsdom'); okJsdom = true; } catch (e) { okJsdom = false; }
     PROBE_CACHE[name] = okJsdom;
     return okJsdom;
+  }
+  if (name === 'panel') {
+    /* THE PANEL IS NOT THE CDP PORT (§245): the label `panel=` used to probe Chrome's debug port, so the
+     * verdict said `panel=down` while the live suite was passing 110 assertions against the panel. */
+    const url = panelUrl();
+    if (!url) { PROBE_CACHE[name] = null; return null; }   // inconclusive, not "down"
+    try {
+      execFileSync(process.execPath, ['-e',
+        'fetch(process.env.P_URL,{signal:AbortSignal.timeout(1500)})'
+        + '.then(r=>process.exit(r.ok?0:1),()=>process.exit(1))'],
+        { stdio: 'ignore', timeout: 4000, env: Object.assign({}, process.env, { P_URL: url }) });
+      PROBE_CACHE[name] = true; return true;
+    } catch (e) { PROBE_CACHE[name] = false; return false; }
   }
   if (name !== 'cdp') { PROBE_CACHE[name] = null; return null; }   // unknown probe => inconclusive
   try {
@@ -789,6 +838,7 @@ console.log(failed === 0
      * unregistered 0/1/5/8, env-missing 0/1/5. A count without its environment is not comparable
      * across commits. */
     + '  [E: cdp=' + (probeOk('cdp') ? 'up' : 'down')
+    + ' panel=' + (probeOk('panel') === true ? 'up' : (probeOk('panel') === null ? 'unknown' : 'down'))
     + ' siblings=' + (function () {
         /* MEASURE THE RIGHT THING (ADR-0048 §200): SELF_CONTAINED holds SUITE names, not
          * capabilities — probing them yields a meaningless 0/52. E must report the ENVIRONMENT
