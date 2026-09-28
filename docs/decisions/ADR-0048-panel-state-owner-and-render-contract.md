@@ -10097,3 +10097,62 @@ Saltzer & Schroeder（逐字）:*"Access decisions should be based on **permissi
 **我上一笔为了让缺席可见,写下了一句比原来更糟的话（假陈述）。**
 ⇒ ⇒ 纪律补一句:**宣告必须与被宣告的实现逐行对照一次**（§211 的宣告**没有**去看 `pipeline/mod.rs:198-212`,
   而它就在同一个仓里、就在同一条路径上）。
+
+
+## 213. 🔴 **判定面是 args,不是工具名** —— 而我照错了上一笔的处方
+
+### 213.1 审查方的实测（我逐条核过,全部属实）
+
+```
+A 名字轴:34 个"执行器"候选名(shell · terminal · execute · run · run_command · script · interpreter ·
+  computer_use · invoke · dispatch · worker …)⇒ **全部放行**
+  ⇒ **名字即危险 100.0%** vs **名字中性 + 危险在 args 2.9%**
+B args 轴:12 个真实形态调用(危险全在 args)——
+  只判 tool 名 ⇒ 拦 **0/12 = 0.0%**;判 tool + args ⇒ 拦 **12/12 = 100.0%**
+C 判别力:真值三态(危险在名/危险在 args/无危险)× 观测两值(拦/放行)
+  ⇒ H(真因)=1.4855 · I=**0.7219** ⇒ **48.6%**;P(真危险 | 放行) = **0.3750**
+D 🔴 **自适应对手**:`contract/mod.rs:332` `tool: name.to_string()` —— **工具名由 LLM 自己的
+  `ReasoningSignal` 解析而来** ⇒ **监管键由被监管者产出**(与 §211 那条自认 *"a self-certification
+  with no check behind it"* 同形)⇒ 名单 c=110 时:10³ ⇒ 11% · 10⁴ ⇒ 1.1% · 10⁵ ⇒ **0.11%**
+E Loop 放大:1 步×3 / 40 步×3 调用 ⇒ args 轴检查 **0 次** ⇒ **未检查率 100%**
+```
+
+### 213.2 审查方**更正自己上一笔**,我采纳
+
+```
+能力维(§212)仍在**名字轴**上:对"名字即危险" **100.0%**(真提高了),对"名字中性 + args 危险" **2.9%**(几乎不动)
+⇒ **把名单从 45 扩到 110,而危险从来不在名单能覆盖的地方。**
+⇒ **这是"判据喂错对象"的又一次:轴错了,在轴上做得越彻底,越像已经解决了。**
+```
+
+### 213.3 附带:同一个判定,**两个输入集**
+
+```
+`gate = Some` ⇒ `GateCheck { tool, **args_json: params**, … }` ← args 参与
+`gate = None` ⇒ `is_high_risk(&call.tool)`                      ← args **不参与**（**生产现状**）
+⇒ 同一个判定的两个实现输入集不同 ⇒ **将来装真 gate 会改变判定语义**（没门宽松、有门严格）。
+```
+
+### 213.4 本笔已落（Anaphase `02af11b` 之后,`hitl::` 6 条全绿）
+
+```
+① `HITLApprover::is_high_risk_call(tool, args_json) = is_high_risk(tool) || is_high_risk(args_json)`
+   —— 与 `Some` 路径的 `GateCheck::args_json` **同一份序列化** ⇒ **两条路径判定面一致**
+② `pipeline/mod.rs` 的 `None` 分支改用它;`params` 已在同一循环算好 ⇒ **纯复用、零新增计算**
+③ 测试:6 个真实形态 **必须拦**(run_command+`rm -rf` · shell+`docker --privileged` ·
+   terminal+`sudo chmod` · executor+`python3 os.system` · process+`kubectl delete` · dispatch+`terraform destroy`),
+   **并断言旧判定面确实放行了它们**;而 `ls` / `read_file` / `grep` **必须仍放行**
+   ⇒ 两侧断言不能省:**噪声会让"红"贬值**（§199/§212 已证）
+```
+
+### 213.5 仍未完成（含审查方两处更正）
+
+```
+④ 工具调用层"**未检查事件数**"被计数并宣告（"不是 0 就说 0"）
+⑤ `dropped` **按 kind 分计** —— 审查方更正:它**有出口**（`main.rs:112-115` `/v1/agent/events` 返回 dropped）
+   ⇒ **不是零消费者**;但它是 u64 **总数**,不分类
+⑥ `default_events_cap() = 1024` 紧邻注释写 "zero hardcoding" ⇒ **词与实现不符**（改注释）
+⇒ 而本笔最该记住的一条(同 §212 的教训,更深一层):
+  **处方也要审查它的"轴"** —— 我上一笔照做了、测试全绿、17 个 bash 类被拦,
+  而**真实形态的拦截率仍是 2.9%**:因为**测试喂的是名字,而危险住在 args 里**。
+```
