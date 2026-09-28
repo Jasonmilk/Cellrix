@@ -179,6 +179,60 @@
     return { tree: tree, select: selectOne };
   }
 
+  /* ── STEP ROWS: the period's facts, rendered locally (P0-2f) ──
+   * Every value comes from the SINGLE readers the rest of the panel uses (`tokOf` / `durOf` /
+   * `foldedCell` / `semOf`), so this view performs NO arithmetic and holds no second copy of a fact.
+   * The three-state distinction is preserved on the wire as `data-state`: `p` measured, `n`
+   * unmeasured, `a` absent — and the criterion asserts the three TEXTS are pairwise different, so
+   * any `|| 0` that collapses them is caught rather than merely discouraged.
+   * The model column exists only when the event declares one: an absent model is not an empty cell
+   * pretending to be data. */
+  function renderRows(box, events) {
+    if (!box || !box.ownerDocument) { return null; }
+    var doc = box.ownerDocument;
+    var M = root.CxCellMetering;
+    box.textContent = '';
+    var list = doc.createElement('div');
+    list.className = 'pt-steps';
+    var stateOf = function (v) { return v && v.k ? String(v.k) : 'a'; };
+    var textOf = function (v) {
+      if (!v) { return ''; }
+      if (M && M.foldedCell) { return M.foldedCell({ tok: v }); }
+      return v.k === 'p' ? String(v.v) : (v.k === 'n' ? '· 未计量' : '· 无数据');
+    };
+    (events || []).forEach(function (e, i) {
+      var row = doc.createElement('div');
+      row.className = 'pt-step';
+      row.setAttribute('data-step', String(i + 1));
+      var sem = doc.createElement('span');
+      sem.className = 'pt-sem';
+      sem.textContent = (M && M.semOf) ? M.semOf(e) : '';
+      var tok = doc.createElement('span');
+      tok.className = 'pt-tok';
+      var t = (M && M.tokOf) ? M.tokOf(e) : null;
+      tok.setAttribute('data-state', stateOf(t));
+      tok.textContent = textOf(t);
+      var dur = doc.createElement('span');
+      dur.className = 'pt-dur';
+      var d = (M && M.durOf) ? M.durOf(e) : null;
+      dur.setAttribute('data-state', stateOf(d));
+      dur.textContent = (d && d.k === 'p') ? String(d.v) + 'ms' : (d && d.k === 'n' ? '未计量' : '');
+      row.appendChild(sem);
+      row.appendChild(tok);
+      row.appendChild(dur);
+      var model = e && e.data && e.data.model;
+      if (model) {
+        var md = doc.createElement('span');
+        md.className = 'pt-model';
+        md.textContent = String(model);
+        row.appendChild(md);
+      }
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+    return list;
+  }
+
   /* ── SIDEBAR MOUNT (P0-2d): additive by construction ──
    * The host (`#s-side`) is owned by the experience list, which re-renders it wholesale and by
    * design knows nothing about this view. So the tree lives in its OWN child container, replaced
@@ -208,6 +262,7 @@
     ancestorClosure: ancestorClosure,
     selection: selection,
     render: render,
-    mountSidebar: mountSidebar
+    mountSidebar: mountSidebar,
+    renderRows: renderRows
   };
 })(window);

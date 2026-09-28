@@ -692,6 +692,10 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
            TICK_K: TICK_K, RESERVE_CAP_PCT: RESERVE_CAP_PCT,
            foldedCell: foldedCell,
            BAR_KEYS: BAR_KEYS,
+           /* `semOf` is the semantic name of an event and the panel's step rows need it; it was
+            * used internally (by `applicable`) but never exported, so a view asking for it got
+            * `undefined` and would have re-derived the fact. One reader, one host. */
+           semOf: semOf,
            tokOf: tokOf, durOf: durOf, scopeOf: scopeOf, ptrGet: ptrGet,
            project: project, ratioOf: ratioOf, shares: shares };
 }));

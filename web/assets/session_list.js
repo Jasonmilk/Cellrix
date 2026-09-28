@@ -80,7 +80,9 @@
           return fetch('/api/events?job_id=' + encodeURIComponent(id))
             .then(function (r) { return r.json(); })
             .then(function (j) { return (j && (j.events || j.rows)) || []; });
-        }
+        },
+        /* P0-2f: the rows render locally through the SAME readers the rest of the panel uses. */
+        onRows: function (box, rows) { window.CxPanelTree.renderRows(box, rows); }
       });
     }
   }

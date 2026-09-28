@@ -154,6 +154,49 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   dom.window.close();
 }
 
+/* ── STEP ROWS: the period's facts rendered locally, three states preserved (P0-2f) ── */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="rows"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  const A = (f) => fs.readFileSync(path.join(__dirname, '..', 'assets', f), 'utf8');
+  /* Load in dependency order: the algebra, then the readers, then the view. */
+  w.eval(A('three_state.js'));
+  w.eval(A('cell_metering.js'));
+  w.eval(A('panel_tree.js'));
+  const T = w.CxPanelTree, M = w.CxCellMetering;
+  ok(!!(M && M.tokOf && M.foldedCell && M.semOf), 'the readers exist and are shared (no local copy)');
+
+  const ROWS = [
+    { kind: 'assistant/usage', data: { completion_tokens: 20, duration_ms: 7, model: 'planner-strong' } },
+    { kind: 'assistant/usage', data: { prompt_tokens: 5, completion_tokens: null } },
+    { kind: 'assistant/usage', data: {} }
+  ];
+  const host = w.document.getElementById('rows');
+  const list = T.renderRows(host, ROWS);
+  const steps = host.querySelectorAll('.pt-step');
+  ok(steps.length === 3, 'one row per event (' + steps.length + ')');
+  const tok0 = steps[0].querySelector('.pt-tok'), tok1 = steps[1].querySelector('.pt-tok'), tok2 = steps[2].querySelector('.pt-tok');
+  ok(tok0.getAttribute('data-state') === 'p' && tok0.textContent === '20',
+    'measured step: state p, value 20  [' + tok0.getAttribute('data-state') + ' ' + tok0.textContent + ']');
+  ok(tok1.getAttribute('data-state') === 'n', 'unreported-but-legal step: state n (never collapsed to 0)');
+  ok(tok2.getAttribute('data-state') === 'a', 'no measurement at all: state a');
+  const texts = [tok0.textContent, tok1.textContent, tok2.textContent];
+  ok(texts[0] !== texts[1] && texts[1] !== texts[2] && texts[0] !== texts[2],
+    'THE THREE STATES STAY THREE TEXTS  [' + texts.join(' | ') + ']');
+  ok(texts[1].indexOf('0') < 0 || texts[1] === '20',
+    'MUTATION scope: a `|| 0` that collapsed "unmeasured" into "0" would make these texts equal (caught above)');
+  ok(host.querySelectorAll('.pt-model').length === 1,
+    'the model column exists ONLY when declared (one of three rows declares it)');
+  ok(host.querySelector('.pt-model').textContent === 'planner-strong', 'and it carries the declared name');
+  ok(steps[0].querySelector('.pt-dur').getAttribute('data-state') === 'p'
+    && steps[1].querySelector('.pt-dur').getAttribute('data-state') === 'a',
+    'duration uses the same three-state discipline (p where measured, a where not)');
+  dom.window.close();
+}
+
 /* Run the deferred assertions, then judge. `setTimeout 0` lets the promise microtasks settle. */
 setTimeout(function () {
   asyncCases.forEach(function (f) { f(); });
