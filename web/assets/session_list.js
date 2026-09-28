@@ -157,7 +157,14 @@
     var when = stamp(p.first_ts);
     var disp = when.date + ' ' + when.time;
     var nm = autoName(p);
-    var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
+    /* EACH FACT ONCE (ADR-0048 §256). `autoName` now returns the user's own words, so the preview line
+     * repeated the title verbatim — measured in the fixture: the same sentence appeared TWICE in one
+     * card, which is the duplication the owner kept reporting. The preview line stays only when the
+     * title is something else (a name the user gave the period). */
+    var said = (p.preview || '').replace(/\s+/g, ' ').trim();
+    var saidLabel = said.length > 24 ? said.slice(0, 24) + '…' : said;
+    var preview = (p.preview && nm !== saidLabel)
+      ? '<div class="p">' + esc(p.preview) + '</div>' : '';
     // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
     /* THREE STATES, NOT TWO (§237): an EMPTY reply used to render nothing, so 18 of 52 cards were
      * wordless with no explanation. The state is named now, and it carries the model fact when the
@@ -179,7 +186,9 @@
        * metering readers use — an absent number must never be rendered as a word. */
       '<div class="t">' + esc(disp) + ' · '
         + (p.count == null ? '未计量' : p.count + ' 事件')
-        + ' · <span class="tid">' + esc(p.period_id.slice(0, 12)) + '</span>' + mdl +
+        /* THE ID IS A SUFFIX, NOT A HEADLINE (§256): twelve characters of a period id led the line and
+         * made every card look alike; six trailing characters still separate two periods of one job. */
+        + ' · <span class="tid">' + esc(p.period_id.slice(-6)) + '</span>' + mdl +
       '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.period_id) + '" title="重命名">✎</button></span></div>' +
       preview + reply;
   }

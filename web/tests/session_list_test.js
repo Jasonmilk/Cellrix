@@ -235,6 +235,14 @@ console.log('');
   /* A missing count must read as ABSENT, never as the word `undefined` (§255). */
   check('a period with no count says 未计量, not undefined  [' + (labels[0] || '') + ']',
     (labels[0] || '').indexOf('undefined') < 0 && (labels[0] || '').indexOf('未计量') >= 0);
+  /* EACH FACT ONCE (§256): the preview is the title now, so it must not also appear as a body line. */
+  const occurrences = (labels[0] || '').split('很高兴再见!!!').length - 1;
+  check('the preview appears EXACTLY ONCE in one card  [' + occurrences + ']', occurrences === 1);
+  check('MUTATION: before this change the same sentence appeared twice (title + preview line)',
+    (labels[0] || '').indexOf('run-aa-p0000') < 0,
+    'and the id is a 6-char suffix, not a 12-char prefix');
+  check('the id survives as a short suffix  [' + (labels[0] || '').slice(-6) + ']',
+    (labels[0] || '').indexOf('000001') >= 0);
   dom4.window.close();
 }
 
