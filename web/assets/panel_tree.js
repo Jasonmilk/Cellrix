@@ -367,7 +367,20 @@
      * panel selects the newest experience exactly once. `overview first` still holds — the tree is
      * drawn in full — while `details-on-demand` is honoured by fetching ONE period rather than N. */
     if (!opts.selected && periods && periods.length && periods[0] && periods[0].period_id) {
-      opts = Object.assign({}, opts, { selected: periods[0].period_id });
+      /* THE DEFAULT SELECTION MUST BE A RENDERED ROW (ADR-0048 §249). The payload is newest-first, and
+       * the newest period can be a CONTINUATION — while the entry set here is the ROOTS. Selecting it
+       * then marked NOTHING, and the detail described a node the list did not contain:
+       * measured live as `the highlight still lands on exactly one row [0 marked]` (three criteria).
+       * So the default walks UP the parent chain to the row that is actually on screen. */
+      var want = periods[0].period_id;
+      if (opts.rootsOnly !== false) {
+        var t = buildTree(periods);
+        var guard = 0;
+        while (t.byId[want] && t.byId[want].parent && t.byId[t.byId[want].parent] && guard++ < 256) {
+          want = t.byId[want].parent;
+        }
+      }
+      opts = Object.assign({}, opts, { selected: want });
     }
     /* ONE SURFACE (§240.2): the sidebar already had a flat card list, and mounting a tree INTO the
      * same host left BOTH visible — the owner's "still duplicated and messy". The legacy children are

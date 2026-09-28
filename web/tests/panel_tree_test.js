@@ -284,6 +284,34 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   dom.window.close();
 }
 
+/* ── THE MARKER MUST LAND ON A RENDERED ROW (ADR-0048 §249) ──
+ * Measured live: the newest period can be a continuation while the entry set is the roots, so the
+ * default selection marked NOTHING (`[0 marked]`) and the detail described a node the list lacked. */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+  const P3 = [
+    { period_id: 'newest-continuation', parent: 'root-1', job_id: 'run-a' },  /* newest-first payload */
+    { period_id: 'root-1', parent: null, job_id: 'run-a' },
+    { period_id: 'root-2', parent: null, job_id: 'run-b' }
+  ];
+  const host = w.document.getElementById('s-side');
+  w.CxPanelTree.mountSidebar(P3, {});
+  const marked = host.querySelectorAll('.ses-item[aria-current="true"]');
+  ok(marked.length === 1, 'exactly ONE rendered row carries aria-current at load  [' + marked.length + ']');
+  ok(marked.length === 1 && marked[0].getAttribute('data-period') === 'root-1',
+    'and it is the ROOT of the newest continuation — a row that is actually rendered  ['
+    + (marked[0] && marked[0].getAttribute('data-period')) + ']');
+  const naive = host.querySelectorAll('.ses-item[data-period="newest-continuation"]');
+  ok(naive.length === 0 && marked.length === 1,
+    'MUTATION: the naive default (newest period) would give 0 marked rows here');
+  dom.window.close();
+}
+
 /* ── THE SELECTION CONTRACT IS INHERITED (ADR-0048 §247) ──
  * The app drives this sidebar through `#s-side .ses-item` + `data-job` (all_views_test.js:488).
  * A replacement that carries only its OWN names satisfies its own tests and removes the app's only way
