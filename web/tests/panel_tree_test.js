@@ -284,6 +284,36 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   dom.window.close();
 }
 
+/* ── THE SELECTION CONTRACT IS INHERITED (ADR-0048 §247) ──
+ * The app drives this sidebar through `#s-side .ses-item` + `data-job` (all_views_test.js:488).
+ * A replacement that carries only its OWN names satisfies its own tests and removes the app's only way
+ * to pick a period — measured live as "sidebar rows available to drive prove-track [0 rows]". */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+  const P2 = [
+    { period_id: 'run-a-p1', parent: null, job_id: 'run-a' },
+    { period_id: 'run-b-p1', parent: null, job_id: 'run-b' }
+  ];
+  const host = w.document.getElementById('s-side');
+  w.CxPanelTree.mountSidebar(P2, {});
+  const drivable = host.querySelectorAll('.ses-item');
+  ok(drivable.length === 2, 'every tree row is drivable through the APP contract (#s-side .ses-item)  ['
+    + drivable.length + ']');
+  ok(host.querySelector('.ses-item').getAttribute('data-job') === 'run-a-p1',
+    'and it carries data-job = period_id, the identity the legacy card carried');
+  ok(host.querySelectorAll('.pt-node').length === 2,
+    'while keeping this module own name, so its own criteria keep working');
+  const renamed = host.querySelectorAll('.pt-row-instead');
+  ok(renamed.length === 0 && drivable.length > 0,
+    'MUTATION: a row carrying only an invented name would give 0 drivable rows here');
+  dom.window.close();
+}
+
 /* ── CONVERSATIONS OVER PERIODS (ADR-0048 §238) ── */
 {
   let JSDOM;

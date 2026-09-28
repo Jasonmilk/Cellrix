@@ -192,8 +192,17 @@
       }
       var row = doc.createElement('button');
       row.type = 'button';
-      row.className = 'pt-node';
+      /* THE CONTRACT IS INHERITED, NOT INVENTED (ADR-0048 §247). Measured: the rest of the app drives
+       * this sidebar through `#s-side .ses-item` (all_views_test.js:488) with `data-job` = period_id,
+       * so a replacement that only carries its OWN names (`.pt-node`, `data-period`) satisfies me and
+       * *removes the app's only way to pick a period* — measured live as "sidebar rows available to
+       * drive prove-track [0 rows]". A row is therefore THREE things at once:
+       *   `.pt-node`   — this module's own name (its criteria keep working),
+       *   `.ses-item`  — the app's contract (selection highlighting + the drive path),
+       *   `data-job`   — the identity, exactly as the legacy card carried it. */
+      row.className = 'pt-node ses-item';
       row.setAttribute('data-period', id);
+      row.setAttribute('data-job', id);   /* the contract's identity: period_id, as the legacy card had it */
       if (conv) { row.setAttribute('data-conversation', conv); }
       /* The fact that separates "one conversation" from "34 near-identical cards" — without drawing
        * the 34. */
