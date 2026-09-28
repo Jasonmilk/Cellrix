@@ -71,6 +71,8 @@
     HOSTS = (ids || []).filter(function (id) { return !!document.getElementById(id); });
     LAST = { periods: periods, empty: empty };
     rerenderSides();
+    /* P0-2d: the DAG tree mounts into its own container; the list above is untouched. */
+    if (window.CxPanelTree && window.CxPanelTree.mountSidebar) { window.CxPanelTree.mountSidebar(periods, {}); }
   }
 
   function rerenderSides() {

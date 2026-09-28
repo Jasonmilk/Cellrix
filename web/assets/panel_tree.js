@@ -163,12 +163,35 @@
     return { tree: tree, select: selectOne };
   }
 
+  /* ── SIDEBAR MOUNT (P0-2d): additive by construction ──
+   * The host (`#s-side`) is owned by the experience list, which re-renders it wholesale and by
+   * design knows nothing about this view. So the tree lives in its OWN child container, replaced
+   * idempotently: the list's markup, its tests and its selection logic stay untouched.
+   * `fetchRows` stays the caller's decision — until the panel has a single-period loader wired, the
+   * mount takes it as an option and, when absent, renders the overview only (declared, not faked). */
+  function mountSidebar(periods, opts) {
+    opts = opts || {};
+    var hostId = opts.hostId || 's-side';
+    var host = (typeof document !== 'undefined') && document.getElementById(hostId);
+    if (!host) { return null; }
+    var box = host.querySelector('[data-panel-tree]');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'pt-mount';
+      box.setAttribute('data-panel-tree', '1');
+      host.appendChild(box);
+    }
+    var view = render(box, periods, opts);
+    return view;
+  }
+
   root.CxPanelTree = {
     MODES: MODES,
     modeFacts: modeFacts,
     buildTree: buildTree,
     ancestorClosure: ancestorClosure,
     selection: selection,
-    render: render
+    render: render,
+    mountSidebar: mountSidebar
   };
 })(window);
