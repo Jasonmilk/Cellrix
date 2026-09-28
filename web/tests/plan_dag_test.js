@@ -10,7 +10,15 @@ const fs = require('fs'), path = require('path');
 let bad = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) bad++; };
 
-const P = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'decisions', 'PLAN-DAG.json'), 'utf8'));
+/* The plan is a SESSION WORKING ARTIFACT and lives OUTSIDE the repository (workspace root), so the
+ * project is not polluted. Its absence is a DECLARED absence (exit 3), never a red: a fresh clone
+ * has no plan file and must not fail because a temporary artifact is missing. */
+const PLAN = path.join(__dirname, '..', '..', '..', 'Cellrix-Plan-DAG.json');
+if (!fs.existsSync(PLAN)) {
+  console.log('NEEDS-INPUT: no session plan file at ' + PLAN + ' (working artifact, kept outside the repo)');
+  process.exit(3);
+}
+const P = JSON.parse(fs.readFileSync(PLAN, 'utf8'));
 const byId = {};
 P.nodes.forEach((n) => { byId[n.id] = n; });
 
