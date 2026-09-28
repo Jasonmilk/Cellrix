@@ -2,6 +2,9 @@
  * The criterion that matters: the tree's EDGES are exactly the non-null parents (one fact, one
  * host), the ancestor closure is structural, and an unknown run mode is a NAMED absence.
  */
+/* Machine-readable requirement (§203): the DOM section needs jsdom. */
+const REQUIRES = 'jsdom';
+
 const fs = require('fs'), path = require('path'), vm = require('vm');
 let bad = 0;
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) bad++; };
