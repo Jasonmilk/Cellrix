@@ -11338,3 +11338,19 @@ F2/§246.1③ 的 tier 在本轮第一次真的起作用:
    （今天:16/61 有 lineage,其中 4 个是 job id、1 个是散文 ⇒ **红**,且红在具名位置。)
 ④ **面板在链缺失期间必须点名"平铺"**（`panel.chain_flat_named`),不许用 n 张无法分辨的卡充数。
 ```
+
+
+## 252. ✅ **血缘修好（写入侧)**;面板侧还差"点名平铺"
+
+```
+落地(Anaphase):`context.resume_period` 成为**血缘的唯一来源**;
+  `main.rs` 把它只设为**解析成功**的 period;`reasoning.rs` 的 `resume_from` 从它读取。
+  ⇒ 解析不出时**不写父**（absent),而不是写一个 job id（wrong）。
+判据:`lineage_records_a_period_and_omits_an_unresolved_parent`
+  · 成功 ⇒ 记录的 `resume_from` == 那个 period id
+  · **变异式断言**:旧路径写的值（job id)**不是** period id ⇒ 判据能红,不是只能绿
+  · 未解析 ⇒ `resume_from` **键不存在**
+⇒ `cargo test --lib` **237 passed / 0 failed**。
+⇒ 旧数据**不迁移**(所有者指示:开发期,手动新建经历即可),所以历史里的 4 条 job id 与 1 条散文**保持原样**,
+  它们会被解析器继续拒绝 —— 这正是"历史是追加写的"应有的行为。
+```
