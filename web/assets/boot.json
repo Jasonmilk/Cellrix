@@ -164,8 +164,7 @@
       "id": "flows",
       "placeholder": "__FLOWS__",
       "asset": "flows.html"
-    },
-    "panel_tree.js"
+    }
   ],
   "derived": [
     {
