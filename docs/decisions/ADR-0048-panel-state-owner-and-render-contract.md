@@ -11539,3 +11539,28 @@ F2/§246.1③ 的 tier 在本轮第一次真的起作用:
      但实测 `:59099` **down**,且仓里**没有**可执行的 mock 服务 ⇒ 需要写一个 5 行的替身)。
 ⇒ 并且这三条任何一条落地后,**判据是同一句**:同一 `/v1/chat` 请求返回**非空 reply 且非空 model**。
 ```
+
+
+## 261. ✅ **链路活了,并把它做成自动判据** —— 所有者:"这不该什么都靠我手动"
+
+### 261.1 真因与修法（都不是代码)
+
+```
+真因(§260):上游 Agnes 对每次调用回 **403** ⇒ 文本推理没有可用产出。
+修法:本机 `:8080` 是 **llama-swap**,列出 coder-14b · **coder-7b** · qwen3.8-27b;
+  注册一份**声明** `local-llama`(openai 端点 `http://127.0.0.1:8080/v1` · bearer `sk-local` · 模型 `coder-7b`),
+  anaphase 声明 `reasoning_model = "coder-7b"` ⇒ **未改一行 Rust**。
+实测(端到端):`{"done":true,"impasse":false,"model":"coder-7b","reply":"你好","success":true}`
+证轨:`assistant/usage model=coder-7b` · `assistant/reply model=coder-7b` · `turn/end model=coder-7b`
+```
+
+### 261.2 决策:**把"靠人报障"换成"自动判据"**
+
+```
+所有者原话:"我觉得这样效率太低,你应该可以 tests 来确认问题吧? 而不是什么都需要我手动?!"
+⇒ 新增 **`chain_e2e_test.js`**(已进网 · `REQUIRES = 'local-llm'`):
+  ① 端点**从声明派生**(0 硬编码):LLM 取自 registry 的 `local-llama`;anaphase 取自 `chain.json` 的组件端口
+  ② 断言三件事,每件都必须**非空**:`reply` 非空 · `model` 非空(证轨能说出**是谁答的**)· `impasse === false`
+  ③ 端点缺失 ⇒ **NEEDS-INPUT(声明缺席)**,不是红;探针 `local-llm` 读同一份 registry
+⇒ 实测:`5 passed / 0 failed` ⇒ 从此**这条链坏了就是红**,不再需要所有者手动发现。
+⇒ 判词:**"靠人报障"是最贵的探测器** —— 与 §237/§257/§259 是同一族病的最后一种形态:这一次被"安静"的不是输出,而是**失败本身**。

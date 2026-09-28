@@ -60,6 +60,7 @@ const SELF_CONTAINED = [
   ['zero_report_test.js', 'a zero must carry its n (rule of three) and a verdict must carry its environment E'],
   ['flake_roster_test.js', 'FLAKY is a third roster: neither red nor proven, with an append-only ledger and K>=3 escalation'],
   ['open_turns_test.js', 'openTurns is derived, cleared on reset, and read as DEFAULT OPEN (rule ⑰)'],
+  ['chain_e2e_test.js', 'the chain, end to end — reply non-empty + model named (§261)'],
   ['capability_declaration_test.js', 'said and declared are two hosts: every jsdom suite declares REQUIRES, register records capability+probe'],
   ['probe_integrity_test.js', 'a criterion about criteria: no hard-coded ok(true/false), and probes call entry points'],
   ['order_contract_test.js', 'order is structural (not temporal) and a truncated lineage declares itself'],
@@ -476,6 +477,28 @@ function probeOk(name) {
     try { require.resolve('jsdom'); okJsdom = true; } catch (e) { okJsdom = false; }
     PROBE_CACHE[name] = okJsdom;
     return okJsdom;
+  }
+  if (name === 'local-llm') {
+    /* The address comes from the FlowModus registry entry `local-llama` — the same declaration the chain
+     * itself uses, so the probe cannot disagree with the thing it probes (0 hardcoded ports). */
+    let base = process.env.CELLRIX_LOCAL_LLM || null;
+    if (!base) {
+      for (const cand of [path.join(__dirname, '..', '..', '..', 'FlowModus', 'flowmodus-rs', 'registry', 'free', 'local-llama.json')]) {
+        try {
+          const d = JSON.parse(fs.readFileSync(cand, 'utf8'));
+          const ep = (d.endpoints || [])[0];
+          if (ep && (ep.base_url || ep.url)) { base = ep.base_url || ep.url; break; }
+        } catch (e) { /* not declared */ }
+      }
+    }
+    if (!base) { PROBE_CACHE[name] = null; return null; }
+    try {
+      execFileSync(process.execPath, ['-e',
+        'fetch(process.env.L_URL + "/models",{signal:AbortSignal.timeout(2000)})'
+        + '.then(r=>process.exit(r.ok?0:1),()=>process.exit(1))'],
+        { stdio: 'ignore', timeout: 5000, env: Object.assign({}, process.env, { L_URL: base }) });
+      PROBE_CACHE[name] = true; return true;
+    } catch (e) { PROBE_CACHE[name] = false; return false; }
   }
   if (name === 'panel') {
     /* THE PANEL IS NOT THE CDP PORT (§245): the label `panel=` used to probe Chrome's debug port, so the

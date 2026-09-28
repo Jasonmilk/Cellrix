@@ -24,6 +24,12 @@
       "probe": "panel",
       "why": "运行器的面板套件需要**可达的面板**。地址必须被**声明**（chain.json 的 panel 条目 / CELLRIX_PANEL),不由代码猜(0 硬编码)。探针 HTTP 问面板本身;可行时运行器把地址交给套件。",
       "owner": "jason"
+    },
+    {
+      "id": "local-llm",
+      "probe": "local-llm",
+      "owner": "jason",
+      "why": "端到端链路判据需要**本机可用的推理端点**（registry 里 local-llama 指向 llama-swap @8080）。地址取自 registry,不由代码猜。"
     }
   ],
   "deferrals": [
