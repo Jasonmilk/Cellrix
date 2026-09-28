@@ -279,5 +279,35 @@ console.log('');
   dom5.window.close(); dom6.window.close();
 }
 
+/* ── A CLICK MUST CONTINUE THE CONVERSATION (ADR-0048 §264) ──
+ * Measured live: after the legacy cards were retired, the tree's click was wired to "switch to the
+ * prove-track view", so the owner could neither read nor continue a conversation from the sidebar
+ * ("无用, 也无法对话"). Identity, drivability and the marker were inherited — the BEHAVIOUR was not. */
+{
+  const dom7 = new JSDOM('<!doctype html><div id="s-side"></div><div id="chat-text"></div>',
+    { runScripts: 'outside-only' });
+  const w7 = dom7.window;
+  const calls = [];
+  w7.Cx = { setNav: function (patch) { calls.push(patch); }, showView: function () {} };
+  const P4 = [{ period_id: 'run-x-p1', job_id: 'run-x', parent: null, preview: '你好', first_ts: '2026-09-29T03:00:00Z' }];
+  const treeStub = { mountSidebar: function (periods, opts) { this.opts = opts; } };
+  w7.CxPanelTree = treeStub;
+  w7.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'session_list.js'), 'utf8'));
+  w7.CxSessionList.renderSides(['s-side'], P4, EMPTY);
+  const opts = treeStub.opts;
+  check('the sidebar hands the tree BOTH gestures  [click+prove]',
+    !!opts && typeof opts.onSelect === 'function' && typeof opts.onProve === 'function');
+  opts.onSelect('run-x-p1');
+  check('a single click BINDS THE PERIOD (continue semantics, not a view switch)  ['
+    + JSON.stringify(calls[calls.length - 1]) + ']',
+    calls.length === 1 && calls[0].period === 'run-x-p1' && calls[0].view === undefined);
+  check('MUTATION: the retired wiring `{view:"prove-track"}` would fail the assertion above',
+    calls[0].view === undefined);
+  opts.onProve('run-x-p1');
+  check('the prove-track view keeps its OWN affordance  [' + JSON.stringify(calls[calls.length - 1]) + ']',
+    calls.length === 2 && calls[1].view === 'prove-track' && calls[1].period === 'run-x-p1');
+  dom7.window.close();
+}
+
 console.log((fail ? 'FAILED' : 'OK') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

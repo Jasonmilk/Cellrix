@@ -96,12 +96,25 @@
          * shell's ONE writer (`Cx.showView` -> `setNav`). The view name is declared here, not
          * invented: it is the id `base.html` gives that container. */
         onSelect: function (id) {
-          /* BIND, DON'T JUST SWITCH (P1-1b): `showView` changed the view but left the view's OWN
-           * declared input untouched, so it kept showing its previous period. The input already
-           * exists and already has a consumer — `prove_track.js` reads `Cx.state.nav.period` and the
-           * shell fires `Cx.onPeriod` when it changes — so the binding is this one writer call,
-           * not a new state field. (A field nobody reads is the zero-consumer defect this cell
-           * keeps meeting; here the reader came first.) */
+          /* THE CLICK SEMANTICS ARE PART OF THE CONTRACT (ADR-0048 §264). Retiring the legacy cards kept
+           * identity, drivability and the marker — and silently dropped what a click DOES: load that
+           * period into the conversation, announce it, and focus the input. The tree's click had been
+           * wired to "switch to the prove-track view", so after the retirement the owner could neither
+           * read nor continue a conversation from the sidebar ("无用, 也无法对话"). A replacement must
+           * inherit the BEHAVIOUR, not only the markup — the fourth part of the same contract. */
+          var p = (periods || []).filter(function (x) { return x && x.period_id === id; })[0] || {};
+          if (window.Cx && typeof window.Cx.setNav === 'function') {
+            window.Cx.setNav({ period: id, meta: { job_id: p.job_id, period_id: id, name: p.name, preview: p.preview } });
+          }
+          try { if (typeof loadPeriodToChat === 'function') { loadPeriodToChat(id); } } catch (e) { /* never block the click */ }
+          try {
+            var nm = (typeof autoName === 'function') ? autoName(p) : id;
+            setBanner('续接经历「' + esc(nm) + '」<span class="tid">' + esc(String(id).slice(-6)) + '</span> —— 下一句话延续这段对话');
+          } catch (e) { /* banner is a courtesy, not the contract */ }
+          try { var t = document.getElementById('chat-text'); if (t) { t.focus(); } } catch (e) { /* idem */ }
+        },
+        /* The prove-track view keeps its own affordance, so it no longer steals the primary click. */
+        onProve: function (id) {
           if (window.Cx && typeof window.Cx.setNav === 'function') {
             window.Cx.setNav({ view: 'prove-track', period: id });
           }

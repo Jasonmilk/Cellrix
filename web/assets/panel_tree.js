@@ -228,6 +228,11 @@
       row.textContent = (n.row && n.row.name) ? n.row.name : id;
       row.addEventListener('click', function () {
         selectOne(id);
+        /* The prove-track view has its own gesture so the PRIMARY click can stay "continue this
+         * conversation" (§264). A double-click is additive: it cannot break the single-click contract. */
+        if (typeof opts.onProve === 'function') {
+          row.addEventListener('dblclick', function (ev) { if (ev) { ev.preventDefault(); } opts.onProve(id); });
+        }
         /* NAVIGATION DRIVES THE MAIN VIEW (option A): a CLICK is the user's intent, so it is the
          * only place that calls `onSelect`. The default selection deliberately does not — opening
          * the panel must respect the view the markup marks as current. */
