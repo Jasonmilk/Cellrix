@@ -75,6 +75,33 @@ const L = w.CxSessionList;
 if (!L || typeof L.renderSides !== 'function' || typeof L.moveSelection !== 'function') {
   console.log('  FAIL  资产未暴露 renderSides/moveSelection —— 套件与资产脱节，拒绝给结论');
 
+/* ── ONE WRITER IN THE SIDEBAR (ADR-0048 §248): the tree owns it, the legacy path stands down ── */
+{
+  const dom2 = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w2 = dom2.window;
+  w2.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'session_list.js'), 'utf8'));
+  /* The tree is PRESENT: the legacy path must build nothing (otherwise the host holds BOTH surfaces,
+   * which is the duplication the owner reported three times). */
+  let mounted = 0;
+  w2.CxPanelTree = { mountSidebar: function () { mounted++; } };
+  w2.CxSessionList.renderSides(['s-side'], [p('pz'), p('py')], EMPTY);
+  const host2 = w2.document.getElementById('s-side');
+  check('tree present => the legacy path builds NO cards (one writer, not two)  ['
+    + host2.querySelectorAll('[data-job]').length + ']',
+    host2.querySelectorAll('[data-job]').length === 0);
+  check('tree present => the tree is still asked to mount  [' + mounted + ']', mounted === 1);
+  /* …and the fallback survives for the case where panel_tree.js is absent. */
+  const dom3 = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w3 = dom3.window;
+  w3.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'session_list.js'), 'utf8'));
+  w3.CxSessionList.renderSides(['s-side'], [p('pz'), p('py')], EMPTY);
+  const host3 = w3.document.getElementById('s-side');
+  check('tree absent => the legacy list still renders, so the fallback survived  ['
+    + host3.querySelectorAll('[data-job]').length + ']',
+    host3.querySelectorAll('[data-job]').length === 2);
+  dom2.window.close(); dom3.window.close();
+}
+
   process.exit(1);
 }
 

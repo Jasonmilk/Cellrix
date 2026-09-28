@@ -159,6 +159,13 @@
       }
       Array.prototype.forEach.call(list.children, function (el) {
         el.setAttribute('aria-selected', el.getAttribute('data-period') === id ? 'true' : 'false');
+        /* THE APP'S MARKER IS `aria-current` (§248): the live contract asks for exactly ONE row with
+         * `aria-current="true"` — "the selection is discernible without colour" (N-019) and "the chosen
+         * period is marked in the sidebar" (N-004). The tree only spoke `aria-selected`, so retiring the
+         * legacy path left three live criteria red with `[0 marked]`. Both are set now: the app's name and
+         * this module's own. */
+        if (el.getAttribute('data-period') === id) { el.setAttribute('aria-current', 'true'); }
+        else { el.removeAttribute('aria-current'); }
       });
       return s;
     }

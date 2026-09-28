@@ -11192,3 +11192,33 @@ F2/§246.1③ 的 tier 在本轮第一次真的起作用:
   ⇒ 于是它标 `tier: fixture`,并在验收里**逐字写明"活体那一半未测,属 panel.e2e_live"**。
   ⇒ 没有这一步,我就会把"夹具证过"读成"活体验证通过" —— 这正是外部审查 P0-3 指出的事,而它是对的。
 ```
+
+
+## 248. 决策:**合约有三部分,我漏了第三部分**;退休因此被推迟两次（DAG 记下了这件事）
+
+### 248.1 观测（两次尝试,两次被同一族判据挡住）
+
+```
+第一次让旧卡片路径"让位" ⇒ live 红:`sidebar rows available to drive prove-track [0 rows]`
+  ⇒ 缺的是**可驱动性**（`.ses-item` + `data-job`）——已补（§247)
+第二次（本笔)再让位 ⇒ live 红**三条**:
+    `the highlight still lands on exactly one row [0 marked]`
+    `the selection is discernible without colour (N-019) [none]`
+    `the chosen period is marked in the sidebar (N-004) [0 marked]`
+  ⇒ 缺的是**可见选中态**:应用要的是 **`aria-current="true"` 恰好一行**（不靠颜色),
+    而树只会说 `aria-selected` —— **属性名不同,语义不同,而且它必须在"加载时"与"点击后"都维护。**
+```
+
+### 248.2 决策
+
+```
+**一个界面合约有三部分,缺一不可**:
+  ① 身份（`data-job` = period_id) ② 可驱动性（`.ses-item` + 交互路径) ③ **可见选中态**（`aria-current`)
+⇒ 因此"删减"不是一次动作,而是**三次合约继承**之后的最后一步。**顺序错了两次,代价是两次回退。**
+⇒ 结构化的处置:新增节点 `panel.tree_marker`,**插在** `panel.tree_available` 与 `panel.retire_legacy` **之间**,
+   于是"标记没做就去删减"在 DAG 上**不可表示**（与 §246.1⑥ 同一条纪律)。
+⇒ 而 `panel.retire_legacy` 的验收里**写下这两次实测**（`[0 rows]`、`[0 marked]`),
+   使后来者读到的不是"某人忘了",而是"这一步必须按顺序做"。
+⇒ 本笔的代码净变化:**保留** `aria-current`（它本来就是应用合约的一部分),
+   **回退**"让位"（旧卡片路径仍是侧栏所有者,直到标记也被树拥有)。
+```
