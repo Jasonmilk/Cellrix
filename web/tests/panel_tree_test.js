@@ -154,6 +154,36 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   dom.window.close();
 }
 
+/* ── MOUNT: one default detail, fetched exactly once (P0-2g) ── */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+  const T = w.CxPanelTree;
+  const calls = [];
+  T.mountSidebar(PERIODS, { fetchRows: function (id) { calls.push(id); return []; } });
+  const box = w.document.querySelector('[data-panel-tree]');
+  ok(!!box, 'the mount creates its OWN container under the host (the list is untouched)');
+  ok(calls.length === 1, 'opening the panel fetches detail for EXACTLY ONE period  [' + calls + ']');
+  const selected = box.querySelector('[aria-selected="true"]');
+  ok(!!selected && selected.getAttribute('data-period') === PERIODS[0].period_id,
+    'and the default selection is the newest experience  [' + (selected && selected.getAttribute('data-period')) + ']');
+  ok(box.querySelectorAll('.pt-node').length === PERIODS.length,
+    'while the OVERVIEW is complete: every period is still listed');
+
+  /* MUTATION: an explicit selection must be honoured instead of the default. */
+  const host2 = w.document.createElement('div');
+  host2.id = 's-side2';
+  w.document.body.appendChild(host2);
+  const calls2 = [];
+  T.mountSidebar(PERIODS, { hostId: 's-side2', selected: 'c', fetchRows: function (id) { calls2.push(id); return []; } });
+  ok(calls2.length === 1 && calls2[0] === 'c', 'an explicit selection wins over the default  [' + calls2 + ']');
+  dom.window.close();
+}
+
 /* ── STEP ROWS: the period's facts rendered locally, three states preserved (P0-2f) ── */
 {
   let JSDOM;

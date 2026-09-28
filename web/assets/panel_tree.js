@@ -244,6 +244,12 @@
     var hostId = opts.hostId || 's-side';
     var host = (typeof document !== 'undefined') && document.getElementById(hostId);
     if (!host) { return null; }
+    /* ONE default detail, not none and not all (P0-2g): the payload is newest-first, so opening the
+     * panel selects the newest experience exactly once. `overview first` still holds — the tree is
+     * drawn in full — while `details-on-demand` is honoured by fetching ONE period rather than N. */
+    if (!opts.selected && periods && periods.length && periods[0] && periods[0].period_id) {
+      opts = Object.assign({}, opts, { selected: periods[0].period_id });
+    }
     var box = host.querySelector('[data-panel-tree]');
     if (!box) {
       box = document.createElement('div');
