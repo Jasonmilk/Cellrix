@@ -170,7 +170,13 @@
       row.setAttribute('data-depth', String(ancestorClosure(tree, id).path.length - 1));
       if (n.truncated) { row.setAttribute('data-truncated', n.truncated); }
       row.textContent = (n.row && n.row.name) ? n.row.name : id;
-      row.addEventListener('click', function () { selectOne(id); });
+      row.addEventListener('click', function () {
+        selectOne(id);
+        /* NAVIGATION DRIVES THE MAIN VIEW (option A): a CLICK is the user's intent, so it is the
+         * only place that calls `onSelect`. The default selection deliberately does not — opening
+         * the panel must respect the view the markup marks as current. */
+        if (typeof opts.onSelect === 'function') { opts.onSelect(id); }
+      });
       list.appendChild(row);
     });
     host.appendChild(list);

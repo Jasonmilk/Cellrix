@@ -82,7 +82,13 @@
             .then(function (j) { return (j && (j.events || j.rows)) || []; });
         },
         /* P0-2f: the rows render locally through the SAME readers the rest of the panel uses. */
-        onRows: function (box, rows) { window.CxPanelTree.renderRows(box, rows); }
+        onRows: function (box, rows) { window.CxPanelTree.renderRows(box, rows); },
+        /* Option A: a click on the tree is navigation, so it drives the main area through the
+         * shell's ONE writer (`Cx.showView` -> `setNav`). The view name is declared here, not
+         * invented: it is the id `base.html` gives that container. */
+        onSelect: function () {
+          if (window.Cx && typeof window.Cx.showView === 'function') { window.Cx.showView('prove-track'); }
+        }
       });
     }
   }

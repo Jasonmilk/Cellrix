@@ -154,6 +154,36 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   dom.window.close();
 }
 
+/* ── OPTION A: a CLICK navigates; opening the panel does not (P1-1a) ── */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="host"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+  const T = w.CxPanelTree;
+  const host = w.document.getElementById('host');
+  const seen = [];
+  T.render(host, PERIODS, { onSelect: function (id) { seen.push(id); } });
+  ok(seen.length === 0,
+    'opening the panel does NOT navigate (the markup keeps its own default view)');
+  host.querySelector('[data-period="c"]').dispatchEvent(new w.Event('click'));
+  ok(seen.length === 1 && seen[0] === 'c',
+    'ONE click ⇒ ONE navigation signal, carrying that period  [' + seen + ']');
+  host.querySelector('[data-period="c"]').dispatchEvent(new w.Event('click'));
+  ok(seen.length === 2, 'each click signals again (the signal is per interaction, not cached)');
+
+  /* MUTATION: without the callback the click must still select locally — the two are separate facts. */
+  const host2 = w.document.createElement('div');
+  w.document.body.appendChild(host2);
+  T.render(host2, PERIODS, {});
+  host2.querySelector('[data-period="a"]').dispatchEvent(new w.Event('click'));
+  ok(host2.querySelector('[aria-selected="true"]').getAttribute('data-period') === 'a',
+    'MUTATION scope: selection happens even with no onSelect — navigation and selection are distinct');
+  dom.window.close();
+}
+
 /* ── ALIVE: a refresh updates in place, it does not rebuild (owner's requirement) ── */
 {
   let JSDOM;
