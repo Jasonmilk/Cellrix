@@ -10520,3 +10520,80 @@ E Loop 放大:1 步×3 / 40 步×3 调用 ⇒ args 轴检查 **0 次** ⇒ **未
 ⇒ 巨人路径判词我记账:**Complete Mediation** 与 **Fail-safe defaults** 是这一笔的准绳 ——
   而**我这版恰好满足它们**,差别在于**没有被判据强制**;
   **"满足"与"被强制满足"之间的距离,就是这一格反复付学费的地方。**
+
+
+## 225. ✅ **吸收 F1/F3/F4/F5**（逐条核实）+ **修正审查方的修法②** + 回答所有者一问
+
+### 225.1 所有者的问题（用测试跑,不靠记忆）—— `rm` 的变体
+
+```
+**全部拦下**（`is_high_risk` 按非字母数字切分 + 大小写不敏感):
+  `rm -rf /` · `rm  -rf  /` · `   rm -rf /   ` · `RM -RF /` · `Rm -Rf /data` ·
+  `/bin/rm -rf /` · `./rm -rf /` · `sudo rm -rf /` · `rm\t-rf /` · `rm\n-rf /` · `sh -c 'rm -rf /'`
+  ⇒ 空格/前导空白/路径前缀/标志/大小写**都无关**。
+```
+**而这一问当场抓到一个真漏**（这正是"问得具体"的价值）：
+```
+`rmdir /data` **不被拦** —— 引擎的 `WRITE` 表**没有 `rmdir`**,而**管道那条 `WRITE_BARE` 有**
+⇒ **两表漂移（§222）的又一处实测**,已补。
+```
+**两类必须如实说明**：
+```
+· `r''m -rf /` · `r\m -rf /` · `r m -rf /` **被拦,但靠运气**:切成 `{r, m}`,而 **`r` 是 R 解释器在表里**
+  ⇒ 我把"**靠运气拦住**"**显式写进测试**,不让它看起来像设计;
+· **真实漏报**（**断言为漏报**,不是假设没有）:`rmm -rf /` · `rnm -rf /` · `del -rf /` · `purge /data` · `$(echo cm0=)`
+  ⇒ **词表可被"改词"击败 —— 结构性,只有能力声明能解决。**
+```
+
+### 225.2 §225 的四条我逐条核实（**F1/F3/F4/F5 全部成立**）
+
+```
+F1 `ApprovalOutcome`（`hitl.rs:279` 四值闭集 + `allows_execution:293`)**在 `src/` 内零消费者**;
+   生产仍走 `check_approval -> Result<bool,String>`（`:265`),消费者 `safety_gate.rs:77`
+   ⇒ **药配好了、也做了质检,而管子还插在旧瓶上。**
+   而 `hitl.rs:273` 的注释**是我自己写的**,逐字:*"布尔会把『人说了不可以』和『没有任何人能回答』折叠成一个值"*
+   ⇒ **写下 ≠ 做到,第 N 次,这次长在我自己的安全底线上。**
+F3 `admit(&self.hitl, self.safety.as_ref(), &c.tool, **&[]**, …)` ⇒ **逐字空切片**：批准单上参数那栏是空的。
+F4 `is_high_risk_call` **唯一消费者**是 `pipeline/mod.rs:213`;而 `pipeline: None` 是默认
+   (`run_cycle/mod.rs:437` · `main.rs:874` 由 `tentacle_endpoint` 决定)
+   ⇒ **默认配置下,args 感知的那个谓词零调用**;而 Loop 走的正是这条路。
+F5 `safety_gate.rs:23` 逐字:*"**Recorded here, not resolved.**"*;`ReportSuccess`/`Block`
+   对同一情况给**两个相反答案**,而路由条件是 `self.pipeline.is_some()` —— **配置,不是安全判断**。
+```
+
+### 225.3 ⚠️ **修正审查方的修法②**（有实测依据）
+
+```
+它建议 `check_approval` **改用** `is_high_risk_call(tool, args_json)`。
+⇒ 实测:那样会**丢掉** `rm -rf /` —— `is_dangerous_name("rm -rf /")` **为 false**
+  （切成 `{rm, rf}`,而**全 token 规则**要求每个词都在表里,`rf` 不在),
+  而旧的 **token-OR** 分类器拦得住 ⇒ **替换会降低引擎的召回。**
+⇒ 正解是**并集**:`is_high_risk(command) || is_high_risk_call(command, &args_json)`
+  ⇒ **引擎保住召回,又获得 args 感知** —— 与 §222 的"并集就在手边"同一句。
+```
+
+### 225.4 又一个实测发现:**缺席 ≠ 畸形**
+
+```
+并集的第一版把 **空 args** 当成"不可判定 ⇒ 拒",于是**每一个无参调用都变成高风险**,
+被**两条既有测试当场抓住**（`low_risk_passes_without_approver` 与 `safety_gate::pc1_…`：低风险工具突然被咨询）。
+⇒ 修:`args_json.trim().is_empty() ⇒ false`
+  ⇒ **"没有参数"是我们理解的事实;"参数无法解析"才是不可判定** —— **B7 只适用于后者。**
+⇒ 这与 §212 的 `{"run":false}` 同形:**把"缺席/否定"读成"存在/肯定",是这一格反复出现的读数错误。**
+```
+
+### 225.5 本笔已落（Anaphase,`hitl::` 11 · `safety_gate` 5 · **lib 全量 230 passed / 0 failed**）
+
+```
+① 引擎 `WRITE` 补 `rmdir`（+ shutil/unlinkat/osremove）;② `check_approval` 改**并集** + 消费 args;
+③ `run_cycle` 把**真实参数**序列化后传给 `admit`（不再是 `&[]`）;④ `carries_command` 区分缺席/畸形;
+⑤ 变体测试（含"靠运气拦住"与"已知漏报"两组**显式断言**）。
+```
+
+### 225.6 仍未完成（判据今天红,具名）
+
+```
+① **`ApprovalOutcome` 走到 `admit`**（4→3→2 的折叠必须拆掉;今天 `I = 0.8113 bits`,丢 1.1887)
+   ⇒ 而审查方的数学指出:**只换 `check_approval` 不够** —— 只要 `admit` 仍折成两值,仍不到 75%
+② **两表合一**（今天差集非空）③ 四站点一道门 ④ 能力声明（与工具注册表同笔）
+```
