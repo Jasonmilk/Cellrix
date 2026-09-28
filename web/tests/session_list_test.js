@@ -246,5 +246,38 @@ console.log('');
   dom4.window.close();
 }
 
+/* ── NAME THE FLATNESS (ADR-0048 §257) ──
+ * Measured: 50 of 61 periods carry no parent, so a conversation of n rounds renders as n cards that
+ * differ only by time. "Lineage not recorded" is a different fact from "one round", so it is named. */
+{
+  const mk = (id, job, parent) => ({ period_id: id, job_id: job, parent: parent || null,
+    first_ts: '2026-09-29T02:00:00Z', preview: 'p-' + id, reply: 'r' });
+  const dom5 = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w5 = dom5.window;
+  w5.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'session_list.js'), 'utf8'));
+  /* Job A: 3 rounds, NO lineage (the measured shape). */
+  w5.CxSessionList.renderSides(['s-side'], [mk('a1','jobA'), mk('a2','jobA'), mk('a3','jobA')], EMPTY);
+  const h5 = w5.document.getElementById('s-side');
+  check('a conversation with SEVERAL rounds and NO lineage says so, per card  ['
+    + h5.querySelectorAll('[data-flat="unlinked"]').length + ']',
+    h5.querySelectorAll('[data-flat="unlinked"]').length === 3);
+  check('and it states the count  [' + (h5.querySelector('[data-flat="unlinked"]') || {}).textContent + ']',
+    /3 轮平铺/.test((h5.querySelector('[data-flat="unlinked"]') || {}).textContent || ''));
+  check('the header carries the DERIVED aggregate  [' + (h5.querySelector('.ses-head') || {}).textContent + ']',
+    /1 段未记录续接链/.test((h5.querySelector('.ses-head') || {}).textContent || ''));
+  /* Job B: lineage IS recorded => no such label (the mutation that matters). */
+  const dom6 = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+  const w6 = dom6.window;
+  w6.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'session_list.js'), 'utf8'));
+  w6.CxSessionList.renderSides(['s-side'], [mk('b1','jobB'), mk('b2','jobB','b1')], EMPTY);
+  const h6 = w6.document.getElementById('s-side');
+  check('a conversation WITH lineage carries no flatness label  ['
+    + h6.querySelectorAll('[data-flat="unlinked"]').length + ']',
+    h6.querySelectorAll('[data-flat="unlinked"]').length === 0);
+  check('MUTATION: the label is driven by the DATA (linked count), not by a constant',
+    h5.querySelectorAll('[data-flat="unlinked"]').length !== h6.querySelectorAll('[data-flat="unlinked"]').length);
+  dom5.window.close(); dom6.window.close();
+}
+
 console.log((fail ? 'FAILED' : 'OK') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -149,7 +149,7 @@
   }
 
   /* 行结构恒定（铁轨）：标题 .nm + 时间 .t + 正文 .p，重命名只换标题文本 */
-  function rowHtml(p) {
+  function rowHtml(p, lineage) {
     /* `st` is this asset's module state object (st.sesSeq / st.histSeq) —
      * shadowing it here with a timestamp broke every later read in this
      * function. Measured: the sidebar rendered zero rows and the panel
@@ -180,6 +180,14 @@
     var mdl = p.model ? '<span class="mdl">' + esc(p.model) + '</span>' : '';
     /* No continuation marker: there is no continuation tier. */
     var tag = '';
+    /* NAME THE FLATNESS (ADR-0048 §257). Measured: 50 of 61 periods have NO parent, so a conversation
+     * of n rounds renders as n cards that differ only by time — and the reader calls that "duplicates".
+     * The honest reading is that the LINEAGE WAS NOT RECORDED, which is a different fact from "this
+     * conversation has only one round". It is shown per conversation (n >= 2 and nothing linked), with
+     * its count, so the reader can tell the two apart. New periods DO carry lineage (§251/§252), so this
+     * label disappears by itself as fresh experiences accumulate. */
+    var flat = (lineage && lineage.n >= 2 && lineage.linked === 0)
+      ? '<div class="p flat" data-flat="unlinked">未记录续接链 · ' + lineage.n + ' 轮平铺</div>' : '';
     return '<div class="nm">' + tag + esc(nm) + '</div>' +
       /* THE COUNT HAS THREE STATES TOO (§255): a missing count printed the literal `undefined 事件`
        * (seen in a fixture), which reads as a fact. Absent is `· 未计量`, the same discipline the
@@ -190,7 +198,7 @@
          * made every card look alike; six trailing characters still separate two periods of one job. */
         + ' · <span class="tid">' + esc(p.period_id.slice(-6)) + '</span>' + mdl +
       '<span class="act"><button type="button" class="btn-icon sm" data-ren="' + esc(p.period_id) + '" title="重命名">✎</button></span></div>' +
-      preview + reply;
+      preview + reply + flat;
   }
 
   function bindRow(div, p) {
@@ -254,7 +262,20 @@
     /* Flat, newest first — no grouping, no traversal yet. */
     /* 头部：计数变化才重建（按钮随之重绑），同数据轮询不碰 DOM */
     var rootCount = periods.length;
-    var headHtml = '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前</span>' +
+    /* Derived, never typed: how many conversations have several rounds and NO recorded lineage. This is
+     * the aggregate form of the per-card label below, and it answers "why are there so many cards". */
+    var linByJob = {};
+    periods.forEach(function (pp) {
+      var k = pp.job_id || pp.period_id;
+      if (!linByJob[k]) { linByJob[k] = { n: 0, linked: 0 }; }
+      linByJob[k].n++;
+      if (pp.parent) { linByJob[k].linked++; }
+    });
+    var flatJobs = Object.keys(linByJob).filter(function (k) {
+      return linByJob[k].n >= 2 && linByJob[k].linked === 0;
+    }).length;
+    var headHtml = '<div class="ses-head"><span>' + rootCount + ' 条记录 · 最新在前'
+      + (flatJobs ? ' · ' + flatJobs + ' 段未记录续接链' : '') + '</span>' +
       '<button type="button" class="btn btn-sm btn-ghost">+ 新对话</button>' +
       '</div>';
     if (cache.headHtml !== headHtml) {
@@ -274,7 +295,7 @@
     });
     periods.forEach(function (p) {
       var k = p.period_id;
-      var html = rowHtml(p);
+      var html = rowHtml(p, linByJob[p.job_id || p.period_id]);
       var row = cache.rows[k];
       if (row) {
         /* 键在 ⇒ 复用节点：HTML 变了才重写 + 重绑，否则只移动到位 */
