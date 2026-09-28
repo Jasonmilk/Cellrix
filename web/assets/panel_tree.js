@@ -132,12 +132,28 @@
       badge.textContent = f.label + (f.note ? ' · ' + f.note : '');
       detail.appendChild(badge);
       if (typeof opts.fetchRows === 'function') {
-        /* ON DEMAND: exactly one call, for the selected period only. */
-        var rows = opts.fetchRows(id);
+        /* ON DEMAND: exactly one call, for the selected period only.
+         * The real loader is `/api/events?job_id=<id>` and therefore ASYNC — so the three states are
+         * named rather than collapsed: `pending` while it travels, a COUNT when it lands, and
+         * `error` when it fails. A silent blank would be the same defect this cell keeps meeting:
+         * "no rows" and "the fetch failed" must not read alike. */
         var box = doc.createElement('div');
         box.className = 'pt-rows';
-        box.setAttribute('data-count', String((rows && rows.length) || 0));
+        box.setAttribute('data-count', 'pending');
         detail.appendChild(box);
+        var got = opts.fetchRows(id);
+        if (got && typeof got.then === 'function') {
+          got.then(function (rows) {
+            box.setAttribute('data-count', String((rows && rows.length) || 0));
+            if (typeof opts.onRows === 'function') { opts.onRows(box, rows, id); }
+          }, function (err) {
+            box.setAttribute('data-count', 'error');
+            box.setAttribute('data-error', String(err && err.message ? err.message : err));
+          });
+        } else {
+          box.setAttribute('data-count', String((got && got.length) || 0));
+          if (typeof opts.onRows === 'function') { opts.onRows(box, got, id); }
+        }
       }
       Array.prototype.forEach.call(list.children, function (el) {
         el.setAttribute('aria-selected', el.getAttribute('data-period') === id ? 'true' : 'false');

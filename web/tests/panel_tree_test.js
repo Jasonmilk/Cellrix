@@ -7,6 +7,8 @@ const REQUIRES = 'jsdom';
 
 const fs = require('fs'), path = require('path'), vm = require('vm');
 let bad = 0;
+/* Deferred assertions (promise microtasks settle after the DOM block closes). */
+const asyncCases = [];
 const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) bad++; };
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8');
@@ -108,9 +110,54 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   ok(calls2.length === PERIODS.length,
     'MUTATION scope: selecting every node DOES fetch every period — so the lazy assertion is real');
 
+  /* ASYNC rows: the real loader is a fetch, so pending/count/error must be three names. */
+  {
+    const host4 = w.document.createElement('div');
+    w.document.body.appendChild(host4);
+    let resolveIt;
+    const p4 = new w.Promise(function (res) { resolveIt = res; });
+    T.render(host4, [{ period_id: 'q1', parent: null, name: 'q' }],
+      { selected: 'q1', fetchRows: function () { return p4; } });
+    const box4 = host4.querySelector('.pt-rows');
+    ok(box4.getAttribute('data-count') === 'pending',
+      'ASYNC: while the fetch travels the state is NAMED `pending` (not 0, not blank)');
+    resolveIt([{ a: 1 }, { a: 2 }]);
+  }
+  {
+    const host5 = w.document.createElement('div');
+    w.document.body.appendChild(host5);
+    const rejected = w.Promise.reject(new Error('boom'));
+    T.render(host5, [{ period_id: 'q2', parent: null, name: 'q2' }],
+      { selected: 'q2', fetchRows: function () { return rejected; } });
+    const box5 = host5.querySelector('.pt-rows');
+    /* CAPTURE AT SETTLE TIME, not after `window.close()`: reading a closed document throws, and a
+     * criterion that throws is a red that carries no information about what it named. */
+    let settled = null;
+    rejected.catch(function () {
+      settled = box5.getAttribute('data-count') + ' / ' + (box5.getAttribute('data-error') || '');
+    });
+    asyncCases.push(function () {
+      ok(settled !== null && settled.indexOf('error') === 0 && /boom/.test(settled),
+        'ASYNC: a FAILED fetch is a NAMED `error` with its reason — never a silent blank  [' + settled + ']');
+    });
+  }
+  /* MUTATION: a synchronous loader must still produce a COUNT — the async branch is not the only one. */
+  {
+    const host6 = w.document.createElement('div');
+    w.document.body.appendChild(host6);
+    T.render(host6, [{ period_id: 'q3', parent: null, name: 'q3' }],
+      { selected: 'q3', fetchRows: function () { return [{ a: 1 }]; } });
+    ok(host6.querySelector('.pt-rows').getAttribute('data-count') === '1',
+      'MUTATION scope: a synchronous loader still yields a count (so the async assertions are about async)');
+  }
+
   dom.window.close();
 }
 
-console.log(bad === 0 ? 'OK — the DAG tree, its closures, and the three modes are all named'
-  : 'FAILED — ' + bad + ' check(s) red');
-process.exit(bad ? 1 : 0);
+/* Run the deferred assertions, then judge. `setTimeout 0` lets the promise microtasks settle. */
+setTimeout(function () {
+  asyncCases.forEach(function (f) { f(); });
+  console.log(bad === 0 ? 'OK — the DAG tree, its closures, the three modes and the async states are all named'
+    : 'FAILED — ' + bad + ' check(s) red');
+  process.exit(bad ? 1 : 0);
+}, 0);

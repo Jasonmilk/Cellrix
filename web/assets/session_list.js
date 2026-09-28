@@ -72,7 +72,17 @@
     LAST = { periods: periods, empty: empty };
     rerenderSides();
     /* P0-2d: the DAG tree mounts into its own container; the list above is untouched. */
-    if (window.CxPanelTree && window.CxPanelTree.mountSidebar) { window.CxPanelTree.mountSidebar(periods, {}); }
+    if (window.CxPanelTree && window.CxPanelTree.mountSidebar) {
+      /* P0-2e: the tree's rows come from the EXISTING single-period path (`/api/events?job_id=`,
+       * the same one the timeline uses) — no new endpoint, no second source of truth. */
+      window.CxPanelTree.mountSidebar(periods, {
+        fetchRows: function (id) {
+          return fetch('/api/events?job_id=' + encodeURIComponent(id))
+            .then(function (r) { return r.json(); })
+            .then(function (j) { return (j && (j.events || j.rows)) || []; });
+        }
+      });
+    }
   }
 
   function rerenderSides() {
