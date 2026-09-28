@@ -237,6 +237,21 @@
       row.textContent = (typeof opts.labelFor === 'function')
         ? opts.labelFor(n.row || {})
         : ((n.row && n.row.name) ? n.row.name : id);
+      /* WHICH ROUND AM I LOOKING AT (ADR-0048 §269). `chainJobIds` returns the LINEAGE PATH
+       * (root -> the opened period) and deliberately does not walk forward, so opening the ROOT shows
+       * one round while opening the LATEST round shows the whole conversation. Measured: click root => 1,
+       * click middle => 2, click leaf => 4 of 4. That is correct behaviour that reads as "the chain is
+       * broken" unless the rows say which is which. Two named facts, no new mechanism. */
+      var isStart = !n.parent;
+      var isLatest = !(n.children && n.children.length);
+      if (isStart) { row.setAttribute('data-role', 'start'); }
+      if (isLatest) { row.setAttribute('data-role', isStart ? 'start-and-latest' : 'latest'); }
+      if (isLatest) {
+        var tag = doc.createElement('span');
+        tag.className = 'pt-tag';
+        tag.textContent = isStart ? ' · 起点(仅此一轮)' : ' · 最新(点它看整段)';
+        row.appendChild(tag);
+      }
       row.addEventListener('click', function () {
         selectOne(id);
         /* The prove-track view has its own gesture so the PRIMARY click can stay "continue this
