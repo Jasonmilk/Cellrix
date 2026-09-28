@@ -11474,3 +11474,32 @@ F2/§246.1③ 的 tier 在本轮第一次真的起作用:
 而当前单焦点是 **`flowmodus.current_model`** ⇒ 下一步先动 FlowModus 侧最小的那一处:
 让 reason 选**文本模型**并把选择写进日志;随后用 `mock-llm` 做一次**不烧配额**的端到端验证。
 ```
+
+
+## 259. 决策:**选择本身(以及选择的失败)必须进证轨** —— 所有者点出的最后一块
+
+### 259.1 实测（四层,每层一个事实）
+
+```
+① **FlowModus 侧已经做了选择并返回**:`grpc_cmd.rs:248-252` —— `model: decision.model_id.clone()`
+   （注释明写 "The ROUTED model — not req.model")
+② **anaphase 的适配器已经接住**:`adapters/flowmodus.rs:90-97` 覆盖了 `last_meta()`:
+   `m.model = if response.model.is_empty() { None } else { Some(...) }`
+③ 而 `config.toml` **从未声明 `reasoning_model`** ⇒ `router.resolve(&raw, &req.model)` 收到空 ⇒ **Auto**
+   ⇒ `/api/status` 的 `current` 是 **agnes-video-v2.0**（**视频**模型)⇒ 文本推理被它接走 ⇒ 回空
+④ 本笔**声明**了 `reasoning_model = "agnes-2.5-pro-alpha"`（文本),重启后**仍回空**;
+   而 `mock-llm` 的端点 **`:59099` 实测 down** ⇒ 那条免费替身当前不可用
+⇒ 并且 **anaphase 日志里没有一句原因** ⇒ anaphase 只能记 `impasse` + 空 reply + `model:null`。
+```
+
+### 259.2 决策
+
+```
+**"证轨"要记的不是"发生了调用",而是"选择了什么、以及为什么没成"**:
+  ① 适配器拿到的**具名失败**（FlowModus 本来就返回具名状态:`路由失败: …` · `未配置 API key` ·
+     `call_chat` 的错误 ⇒ `Status::aborted`)必须写进事件流;
+  ② 成功时 `model` 必须非空（适配器已接住,见 ②),失败时**原因**必须非空;
+  ③ 判据(两侧):成功 ⇒ `model` 非空;失败 ⇒ 事件里有一条**具名原因**;
+     变异:把原因折成 `impasse` 而不写理由 ⇒ **必红**（今天正是如此)。
+⇒ 这条与 §237/§257 同一条律的第四层:**安静的输出必须能被归因** —— 这次是在**推理链的最上游**。
+```
