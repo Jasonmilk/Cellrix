@@ -96,7 +96,16 @@
          * shell's ONE writer (`Cx.showView` -> `setNav`). The view name is declared here, not
          * invented: it is the id `base.html` gives that container. */
         /* The label rule lives HERE (autoName) and the tree asks for it — one host, not two. */
-        labelFor: function (p) { return autoName(p); },
+        /* A LABEL MUST DISTINGUISH (§238/§255/§266). Measured after the label fix: six entries all read
+         * "只回答两个字:你好" because one job owned several roots with the same preview — readable, still
+         * indistinguishable. So the label carries the facts that differ: the minute and whether that round
+         * produced words. */
+        labelFor: function (p) {
+          var w = stamp(p.first_ts);
+          var has = (typeof p.reply === 'string' && p.reply.trim() !== '');
+          return autoName(p) + ' · ' + w.time + (w.secs ? ':' + w.secs : '')
+            + (has ? ' · 有回复' : ' · 本轮无产出');
+        },
         onSelect: function (id) {
           /* THE CLICK SEMANTICS ARE PART OF THE CONTRACT (ADR-0048 §264). Retiring the legacy cards kept
            * identity, drivability and the marker — and silently dropped what a click DOES: load that
