@@ -10349,3 +10349,59 @@ E Loop 放大:1 步×3 / 40 步×3 调用 ⇒ args 轴检查 **0 次** ⇒ **未
 ⇒ 所以本轮**不改 Anaphase 代码**:唯一会驱使我改代码的那条(②)**已被实测驳回**;
   而我不会为"看起来在推进"而改一个**没有声明者**的枚举。
 ```
+
+
+## 220. ✅ **吸收:两道门串联,而必然执行的那道只看得到名字** —— 并把 §216 的回归修回
+
+### 220.1 我先量后修:审查方 ③ 的回归**属实**（探针测试当场失败）
+
+```
+我加了一条探针断言 `is_high_risk_call("rm", {"path":"/data"})` 等 6 个必须为真 ⇒
+  `thread panicked: REGRESSION: rm by NAME must be high-risk`
+⇒ **§216 把名字轴收窄到 EXECUTION 时,静默丢掉了 WRITE/NETWORK/CREDENTIAL 三类名字信号。**
+⇒ 本笔已修:`is_dangerous_name` = 名字**就是**危险动词,或**每个 token 都是**危险词:
+  `rm/dd/shred/truncate/unlink/mkfs/fdisk` · `curl/wget/nc/ncat/netcat/ssh/scp/sftp/telnet/ftp` ·
+  `sudo/su/doas/pkexec/chmod/chown/mount/umount/kill/killall/pkill/shutdown/reboot/systemctl/launchctl/crontab`
+⇒ 而 §216 实测的**误报形态仍放行**（`code_review`/`dry_run`/`send_message`/`run_query`/`process_document`/
+  `shell_completion`/`service_status`/`mount_info`/`translate`/`render`） ⇒ **两侧都断,`hitl::` 9 条全绿**
+```
+
+### 220.2 核到的结构事实（审查方 §220,我逐条验证）
+
+```
+· pipeline 的分类器站点 = `:213`（`None` 支）;
+· **引擎侧**的闸 = `safety_gate::admit(&self.hitl, self.safety, command, &actions,
+  **OnAuditError::ReportSuccess**)` ⇒ **审计出错即放行（fail-open）** ——
+  这正是审查方称为 **K-033** 的那个耦合的 fail-open 侧,**实测成立**;
+· `SecurityClass { Normal, Critical }` 只在 `Action` 上;`Call { tool, args, expect }` **无此字段**;
+  **全仓没有工具注册表**。
+⇒ ⇒ 于是那个结构判词成立:**必然执行的那道只看得到名字;看得见 args 的那道只在装了 gate 时才存在**
+  ⇒ 两道串联 ⇒ 纵深防御的**反面**。
+```
+
+### 220.3 **吸收**的三步（顺序即依赖）与我的裁决
+
+```
+① 【边界】`Call` 在解析时携带 **capability**,由**注册表 / MCP 服务器声明**产出:
+   **不由 LLM 提供**（**Hardy 1988 Confused Deputy**:"authority stemming from two sources" ——
+   闸门**握着自己的分类器**,又**读被监管者的文本**,正是这个混淆),
+   **也不由人手写名单**（S&S Economy of mechanism:"a small and simple design is essential";
+   名单 45→110 已违反它)
+② 【合一】四个站点收敛成**一道门、一个判定面**
+③ 【拒绝语义】拒绝 = **跳过该调用 + 留痕**,不是 `return Err` / `return Ok(condition)` **杀整轮**
+   ⇒ **与我 §215.4 的裁决同向**（当时我已裁:一次 blocked 不应终止整个 job)
+⇒ 而 **MCP 规范**那句我记账:*"MUST consider tool annotations untrusted unless from trusted servers"*
+  ⇒ **信任锚在服务器身份,不在文本** —— 与"能力令牌不可伪造"同一句。
+```
+
+### 220.4 ⚠️ 一处我必须更正的自家记录（审查方**自己**更正过那个数）
+
+```
+审查方 §220 自认:它上一轮报的 `I = 0.0396` **是错的**（误用 `H(P(O))` 当条件熵),
+正确式 `H(D|O)` 下 **A 门只有 I = 0.0150 bits（1.6%）**。
+⇒ 而我在 §216.1 **逐字引用了它那个 0.0396**（并写了"8.4×"）。
+⇒ ⇒ 按纪律:**我的记录里因此含一个已被更正的数** ⇒ 在此标注:
+  **§216.1 的 `I = 0.0396 bits` 作废**;有效读数是 §220 的分层测量:
+  **A（引擎,只看名字）I = 0.0150** · **B（pipeline,名字+args）I = 0.4234** · **能力声明 I = 0.9321**
+⇒ 教训与 §190.5/§197.2 同一条,再深一层:**凡引用一个数,不仅要抄它,还要记下"它是谁的、哪一版"** ——
+  因为**被引用的数会被它的作者更正**,而我的记录不会自动跟着变。
