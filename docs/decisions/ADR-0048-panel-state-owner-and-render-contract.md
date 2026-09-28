@@ -10597,3 +10597,66 @@ F5 `safety_gate.rs:23` 逐字:*"**Recorded here, not resolved.**"*;`ReportSucces
    ⇒ 而审查方的数学指出:**只换 `check_approval` 不够** —— 只要 `admit` 仍折成两值,仍不到 75%
 ② **两表合一**（今天差集非空）③ 四站点一道门 ④ 能力声明（与工具注册表同笔）
 ```
+
+
+## 226. ✅ **吸收:闭集不是"没有消费者",是"接缝的类型装不下它"** —— 而我把管子加宽了
+
+### 226.1 审查方的诊断（比"零消费者"深一层,我接受）
+
+```
+`hitl.rs:12`:`pub type ApproveFn = Arc<dyn Fn(&str, &[String]) -> **Result<bool, String>** + Send + Sync>;`
+⇒ **批准者的返回类型是 `bool`** ⇒
+  `ApprovalOutcome::{Rejected, Cancelled, Unavailable}` **在类型上无法从批准者流出**。
+⇒ ⇒ **不是"没人接",是接缝的截面装不下四种答复。**
+  ⇒ 所以"接上消费者"这个修法**落不下去** —— 它要求先换管子(改这个类型)。
+```
+**类比（它给的,很准）**：仪器能报四种结果 ✓、也做了质检 ✓,而接它的那根管子**内径是 2 厘米** ——
+**四种结果物理上进不去。换管子,不是催工人。**
+
+### 226.2 本笔已落（Anaphase `be4e9b9`,`lib` 全量 **230 passed** · 集成 `approval_outcome` **3 passed**）
+
+```
+① `ApproveFn -> ApprovalOutcome` + **`from_bool` 适配器**
+   （`Ok(true) ⇒ AllowedOnce` · `Ok(false) ⇒ Rejected` · `Err ⇒ Unavailable`）
+   ⇒ **旧批准者不必改写,而新批准者可以表达 `Cancelled`** —— **加宽管子,不是催工人接线**
+② `Default = Unavailable` ⇒ **缺席成为一等事实**,不再是一个字符串错误
+③ `check_approval -> ApprovalOutcome` ④ **args 不变量已声明**（doc + `debug_assert!`）—— 判据⑤落地
+⑤ `safety_gate` 的 match 改为四答复,**四个名字各自一条 `warn!`**
+```
+⇒ ⇒ **而编译器把迁移面收敛到恰好一处生产站点**（`safety_gate.rs:77`)
+  —— **这正是"用类型替代靠纪律"的价值:它把"还有谁在用"变成编译错误,而不是一次 grep。**
+
+### 226.3 🔴 一个更深的类型发现（**再下一层**）
+
+```
+`GateVerdict::Refused(**TransitionCondition**)` —— 载荷是**状态机条件,不是 reason**
+⇒ ⇒ **折叠在布尔下面一层**:闭集现在流出了批准者,而 **verdict 装不下它**
+   （我第一版写 `Refused("hitl-rejected: …".to_string())` ⇒ **编译器当场拒绝**:expected `TransitionCondition`）
+⇒ 所以今天四答复**只在日志里可分辨,在 verdict 里仍同名**
+⇒ **下一根要加宽的管子就是这个载荷**（第三支 `GateVerdict` 携带 reason）——
+  **已具名,不用 `warn!` 假装已解决。**
+```
+
+### 226.4 审查方其余各条
+
+```
+② **它的反直觉判词我接受**:K-033 的 legacy `ReportSuccess` 分支是**唯一**让"审计不可用"可观测的东西
+   （structured 2 值 ⇒ 57.9%;legacy 3 值 ⇒ 100%）⇒ **直接改成 `Block` 会丢掉这份可观测性**
+   ⇒ **正解是加第三个名字**（`Cleared` / `Refused(reason)` / `Skipped(unaudited)`),不是二选一。
+③ **一次拒绝不应终止整轮**（我 §215.4 已裁,仍未落)⇒ 而 Loop 下代价被放大 `N·K` 倍。
+④ **默认路径传给判定的是 `suggested_actions`**（`mod.rs:937`,**LLM 写的文本**)
+   ⇒ **"监管键由被监管者产出"（§213）在默认配置下仍成立**;并集修法补的是结构化那一半。
+⑤ 已落(本轮)。
+```
+
+### 226.5 判据状态（逐条,不含糊）
+
+```
+① `ApprovalOutcome` 在 `src/` 内**有消费者了**（流经 `check_approval` 与 `safety_gate`)**✓**
+② 四值在**可观测**里两两可分辨 —— **日志 ✓ · verdict ✗** ⇒ **仍红**
+③ 审计不可用不得与"审计拒绝"同名 ⇒ **仍红** ④ 一次拒绝不得终止整轮 ⇒ **仍红**
+⑥ 变异:把 `ApproveFn` 改回 `bool` ⇒ **现在会编译失败** ⇒ **类型即强制 ✓**
+```
+⇒ 而本笔最该记住的一条,与 §220.1 同形但更深:
+  **"有消费者"这件事本身也可能是假的** ——
+  **真正的问法不是"有没有人在读它",而是"运它的那根管子的截面装得下它吗"。**
