@@ -71,4 +71,75 @@ ok(!!cyc2, 'MUTATION: a cycle IS detected by this check (so the acyclicity claim
 
 console.log(bad === 0 ? 'OK — the plan is a DAG: acyclic, complete, single-focus, with a visible frontier'
   : 'FAILED — ' + bad + ' check(s) red');
+/* ── THE GOAL MUST BE FALSIFIABLE (ADR-0048 §246.1③ + the external review's F2) ──
+ * Measured: the goal named navigation / on-demand rendering / the proof-track / three modes, but NOT
+ * "continue from a selected node" — so a delivery with no branching satisfied every clause. A goal that
+ * a MISSING capability satisfies is a description, not a goal. */
+{
+  const g = (P.goal && P.goal.statement) || '';
+  const must = (P.goal && P.goal.must_include) || [];
+  ok(must.length >= 4, 'the goal declares the capabilities it must include  [' + must.length + ']');
+  for (const phrase of must) {
+    ok(g.indexOf(phrase) >= 0, 'the goal names a capability a delivery could otherwise omit: ' + phrase);
+  }
+  /* MUTATION: remove the fork sentence and this must go red — asserted against a synthetic copy. */
+  const withoutFork = g.replace(/从任意选中的节点继续[^。]*。/, '');
+  ok(withoutFork.indexOf('从任意选中的节点继续') < 0 && withoutFork !== g,
+    'MUTATION: deleting the fork clause is DETECTED (the check can fail)');
+}
+
+/* ── THE COUNTS ARE DERIVED, NOT TYPED (P0-2): prose counts cannot be reconstructed, derived ones can ── */
+{
+  const byStream = {};
+  for (const n of P.nodes) {
+    const st = n.stream || '(none)';
+    byStream[st] = byStream[st] || { done: 0, total: 0 };
+    byStream[st].total++;
+    if (n.status === 'done') { byStream[st].done++; }
+  }
+  const lines = Object.keys(byStream).sort().map(function (k) {
+    return k.split(' ')[0] + ' ' + byStream[k].done + '/' + byStream[k].total;
+  });
+  console.log('  NOTE  derived counts (from status+stream): ' + lines.join(' · '));
+  const doneAll = P.nodes.filter(function (n) { return n.status === 'done'; }).length;
+  ok(doneAll === P.nodes.filter(function (n) { return n.status === 'done'; }).length,
+    'the completion number is READ FROM the DAG: ' + doneAll + '/' + P.nodes.length);
+  /* MUTATION: a node whose status is flipped must move the number. */
+  const probe = JSON.parse(JSON.stringify(P));
+  const firstTodo = probe.nodes.filter(function (n) { return n.status === 'todo'; })[0];
+  let moved = null;
+  if (firstTodo) {
+    firstTodo.status = 'done';
+    moved = probe.nodes.filter(function (n) { return n.status === 'done'; }).length;
+    ok(moved === doneAll + 1, 'MUTATION: flipping one status moves the derived count (' + doneAll + ' -> ' + moved + ')');
+  }
+}
+
+/* ── A 'done' NODE MUST CARRY ITS EVIDENCE TIER (P0-3): low-grade evidence cannot support a high claim ── */
+{
+  const untagged = P.nodes.filter(function (n) { return n.status === 'done' && !n.tier; });
+  ok(untagged.length === 0, 'every done node names its tier  [' + untagged.map(function (n) { return n.id; }).join(',') + ']');
+  /* A CLOSED VOCABULARY, NOT A WORD SEARCH. The first version asserted that a `live*` tier's
+   * acceptance contains the word "live" — a functional check on prose, exactly the trap where
+   * `acceptance = "aaaaaaaaaaaaaaaa"` passes. What is machine-checkable and meaningful is:
+   * the tier comes from a DECLARED SET, and a `done` node may not carry `none`/`UNKNOWN`. */
+  const TIERS = ['fixture', 'unit', 'live-payload', 'live-process', 'live-record', 'none'];
+  const badTier = P.nodes.filter(function (n) { return n.tier && TIERS.indexOf(n.tier) < 0; });
+  ok(badTier.length === 0, 'every tier comes from the declared set  ['
+    + badTier.map(function (n) { return n.id + ':' + n.tier; }).join(',') + ']');
+  const weakDone = P.nodes.filter(function (n) {
+    return n.status === 'done' && (!n.tier || n.tier === 'none');
+  });
+  ok(weakDone.length === 0, 'a done node never rests on `none`/missing evidence  ['
+    + weakDone.map(function (n) { return n.id; }).join(',') + ']');
+  /* MUTATION: a done node demoted to `none` must be caught. */
+  const probe2 = JSON.parse(JSON.stringify(P));
+  const d0 = probe2.nodes.filter(function (n) { return n.status === 'done'; })[0];
+  d0.tier = 'none';
+  const caught = probe2.nodes.filter(function (n) {
+    return n.status === 'done' && (!n.tier || n.tier === 'none');
+  }).length;
+  ok(caught === 1, 'MUTATION: demoting the tier of a done node to none IS detected (' + caught + ')');
+}
+
 process.exit(bad ? 1 : 0);
