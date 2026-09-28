@@ -164,7 +164,13 @@
     }
 
     var lastGroup = null;
-    tree.order.forEach(function (id) {
+    /* ENTRY SET IS A PARAMETER, NOT A NEW DEFAULT (ADR-0048 §240.3). Measured: the payload holds 52
+     * periods of which **44 are roots** and only 8 are continuations, while one job carries 34 of
+     * them — so a flat list makes 34 near-identical cards. `parent == null` is the TOPOLOGICAL entry
+     * set; `job_id` is provenance. Both can group, so which one is used must be DECLARED — and the
+     * declaration lives here, as an option, because changing the default broke dependent criteria. */
+    var visible = opts.rootsOnly === true ? tree.roots.slice() : tree.order.slice();
+    visible.forEach(function (id) {
       var n = tree.byId[id];
       /* GROUP HEADER when the conversation changes: 13 first-level entries over 52 children (§238). */
       var conv = (n.row && (n.row.job_id || n.row.period_id)) || null;
@@ -183,6 +189,11 @@
       row.className = 'pt-node';
       row.setAttribute('data-period', id);
       if (conv) { row.setAttribute('data-conversation', conv); }
+      /* The fact that separates "one conversation" from "34 near-identical cards" — without drawing
+       * the 34. */
+      var subtree = 0;
+      (function count(nid) { subtree++; tree.byId[nid].children.forEach(count); })(id);
+      row.setAttribute('data-descendants', String(subtree));
       row.setAttribute('data-depth', String(ancestorClosure(tree, id).path.length - 1));
       if (n.truncated) { row.setAttribute('data-truncated', n.truncated); }
       row.textContent = (n.row && n.row.name) ? n.row.name : id;
@@ -336,6 +347,12 @@
     if (!opts.selected && periods && periods.length && periods[0] && periods[0].period_id) {
       opts = Object.assign({}, opts, { selected: periods[0].period_id });
     }
+    /* ONE SURFACE (§240.2): the sidebar already had a flat card list, and mounting a tree INTO the
+     * same host left BOTH visible — the owner's "still duplicated and messy". The legacy children are
+     * hidden here; the tree takes the surface. Deleting them outright is a separate step. */
+    Array.prototype.forEach.call(host.children, function (el) {
+      if (!el.hasAttribute('data-panel-tree')) { el.hidden = true; el.setAttribute('data-superseded-by-tree', '1'); }
+    });
     var box = host.querySelector('[data-panel-tree]');
     if (!box) {
       box = document.createElement('div');
@@ -343,7 +360,8 @@
       box.setAttribute('data-panel-tree', '1');
       host.appendChild(box);
     }
-    var view = render(box, periods, opts);
+    /* The sidebar asks for the ROOTS explicitly (44 of 52 measured) — its entry set, declared. */
+    var view = render(box, periods, Object.assign({}, opts, { rootsOnly: opts.rootsOnly !== false }));
     return view;
   }
 

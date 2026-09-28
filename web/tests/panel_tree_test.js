@@ -198,6 +198,48 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
     'MUTATION scope: switching the view WITHOUT the period is gone (that was the half-truth)');
 }
 
+/* ── ROOTS ARE THE SIDEBAR'S ENTRY SET (ADR-0048 §240): opt-in, so nothing old changes ── */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="s-side"><div class="legacy">flat cards</div></div>',
+    { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+  const T = w.CxPanelTree;
+  const P = [
+    { period_id: 'r1', parent: null, job_id: 'j1' },
+    { period_id: 'r1a', parent: 'r1', job_id: 'j1' },
+    { period_id: 'r1b', parent: 'r1', job_id: 'j1' },
+    { period_id: 'r2', parent: null, job_id: 'j2' },
+    { period_id: 'r3', parent: null, job_id: 'j3' }
+  ];
+  const host = w.document.getElementById('s-side');
+  T.mountSidebar(P, {});
+  const rows = host.querySelectorAll('.pt-node');
+  ok(rows.length === 3, 'THE SIDEBAR LISTS THE ROOTS: 3 rows for 5 periods  [' + rows.length + ']');
+  ok(rows.length !== P.length, 'MUTATION scope: listing every period would be ' + P.length + ' rows');
+  ok(host.querySelector('[data-period="r1"]').getAttribute('data-descendants') === '3',
+    'a root states how much lives under it (3 = itself + two continuations)');
+  ok(host.querySelectorAll('.pt-node[data-period="r1a"]').length === 0,
+    'a continuation is NOT a top-level card (the "many duplicates" the owner saw)');
+  ok(host.querySelector('.legacy').hidden === true
+    && host.querySelector('.legacy').getAttribute('data-superseded-by-tree') === '1',
+    'ONE SURFACE: the legacy flat list is hidden when the tree mounts');
+  /* The generic contract is unchanged: `render` still draws every node unless asked otherwise. */
+  const h2 = w.document.createElement('div');
+  w.document.body.appendChild(h2);
+  T.render(h2, P, {});
+  ok(h2.querySelectorAll('.pt-node').length === P.length,
+    'MUTATION guard: `render` without the option still draws EVERY node (' + h2.querySelectorAll('.pt-node').length + ')');
+  const h3 = w.document.createElement('div');
+  w.document.body.appendChild(h3);
+  T.render(h3, P, { rootsOnly: true });
+  ok(h3.querySelectorAll('.pt-node').length === 3, 'and with `rootsOnly:true` exactly the roots');
+  dom.window.close();
+}
+
 /* ── THE STEP BOUNDARY (ADR-0048 §239): one turn, several steps, each shown as itself ──
  * An Agent Loop runs N steps inside ONE turn. The acceptance is not "the turn has a token total" but
  * "each step is visible as its own row, with its OWN model and its OWN tokens" — a single mixed row
@@ -361,8 +403,12 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   const selected = box.querySelector('[aria-selected="true"]');
   ok(!!selected && selected.getAttribute('data-period') === PERIODS[0].period_id,
     'and the default selection is the newest experience  [' + (selected && selected.getAttribute('data-period')) + ']');
-  ok(box.querySelectorAll('.pt-node').length === PERIODS.length,
-    'while the OVERVIEW is complete: every period is still listed');
+  /* SEMANTICS UPDATED WITH THE CODE (§240.3 ⑤): the SIDEBAR's entry set is the forest's ROOTS —
+   * the full DAG is still one call away (`render(..., {rootsOnly:false})`), and that is asserted in
+   * the block below. Exactly ONE assertion moved, because the change was confined to ONE caller. */
+  const rootCount = PERIODS.filter((p) => !p.parent).length;
+  ok(box.querySelectorAll('.pt-node').length === rootCount,
+    'the sidebar lists the ROOTS (' + rootCount + ' of ' + PERIODS.length + ' periods) — the entry set, declared');
 
   /* MUTATION: an explicit selection must be honoured instead of the default. */
   const host2 = w.document.createElement('div');
