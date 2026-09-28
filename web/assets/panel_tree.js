@@ -170,11 +170,17 @@
      * set; `job_id` is provenance. Both can group, so which one is used must be DECLARED — and the
      * declaration lives here, as an option, because changing the default broke dependent criteria. */
     var visible = opts.rootsOnly === true ? tree.roots.slice() : tree.order.slice();
+    /* WHEN THE ROOTS ARE THE LIST, GROUP HEADERS ARE A LEFTOVER (ADR-0048 §242): measured on the live
+     * payload, the roots-only list emitted 9 headers for 13 jobs, because the tree's order is not
+     * grouped by job and one job splits into several runs. A header that does not correspond to a
+     * conversation is noise — and the ROOT already IS the conversation's entry, so nothing is lost.
+     * With the full DAG (`rootsOnly:false`) the headers still separate conversations. */
+    var showGroups = opts.rootsOnly !== true;
     visible.forEach(function (id) {
       var n = tree.byId[id];
       /* GROUP HEADER when the conversation changes: 13 first-level entries over 52 children (§238). */
       var conv = (n.row && (n.row.job_id || n.row.period_id)) || null;
-      if (conv && conv !== lastGroup) {
+      if (showGroups && conv && conv !== lastGroup) {
         var g = groupsById[conv];
         var head = doc.createElement('div');
         head.className = 'pt-group';

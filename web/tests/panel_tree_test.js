@@ -224,6 +224,11 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
     'a root states how much lives under it (3 = itself + two continuations)');
   ok(host.querySelectorAll('.pt-node[data-period="r1a"]').length === 0,
     'a continuation is NOT a top-level card (the "many duplicates" the owner saw)');
+  /* §242: a header that does not map to a conversation is noise — measured 9 headers for 13 jobs. */
+  ok(host.querySelectorAll('.pt-group').length === 0,
+    'roots-only list has NO group headers (the root IS the entry)  [' + host.querySelectorAll('.pt-group').length + ']');
+  ok(host.querySelector('[data-period="r1"]').getAttribute('data-descendants') === '3',
+    'and each root still states its own size, which is the fact a header was trying to carry');
   ok(host.querySelector('.legacy').hidden === true
     && host.querySelector('.legacy').getAttribute('data-superseded-by-tree') === '1',
     'ONE SURFACE: the legacy flat list is hidden when the tree mounts');
