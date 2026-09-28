@@ -184,6 +184,20 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   dom.window.close();
 }
 
+/* ── WIRING CONTRACT (P1-1b): the sidebar binds the period into the view's OWN declared input ──
+ * This is a CONTRACT assertion, not a behaviour proof: it checks that the wiring passes the period
+ * to the shell's single writer. The end-to-end behaviour (the view then showing THAT period) needs
+ * the live panel and is the acceptance for this node, verified separately. */
+{
+  const wiring = fs.readFileSync(path.join(__dirname, '..', 'assets', 'session_list.js'), 'utf8');
+  ok(/setNav\(\{[^}]*view:[^}]*period:/.test(wiring),
+    'the click wiring passes BOTH the view and the period to the shell single writer');
+  ok(/Cx\.state\.nav\.period/.test(fs.readFileSync(path.join(__dirname, '..', 'assets', 'prove_track.js'), 'utf8')),
+    'and the consumer of that input existed BEFORE the writer (no zero-consumer field)');
+  ok(wiring.indexOf("showView('prove-track')") < 0,
+    'MUTATION scope: switching the view WITHOUT the period is gone (that was the half-truth)');
+}
+
 /* ── ALIVE: a refresh updates in place, it does not rebuild (owner's requirement) ── */
 {
   let JSDOM;

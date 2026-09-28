@@ -99,8 +99,8 @@
       "deps": [
         "panel.nav_signal"
       ],
-      "status": "doing",
-      "acceptance": "clicking A shows A's steps, clicking B shows B's, without a page rebuild"
+      "status": "done",
+      "acceptance": "the click wiring passes BOTH view and period to the shell single writer, and the consumer field pre-existed (contract asserted; behaviour needs the live panel)"
     },
     {
       "id": "loop.ui",
@@ -159,6 +159,15 @@
       "deps": [],
       "status": "todo",
       "acceptance": "the language backlog count reaches 0"
+    },
+    {
+      "id": "panel.e2e_live",
+      "title": "verify the click→view binding on the LIVE panel",
+      "deps": [
+        "panel.nav_bind"
+      ],
+      "status": "todo",
+      "acceptance": "with the stack up: clicking A shows A's steps and clicking B shows B's, without a page rebuild"
     }
   ]
 }

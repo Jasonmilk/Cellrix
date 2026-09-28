@@ -86,8 +86,16 @@
         /* Option A: a click on the tree is navigation, so it drives the main area through the
          * shell's ONE writer (`Cx.showView` -> `setNav`). The view name is declared here, not
          * invented: it is the id `base.html` gives that container. */
-        onSelect: function () {
-          if (window.Cx && typeof window.Cx.showView === 'function') { window.Cx.showView('prove-track'); }
+        onSelect: function (id) {
+          /* BIND, DON'T JUST SWITCH (P1-1b): `showView` changed the view but left the view's OWN
+           * declared input untouched, so it kept showing its previous period. The input already
+           * exists and already has a consumer — `prove_track.js` reads `Cx.state.nav.period` and the
+           * shell fires `Cx.onPeriod` when it changes — so the binding is this one writer call,
+           * not a new state field. (A field nobody reads is the zero-consumer defect this cell
+           * keeps meeting; here the reader came first.) */
+          if (window.Cx && typeof window.Cx.setNav === 'function') {
+            window.Cx.setNav({ view: 'prove-track', period: id });
+          }
         }
       });
     }
