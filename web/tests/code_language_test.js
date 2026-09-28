@@ -44,8 +44,13 @@ console.log('  NOTE  backlog: ' + backlog + ' non-English comment line(s) remain
 
 /* MUTATION: the detector must be able to fail — inject one non-English comment into a clean file. */
 const sample = '/* ' + '\u6d4b\u8bd5' + ' */\n';   /* "test" in Chinese, built from escapes */
-ok(cjkCommentLines(fs.readFileSync(path.join(ASSETS, CLEAN[0]), 'utf8') + sample).length === 1,
-  'MUTATION: an injected non-English comment IS detected (the rule can fail)');
+/* RELATIVE, not absolute: the first version asserted `=== 1`, which silently assumed the file was
+ * already clean — so the criterion broke the moment it correctly found something. A criterion that
+ * assumes its own premise cannot report a regression in that premise. */
+const base = cjkCommentLines(fs.readFileSync(path.join(ASSETS, CLEAN[0]), 'utf8')).length;
+const withSample = cjkCommentLines(fs.readFileSync(path.join(ASSETS, CLEAN[0]), 'utf8') + sample).length;
+ok(withSample === base + 1,
+  'MUTATION: an injected non-English comment IS detected (' + base + ' -> ' + withSample + ')');
 
 console.log(bad === 0 ? 'OK — the declared files keep English comments; the remaining backlog is counted'
   : 'FAILED — ' + bad + ' check(s) red');

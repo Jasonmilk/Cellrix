@@ -147,7 +147,17 @@
     var nm = autoName(p);
     var preview = p.preview ? '<div class="p">' + esc(p.preview) + '</div>' : '';
     // 回答预览：period.reply（assistant/reply 交付物）——列表不再盲。
-    var reply = p.reply ? '<div class="p rp">' + esc(p.reply) + '</div>' : '';
+    /* THREE STATES, NOT TWO (§237): an EMPTY reply used to render nothing, so 18 of 52 cards were
+     * wordless with no explanation. The state is named now, and it carries the model fact when the
+     * model was not reported — which is exactly the shape the owner reported as an error. */
+    var rs = (window.CxPanelTree && window.CxPanelTree.replyState)
+      ? window.CxPanelTree.replyState(p.reply, p.model) : null;
+    var reply = '';
+    if (rs && rs.kind === 'present') {
+      reply = '<div class="p rp">' + esc(p.reply) + '</div>';
+    } else if (rs) {
+      reply = '<div class="p rp" data-reply-state="' + rs.kind + '">' + esc(rs.label) + '</div>';
+    }
     var mdl = p.model ? '<span class="mdl">' + esc(p.model) + '</span>' : '';
     /* No continuation marker: there is no continuation tier. */
     var tag = '';

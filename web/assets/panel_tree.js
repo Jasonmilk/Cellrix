@@ -261,6 +261,23 @@
    * idempotently: the list's markup, its tests and its selection logic stay untouched.
    * `fetchRows` stays the caller's decision — until the panel has a single-period loader wired, the
    * mount takes it as an option and, when absent, renders the overview only (declared, not faked). */
+  /* THE REPLY HAS THREE STATES, NOT TWO (ADR-0048 §237).
+   * Measured on the live payload: 52 cards, of which 18 carry an EMPTY reply string, 0 are missing,
+   * and 34 have text. The sidebar rendered an empty reply as NOTHING, so a third of the list was
+   * silently wordless. An empty string and an absent field are different facts: the first says "the
+   * turn produced nothing", the second says "we never had a reply here". Naming them is the same
+   * discipline as the "not measured" / "no data" distinction.
+   */
+  function replyState(reply, model) {
+    if (typeof reply === 'string' && reply.trim() !== '') {
+      return { kind: 'present', label: null };
+    }
+    if (typeof reply === 'string') {
+      return { kind: 'empty', label: '本轮无产出' + (model ? '' : '（模型未报）') };
+    }
+    return { kind: 'absent', label: '· 无数据' };
+  }
+
   function mountSidebar(periods, opts) {
     opts = opts || {};
     var hostId = opts.hostId || 's-side';
@@ -291,6 +308,7 @@
     selection: selection,
     render: render,
     mountSidebar: mountSidebar,
-    renderRows: renderRows
+    renderRows: renderRows,
+    replyState: replyState
   };
 })(window);

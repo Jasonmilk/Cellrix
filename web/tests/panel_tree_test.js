@@ -198,6 +198,30 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
     'MUTATION scope: switching the view WITHOUT the period is gone (that was the half-truth)');
 }
 
+/* ── THE REPLY'S THREE STATES (ADR-0048 §237): measured 18 of 52 live cards carry reply:"" ── */
+{
+  const T2 = (function () {
+    const vm2 = require('vm');
+    const sb = { window: {} };
+    vm2.createContext(sb);
+    vm2.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'), sb);
+    return sb.window.CxPanelTree;
+  })();
+  const present = T2.replyState('pong', 'agnes-3.0-flash');
+  const empty = T2.replyState('', null);
+  const absent = T2.replyState(undefined, null);
+  ok(present.kind === 'present' && present.label === null, 'a real reply is `present` with no label');
+  ok(empty.kind === 'empty' && /\u65e0\u4ea7\u51fa/.test(empty.label) && /\u6a21\u578b\u672a\u62a5/.test(empty.label),
+    'an EMPTY reply is a NAMED state that carries the model fact: ' + empty.label);
+  ok(absent.kind === 'absent' && absent.label === '\u00b7 \u65e0\u6570\u636e',
+    'an ABSENT field is the other named state: ' + absent.label);
+  ok(new Set([present.kind, empty.kind, absent.kind]).size === 3,
+    'THREE kinds stay three (mutation: merging empty into absent makes this 2 and fails)');
+  ok(T2.replyState('   ', 'm').kind === 'empty', 'whitespace counts as empty, not as a reply');
+  ok(T2.replyState('', 'agnes-3.0-flash').label === '\u672c\u8f6e\u65e0\u4ea7\u51fa',
+    'when the model IS reported, the label does not claim it was not');
+}
+
 /* ── ALIVE: a refresh updates in place, it does not rebuild (owner's requirement) ── */
 {
   let JSDOM;
