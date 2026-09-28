@@ -90,11 +90,85 @@
     };
   }
 
+  /* ── RENDER (Shneiderman's mantra, §227): overview → zoom/filter → details on demand ──
+   * `render` builds ONLY the overview (one row per period) plus a detail host. The period's rows
+   * are fetched by the caller's `fetchRows` and ONLY when a node is selected — never for the whole
+   * tree. That is the difference between this and the monolithic dashboard the cell started with:
+   * there, details-on-demand was rendered first.
+   * UI text keeps the product's language; identifiers and comments stay English (owner's rule). */
+  function render(host, periods, opts) {
+    opts = opts || {};
+    var tree = buildTree(periods);
+    var sel = opts.selected || null;
+    if (!host || !host.ownerDocument) { return { tree: tree, select: function () {} }; }
+    var doc = host.ownerDocument;
+    host.textContent = '';
+    var list = doc.createElement('div');
+    list.className = 'pt-tree';
+    list.setAttribute('role', 'tree');
+    var detail = doc.createElement('div');
+    detail.className = 'pt-detail';
+
+    function selectOne(id) {
+      sel = id;
+      var s = selection(tree, id);
+      detail.textContent = '';
+      if (s.kind !== 'node') {
+        var miss = doc.createElement('div');
+        miss.className = 'pt-missing';
+        miss.textContent = s.note;
+        detail.appendChild(miss);
+        return s;
+      }
+      var ctx = doc.createElement('div');
+      ctx.className = 'pt-context';
+      ctx.setAttribute('data-path', s.context.path.join('>'));
+      ctx.textContent = s.context.path.join(' > ');
+      detail.appendChild(ctx);
+      var badge = doc.createElement('span');
+      badge.className = 'pt-mode';
+      badge.setAttribute('data-mode-kind', modeFacts(tree.byId[id].row && tree.byId[id].row.mode).kind);
+      var f = modeFacts(tree.byId[id].row && tree.byId[id].row.mode);
+      badge.textContent = f.label + (f.note ? ' · ' + f.note : '');
+      detail.appendChild(badge);
+      if (typeof opts.fetchRows === 'function') {
+        /* ON DEMAND: exactly one call, for the selected period only. */
+        var rows = opts.fetchRows(id);
+        var box = doc.createElement('div');
+        box.className = 'pt-rows';
+        box.setAttribute('data-count', String((rows && rows.length) || 0));
+        detail.appendChild(box);
+      }
+      Array.prototype.forEach.call(list.children, function (el) {
+        el.setAttribute('aria-selected', el.getAttribute('data-period') === id ? 'true' : 'false');
+      });
+      return s;
+    }
+
+    tree.order.forEach(function (id) {
+      var n = tree.byId[id];
+      var row = doc.createElement('button');
+      row.type = 'button';
+      row.className = 'pt-node';
+      row.setAttribute('data-period', id);
+      row.setAttribute('data-depth', String(ancestorClosure(tree, id).path.length - 1));
+      if (n.truncated) { row.setAttribute('data-truncated', n.truncated); }
+      row.textContent = (n.row && n.row.name) ? n.row.name : id;
+      row.addEventListener('click', function () { selectOne(id); });
+      list.appendChild(row);
+    });
+    host.appendChild(list);
+    host.appendChild(detail);
+    if (sel) { selectOne(sel); }
+    return { tree: tree, select: selectOne };
+  }
+
   root.CxPanelTree = {
     MODES: MODES,
     modeFacts: modeFacts,
     buildTree: buildTree,
     ancestorClosure: ancestorClosure,
-    selection: selection
+    selection: selection,
+    render: render
   };
 })(window);

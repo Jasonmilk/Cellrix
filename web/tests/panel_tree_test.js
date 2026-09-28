@@ -59,6 +59,55 @@ const broken = PT.buildTree(PERIODS.concat([{ period_id: 'z', parent: null }]));
 ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   'MUTATION scope: adding a root changes roots, not edges — so the edge equality is about parents');
 
+/* ── DOM: overview first, details ON DEMAND (§227 / Shneiderman) ── */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="host"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+  const T = w.CxPanelTree;
+  const host = w.document.getElementById('host');
+  let calls = [];
+  const view = T.render(host, PERIODS, { fetchRows: (id) => { calls.push(id); return [{ step: 1 }]; } });
+
+  ok(host.querySelectorAll('.pt-node').length === PERIODS.filter((p) => p.period_id).length,
+    'overview: one row per period (' + host.querySelectorAll('.pt-node').length + ')');
+  ok(calls.length === 0, 'ON DEMAND: rendering the overview fetches NO period rows');
+  ok(host.querySelector('[data-period="d"]').getAttribute('data-depth') === '3',
+    'depth comes from the structural closure (d is 3 levels below the root)');
+  ok(host.querySelector('[data-period="x"]').getAttribute('data-truncated') === 'ghost',
+    'a truncated lineage is marked on the row itself (declared, not hidden)');
+
+  host.querySelector('[data-period="d"]').dispatchEvent(new w.Event('click'));
+  ok(calls.length === 1 && calls[0] === 'd', 'ONE click ⇒ ONE fetch, for that period only  [' + calls + ']');
+  ok(host.querySelector('.pt-context').getAttribute('data-path') === 'r>a>c>d',
+    'the detail shows the ancestor chain (how this experience came to be)');
+  ok(host.querySelector('.pt-mode').getAttribute('data-mode-kind') === 'undeclared',
+    'a period with no run mode says UNDECLARED — never a blank, never a default');
+  ok(host.querySelector('[aria-selected="true"]').getAttribute('data-period') === 'd',
+    'the selected node is marked for assistive tech as well as visually');
+
+  const host2 = w.document.createElement('div');
+  w.document.body.appendChild(host2);
+  T.render(host2, [{ period_id: 'p1', parent: null, name: 'one', mode: 'Survive' }], { selected: 'p1' });
+  ok(host2.querySelector('.pt-mode').textContent.indexOf('reserved') >= 0
+    || host2.querySelector('.pt-mode').textContent.indexOf('\u4fdd\u7559') >= 0,
+    'mode ③ renders as DECLARED BUT UNIMPLEMENTED: ' + host2.querySelector('.pt-mode').textContent);
+
+  /* MUTATION: if the renderer fetched every period up front, the "no calls" assertion must break. */
+  let calls2 = [];
+  const host3 = w.document.createElement('div');
+  w.document.body.appendChild(host3);
+  const v3 = T.render(host3, PERIODS, { fetchRows: (id) => { calls2.push(id); return []; } });
+  PERIODS.forEach((p) => { try { v3.select(p.period_id); } catch (e) { /* named miss */ } });
+  ok(calls2.length === PERIODS.length,
+    'MUTATION scope: selecting every node DOES fetch every period — so the lazy assertion is real');
+
+  dom.window.close();
+}
+
 console.log(bad === 0 ? 'OK — the DAG tree, its closures, and the three modes are all named'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);
