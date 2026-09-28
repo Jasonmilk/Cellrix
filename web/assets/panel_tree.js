@@ -191,45 +191,61 @@
     if (!box || !box.ownerDocument) { return null; }
     var doc = box.ownerDocument;
     var M = root.CxCellMetering;
-    box.textContent = '';
-    var list = doc.createElement('div');
-    list.className = 'pt-steps';
+    /* ALIVE, NOT REBUILT (owner's requirement): a refresh must touch only what changed.
+     * The first version cleared `box.textContent` and rebuilt every row — which loses focus, scroll
+     * position and any transient UI state, and is exactly the "wholesale re-render" the existing
+     * experience list already paid for (its own comment records the scroll-jump bug). So rows are
+     * RECONCILED BY POSITION: existing nodes are reused and updated in place, surplus rows are
+     * removed from the end, new ones are appended. DOM identity is the observable property, and the
+     * criterion asserts it (a stashed sentinel must survive a refresh). */
+    var list = box.querySelector('.pt-steps');
+    if (!list) {
+      list = doc.createElement('div');
+      list.className = 'pt-steps';
+      box.appendChild(list);
+    }
+    var rows = events || [];
+    while (list.children.length > rows.length) { list.removeChild(list.lastChild); }
+    var cell = function (row, cls, tag) {
+      var el = row.querySelector('.' + cls);
+      if (!el) { el = doc.createElement(tag || 'span'); el.className = cls; row.appendChild(el); }
+      return el;
+    };
     var stateOf = function (v) { return v && v.k ? String(v.k) : 'a'; };
     var textOf = function (v) {
       if (!v) { return ''; }
       if (M && M.foldedCell) { return M.foldedCell({ tok: v }); }
-      return v.k === 'p' ? String(v.v) : (v.k === 'n' ? '· 未计量' : '· 无数据');
+      return v.k === 'p' ? String(v.v) : (v.k === 'n' ? '· \u672a\u8ba1\u91cf' : '· \u65e0\u6570\u636e');
     };
-    (events || []).forEach(function (e, i) {
-      var row = doc.createElement('div');
-      row.className = 'pt-step';
+    for (var i = 0; i < rows.length; i++) {
+      var e = rows[i];
+      var row = list.children[i];
+      if (!row) {
+        row = doc.createElement('div');
+        row.className = 'pt-step';
+        list.appendChild(row);
+      }
       row.setAttribute('data-step', String(i + 1));
-      var sem = doc.createElement('span');
-      sem.className = 'pt-sem';
+      var sem = cell(row, 'pt-sem');
       sem.textContent = (M && M.semOf) ? M.semOf(e) : '';
-      var tok = doc.createElement('span');
-      tok.className = 'pt-tok';
+      var tok = cell(row, 'pt-tok');
       var t = (M && M.tokOf) ? M.tokOf(e) : null;
       tok.setAttribute('data-state', stateOf(t));
       tok.textContent = textOf(t);
-      var dur = doc.createElement('span');
-      dur.className = 'pt-dur';
+      var dur = cell(row, 'pt-dur');
       var d = (M && M.durOf) ? M.durOf(e) : null;
       dur.setAttribute('data-state', stateOf(d));
-      dur.textContent = (d && d.k === 'p') ? String(d.v) + 'ms' : (d && d.k === 'n' ? '未计量' : '');
-      row.appendChild(sem);
-      row.appendChild(tok);
-      row.appendChild(dur);
+      dur.textContent = (d && d.k === 'p') ? String(d.v) + 'ms' : (d && d.k === 'n' ? '\u672a\u8ba1\u91cf' : '');
       var model = e && e.data && e.data.model;
+      var md = row.querySelector('.pt-model');
       if (model) {
-        var md = doc.createElement('span');
-        md.className = 'pt-model';
+        if (!md) { md = doc.createElement('span'); md.className = 'pt-model'; row.appendChild(md); }
         md.textContent = String(model);
-        row.appendChild(md);
+      } else if (md) {
+        /* A model that stops being declared must stop being shown — absence is not a stale value. */
+        row.removeChild(md);
       }
-      list.appendChild(row);
-    });
-    box.appendChild(list);
+    }
     return list;
   }
 

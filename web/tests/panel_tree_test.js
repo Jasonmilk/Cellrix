@@ -154,6 +154,51 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   dom.window.close();
 }
 
+/* ── ALIVE: a refresh updates in place, it does not rebuild (owner's requirement) ── */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="live"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  const A = (f) => fs.readFileSync(path.join(__dirname, '..', 'assets', f), 'utf8');
+  w.eval(A('three_state.js'));
+  w.eval(A('cell_metering.js'));
+  w.eval(A('panel_tree.js'));
+  const T = w.CxPanelTree;
+  const host = w.document.getElementById('live');
+
+  const v1 = [
+    { kind: 'assistant/usage', data: { completion_tokens: 20, duration_ms: 7, model: 'planner' } },
+    { kind: 'assistant/usage', data: { prompt_tokens: 5, completion_tokens: null } }
+  ];
+  T.renderRows(host, v1);
+  const firstRow = host.querySelector('.pt-step');
+  firstRow.__sentinel = 'kept';           /* a stand-in for focus / scroll / transient UI state */
+
+  const v2 = v1.concat([{ kind: 'tool/result', data: { duration_ms: 3, model: 'executor' } }]);
+  T.renderRows(host, v2);
+  const rowsNow = host.querySelectorAll('.pt-step');
+  ok(rowsNow.length === 3, 'a refresh ADDS the new step (' + rowsNow.length + ' rows)');
+  ok(rowsNow[0] === firstRow && firstRow.__sentinel === 'kept',
+    'ALIVE: the first row is the SAME DOM NODE after a refresh (identity preserved)');
+  ok(rowsNow[0].querySelector('.pt-tok').textContent === '20',
+    'and its value is updated in place, not re-created');
+
+  T.renderRows(host, v1);
+  ok(host.querySelectorAll('.pt-step').length === 2,
+    'a refresh that SHRANK removes the surplus row from the end');
+  ok(host.querySelector('.pt-step') === firstRow && firstRow.__sentinel === 'kept',
+    'MUTATION scope: a wholesale rebuild would have destroyed the sentinel (caught above)');
+
+  /* Absence must not leave a stale value behind. */
+  T.renderRows(host, [{ kind: 'assistant/usage', data: { completion_tokens: 5, model: 'planner' } }]);
+  T.renderRows(host, [{ kind: 'assistant/usage', data: { completion_tokens: 5 } }]);
+  ok(host.querySelectorAll('.pt-model').length === 0,
+    'a model that stops being declared STOPS being shown (no stale cell)');
+  dom.window.close();
+}
+
 /* ── MOUNT: one default detail, fetched exactly once (P0-2g) ── */
 {
   let JSDOM;

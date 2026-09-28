@@ -47,6 +47,8 @@
 | `.nav` | script.html |
 | `nledger` | cockpit.html, cockpit.js |
 | `.nm` | flows.html, session_list.js |
+| `.pt-model` | panel_tree.js |
+| `.pt-steps` | panel_tree.js |
 | `resume-list` | chat.html, session_list.js |
 | `.resume-opt` | session_list.js |
 | `s-side` | base.html, prove_track.view.js, session.html |
