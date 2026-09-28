@@ -9944,3 +9944,89 @@ H(真因) = 1.5850 bits
   ⑤ 未配置 ⇒ 放行且 `governance::warning` 非空（两侧）· ⑦ helper 不得内置终止条件（停止谓词为传入的声明输入）
 ⇒ 而本笔交付的是一个**有测试的库类型**（不是守卫声明):它的测试证明的正是**接线安全的前提**
   —— Closed 零探测、Open 零探测且 <100ms、记忆单向。
+
+
+## 211. 🔴 **闸门的落点不是 period,是工具调用** —— 而第 1 道闸门在生产路径上是 0
+
+### 211.1 决定性发现（审查方逐字引本仓,我复核全部成立）
+
+```
+`security.rs:17` **自认**:*"⚠️ MEASURED 2026-09-20: no gate is installed anywhere on the production
+path. `with_security_gate` is called **only from `tests/`**; `PipelineConfig` defaults the field to
+`None`; `src/main.rs` never calls the setter; and `tuck-core` is a **dev-only** dependency. So in
+production **every tool call executes ungated**."*
+⇒ 我实测:`with_security_gate` 在 `src/` 内**只有定义**（`pipeline/mod.rs:126`）,**14 处调用全在 `tests/`** ✓
+⇒ 而 `security_gate` 属于**运行时 `Pipeline`**（`mod.rs:91/97`),**不在 `PipelineConfig` 上**（`mod.rs:35` 起）
+   —— 这一点我是在**接线失败**时测出来的（E0609),它同时说明了接线该落在哪里。
+```
+
+### 211.2 🔴 **我们优化的不是 Complete Mediation 的落点**
+
+```
+三道门(本仓 `security.rs:8-11` 自述):
+  1. **tool audit**(registry gate) ← per-**tool-call**  ← **生产路径:未接线**
+  2. HITL(execution gate)          ← 已在 `run_cycle` 内消费（已接）
+  3. Tuck(edge physical)           ← **我们这几轮优化的**,per-period,生产路径 **4/4 已闸**
+Saltzer & Schroeder 1975:*"Every access to **every object** must be checked for authority."*
+⇒ 被访问的**对象**是**工具调用** ⇒ **落点是第 1 道。**
+覆盖（审查方算）:L=1 ⇒ 50.0% · L=10 ⇒ **9.1%** · L=50 ⇒ **2.0%**;而 security_gate 缺失 ⇒ **工具层恒 0,与 L 无关**
+Agent Loop 放大:N 步 × K 调用 ⇒ N=10/40 时**未检查率 100.0%**
+⇒ ⇒ **Loop 会让工具调用数涨一个数量级,而这一层当前是 0。**
+```
+
+### 211.3 🔴 第二处:`permits()` 把 4 个判决折成 2 个值
+
+```
+`security.rs:78-80`:`matches!(self, Self::Pass | Self::HardOverride)`
+H(verdict)=2.0000 · H(output)=1.0000 ⇒ **I = 1.0000 ⇒ 判别力 50.0%,丢 1.0000 bits**
+⇒ **`Pass` 与 `HardOverride` 不可分辨**,而 `HardOverride` 是**紧急放行**,
+  其自身注释(`security.rs:47-54`)承认:*"That was a **self-certification with no check behind it**"*
+⇒ ⇒ **"正常放行"与"未经审计的紧急放行"在同一支里,而后者正是最需要痕迹的那一条。**
+```
+
+### 211.4 🔴 第三处(最便宜,且已解过一次):**缺席必须可见**
+
+```
+`security.rs:28`(逐字,极硬):*"**Do not paper over this with `PermissiveGate`.** It permits
+everything, so the pipeline would **look gated while nothing is checked — worse than `None`**,
+because the absence would stop being visible."*
+⇒ 数学:None（静默）与 PermissiveGate（看起来已接线）⇒ **观测同形（都沉默）⇒ 判别力 0**;
+  Unconfigured + 宣告 ⇒ **缺席可见 ⇒ 判别力满**
+⇒ **而这正是 §210 的 `Gate::Unconfigured` 已解对的形状** ⇒ **同一解第三次复用**（通则⑰）
+```
+
+### 211.5 本笔已落（Anaphase `6d6359d`）
+
+```
+`security.rs::gate_declaration(&Option<Arc<dyn SecurityGate>>) -> String`:
+  `None` ⇒ *"security_gate: ABSENT — there is no door; every tool call executes UNGATED.
+            (Announced, not silent: a PermissiveGate would hide exactly this fact.)"*;`Some(_)` ⇒ `installed`
+测试 3 条(全绿,`security::` 共 5 条):缺席被宣告（ABSENT/UNGATED/no door）· 已装可分辨（**两态不共用一个词**）·
+  **`HardOverride` 与 `Pass` 在名字上可分辨**
+```
+
+### 211.6 ⚠️ 接线**未完成**,已具名（并说明为何不在此处）
+
+```
+在 `pipeline_config` 处宣告会**编译错**（E0609):`security_gate` 属于运行时 `Pipeline`,不在 `PipelineConfig`。
+⇒ 正确落点是 **`Pipeline` 的构建点**;而**接线必须与宣告同笔**,否则就是 §207 的"零消费者出口"
+  （本笔已触及该边界,故在此**具名**,不假装完成)。
+```
+
+### 211.7 判据②的措辞我纠正一处（判据必须对准它点名的量）
+
+```
+审查方写"全仓不得出现 `PermissiveGate` 于 `src/`" —— **不成立**:它的**定义**就在 `src/security.rs`,
+  且**必须**在那里（否则 tests/ 无法验证这条禁令）。
+⇒ 可执行的形式:**生产路径不得安装** `PermissiveGate`（`src/` 内不得出现
+  `Some(PermissiveGate)` / `with_security_gate(Some(Arc::new(PermissiveGate)))`）,`tests/` 内允许。
+```
+
+### 211.8 ⚠️ **我第二次犯同一个记录错误**（§208.5 刚写下的纪律,这一笔又破）
+
+```
+`6d6359d` 的提交信息由 `python3 -c "…"`（**双引号**）构造 ⇒ 其中的反引号被 **bash 命令替换**吃掉。
+⇒ §208.5 我刚写:*"凡写进记录的文本,必须回读一次确认它没被工具改写"* —— **写下 ≠ 做到,第 N 次,这次长在我自己的纪律上。**
+⇒ 修法(下一次起):**提交信息一律经 `python3 - <<'PY'`（引号 heredoc)写入文件,再 `git commit -F`**;
+  且**每次提交后回读 `git log -1 --format=%B`** 确认无损。
+```
