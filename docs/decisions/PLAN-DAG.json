@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "note": [
+    "THE PLAN IS A DAG (ADR-0048 §228): nodes are work items, edges are prerequisites.",
+    "Status is a closed set: done | doing | todo | blocked. Exactly one node may be `doing`",
+    "(single focus is enforced by a criterion, so the plan cannot quietly grow two fronts).",
+    "'acceptance' must name something VISIBLE — a screen, a reading, or a file — never a count.",
+    "Placed under docs/decisions/ because §13's executable projection is the boundary the ADR test enforces: a plan file outside it is a red, not a preference."
+  ],
+  "statuses": [
+    "done",
+    "doing",
+    "todo",
+    "blocked"
+  ],
+  "nodes": [
+    {
+      "id": "panel.tree",
+      "title": "DAG tree core: edges == parents, structural closure, three named modes",
+      "deps": [],
+      "status": "done",
+      "acceptance": "panel_tree_test green (incl. mutations)"
+    },
+    {
+      "id": "panel.assets",
+      "title": "three-way registration (boot.json + base.html + boot.rs)",
+      "deps": [
+        "panel.tree"
+      ],
+      "status": "done",
+      "acceptance": "boot_placeholders_test green and the asset reaches the page"
+    },
+    {
+      "id": "panel.render",
+      "title": "render(): overview first, rows on demand",
+      "deps": [
+        "panel.assets"
+      ],
+      "status": "done",
+      "acceptance": "rendering fetches NO rows; one click fetches exactly one period"
+    },
+    {
+      "id": "panel.mount",
+      "title": "mount into the live sidebar (own container, idempotent)",
+      "deps": [
+        "panel.render"
+      ],
+      "status": "done",
+      "acceptance": "the list above is untouched; the tree is its own node"
+    },
+    {
+      "id": "panel.fetch",
+      "title": "on-demand async fetch of one period (pending/count/error named)",
+      "deps": [
+        "panel.mount"
+      ],
+      "status": "done",
+      "acceptance": "three named states asserted"
+    },
+    {
+      "id": "panel.rows",
+      "title": "step rows rendered locally through the shared readers",
+      "deps": [
+        "panel.fetch"
+      ],
+      "status": "done",
+      "acceptance": "three states stay three texts; zero arithmetic in the view"
+    },
+    {
+      "id": "panel.default",
+      "title": "one default detail on open, fetched exactly once",
+      "deps": [
+        "panel.rows"
+      ],
+      "status": "done",
+      "acceptance": "exactly one fetch, overview still complete"
+    },
+    {
+      "id": "panel.alive",
+      "title": "identity-preserving refresh (no wholesale rebuild)",
+      "deps": [
+        "panel.rows"
+      ],
+      "status": "done",
+      "acceptance": "the first row is the same DOM node after a refresh"
+    },
+    {
+      "id": "panel.nav_signal",
+      "title": "click navigates through the shell's single writer",
+      "deps": [
+        "panel.alive"
+      ],
+      "status": "done",
+      "acceptance": "one click ⇒ one navigation signal; opening does not navigate"
+    },
+    {
+      "id": "panel.nav_bind",
+      "title": "bind the selected period INTO the proof-track view",
+      "deps": [
+        "panel.nav_signal"
+      ],
+      "status": "doing",
+      "acceptance": "clicking A shows A's steps, clicking B shows B's, without a page rebuild"
+    },
+    {
+      "id": "loop.ui",
+      "title": "Loop shape rendered read-only (steps / retry=branch / budget terminal)",
+      "deps": [
+        "panel.nav_bind"
+      ],
+      "status": "todo",
+      "acceptance": "a retry shows as a branch; a terminal row names its reason"
+    },
+    {
+      "id": "sec.ablation",
+      "title": "runtime ablation A/B/C (stop flowmodus / dead port / clear endpoint)",
+      "deps": [],
+      "status": "todo",
+      "acceptance": "the same request changes or fails — a recorded reading, not a code change"
+    },
+    {
+      "id": "sec.lists",
+      "title": "one word list + one predicate for both gates",
+      "deps": [],
+      "status": "todo",
+      "acceptance": "symmetric difference empty; the two gates cannot disagree"
+    },
+    {
+      "id": "sec.gate_wire",
+      "title": "gate sunk into run_cycle with failure feeding + refusal recorded in the DAG",
+      "deps": [
+        "sec.lists"
+      ],
+      "status": "todo",
+      "acceptance": "every path judged; a refusal leaves a named row"
+    },
+    {
+      "id": "sec.capability",
+      "title": "capability classes declared by a registry (never by the model)",
+      "deps": [
+        "sec.gate_wire"
+      ],
+      "status": "todo",
+      "acceptance": "an undeclared class is refused with a named reason"
+    },
+    {
+      "id": "loop.impl",
+      "title": "the Agent Loop itself (reusing run_cycle per period)",
+      "deps": [
+        "sec.capability",
+        "loop.ui"
+      ],
+      "status": "todo",
+      "acceptance": "the four declared probes turn green one by one"
+    },
+    {
+      "id": "hygiene.backlog",
+      "title": "declared backlog: 241 comment lines, var open literal, TURN_MARKS note",
+      "deps": [],
+      "status": "todo",
+      "acceptance": "the language backlog count reaches 0"
+    }
+  ]
+}
