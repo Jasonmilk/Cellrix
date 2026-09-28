@@ -103,6 +103,9 @@
 
   function rerenderSides() {
     if (!LAST) return;
+    /* REVERTED (§243.3): standing this down removed the rows that CARRY THE SELECTION CONTRACT
+     * (`data-job`, used to drive the prove-track view) — measured live as "sidebar rows available to
+     * drive prove-track [0 rows]". The tree must inherit that contract BEFORE this path can retire. */
     HOSTS.forEach(function (id) {
       if (document.getElementById(id)) renderOne(id, LAST.periods, LAST.empty);
     });

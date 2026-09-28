@@ -74,6 +74,7 @@ w.eval(fs.readFileSync(ASSET, 'utf8'));
 const L = w.CxSessionList;
 if (!L || typeof L.renderSides !== 'function' || typeof L.moveSelection !== 'function') {
   console.log('  FAIL  资产未暴露 renderSides/moveSelection —— 套件与资产脱节，拒绝给结论');
+
   process.exit(1);
 }
 

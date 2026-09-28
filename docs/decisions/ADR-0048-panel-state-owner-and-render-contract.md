@@ -10993,3 +10993,48 @@ run_all.js:791 的探针是 `probeOk('cdp')` —— 探的是**浏览器调试�
 ⇒ 门 B 的意义正是"看见了就必须停";我停在了**下一次工具调用**,而不是**提交之前**。
 ⇒ 纠正:本次提交前先把红名单**逐条点名**(2 已知红 + 1 未注册),归因完毕后才提交。
 ```
+
+
+## 243. 🔬 **四个问题的活体探针答案 + 我修"卡片混乱"时犯的更大的一次错**
+
+### 243.1 四个问题,四个可观测的答案（都是实测）
+
+```
+① **链条通到 Helix-mind 了吗** —— 通了。七个端点在听:
+   50050 面板 · **50051 tentacle** · **50052 mind** · 50061 anaphase · 60052 tuck · 60053 flowmodus serve · 60054 flowmodus reason
+   Anaphase 自己的 `/v1/health`:tentacle **configured+reachable** · mind **configured+reachable** ·
+   flowmodus **configured+reachable** · tuck **configured+reachable**
+② **tentacle 能被调用吗** —— 能,且它说的是 **gRPC**:HTTP 探它得 `状态 000`（连上了但不说 HTTP),
+   这正是"在听"与"能用 HTTP 说"的区别 —— **000 ≠ 不可达**。
+③ **flowmodus 像玄学、时有时无?** —— **不是玄学**:连发三次同一请求,响应**逐字相同**
+   `{done:true, impasse:true, model:null, reason:"impasse", reply:"", success:true}`
+   ⇒ **确定性**的空产出。你感到"时有时无"的真因在**卡片列表**:18/52 无回复、34/52 有内容混在一起
+   ⇒ 于是"有的会话有字、有的没有"被读成"有时灵有时不灵"。
+④ **卡片依旧混乱** —— 真因与我的错见下。
+```
+
+### 243.2 🔴 **我"修"卡片时把应用修坏了,活面板判据当场抓住**
+
+```
+我做了:`rerenderSides()` 在树存在时**让位**（旧卡片路径不再渲染)⇒ 看似"一个写者",看起来更干净
+live 判据立刻红:
+    FAIL sidebar rows available to drive prove-track [**0 rows**]
+    FAIL event rows rendered [0 rows] · with a period loaded, the hint is visible [traj=none hint=none]
+⇒ **那张卡不只是"一张卡":它带 `data-job`（period_id),是整个应用"选一个 period"的入口合约。**
+   我把旧路径让位 ⇒ 用户**再也点不出一个 period** ⇒ 我修掉了"乱",也修掉了"能用"。
+⇒ ⇒ 第一性原理:**移除一个面之前,替代品必须继承它的合约,不只是它的信息。**
+   树的行是 `data-period`(我的命名),而应用要的是 `data-job`(既有合约) —— 差一个属性,应用就死了。
+⇒ 处置:**回退让位**(live 恢复 `110 passed / 0 failed`),并把我那条"让位"判据**撤掉**
+   （它的前提已被 live 判据证伪;留着它就是留一条与实现互相矛盾的判据)。
+```
+
+### 243.3 正确的修法（下一笔的配方,替换"让位")
+
+```
+① 先给**树的行**继承合约:每行带 `data-job`（= period_id)与点击选中（`onSelect` 已在,指向
+   `Cx.setNav({view:'prove-track', period:id})`）—— **合约先到位**;
+② 再让 live 判据在"旧列表缺席"的情况下通过:`sidebar rows available to drive prove-track` ≥ 1
+   —— **这条才是"替换完成"的判据**,而不是"卡片的数量变少";
+③ 最后**才**让旧卡片路径退休（退休是**删减**,必须与 ② 同笔:判据先绿,代码再删)。
+⇒ 判据顺序:**合约(1) → 可用性(2) → 删减(3)**。我这次把顺序倒过来做,于是先丢了可用性。
+```
