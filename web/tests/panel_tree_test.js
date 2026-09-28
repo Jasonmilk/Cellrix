@@ -198,6 +198,45 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
     'MUTATION scope: switching the view WITHOUT the period is gone (that was the half-truth)');
 }
 
+/* ── THE STEP BOUNDARY (ADR-0048 §239): one turn, several steps, each shown as itself ──
+ * An Agent Loop runs N steps inside ONE turn. The acceptance is not "the turn has a token total" but
+ * "each step is visible as its own row, with its OWN model and its OWN tokens" — a single mixed row
+ * would satisfy every total and still lose the pairing (§190/§213). */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="steps"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  const A = (f) => fs.readFileSync(path.join(__dirname, '..', 'assets', f), 'utf8');
+  w.eval(A('three_state.js'));
+  w.eval(A('cell_metering.js'));
+  w.eval(A('panel_tree.js'));
+  const T = w.CxPanelTree;
+  /* The Loop's real shape: one turn, three steps, three models, three token counts. */
+  const EV = [
+    { kind: 'assistant/usage', data: { completion_tokens: 20, model: 'planner-strong' }, seq: 1 },
+    { kind: 'assistant/usage', data: { completion_tokens: 7, model: 'executor-cheap' }, seq: 2 },
+    { kind: 'assistant/usage', data: { completion_tokens: 11, model: 'executor-cheap' }, seq: 3 }
+  ];
+  const host = w.document.getElementById('steps');
+  T.renderRows(host, EV);
+  const rows = host.querySelectorAll('.pt-step');
+  ok(rows.length === EV.length, 'ONE ROW PER STEP, not one row per turn  [' + rows.length + ']');
+  const steps = Array.prototype.map.call(rows, (r) => r.getAttribute('data-step'));
+  ok(steps.join(',') === '1,2,3', 'and they are numbered in order  [' + steps.join(',') + ']');
+  const toks = Array.prototype.map.call(rows, (r) => r.querySelector('.pt-tok').textContent);
+  ok(toks.join(',') === '20,7,11',
+    'EACH STEP SHOWS ITS OWN TOKENS (a mixed row would pass every total and lose the pairing)  [' + toks.join(',') + ']');
+  const models = Array.prototype.map.call(rows, (r) => (r.querySelector('.pt-model') || {}).textContent);
+  ok(models.join(',') === 'planner-strong,executor-cheap,executor-cheap',
+    'and each step names its own model  [' + models.join(',') + ']');
+  ok(rows[0].querySelector('.pt-tok').getAttribute('data-state') === 'p'
+    && rows[0].querySelector('.pt-tok').getAttribute('data-state') === 'p',
+    'three measured steps stay three measured states (no collapse to a summary)');
+  dom.window.close();
+}
+
 /* ── CONVERSATIONS OVER PERIODS (ADR-0048 §238) ── */
 {
   let JSDOM;
