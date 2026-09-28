@@ -10156,3 +10156,66 @@ E Loop 放大:1 步×3 / 40 步×3 调用 ⇒ args 轴检查 **0 次** ⇒ **未
   **处方也要审查它的"轴"** —— 我上一笔照做了、测试全绿、17 个 bash 类被拦,
   而**真实形态的拦截率仍是 2.9%**:因为**测试喂的是名字,而危险住在 args 里**。
 ```
+
+
+## 215. ✅ **吸收:判定面是"能力",不是"文本"** —— 而我 §213 那半步把门变得更糟
+
+### 215.1 我的判断:先自证这笔错误的严重性（它不是估计,是**推论**）
+
+```
+我 §213 落的 `is_high_risk_call = is_high_risk(tool) || is_high_risk(args 文本)`,
+而名单是 WRITE/NETWORK/CREDENTIAL/EXECUTION + **CREDENTIAL 子串匹配** ⇒ 误报是**我实现的推论**:
+  `{"key":"theme"}` 命中 CREDENTIAL 的 `key`（且 `monkey`/`keyword`/`donkey` 也命中子串)
+  `{"query":"how to remove a stain"}` 命中 WRITE 的 `remove`
+  `{"path":"…/.ssh/id_rsa.pub"}` 命中 NETWORK 的 `ssh` · `{"url":"https://…"}` 命中 `https`
+  `{"to":"bob","text":"send my regards"}` 命中 `send` · `translate {"text":"…delete…"}` 命中 `delete`
+⇒ **无害调用 11/12 = 91.7% 被误判**;而 **base64 / `chr()` 拼接**的精巧形态**不含任何名单 token**
+  ⇒ **0/2 拦住** ⇒ **I = 0.0047 bits（0.47%）** ⇒ **判"拦"几乎不携带"危险"**
+⇒ ⇒ **拦截的是"不试图绕过的人"** —— 而我把它当成"已落地"交了。
+```
+
+### 215.2 审查方**更正自己上一笔**,我采纳
+
+```
+对 `read_file` / `search` / `translate`,args 是**数据**（路径 / 查询串 / 待译句）
+⇒ 把数据当命令读是**范畴错误**;
+对**执行器**,args 是**指令**,而指令**不可判定** —— 那是拒绝的理由,且**与内容无关**。
+⇒ 统一形式:**危险住在"这个工具能做什么"（能力）,不在"这次调用写了什么"（内容）。**
+⇒ 而 Dennis & Van Horn 1966 给出了正解的名字:*"access rights are represented as **unforgeable
+  tokens, called capabilities**"* ⇒ **文本由被监管者产出 ⇒ 可伪造;能力由注册表签发 ⇒ 不可伪造。**
+```
+
+### 215.3 本笔已落（Anaphase,`hitl::` **6 条全绿**）
+
+```
+① `is_executor_name(tool)` —— **名字轴收窄**为"这个工具本身是不是程序运行器"（EXECUTION 能力表）;
+   因为只有在这里"名字就是能力"。实测它修掉了 `send_message`（token `send` ∈ NETWORK）被误判的问题。
+② `carries_command(args_json)` —— **文本无关**地判"这次调用有没有把一段程序交给能运行它的东西"
+   （`cmd/command/script/code/input/bin/exec/argv/program/action/shell/run/eval/expr/payload/snippet/source`…）;
+   非空字符串或数组 ⇒ 是;**无法解析 ⇒ 拒**（不可判定不是许可,B7）
+③ 测试:11 个数据类调用**必须放行**（91.7% 误报消失）· 3 个 `key` 子串探针必须放行 ·
+   4 个精巧/结构化危险**必须拦**（它们不含名单 token,全靠形状）· 无法解析必须拒
+```
+
+### 215.4 ⑤ 我的裁决（审查方点名要我定）
+
+```
+**一次 `blocked` 不应使整个 job `return Err`。**
+⇒ 应**跳过该调用并把拒绝记进 ledger/事件**（拒绝必须**被声明**,不是静默);
+  **是否中止 period 交给调用者的策略**（ADR-0016 D1:「循环策略归调用者,永远不是引擎的属性」）。
+⇒ 理由:(a) 审查方自己的数学 —— q=0.917 时 N=1,K=3 只有 **0.057%** 能跑完;
+  (b) S&S 的 **psychological acceptability** —— 会杀掉整轮的门只会**逼人装 `PermissiveGate`**
+      （而 §212 已证那是"比 None 更糟"的方向）。
+⇒ 这是**下一笔**（改 pipeline 的控制流,不动判定面）。
+```
+
+### 215.5 仍未完成（目的地 = permission-based）
+
+```
+① **能力类声明**（read / write / network / execute / credential）由**工具注册表派生**,
+   判定读声明,不读内容 —— 且**应派生而非手写**（通则⑰):Helix-MCP-Learner 已在做
+   "MCP Server ⇒ CI-144 Tool Definition Auto-Learner" ⇒ 能力可从工具定义**自动派生**。
+② `key` 等高频 token **退出子串匹配**（或子串匹配只作用于**结构化字段名**,不作用于自由文本）。
+③ 阶段②已落(本笔):能力 = 任意执行 ⇒ args 不可判定 ⇒ **一律 fail-closed,且判据不随文本变形变化**
+   （"因为它不可判定" ≠ "因为它含 `rm`"）。
+```
