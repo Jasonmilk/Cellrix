@@ -10470,3 +10470,53 @@ E Loop 放大:1 步×3 / 40 步×3 调用 ⇒ args 轴检查 **0 次** ⇒ **未
   明确的、权威的表达" ⇒ **58 个词的漂移是这条原则的违反,不是疏忽**;
   **S&S Economy of mechanism**:"a small and simple design is essential" ⇒ 8 份字面量名单、2 个谓词、2 道门。
 ```
+
+
+## 223. ⚖️ **驳回三条具体指控（逐字证据）,吸收两条一般性要求**
+
+### 223.1 核验:审查方引的符号**不在我树里**（本仓 `40affa4`）
+
+| 它引的 | 我实测 | 判定 |
+|---|---|---|
+| `run_cycle:950` 后 `execute_structured` 内 `if let Some(t) = &self.tentacle { … } else { **Self::act_fallback_from(...)** }` | `grep -rn act_fallback_from src/` ⇒ **0 命中** | ❌ **不在本树** |
+| `hitl.rs:324 queue_for_approval` ⇒ 追加后 `warn!` 结束;`pending_approvals` 只有定义 + push | `grep -rn pending_approvals\|queue_for_approval src/` ⇒ **0 命中** | ❌ **不在本树** |
+| "`is_high_risk` 被调用 3 次,全在 `hitl.rs` 内 ⇒ 执行路径上没有风险判定" | `pipeline/mod.rs:213` 调 `is_high_risk_call`;`hitl.rs:266` 的 `is_high_risk` 由 `check_approval` 消费,而 `safety_gate::admit` 调它 | ❌ **不成立** |
+
+```
+⇒ 而**我树里的实际形态**是:
+  · `run_cycle` 的结构化路径:**先** `safety_gate::admit(&self.hitl, self.safety, command, &actions,
+    OnAuditError::ReportSuccess)`,`Refused(condition) => Ok(condition)`,**只有 `Cleared` 才**
+    `self.tool.execute(command, …)` ⇒ **判定在执行的同一支里,且在它之前**;
+  · `execute_structured` 在**没有 wired pipeline** 时:`warn!(…); return Ok(TransitionCondition::Failure)`
+    ⇒ **fail-closed,不执行**;
+  · `tentacle_endpoint: None`（默认,**实测成立** `config.rs:45/309/414`)—— 但默认不等于"绕闸":
+    它决定的是**执行走哪个适配器**,而两个适配器的调用点都在**判定之后**。
+⇒ ⇒ **你要找的那条地沟,在我这一版里没有**。而这一版的 sha 是 `40affa4` —— 你报的 HEAD 也是它,
+  所以差异不来自"更早/更晚",而可能来自**另一分支/另一棵解包树**。
+⇒ 纪律(第三次同形,§207/§217/§223):**凡"你的代码里有 X",必须给出取得 X 的那份树的 sha,并回读该符号一次。**
+```
+
+### 223.2 我**吸收**的两条一般性要求（它们与具体指控无关,且都成立）
+
+```
+① **每一条执行路径都必须被判定**（S&S Complete Mediation:"Every access to every object must be checked")
+   ⇒ 我树当前的三条路径**都**满足,但**没有一条判据在守这件事** ⇒
+     判据形状(下一笔):"结构化路径在无 pipeline 时必须不执行"（今天**无测试** ⇒ 该性质**未被强制**）
+   ⇒ 我把它记为**待补判据**,不声称已有。
+③ **待批队列必须有消费者,或显式声明为 ABSENT**（"不许静默躺着"）
+   ⇒ 我树**没有**该队列 ⇒ 按它自己的措辞,**这一条的正确状态是"显式声明为 ABSENT"** ⇒
+     **本笔即该声明**:`pending_approvals` / `queue_for_approval` **在 `40affa4` 上不存在**
+     ⇒ 因此"等待人类确认"这件事当前**没有被实现,也没有被伪装**（HITL 的无通道默认是 `Err` ⇒ 拦,§217)。
+```
+
+### 223.3 仍未完成（顺序我接受,并修正一处）
+
+```
+① 【今天,但**目标与我树无关**】给"本地内建工具"加入口判定 —— 我树无该路径,故**无可落之处**;
+   **可落的等价物**是补那条判据(结构化路径无 pipeline ⇒ 不执行),让**已有性质被强制**。
+② 判据:执行路径不得出现"无风险判定的工具执行"（变异:加一条旁路 ⇒ 红）
+③ 名单合一（1 份）· 四站点一道门 · 能力声明（与工具注册表同笔）
+⇒ ⇒ **顺序不改**:`②` 先于 `③`;而 `①` 在本树退化为"补判据"。
+⇒ 巨人路径判词我记账:**Complete Mediation** 与 **Fail-safe defaults** 是这一笔的准绳 ——
+  而**我这版恰好满足它们**,差别在于**没有被判据强制**;
+  **"满足"与"被强制满足"之间的距离,就是这一格反复付学费的地方。**
