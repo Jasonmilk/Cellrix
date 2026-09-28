@@ -152,7 +152,14 @@
     Cx.state.chatBusy = true;
     btn.disabled = true; btn.textContent = '思考中…';
     var done = false;
-    var job = Cx.state.nav.period || null;
+    /* THE CONTINUATION IDENTIFIER IS A JOB, NOT A PERIOD (ADR-0048 §265). Measured: `nav.period` holds
+     * the SELECTED PERIOD id (that is what the sidebar sets and what the shell's period notification
+     * carries), while the server's `job_id` must be `run-<1..=16 hex>` — a period id
+     * (`run-…-p…`) fails that shape, so "click a card, type, send" could NOT continue the
+     * conversation at all ("无法对话"). `meta.job_id` was already being passed by both the legacy card
+     * click and the tree's click; it simply was not used here. Job for the scope, period for the
+     * identity — the same two-facts rule as the lineage fix (§251), on the client side. */
+    var job = (Cx.state.nav.meta && Cx.state.nav.meta.job_id) || Cx.state.nav.period || null;
     function finish() {
       if (done) return;
       done = true;
