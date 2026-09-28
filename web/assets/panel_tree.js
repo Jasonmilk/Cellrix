@@ -227,7 +227,7 @@
       if (n.truncated) { row.setAttribute('data-truncated', n.truncated); }
       /* THE LABEL RULE HAS ONE HOST (§266). This line used to fall back to the raw period id, and since
        * every period's `name` is null the sidebar listed identifiers — measured on the live page:
-       * rows reading `run-233a86e49afbc98c-p006abab075000001`. That is the owner's "无用": an entry you
+       * rows reading `run-233a86e49afbc98c-p006abab075000001`. That is the owner's " (Chinese UI text lives in strings, not comments)
        * cannot recognise. The panel already owns the rule (`autoName`: name → the user's own words →
        * time), so the tree ASKS for it instead of inventing a second one. The `name || id` fallback stays
        * for callers that pass no oracle. */
