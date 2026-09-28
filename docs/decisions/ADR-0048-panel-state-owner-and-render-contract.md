@@ -10405,3 +10405,68 @@ E Loop 放大:1 步×3 / 40 步×3 调用 ⇒ args 轴检查 **0 次** ⇒ **未
   **A（引擎,只看名字）I = 0.0150** · **B（pipeline,名字+args）I = 0.4234** · **能力声明 I = 0.9321**
 ⇒ 教训与 §190.5/§197.2 同一条,再深一层:**凡引用一个数,不仅要抄它,还要记下"它是谁的、哪一版"** ——
   因为**被引用的数会被它的作者更正**,而我的记录不会自动跟着变。
+
+
+## 222. ✅ **吸收:两本册子各缺对方那一半,而并集就在手边** —— 我 §221 只补回了西门那本
+
+### 222.1 审查方实测（我按构造逐条复核成立）
+
+```
+引擎门 `is_high_risk` 与管道门 `is_high_risk_call` 的两份词表:
+  **交集 79 · 并集 137 · Jaccard = 0.577**
+  **old-only 30**（引擎拦、管道盲）:`write delete remove mv cp mkdir touch` ·
+      `http https fetch post send` · `token key secret password cookie credential api_key bearer`
+  **new-only 28**（管道拦、引擎盲）:`run code script command shell terminal interpreter process
+      spawn invoke dispatch sandbox computeruse executor` …
+⇒ ⇒ **两本册子各自补上了对方缺的那一半,而没有任何一处同时拥有两半。**
+⇒ 而 `security.rs`/`hitl.rs` 自己的文档写着高风险 = **写操作 / 网络请求 / 凭证使用**,
+  管道门在这三类**裸名**上实测 **0/20**:
+  `delete_database {"target":"prod"}` 与 `read_secret {"name":"api_key"}` 走管道路径**未经确认直达 Tentacle**。
+⇒ 而 **§221/§222 我补的只是"西门那本"**（无歧义危险名）—— **东门那本（引擎的宽表）从来没动过。**
+```
+
+### 222.2 数学（审查方给,我采纳）
+
+```
+门            危险 recall   误报    判别力 I
+引擎          4/14          13.8%   0.0218 bits（2.4%）
+管道          10/14         0/29    0.5014 bits（55.1%）
+并集一份+同谓词 10/14        0/29    0.5014,而**裸名 19/20**
+同步成本:k 份手抄名单、每份保真 p ⇒ P(全部一致) = p^k;k=2,p=0.95 ⇒ 0.9025,**四轮后 0.664**
+序列化（引擎先看、且一拒就结束整轮）:N=10,K=3 ⇒ P(跑完) = **0.0116**
+⇒ 残余 7 个复合名（`write_file`/`delete_database`/`read_secret`…）在**并集下仍是 0/7** ——
+  **这不是名单不够,是名字轴不可判定的实测证据** ⇒ 只有能力声明能解决（与 §215 同向）。
+```
+
+### 222.3 本笔已落（Anaphase,`hitl::` **10 条全绿**）
+
+```
+`is_dangerous_name` 新增 **WRITE_BARE / NETWORK_BARE / CREDENTIAL_BARE** 三张 **bare 命中**表:
+  `write delete remove mv cp move copy mkdir touch rmdir` ·
+  `http https fetch post send request upload` ·
+  `token key secret password passwd cookie credential credentials apikey bearer auth`
+⇒ **20 个裸名 20/20 拦下**;而 §216 的误报形态（`code_review` / `dry_run` / `send_message` /
+  `kv_get{"key":…}` / `translate`）**仍放行** —— **复合名不是动词;字段名从不被扫描**
+⇒ **关键在于它们是 bare 词**:名叫 `key` 的**工具**是凭证读取器,而名叫 `key` 的**字段**在这个谓词里
+  根本不被看（那正是 §216 的误报通道)**—— 两件事必须分开,这一笔把分开做对了。**
+```
+
+### 222.4 ⚠️ 残余:我**明确声明,不假装已修**
+
+```
+`delete_database {"target":"prod"}` 在**任何名单下都不被拦**,而我把这一点**写成了断言**
+  （`assert!(!is_high_risk_call("delete_database", …), "residual: … undecidable on the name axis")`）
+⇒ 一个**被断言的已知缺口**,比一个"看起来覆盖了"的缺口安全:
+  前者在,后者会在某次"补词"后**消失于记录,却仍在系统里**。
+```
+
+### 222.5 仍未完成（判据①②今天红,我具名）
+
+```
+① **两份词表合一**（同一份 + 同一谓词）⇒ 判据:**两门对同一个名字不得给出相反判定（差集必须为空）**
+② **名单字面量 = 1**（今天仍多份:引擎 4 张 + 管道 3+2+3 张）
+③ 四个站点 → 一道门、一个判定面 ④ 拒绝 = 跳过 + 留痕（不杀整轮）⑤ 能力声明（与工具注册表同笔）
+⇒ 而巨人路径的判词我记账:**DRY / OAOO（Hunt & Thomas）**:"系统中的每一个知识点都必须有单一的、
+  明确的、权威的表达" ⇒ **58 个词的漂移是这条原则的违反,不是疏忽**;
+  **S&S Economy of mechanism**:"a small and simple design is essential" ⇒ 8 份字面量名单、2 个谓词、2 道门。
+```
