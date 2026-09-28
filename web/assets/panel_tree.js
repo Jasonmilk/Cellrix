@@ -225,7 +225,15 @@
       row.setAttribute('data-descendants', String(subtree));
       row.setAttribute('data-depth', String(ancestorClosure(tree, id).path.length - 1));
       if (n.truncated) { row.setAttribute('data-truncated', n.truncated); }
-      row.textContent = (n.row && n.row.name) ? n.row.name : id;
+      /* THE LABEL RULE HAS ONE HOST (§266). This line used to fall back to the raw period id, and since
+       * every period's `name` is null the sidebar listed identifiers — measured on the live page:
+       * rows reading `run-233a86e49afbc98c-p006abab075000001`. That is the owner's "无用": an entry you
+       * cannot recognise. The panel already owns the rule (`autoName`: name → the user's own words →
+       * time), so the tree ASKS for it instead of inventing a second one. The `name || id` fallback stays
+       * for callers that pass no oracle. */
+      row.textContent = (typeof opts.labelFor === 'function')
+        ? opts.labelFor(n.row || {})
+        : ((n.row && n.row.name) ? n.row.name : id);
       row.addEventListener('click', function () {
         selectOne(id);
         /* The prove-track view has its own gesture so the PRIMARY click can stay "continue this

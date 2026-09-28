@@ -95,6 +95,8 @@
         /* Option A: a click on the tree is navigation, so it drives the main area through the
          * shell's ONE writer (`Cx.showView` -> `setNav`). The view name is declared here, not
          * invented: it is the id `base.html` gives that container. */
+        /* The label rule lives HERE (autoName) and the tree asks for it — one host, not two. */
+        labelFor: function (p) { return autoName(p); },
         onSelect: function (id) {
           /* THE CLICK SEMANTICS ARE PART OF THE CONTRACT (ADR-0048 §264). Retiring the legacy cards kept
            * identity, drivability and the marker — and silently dropped what a click DOES: load that
