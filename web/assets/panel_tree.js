@@ -103,6 +103,8 @@
     if (!host || !host.ownerDocument) { return { tree: tree, select: function () {} }; }
     var doc = host.ownerDocument;
     host.textContent = '';
+    var groupsById = {};
+    groupByConversation(periods).forEach(function (g) { groupsById[g.job_id] = g; });
     var list = doc.createElement('div');
     list.className = 'pt-tree';
     list.setAttribute('role', 'tree');
@@ -161,12 +163,26 @@
       return s;
     }
 
+    var lastGroup = null;
     tree.order.forEach(function (id) {
       var n = tree.byId[id];
+      /* GROUP HEADER when the conversation changes: 13 first-level entries over 52 children (§238). */
+      var conv = (n.row && (n.row.job_id || n.row.period_id)) || null;
+      if (conv && conv !== lastGroup) {
+        var g = groupsById[conv];
+        var head = doc.createElement('div');
+        head.className = 'pt-group';
+        head.setAttribute('data-conversation', conv);
+        head.setAttribute('data-count', String((g && g.count) || 0));
+        head.textContent = (g && g.label) || conv;
+        list.appendChild(head);
+        lastGroup = conv;
+      }
       var row = doc.createElement('button');
       row.type = 'button';
       row.className = 'pt-node';
       row.setAttribute('data-period', id);
+      if (conv) { row.setAttribute('data-conversation', conv); }
       row.setAttribute('data-depth', String(ancestorClosure(tree, id).path.length - 1));
       if (n.truncated) { row.setAttribute('data-truncated', n.truncated); }
       row.textContent = (n.row && n.row.name) ? n.row.name : id;
@@ -268,6 +284,37 @@
    * turn produced nothing", the second says "we never had a reply here". Naming them is the same
    * discipline as the "not measured" / "no data" distinction.
    */
+  /* ── CONVERSATIONS, THEN THEIR PERIODS (ADR-0048 §238) ──
+   * Measured on the live payload: 52 periods but only 13 jobs, and ONE job carries 34 of them. The
+   * sidebar showed all 52 flat, so a reader could not pair "13 conversations" with "52 cards" — and
+   * read it as duplication. Grouping is not cosmetics: the world is 1 conversation : N periods, and a
+   * list that flattens that relation loses the relation.
+   * Each group carries a DISTINGUISHING FACT (its size and how many turns produced words), because
+   * two entries a reader cannot tell apart ARE a duplicate as far as the reader is concerned. */
+  function groupByConversation(periods) {
+    var order = [], by = {};
+    (periods || []).forEach(function (p) {
+      if (!p) { return; }
+      var key = p.job_id || p.period_id;
+      if (!key) { return; }
+      if (!by[key]) {
+        by[key] = { job_id: key, periods: [], first_ts: p.first_ts || null, last_ts: p.last_ts || null, replied: 0 };
+        order.push(key);
+      }
+      var g = by[key];
+      g.periods.push(p);
+      if (p.first_ts && (!g.first_ts || p.first_ts < g.first_ts)) { g.first_ts = p.first_ts; }
+      if (p.last_ts && (!g.last_ts || p.last_ts > g.last_ts)) { g.last_ts = p.last_ts; }
+      if (typeof p.reply === 'string' && p.reply.trim() !== '') { g.replied++; }
+    });
+    return order.map(function (k) {
+      var g = by[k];
+      g.count = g.periods.length;
+      g.label = g.count + (g.count === 1 ? ' period' : ' periods') + ' \u00b7 ' + g.replied + ' with reply';
+      return g;
+    });
+  }
+
   function replyState(reply, model) {
     if (typeof reply === 'string' && reply.trim() !== '') {
       return { kind: 'present', label: null };
@@ -309,6 +356,7 @@
     render: render,
     mountSidebar: mountSidebar,
     renderRows: renderRows,
-    replyState: replyState
+    replyState: replyState,
+    groupByConversation: groupByConversation
   };
 })(window);

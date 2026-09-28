@@ -198,6 +198,44 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
     'MUTATION scope: switching the view WITHOUT the period is gone (that was the half-truth)');
 }
 
+/* ── CONVERSATIONS OVER PERIODS (ADR-0048 §238) ── */
+{
+  let JSDOM;
+  try { ({ JSDOM } = require('jsdom')); }
+  catch (e) { console.log('NEEDS-INPUT: jsdom not installed'); process.exit(3); }
+  const dom = new JSDOM('<!doctype html><div id="host"></div>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+  const T = w.CxPanelTree;
+  /* The SHAPE is the live one: one job carrying several periods, ids run-<job>-p<period>. */
+  const P = [];
+  [['j1', 4], ['j2', 3], ['j3', 1]].forEach(([job, n]) => {
+    for (let i = 0; i < n; i++) {
+      P.push({ period_id: 'run-' + job + '-p' + i, job_id: 'run-' + job, parent: i === 0 ? null : 'run-' + job + '-p' + (i - 1),
+        first_ts: '2026-09-28T14:0' + i + ':00Z', last_ts: '2026-09-28T14:0' + i + ':10Z', reply: i === 0 ? 'ok' : '' });
+    }
+  });
+  const groups = T.groupByConversation(P);
+  ok(groups.length === 3, 'THREE conversations, not eight periods  [' + groups.length + ']');
+  ok(groups.reduce((a, g) => a + g.count, 0) === P.length,
+    'and the children add up to every period (bidirectional: ' + groups.map((g) => g.count).join('+') + ')');
+  ok(groups.every((g) => /with reply/.test(g.label)),
+    'every group states a DISTINGUISHING fact: ' + groups.map((g) => g.label).join(' | '));
+  ok(new Set(groups.map((g) => g.label)).size === 3, 'no two group labels are identical');
+
+  const host = w.document.getElementById('host');
+  T.render(host, P, {});
+  const heads = host.querySelectorAll('.pt-group');
+  const rows = host.querySelectorAll('.pt-node');
+  ok(heads.length === 3, 'the sidebar renders 3 conversation headers  [' + heads.length + ']');
+  ok(rows.length === P.length, 'and every period as a child  [' + rows.length + ']');
+  ok(host.querySelector('.pt-group').getAttribute('data-count') === '4',
+    'each header carries its own size (the fact that makes neighbours distinguishable)');
+  const kids = Array.prototype.filter.call(rows, (r) => r.getAttribute('data-conversation') === 'run-j1');
+  ok(kids.length === 4, 'children are attributed to their conversation  [' + kids.length + ']');
+  dom.window.close();
+}
+
 /* ── THE REPLY'S THREE STATES (ADR-0048 §237): measured 18 of 52 live cards carry reply:"" ── */
 {
   const T2 = (function () {
