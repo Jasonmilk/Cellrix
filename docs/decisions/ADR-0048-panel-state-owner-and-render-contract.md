@@ -10279,3 +10279,73 @@ E Loop 放大:1 步×3 / 40 步×3 调用 ⇒ args 轴检查 **0 次** ⇒ **未
   **每换一次判定面,必须回答它读的文本"由谁产出"** ——
   若答案是被监管者,那么这一次移动**只是换了位置,没有换范畴**。
 ```
+
+
+## 217. ⚖️ **吸收一半,驳回一半** —— 两条驳回都有逐字证据
+
+### 217.1 ✅ 先解决审查方的"待你确认"（关于我自己的诚实度）
+
+```
+它报:`grep dry_run|run_id|"input":` 在 `src/hitl.rs` **0 命中** ⇒ 不能断言"已修"。
+我实测(逐字,本仓 `cc9b09a`):
+  `:271 ("dry_run", r#"{"enabled":true}"#)` · `:273 ("background_job", r#"{"run":false}"#)`
+  `:274 ("build", r#"{"run_id":42}"#)` · `:276 ("translate", r#"{"source":"en"}"#)`
+  `:322 for probe in [r#"{"monkey":"x"}"#, r#"{"keyword":"x"}"#, r#"{"donkey":"x"}"#]`
+  `:259 fn compound_names_and_generic_fields_are_not_capabilities()` · `:289 fn the_refusal_reason_must_not_name_its_trigger()`
+⇒ **测试在树里,且 `cargo test --lib hitl::` = 8 passed / 0 failed** ⇒ **"待确认"结案:已修且已验。**
+⇒ 而它的 grep 落在**更早的版本**上（与 §207 那次同形:**取文件的路径要先核 sha**）。
+```
+
+### 217.2 ❌ 驳回一:那个 OR 形(`:187 if !gate_allows || …`)**不在我树里**
+
+```
+我树 `pipeline/mod.rs` 是 **`match &self.security_gate { Some(gate) => …, None => … }`** ⇒ **两支互斥,不是 OR**
+⇒ 它引的 `:187` 行来自**别的版本**。
+⇒ 而**实质判词我依然接受并已记录**(§213.3/§215):**两条路径判定的东西不同**(`Some` 用 gate 的 `permits()`,
+  `None` 用本地分类器)⇒ **同一个判定两个输入集** ⇒ 收敛成一处仍是待办。
+```
+
+### 217.3 ❌ 驳回二(最要紧):"无人值守 ⇒ Critical 被执行"**与我的实现相反**
+
+```
+它报:*"Critical ⇒ 交给 HITL ⇒ 而 HITL 默认 APPROVE(`hitl.rs:150 deny=false`)⇒ 无人值守 ⇒ Critical 被执行"*
+我实测 `hitl.rs:18-26`(逐字):
+    impl Default for HITLApprover {
+        fn default() -> Self {
+            // fail-closed：无确认通道时，高风险动作拦截（Err = 通道缺失）
+            Self { approver: Arc::new(|_cmd, _args| Err("No HITL confirmation channel configured".to_string())) }
+        }
+    }
+⇒ **默认是 `Err` ⇒ 无通道时"拦截",不是"批准"** ⇒ **无人值守时 Critical 不会被静默执行。**
+⇒ 而它引的 `deny=false` 出现在 `:394` 的**测试替身**里:
+    `let deny = HITLApprover::new(Arc::new(|_c, _a| Ok(false)));` ⇒ 那是**测试构造的**一个 approver,不是默认。
+⇒ 所以 `I(类; 动作) = 0.0000 bits` **不是无条件成立的**:它要求"通道存在且会批准"这一前提;
+  在**无人值守**（默认 `Err`）这一支里,`Normal` 与 `Critical` **确实落到不同动作**（执行 / 拒绝）。
+```
+
+### 217.4 ✅ 吸收的实质（这些是真的结构缺口）
+
+```
+① **`SecurityClass` 只有两档**(`Normal` · `Critical`,`ci144/mod.rs:61-64`),
+   而它要表达**三件事**:`execute` / `confirm` / **`refuse`** ⇒ **缺的正是"永不执行"这一档**:
+   `Critical` 把"必须问"与"必须不跑"**混为一档**,而**"问"在没有渠道时会变成"拒"、在有渠道时可变成"执行"**
+   ⇒ 语义依赖渠道,而非由类决定。
+⑤ **类由谁声明 —— 这才是不可伪造的落点**:`Call { tool, args, expect }` 里**没有 security_class**,
+   ADR-0017 D3 的那个类属于 `Action`(agent→cockpit),而 **全仓没有工具注册表**
+   ⇒ **若由 LLM 填,它与工具名同样可伪造 ⇒ 加了等于没加。**
+   ⇒ ⇒ **类必须由注册表/配置声明** ⇒ 这与我 §216.5 那条纪律同一句话:
+     **它读的东西,必须由监管者一侧产出。**
+⑥ **拒绝理由不得点触发者**:`None` 支已落(§216);而 **ledger 仍记 `&call.tool`** ——
+   那是**记录**,不是给模型的拒绝消息 ⇒ **保留是对的**(审计需要它),我不改。
+```
+
+### 217.5 顺序（我接受,并给出为何本轮不动代码）
+
+```
+①② 三档化(`execute|confirm|refuse`)+ 无渠道时 `Critical` 不得执行:
+   ⇒ **② 已经成立**(默认 `Err`)⇒ **只剩 ① 的三档化**;而它改的是 `ci144` 的**协议枚举**,
+     序列化与消费者面广 ⇒ **必须与工具注册表同笔**(§217.4 ⑤),否则三档化之后**仍无人能声明那一档**。
+④⑤ 随工具注册表（与 Agent Loop 同笔）;⑥ 已完成(`None` 支)。
+⇒ 所以本轮**不改 Anaphase 代码**:唯一会驱使我改代码的那条(②)**已被实测驳回**;
+  而我不会为"看起来在推进"而改一个**没有声明者**的枚举。
+```
