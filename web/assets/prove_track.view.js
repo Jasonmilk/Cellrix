@@ -248,7 +248,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
           '<button type="button" class="e-turn-btn" data-e-turntoggle="' + it.id + '" aria-expanded="' + isOpen + '">' +
           '<span style="display:inline-block;width:14px" aria-hidden="true">' + (isOpen ? '▾' : '▸') + '</span>' +
           '<span>Turn ' + it.index + ' · ' + esc(it.note) + '</span>' +
-          '<span class="cnt"> · ' + cnt + ' events · ' + fmtDur(tl) + '</span>' +
+          '<span class="cnt" data-e-events="' + cnt + '"> · ' + cnt + ' events · ' + fmtDur(tl) + '</span>' +
           '</button></td></tr>' });
         /* The folded row, drawn where the steps it stands for would have been —
          * directly under its turn header. It borrows the turn header's own
@@ -287,7 +287,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
             'aria-expanded="' + open + '">' +
             '<span style="display:inline-block;width:14px" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>' +
             '<span>内部步骤已折叠</span>' +
-            '<span class="cnt"> · ' + g.ids.length + ' internal steps · ' + fmtDur(g.dur) +
+            '<span class="cnt" data-e-fold-count="' + g.ids.length + '"> · ' + g.ids.length + ' internal steps · ' + fmtDur(g.dur) +
             /* I6 (CI-144 §13.3): 缺失不得比显式未知更宽松。
              * `g.tok ? ... : ''` rendered an UNMEASURED fold and a fold that
              * measured ZERO identically — both produced no statement at all.
