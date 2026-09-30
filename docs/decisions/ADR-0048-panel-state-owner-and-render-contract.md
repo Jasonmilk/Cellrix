@@ -12086,3 +12086,23 @@ yet this suite is unproven`。而它在**声明了能力**、面板也**在**的
   而且更进一步:**连合成的 exit 4 都不进账** ⇒ 真因待查(catch 顺序? `e.status` 不为 4?)。
 ⇒ 下一步(线 1 余项):**把这条路径修到能被行使**,并给它一条判据(喂合成崩溃 ⇒ 必须出现 ABORTED)。
 ```
+
+
+### 291.3 **撤回上一小节**:ABORT 路径是好的;而 exit-code 的洞在别处**成片存在**
+
+```
+撤回:我用**错误的注入点**(把那行文字当代码,实际它在 TODO 注释里)⇒ 得到"接不住 exit 4"的假结论。
+正确注入(在 `require("jsdom")` 之后)⇒
+   · 直接 spawn:`e.status = **4**`
+   · 门里:`ABORT all_views_test.js — the suite crashed; nothing was asserted (rule ⑳)`
+   · 判决行:`, **1 ABORTED (not red)**`
+⇒ **ABORT 有名字、有判决行、也确实接住了** ⇒ 审查的"有数字无账本/未行使"与我的"接不住"**都证伪**。
+   （同族第四次:**探针的错**。教训:注入之前先确认那一行**真的会执行** —— 打印它、或直接 spawn 验 status。)
+
+新发现(比原来那条更重要):`exit(2)` = "环境缺失,不是失败" 的入口**不止一处**:
+   `chain_e2e_test.js:102` · `hit_targets_test.js:146` · `flows_suppliers_test.js:52/56` · `ledger_rows_test.js:34`
+   ⇒ 这些套件的 **harness 错**会被归档为 `env-missing (not red)` ⇒ **正是那个偶发的 `1 env-missing`**
+   ⇒ 我在 `all_views` 修过的"崩溃洗成环境"的洞,在别的套件里**原样存在**
+   ⇒ 下一步:**全库整齐一笔** —— 所有套件的 harness-error 出口 `exit(2)` → **`exit(4)`**
+     (`2` 只留给"真的缺模块/工具"),并给一条判据:**喂合成崩溃 ⇒ 必须出现 `ABORTED`,不得出现 `env-missing`**
+```
