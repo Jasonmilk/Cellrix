@@ -98,6 +98,7 @@ const SELF_CONTAINED = [
   ['ledger_rows_test.js', 'ledger rows — keyed reuse, not a whole-table rebuild'],
   ['prove_track_rows_test.js', 'trajectory rows — keyed reuse, not a whole-table rebuild (PANEL-PLAN §2)'],
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
+  ['events_param_contract_test.js', 'the event endpoint: `id=` honest, `job_id=` compatible, same events, missing names the spellings (§296)'],
   ['abort_roster_test.js', 'the CRASH path is exercised: exit 4 is observable, distinct from ENV, and rosters (the fourth fact, §295)'],
   ['flows_suppliers_test.js', 'flows supplier config — panel proxy contract, key never echoed (PANEL-PLAN §3)'],
   /* The chain's wiring facts have ONE source (anaphase:ADR-0046). This asserts a
@@ -360,7 +361,15 @@ const NEEDS_INPUT_EXIT = 3;
 for (const [file, what] of SELF_CONTAINED) {
   const target = path.join(__dirname, file);
   /* Addresses are passed IN, so no suite needs a default of its own. */
-  const extra = file === 'all_views_test.js' ? [PANEL]
+  /* ADDRESS PASSING IS DECLARATION-DRIVEN (ADR-0048 §296): the suite SAYS what it needs
+   * (`REQUIRES='panel-http'` / `'cdp-browser'`) and the runner hands over exactly that — for the first
+   * spawn AND the flaky-retry spawn, which reuses `...extra`. A hard-coded file list meant every NEW
+   * suite silently got nothing, answered NEEDS-INPUT, and was filed `UNREGISTERED/BLOCKING — capability
+   * IS present (probed), yet this suite is unproven` (measured with `events_param_contract_test.js`).
+   * The explicit list below stays only as a fallback for suites that have not declared yet. */
+  const req = declaredRequires(file);
+  const extra = (req === 'cdp-browser') ? [PANEL, CDP]
+    : (req === 'panel-http') ? [PANEL]
     : (file === 'layout_test.js' || file === 'measure_test.js'
        || file === 'perf_measure.js' || file === 'hit_targets_test.js') ? [PANEL, CDP] : [];
   try {

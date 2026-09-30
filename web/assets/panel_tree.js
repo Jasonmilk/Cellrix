@@ -135,7 +135,7 @@
       detail.appendChild(badge);
       if (typeof opts.fetchRows === 'function') {
         /* ON DEMAND: exactly one call, for the selected period only.
-         * The real loader is `/api/events?job_id=<id>` and therefore ASYNC — so the three states are
+         * The real loader is `/api/events?id=<period_id>` and therefore ASYNC — so the three states are
          * named rather than collapsed: `pending` while it travels, a COUNT when it lands, and
          * `error` when it fails. A silent blank would be the same defect this cell keeps meeting:
          * "no rows" and "the fetch failed" must not read alike. */

@@ -12259,3 +12259,39 @@ P1'' `?job_id=` → `id=`（Cellrix 3 处真站点 + 1 处测试旧键;Anaphase 
 P1'  Anaphase 加 `session_id`/`conversation_id`（**不动 `job_id` 语义**;§276 已裁定)
 P3   老数据具名"无血缘"，与"单轮会话"分开(今日不可判定 ⇒ 只能具名)
 ```
+
+
+## 296. ✅ **P1'' 落地**:参数名收敛（`id=` 诚实名 + `job_id=` 兼容）—— 线 2 开工
+
+### 296.1 逻辑先读透(改之前)
+
+```
+· `PeriodRef::parse`(`identity.rs:138`)按**形状**分类:period id 优先,否则当 job ⇒ **参数名不携带信息**
+· Anaphase `/v1/events`(`main.rs:266`)硬取 `params.get("job_id")` ⇒ 所以 `?id=` 报 `job_id required`
+· Cellrix 三个真站点传的都是 **period_id**:`panel_tree:146 fetchRows(id)` · `loadPeriodToChat(jobId)`(参数名说谎) ·
+  `script.html` 的链式 `ids` ⇒ 而 URL 参数名叫 `job_id`
+· Cellrix 代理(`routes.rs`)是**原样透传** ⇒ 名字一路到 Anaphase
+⇒ 所以"改名"只涉及**取键处 + 发送处**;而**判据今天必红**(实测 `?id=` ⇒ `job_id required`)
+```
+
+### 296.2 落地
+
+```
+Anaphase(`main.rs`):`id` 优先 ⇒ `job_id` ⇒ `period_id`;缺参错误**点名三个名字**
+   实测:`?id=` / `?job_id=` / `?period_id=` ⇒ **同一批 8 条事件**;`cargo test --lib` **237 passed**
+Cellrix:三个站点改发 `id=`;`loadPeriodToChat(jobId)` → `(periodId)`(参数名不再说谎);注释同步
+   实测:活页面点一条经历 ⇒ 请求为 `/api/events?id=…`,**无 `job_id=` 残留**
+新判据 `events_param_contract_test.js`(5 条,进网):id 可用 · job_id 兼容 · 两者**同一批** ·
+   缺参点名拼法 · **变异**(别名必须保留) ⇒ 实测 **5 passed**
+```
+
+### 296.3 附带修好的一条老 TODO（结构性)
+
+```
+运行器过去**硬编码**哪些套件拿地址(`file === 'all_views_test.js' ? [PANEL] : …`)⇒ 新套件静默拿不到 ⇒
+`NEEDS-INPUT` ⇒ `classify()` 判 `UNREGISTERED/BLOCKING — capability IS present, yet this suite is unproven`。
+改为**按声明驱动**:读套件的 `REQUIRES`(`panel-http` ⇒ `[PANEL]` · `cdp-browser` ⇒ `[PANEL, CDP]`),
+首个与**重试**两个 spawn 点共用 `...extra` ⇒ **TODO(gate.env_class) 由结构关闭**;
+并据此把 `all_views_test.js` 里的 TODO 注释换成**真声明**。
+⇒ 门:**2 red(皆既知) / 62 proven / 5 held / 0 unregistered**
+```

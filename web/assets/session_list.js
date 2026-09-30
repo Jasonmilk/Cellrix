@@ -82,11 +82,11 @@
     rerenderSides();
     /* P0-2d: the DAG tree mounts into its own container; the list above is untouched. */
     if (window.CxPanelTree && window.CxPanelTree.mountSidebar) {
-      /* P0-2e: the tree's rows come from the EXISTING single-period path (`/api/events?job_id=`,
+      /* P0-2e: the tree's rows come from the EXISTING single-period path (`/api/events?id=`,
        * the same one the timeline uses) — no new endpoint, no second source of truth. */
       window.CxPanelTree.mountSidebar(periods, {
         fetchRows: function (id) {
-          return fetch('/api/events?job_id=' + encodeURIComponent(id))
+          return fetch('/api/events?id=' + encodeURIComponent(id))
             .then(function (r) { return r.json(); })
             .then(function (j) { return (j && (j.events || j.rows)) || []; });
         },
@@ -432,10 +432,10 @@
   // user turns and answers render as messages, then the next sentence
   // continues the period (resume_from on the backend). seq-guarded: a slow
   // earlier fetch must not overwrite a session the user switched to.
-  function loadPeriodToChat(jobId) {
+  function loadPeriodToChat(periodId) {
     var seq = ++st.histSeq;
     var box = document.getElementById('chat-msgs');
-    box.innerHTML = '<div class="period-head">—— 正在加载 ' + esc(jobId.slice(0, 12)) + ' 的历史 ——</div>';
+    box.innerHTML = '<div class="period-head">—— 正在加载 ' + esc(periodId.slice(0, 12)) + ' 的历史 ——</div>';
     /* ONE read, two projections (ADR-0018 T4). The shell merges the chain
      * through the assembly and hands ONE window to the tape; this view renders
      * the events off that window, and the trajectory reads the same window as
@@ -445,7 +445,7 @@
      * L0 (temporary, retired when anaphase provides session_id) lives with the
      * read, in script.html's loadWindow.
      */
-    Cx.loadWindow(jobId).then(function (win) {
+    Cx.loadWindow(periodId).then(function (win) {
       if (seq !== st.histSeq) return;
       var events = win.events;
       if (!events.length) {
@@ -454,7 +454,7 @@
         window.CxWayout.render(box, {
           code: 'events-all-rejected',
           action: { run: function () {
-            if (window.open) { window.open('/api/events?job_id=' + encodeURIComponent(jobId), '_blank'); }
+            if (window.open) { window.open('/api/events?id=' + encodeURIComponent(periodId), '_blank'); }
           } }
         });
         return;
@@ -466,7 +466,7 @@
                             // only backfills periods written before it existed
       var d = document.createElement('div');
       d.className = 'period-head';
-      d.textContent = '—— 经历 ' + jobId + ' 的历史 ——'
+      d.textContent = '—— 经历 ' + periodId + ' 的历史 ——'
         + (win.jobs.length > 1 ? '（含 ' + win.jobs.length + ' 段）' : '');
       box.appendChild(d);
       events.forEach(function (e) {
@@ -528,14 +528,14 @@
       /* The trajectory is another projection of this same tape: it is told
        * WHICH period was chosen, not handed the events. Passing the stream
        * along as well is the second way in that let the two drift apart. */
-      if (Cx.selectPeriod) { Cx.selectPeriod(jobId); }
+      if (Cx.selectPeriod) { Cx.selectPeriod(periodId); }
     }).catch(function (e) {
       if (seq !== st.histSeq) return;
       /* 就地给出路：重试就是把这一段再载一次。 */
       window.CxWayout.render(box, {
         code: 'history-fetch-failed',
         detail: String(e && e.message || e),
-        action: { run: function () { loadPeriodToChat(jobId); } }
+        action: { run: function () { loadPeriodToChat(periodId); } }
       });
     });
   }

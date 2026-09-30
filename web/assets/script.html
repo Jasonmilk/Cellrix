@@ -161,7 +161,7 @@
           return { parts: [], start: start, ordered: [], windowState: windowState, walk: walk };
         }
         return Promise.all(ids.map(function (id) {
-          return fetch('/api/events?job_id=' + encodeURIComponent(id))
+          return fetch('/api/events?id=' + encodeURIComponent(id))
             .then(function (r) { return r.json(); })
             .then(function (j) { return { id: id, events: (j && j.events) || [] }; });
         })).then(function (parts) {
