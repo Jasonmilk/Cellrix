@@ -49,8 +49,6 @@
 | `.nm` | flows.html, session_list.js |
 | `.pt-model` | panel_tree.js |
 | `.pt-steps` | panel_tree.js |
-| `resume-list` | chat.html, session_list.js |
-| `.resume-opt` | session_list.js |
 | `s-side` | base.html, prove_track.view.js, session.html |
 | `.ses-edit` | session_list.js |
 | `.ses-head` | session_list.js |
@@ -133,7 +131,7 @@
 | `.badge` | base.html |
 | `.brand` | base.html |
 | `.btn` | base.html, chat.html, flows.html |
-| `.btn-ghost` | base.html, chat.html |
+| `.btn-ghost` | base.html |
 | `.btn-icon` | base.html |
 | `.btn-primary` | chat.html |
 | `.btn-sm` | base.html |

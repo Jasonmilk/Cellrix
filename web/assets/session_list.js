@@ -562,46 +562,12 @@
     if (drop) drop.onclick = function () { newChat(); };
   }
 
-  // Resume-from-experience dropdown: sits in the chat-input's bottom-right,
-  // listing the latest periods to continue (explicit, never implicit).
-  function toggleResume() {
-    var list = document.getElementById('resume-list');
-    if (list.style.display !== 'none') { list.style.display = 'none'; return; }
-    fetch('/api/sessions').then(function (r) { return r.json(); }).then(function (j) {
-      var periods = (j.periods || []).slice(0, 8);
-      list.innerHTML = periods.map(function (p) {
-        /* The label leads and the id is a SUFFIX OF A FEW CHARACTERS: a 20-character id as the visible
-         * text made every option look like every other one (§255). */
-        return '<div class="resume-opt" data-job="' + esc(p.period_id) + '">' + esc(autoName(p))
-          + ' <span class="dim">' + esc(p.period_id.slice(-6)) + '</span></div>';
-      }).join('') || '<div class="empty">尚无经历</div>';
-      list.style.display = '';
-      list.querySelectorAll('.resume-opt').forEach(function (el) {
-        el.onclick = function () {
-          var job = el.getAttribute('data-job');
-          list.style.display = 'none';
-          Cx.setNav({ period: job });
-          setBanner('续接经历<span class="tid">' + esc(String(job).slice(-6)) + '</span> —— 下一句话延续这段对话');
-          loadPeriodToChat(job);
-          document.getElementById('chat-text').focus();
-        };
-      });
-    }).catch(function (e) {
-      /* 就地给出路：重试 = 收起再展开这个下拉，它自己会重新取一次。 */
-      list.style.display = '';
-      window.CxWayout.render(list, {
-        code: 'sessions-fetch-failed',
-        detail: String(e && e.message || e),
-        action: { run: function () { list.style.display = 'none'; toggleResume(); } }
-      });
-    });
-  }
+  /* The 「续接」 dropdown is GONE (§299): continuing is what clicking a conversation does. */
 
   window.CxSessionList = {
     esc: esc,
     renderSides: renderSides,
     moveSelection: moveSelection,
-    toggleResume: toggleResume,
     newChat: newChat
   };
 })();

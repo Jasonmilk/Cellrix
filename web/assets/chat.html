@@ -6,10 +6,13 @@
             <div class="empty"><div class="orb" aria-hidden="true">⌁</div><b>尚未开始的对话</b><p>说句话吧——这是给 Helix 的一段新经历。</p></div>
           </div>
           <div class="chat-input">
-            <input id="chat-text" class="inp" type="text" placeholder="输入消息，回车发送（Enter 发送 / Esc 清除）" autocomplete="off">
+            <!-- MULTI-LINE COMPOSER (owner request): Enter makes a newline, Cmd/Ctrl+Enter sends, Esc clears.
+                 The 「续接」 control is gone: clicking a conversation in the sidebar IS the way to continue
+                 one, so a second, competing entry point only invited the two to disagree (§299). -->
+            <textarea id="chat-text" class="inp" rows="1" autocomplete="off"
+                      style="resize:none;min-height:2.6em;max-height:12em;overflow-y:auto;line-height:1.45"
+                      placeholder="输入消息，⌘/Ctrl+Enter 发送（Enter 换行 / Esc 清除）"></textarea>
             <button type="button" class="btn btn-primary" onclick="sendChat()">发送</button>
-            <button type="button" class="btn btn-ghost" onclick="toggleResume()" title="续接某段经历继续对话">续接</button>
-            <div id="resume-list" class="resume-list" style="display:none;"></div>
           </div>
         </div>
       </div>

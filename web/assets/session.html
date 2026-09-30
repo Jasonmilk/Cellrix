@@ -70,8 +70,8 @@
     });
   }
 
-  window.CxSession = { loadSessions: loadSessions, toggleResume: L.toggleResume, newChat: L.newChat };
-  window.toggleResume = L.toggleResume; // chat.html onclick 内联依赖全局
+  window.CxSession = { loadSessions: loadSessions, newChat: L.newChat };   /* `toggleResume` is gone (§299: continuing is a click) */
+  /* `window.toggleResume` removed with the 「续接」 control (§299) — nothing calls it. */
 
   /* The shell never names a view it does not own — a view asset declares its
    * own enter hook (ADR-0015 D8 follow-through). The experience list feeds

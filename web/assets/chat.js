@@ -148,7 +148,7 @@
     var btn = document.querySelector('.chat-input .btn');
     clearFail();                       /* 新一轮尝试不该把上一次的失败留在上面 */
     addMsg('user', text, false);
-    input.value = '';
+    input.value = ''; growComposer(input);
     Cx.state.chatBusy = true;
     btn.disabled = true; btn.textContent = '思考中…';
     var done = false;
@@ -280,11 +280,26 @@
 
   /* Enter sends, Esc clears — owned here because the target is this view's
    * input, not the shell's business. */
+  /* COMPOSER KEYS (owner request): the box is a TEXTAREA, so Enter is a NEWLINE and
+   * `Cmd/Ctrl+Enter` sends. Esc clears. One modifier, no ambiguity about which gesture sends. */
   document.addEventListener('keydown', function (e) {
     if (!e.target || e.target.id !== 'chat-text') return;
-    if (e.key === 'Enter') sendChat();
-    if (e.key === 'Escape') e.target.value = '';
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendChat(); return; }
+    if (e.key === 'Escape') { e.target.value = ''; growComposer(e.target); }
   });
+
+  /* AUTO-GROW: the box starts at one line and grows with its content up to the CSS max-height, so a
+   * multi-line message stays visible without stealing the conversation's space. */
+  function growComposer(el) {
+    if (!el) { return; }
+    try {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight || 0, 200) + 'px';
+    } catch (err) { /* a measured height is cosmetic; never block typing */ }
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'chat-text') { growComposer(e.target); }
+  }, true);
 
   // Inline `onclick` attributes resolve against the global scope.
   window.sendChat = sendChat;
