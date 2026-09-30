@@ -11900,3 +11900,16 @@ expected: **8** rows（7 drawn + 1 turn header)｜ rendered: **1 row + 1 header*
   焊成一个数就是**两个量共用一个词**,这个坑本项目已踩过多次。
 · 剩余一条红(另一件事):`every row is traceable to a source file and line`(provenance `#6`)。
 ```
+
+
+## 284. ✅ **陈旧的正则**:最后一条红也是判据的,不是产品的
+
+```
+活页面:`data-e-ev = run-233a86e49afbc98c-p006abcd8ed000001#6`
+旧判据:`/^run-[0-9a-f]+#\d+$/` —— 写在 period id **还没有** `-p<clock><counter>` 后缀的年代
+⇒ 行**是可追溯的**(period id + 序号 `#6`),但正则不认 ⇒ 该红。
+修法:**从窗口自己的 id 派生** —— 行的来源必须指向**本窗口**的某个 period id + 一个序号
+  (实测 `#6` 对得上 window 的第一个 id);它仍能红:**来自别的窗口的行会失败**。
+顺带:该套件补上 `REQUIRES = 'panel-http'` ⇒ 从"未注册"变成"面板缺席时 held"。
+⇒ 于是 `all_views_test` 由「3 红 + 假 skip」变为 **全绿**,门回到 **2 红(皆既知)**。
+```

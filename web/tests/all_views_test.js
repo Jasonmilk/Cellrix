@@ -267,7 +267,7 @@ function skip(label, why) {
       }).length;
       /* `list` lives inside this try; the branch below needs its length, so carry it out explicitly. */
       expect = { periods: ids.length, drawn: drawn, rows: drawn + ids.length,
-                 listCount: list.length,
+                 listCount: list.length, windowIds: ids.slice(),
                  metering: merged.events.filter((e) => EFX.KIND_OF[e.type] === "metering").length };
       global.window = prevWindow;
     } catch (e) {
@@ -352,9 +352,19 @@ function skip(label, why) {
       /* 导出的可追溯性: every row can be traced back to a line of a file. */
       const ids2 = Array.from(doc.querySelectorAll("#eTbody tr.ev[data-e-ev]"))
         .map((r) => r.getAttribute("data-e-ev"));
-      check("every row is traceable to a source file and line",
-        ids2.length > 0 && ids2.every((v) => /^run-[0-9a-f]+#\d+$/.test(v)),
-        JSON.stringify(ids2.slice(0, 2)));
+      /* DERIVED FROM THE DATA, NOT FROM A PHANTOM SHAPE (§284): the old regex was
+       * /^run-[0-9a-f]+#\d+$/, written before period ids carried the `-p<clock><counter>` suffix; the
+       * live id is `run-<16hex>-p<10hex><6hex>#<seq>`, so every row failed a check it actually passes.
+       * The criterion now asks the question that matters: does the row's provenance name a period of
+       * THIS window (plus a sequence)? It can still go red — a row from outside the window fails. */
+      const traceOk = (v) => {
+        const m = /^(.+)#(\d+)$/.exec(String(v));
+        return !!m && (expect.windowIds || []).indexOf(m[1]) >= 0;
+      };
+      check("every row is traceable to a period of THIS window + a sequence",
+        ids2.length > 0 && ids2.every(traceOk),
+        JSON.stringify(ids2.slice(0, 2)) + " against window " + JSON.stringify((expect.windowIds || []).slice(0, 2))
+          + (ids2.length && !ids2.every(traceOk) ? "  (MUTATION would be: a row from another window)" : ""));
     }
   }
 
