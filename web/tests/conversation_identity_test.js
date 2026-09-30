@@ -63,6 +63,37 @@ const jobMembers = Object.keys(byJob).map((k) => byJob[k].sort().join('+')).sort
 ok('MUTATION: keying by job_id CROSSES the two conversations (membership differs)',
   jobMembers !== members.join(' | '), 'by job_id: ' + jobMembers);
 
+/* SINGLE-ROUND CONVERSATIONS ARE ONE CLASS, NOT N ROWS (§302). Measured in the owner's own view: ~45
+ * visible rows were the same one-round conversation repeated, so the sidebar read as noise. */
+{
+  const host3 = w.document.createElement('div');
+  host3.id = 'host-fixture-302';
+  w.document.body.appendChild(host3);
+  const S = [
+    { period_id: 'm1', parent: null, job_id: 'A', reply: 'r', first_ts: '2026-09-30T05:00:00Z' },
+    { period_id: 'm2', parent: 'm1', job_id: 'A2', reply: 'r', first_ts: '2026-09-30T05:01:00Z' },
+    { period_id: 's1', parent: null, job_id: 'B', reply: 'r', first_ts: '2026-09-30T06:00:00Z' },
+    { period_id: 's2', parent: null, job_id: 'C', reply: 'r', first_ts: '2026-09-30T07:00:00Z' },
+    { period_id: 's3', parent: null, job_id: 'D', reply: 'r', first_ts: '2026-09-30T08:00:00Z' }
+  ];
+  w.CxPanelTree.mountSidebar(S, { hostId: host3.id });
+  const box = host3.querySelector('.pt-singles');
+  const head = host3.querySelector('[data-single-rounds-toggle]');
+  const outside = Array.from(host3.querySelectorAll('.ses-item')).filter((r) => !box || !box.contains(r));
+  ok('single-round conversations are folded under ONE declared header (§302)',
+    !!box && !!head && box.getAttribute('data-single-rounds') === '3',
+    'box=' + !!box + ' declared=' + (box && box.getAttribute('data-single-rounds')));
+  ok('and they are COLLAPSED by default, so the list is at conversation scale',
+    !!box && box.hasAttribute('hidden') && outside.length === 2,
+    'hidden=' + (box && box.hasAttribute('hidden')) + ' visible=' + outside.length);
+  ok('one click reveals them (and relabels the header)',
+    (function () { if (!head) { return false; } head.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); return !box.hasAttribute('hidden'); })(),
+    head && head.textContent);
+  ok('MUTATION: without folding all five rows would be visible (the noise the owner saw)',
+    outside.length !== S.length, 'visible=' + outside.length + ' of ' + S.length);
+  if (host3.parentNode) { host3.parentNode.removeChild(host3); }
+}
+
 /* A ONE-ROUND CONVERSATION MUST OCCUPY ONE LINE (§301). Measured live: 49 headers + 50 rows for 50
  * conversations — a header saying "1 period · 1 with reply" above the only row it described. */
 {

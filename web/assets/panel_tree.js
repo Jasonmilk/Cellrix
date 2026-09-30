@@ -301,6 +301,43 @@
       });
       list.appendChild(row);
     });
+    /* SINGLE-ROUND CONVERSATIONS ARE ONE CLASS, NOT N ROWS (ADR-0048 §302). Measured in the owner's own
+     * view: ~45 visible rows were the SAME one-round conversation (same opening words, "start, single
+     * round") repeated, so the sidebar read as noise instead of as conversations. They are NOT deleted and NOT
+     * hidden facts: they are folded under ONE header that DECLARES how many there are, collapsed by
+     * default and one click away. Multi-round conversations keep their own entries and headers (§301). */
+    var convOf = function (id) {
+      var n0 = tree.byId[id] || {};
+      return (n0.row && n0.row.conversation_id) || n0.root || (n0.row && n0.row.period_id) || null;
+    };
+    var singleIds = visible.filter(function (id) { return (convCount[convOf(id)] || 0) === 1; });
+    if (singleIds.length >= 2) {
+      var singleBox = doc.createElement('div');
+      singleBox.className = 'pt-singles';
+      singleBox.setAttribute('hidden', '');
+      singleBox.setAttribute('data-single-rounds', String(singleIds.length));
+      var singleHead = doc.createElement('button');
+      singleHead.type = 'button';
+      singleHead.className = 'pt-group pt-single-head';
+      singleHead.setAttribute('data-single-rounds-toggle', '');
+      var label = function (open) { return '\u5355\u8f6e\u4f1a\u8bdd \u00b7 ' + singleIds.length + ' \u6bb5' + (open ? '\uff08\u70b9\u51fb\u6536\u8d77\uff09' : '\uff08\u70b9\u51fb\u5c55\u5f00\uff09'); };
+      singleHead.textContent = label(false);
+      singleHead.onclick = function () {
+        if (singleBox.hasAttribute('hidden')) {
+          singleBox.removeAttribute('hidden');
+          singleHead.textContent = label(true);
+        } else {
+          singleBox.setAttribute('hidden', '');
+          singleHead.textContent = label(false);
+        }
+      };
+      singleIds.forEach(function (id) {
+        var r = list.querySelector('[data-period="' + id + '"]');
+        if (r) { singleBox.appendChild(r); }
+      });
+      list.appendChild(singleHead);
+      list.appendChild(singleBox);
+    }
     host.appendChild(list);
     host.appendChild(detail);
     if (sel) { selectOne(sel); }
