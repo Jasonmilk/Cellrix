@@ -12568,3 +12568,30 @@ payload:period=115 ｜ **会话(链根)=101** ｜ 真根(parent null)=101 ｜ �
 **判定记录五字段**(principal / item / operation / rule_version / decision_time)= tuck 审计线的工作;
 本次未核其现状 ⇒ 不据此下结论,也不抢在线 2/线 3 之前。
 ```
+
+
+### 304.4 ✅ **机制查清**:那一列是**计量列**,不是文本列 —— "无痕"结论第二次被证伪
+
+```
+`cell_metering.js:41  var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];`
+`cell_metering.js:127 function tokOf(e) { return readChain(e, TOK_PATHS, true); }`
+⇒ `panel_tree.js:396` 的行值 = `CxCellMetering.tokOf(e)` ⇒ **读的是 token 计数(计量维度)**,不是文本。
+而 `assistant/reply` / `assistant/think` / `turn/start` **本来就不携带** completion_tokens
+⇒ 该列显示 `· 无数据` 是【**维度不适用**】,不是"未记录",更不是"没留痕"。
+⇒ 该纪律**代码里早就写着**(`cell_metering.js:42-46`,ADR §52 / Codd 第四态):
+   "A dimension is INAPPLICABLE to an event type that never carries it — that is NOT 'unmeasured this time'"
+   并明确警告:把两态合并会"flood every group with >="。
+⇒ 文本记录与呈现**都在**:`assistant/reply.text` ✓ · `turn/end.reply` ✓ · 检视面板
+   `prove_track.view.js:653` 渲染 `ev.payload` ✓ ⇒ 缺的只是**行上"不适用"没有自己的名字**。
+```
+
+### 304.5 因此吸收项 ① 的**正确形态**
+
+```
+不是"在产生处补写 payload"(它已经在写),而是 **让"不适用"具名**:
+  · 行上的计量列:不适用 ⇒ `—`(em dash,与 `prove_track.view.js:80` 的约定一致);
+    只有"该类应当携带却缺失"才用 `· 无数据`;"未测量"继续用 `· 未计量`
+  · `assistant/think.text === ''`(空串)仍是**真三态问题**:`有内容 / 有但为空(模型未产出) / 缺席`
+    ⇒ 三者必须可分辨(这一条**保留**,是本审查唯一站得住的"源头"要求)
+⇒ 判据(下一轮):同一 period 的三态各出现一次 ⇒ 行上出现三种不同的名字;变异:合并任意两态 ⇒ 红
+```
