@@ -27,7 +27,11 @@ const ADR = 'docs/decisions/ADR-0048-panel-state-owner-and-render-contract.md';
 
 /* The governor: the CONCERN, with the path list as its projection. */
 const GOVERNS = ['web/assets/', 'web/src/', 'web/tests/', 'tools/',
-  'docs/adr-ecosystem.lock.json', 'docs/dom-contract.md'];   /* §13: the boundary's own check + its input + its product */
+  'docs/adr-ecosystem.lock.json', 'docs/dom-contract.md',
+  /* §13 (amended): the FLAKY LEDGER is this conern's own machinery — `run_all.js` reads it, and
+   * `flake_roster_test.js` is its criterion. It is not application state; leaving it outside the
+   * projection made the boundary red, which is the projection telling me the prose needed amending. */
+  'docs/flaky-ledger.jsonl'];   /* §13: the boundary's own check + its input + its product */
 const ADR_PATHS = ['docs/decisions/',
   /* ADR-0048 §13 (amended): the ADR's OWN navigation layer is part of the concern
    * ("本 ADR 自身"). §13 says the path list is only the EXECUTABLE PROJECTION of a

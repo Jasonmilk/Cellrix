@@ -249,6 +249,8 @@ loading 用 **`aria-busy`**（标准表示），错误表示借 **RFC 9457**。
 governs 条款已含这一项，而 `tools/adr_anchor.js` 就是那个检查;补进来是**补全投影**,不是放宽边界）
 · **`docs/adr-ecosystem.lock.json`** —— **本节机械检查的输入**（由 `adr_anchor.js --refresh` 派生;与索引同理:它是本 ADR 自己那套检查的产物/输入,不是越界物）
 · **`docs/dom-contract.md`** —— **本节机械检查的另一半产物**（由 `dom_contract_scan.py` 生成;
+
+· **`docs/flaky-ledger.jsonl`** —— **本节机械检查的第三个产物**:`run_all.js` 的 flaky 名单读它,`flake_roster_test.js` 是它的判据。它记的是**判据自身的复现性**,不是应用状态 ⇒ 属本节关切。（写入 `web/tests/docs/` 时机器读不到;写入受管路径时边界红 —— 两次红都指回了**同一件事**:投影与散文必须同时改。)
   与索引/锁文件同理:它是本 ADR 自己那套检查的产物,不是越界物）
 · `docs/decisions/`（本 ADR 自身）
 · **`docs/ADR-0048.index.md`** —— **本 ADR 自己的导航层**（由 `adr_index_test.js` 生成）。
