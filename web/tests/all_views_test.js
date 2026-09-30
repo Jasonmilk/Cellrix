@@ -274,10 +274,27 @@ function skip(label, why) {
       check("the expected chain could be recomputed independently", false, e.message);
     }
 
-    /* The rows arrive when the tape publishes; wait rather than assume. */
+    /* WAIT FOR SETTLE, NOT FOR "SOMETHING" (§280). Measured: the loop below waited until ≥1 row
+     * existed, while the assertions require the FULL count — so a panel that fills in steps (1→3→7)
+     * was judged at 1 and reported as a product defect. The trajectory is printed so the two causes can
+     * be told apart afterwards: a RISING series means the probe stopped too early; a PLATEAU means a
+     * real gap. Budget raised to 8s (> 3 data periods; `prove_track.view.js` polls every 2s). */
     const rowsNow = () => doc.querySelectorAll("#eTbody tr.ev[data-e-ev]").length;
     const headsNow = () => doc.querySelectorAll("#eTbody [data-e-turntoggle]").length;
-    for (let i = 0; i < 20 && !rowsNow(); i++) { await sleep(250); }
+    const traj = [];
+    const budget = Number(process.env.SETTLE_MS || 8000);
+    const t0 = Date.now();
+    let plateau = 0, last = -1;
+    for (;;) {
+      const n = rowsNow() + headsNow();
+      traj.push(n);
+      if (expect && n === expect.rows) { break; }              /* reached the expected total: settled */
+      if (n === last) { plateau++; if (plateau >= 3) { break; } } else { plateau = 0; last = n; }
+      if (Date.now() - t0 > budget) { break; }                  /* budget exhausted: report what we saw */
+      await sleep(250);
+    }
+    console.log("     settle trajectory: " + traj.join("\u2192") + "  (" + (Date.now() - t0) + "ms, budget " + budget + ")");
+    if (process.env.SETTLE_MS === "0") { traj.push(-1); }
 
     if (!expect) {
       skip("the trajectory opened on its own", "the expectation could not be recomputed");
@@ -291,9 +308,13 @@ function skip(label, why) {
     } else {
       console.log("     expected: " + expect.rows + " rows (" + expect.drawn +
         " drawn + " + expect.periods + " turn headers), " + expect.metering + " metering events not drawn");
-      check("opening the trajectory alone shows the whole chain",
+      /* The name no longer over-promises (§280): it asserts what it measures — the rendered total
+       * equals the EXPECTED total for the window that was loaded (`expect.periods` may be 1). */
+      check("the trajectory renders the WHOLE loaded window (rows + turn headers == expected)",
         rowsNow() + headsNow() === expect.rows,
-        rowsNow() + " rows + " + headsNow() + " headers vs " + expect.rows);
+        rowsNow() + " rows + " + headsNow() + " headers vs " + expect.rows
+        + "  |  trajectory " + traj.join("\u2192")
+        + (traj.length > 1 && traj[traj.length - 1] > traj[0] ? "  (RISING ⇒ the probe stopped early)" : "  (plateau)"));
       check("every period of the chain has a turn header",
         headsNow() === expect.periods,
         headsNow() + " vs " + expect.periods);
