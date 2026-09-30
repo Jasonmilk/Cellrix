@@ -278,6 +278,11 @@ function checkEngScannerSelfTest() {
 
 let failed = 0;
 const results = [];
+/* SKIPS ARE A FOURTH FACT, NOT A FOOTNOTE (§287). A suite can PASS while some criteria never ran
+ * because this data set has nothing to exercise. Counting that as fully `proven` hides it — and if
+ * the skipped ones are the strong assertions, the gate drifts silently (0-bit family again). */
+const skippedRoster = [];
+let skippedTotal = 0;
 const failedRoster = [];
 /* EXIT CODES ARE A CONTRACT (ADR-0048 §147 / rule ⑳): 1 = assertion failure (RED),
  * 2 = environment missing, 3 = declared absent (NEEDS-INPUT, handled above),
@@ -363,7 +368,11 @@ for (const [file, what] of SELF_CONTAINED) {
      * suite unproven at the other, and the probe then said "capability IS present, yet this suite is
      * unproven" — a red for the wrong reason. Landed already: the capability, the probe (which reads
      * the DECLARED panel component in chain.json), and the register entry with owner+probe. */
-    execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' });
+    /* Capture the suite's own RESULT line: its skip count is evidence about COVERAGE, and coverage
+     * that is not printed is coverage nobody can audit. */
+    const passOut = execFileSync(process.execPath, [target, ...extra], { stdio: 'pipe' }).toString();
+    const sk = /(\d+) skipped/.exec(passOut);
+    if (sk) { skippedRoster.push(file + ' (' + sk[1] + ')'); skippedTotal += Number(sk[1]); }
     results.push(['PASS', file, what]);
   } catch (e) {
     const out = (e.stdout || Buffer.from('')).toString();
@@ -877,7 +886,8 @@ console.log(failed === 0
     + ']'
     + (abortedRoster.length ? ', ' + abortedRoster.length + ' ABORTED (not red)' : '')
     + (envMissingRoster.length ? ', ' + envMissingRoster.length + ' env-missing (not red)' : '')
-    + (flakyRoster.length ? ', ' + flakyRoster.length + ' FLAKY (filed, neither red nor proven)' : ''));
+    + (flakyRoster.length ? ', ' + flakyRoster.length + ' FLAKY (filed, neither red nor proven)' : '')
+    + (skippedTotal ? ', ' + skippedTotal + ' skipped (criteria that RAN NOTHING: nothing to exercise)' : ''));
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
  * ledger". Merging them into exit 1 would guarantee the wrong remedy, so XPASS
  * rides the register channel (3 = the checker's own bookkeeping is stale). */

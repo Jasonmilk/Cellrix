@@ -29,6 +29,19 @@ ok(SRC.indexOf('FLAKY ' + "' + file + '") >= 0 || /FLAKY ' \+ file/.test(SRC),
 /* MUTATION: reverting to option A (treat the green as proof) must be visible */
 const optA = SRC.replace(/if \(flakyCount\(file\) >= FLAKY_ESCALATE_AT\) \{/, 'if (false) {');
 ok(optA !== SRC, 'MUTATION: the A/B/C decision is a real branch in the source (it can be reverted)');
+/* A FOURTH FACT: SKIPPED (§287). A suite can pass while criteria never ran; if that count is not in the
+ * verdict, "proven" silently means "proven OR not looked at". The three checks below pin the wiring, and
+ * the mutation shows they can go red: delete the verdict clause and the pattern disappears. */
+ok(/let skippedTotal = 0;/.test(SRC), 'the runner accumulates a SKIPPED total (a fact, not a footnote)');
+ok(/\(\\d\+\) skipped/.test(SRC), 'and it reads the count from the suite\'s own RESULT line');
+ok(/skipped \(criteria that RAN NOTHING/.test(SRC), 'and the verdict names the class: criteria that RAN NOTHING');
+/* A REAL mutation (§287): delete the exact clause by literal string, so the pattern the check looks
+ * for is genuinely gone — a regex that fails to match would leave this check as a tautology. */
+const NO_SKIP_CLAUSE = "+ (skippedTotal ? ', ' + skippedTotal + ' skipped (criteria that RAN NOTHING: nothing to exercise)' : '')";
+const noSkipClause = SRC.split(NO_SKIP_CLAUSE).join('');
+ok(!/skipped \(criteria that RAN NOTHING/.test(noSkipClause),
+  'MUTATION: removing the verdict clause makes the check above fail (it is not a tautology)');
+
 console.log(bad === 0 ? 'OK — red, green, and FILED are three different things'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);

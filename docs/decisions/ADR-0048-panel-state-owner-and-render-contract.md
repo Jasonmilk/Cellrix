@@ -11978,3 +11978,18 @@ yet this suite is unproven`。而它在**声明了能力**、面板也**在**的
 而 `run_all.js:377` **早已**把 4 定义为 `ABORT — the suite crashed; nothing was asserted`(既有语义,我差点多加一条冲突分支)。
 三态实测:正常 **0** ｜ 无地址 **3** ｜ 人为崩溃 **1**(同步崩溃走 1 ⇒ **红**,不洗)｜ 异步 harness 错走 **4**(ABORT,具名)
 ```
+
+
+### 287.4 已落:**跳过进判决行**（一次改完,不再分两步)
+
+```
+① `run_all.js`:`skippedRoster` / `skippedTotal` 与 `results` 同时声明
+② PASS 路径**捕获套件 stdout**,解析其 `RESULT` 行里的 `(\d+) skipped` 并累计
+③ 判决行追加 `, N skipped (criteria that RAN NOTHING: nothing to exercise)`
+⇒ 实测:`2 red / 60 proven / 5 held / 0 unregistered … , **2 skipped (criteria that RAN NOTHING)**`
+⇒ 判据(`flake_roster_test.js`,4 条,全绿):
+   · 累计变量存在 · 从套件 RESULT 行读 · 判决行**具名**该类别
+   · **真变异**(字面删除那段判决子句 ⇒ 上面的检查必须失败 —— 我第一次用正则删,没删掉,
+     于是"变异"成了同义反复 ⇒ 改成**字面 split/join** 才真)
+⇒ 于是"proven"不再可能同时意味着"没查"(0-bit 家族,这次长在门的计数里)
+```
