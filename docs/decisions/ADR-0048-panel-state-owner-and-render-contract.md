@@ -12330,3 +12330,39 @@ conversation_id := 该 period 的 **parent 链之根**(一个 period id)
 live 实测:period=93 ｜ **真实对话数(链根)= 79** ｜ **job 数 = 22**(⇒ 22 个 job 曾"代表"79 段对话,少算 3.6×)
         `data-conversation` 与链根不一致的行 = **0** ✓
 ⇒ 门:旧判据(panel_tree)那条改为关系式后,PASS ⇒ **2 red(皆既知) / 63 proven / 5 held / 0 unregistered**
+
+
+## 298. ✅ **P1' 落地**:`conversation_id` 由**读侧声明**,客户端只消费
+
+### 298.1 读侧（Anaphase,`cargo test --lib` **240 passed**)
+
+```
+`PeriodSummary` 增 `conversation_id: Option<String>` —— 语义与两条**具名边界**:
+  · `Some(id)`:根自名,续轮继承根(由**不可变血缘**派生,不是内容摘要、不是新发放)
+  · `None`:**窗口把链截断**(根不在窗口)⇒ 任何答案都会随 `limit` 变化 ⇒ 具名缺席,不猜
+  · 环 ⇒ 同样 `None`
+计算在窗口确定之后统一做(memo,O(n)) ⇒ 所以"事实"不依赖调用者的分页。
+判据(3 条新测试):根自名 · 续轮继承 · **同一 job 的两条链仍是两段** · **根出窗口 ⇒ None**
+⚠️ 夹具教训:非 period 形状的 `resume_from` 会被当作 **job 引用并拒绝**(既有判据),我第一版夹具
+   因此"子节点成了根" —— 夹具必须用 `run-<16hex>-p<16hex>` 形状,否则测的是别的东西。
+```
+
+### 298.2 客户端（Cellrix):**声明优先,派生兜底,并有判据钉住一致**
+
+```
+`panel_tree.js`:`conv = row.conversation_id || 血缘派生 || period_id`(旧 payload 仍可工作);
+`groupByConversation` 同序 ⇒ 一个事实一个来源,而**回落路径**不静默(见下)
+`newest_first_contract_test.js` 增 3 条(实测 **7 passed**):
+  · 每个**已声明**的 `conversation_id` 与血缘派生**一致** ⇒ 不符 = **0**（漂移会红,不会被静默调和)
+  · 读侧对根与续轮都声明(只在截断时空缺)
+  · **变异**:按 `job_id` 分组会把不同链揉在一起(实测 defect)
+live:period=60 ｜ 不符 **0** ｜ `None`(截断)**2** ｜ 6 条**同 job** 的 period 各自是不同的对话 ✓
+```
+
+### 298.3 线 2 进度
+
+```
+✅ P1'' 参数名收敛(id=,job_id 兼容)  ✅ 对话键 = 血缘根(表现层)  ✅ P1' 读侧声明 conversation_id
+□ P3 老数据具名"无血缘",与"单轮会话"分开(今日不可判定 ⇒ 只能具名)
+□ 之后:线 3(mode 进 payload → 能力过滤/失败转移 → loop.impl) 与线 4(适配器 ADR → Tauri 壳)
+```

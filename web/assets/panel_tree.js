@@ -214,7 +214,11 @@
     visible.forEach(function (id) {
       var n = tree.byId[id];
       /* GROUP HEADER when the conversation changes: 13 first-level entries over 52 children (§238). */
-      var conv = n.root || (n.row && n.row.period_id) || null;   /* §297: the lineage root, never the content digest */
+      /* THE DECLARED FACT WINS (§298): the reader now projects `conversation_id` (the lineage root,
+       * `null` when the window truncated the chain). The local derivation stays as the fallback for
+       * payloads that predate the field — and a LIVE criterion asserts the two agree, so drift is red
+       * rather than silently resolved. Never `job_id`: a digest is provenance, not a key. */
+      var conv = (n.row && n.row.conversation_id) || n.root || (n.row && n.row.period_id) || null;
       if (showGroups && conv && conv !== lastGroup) {
         var g = groupsById[conv];
         var head = doc.createElement('div');
@@ -396,7 +400,7 @@
       if (!p) { return; }
       /* KEYED BY THE LINEAGE ROOT (§297), computed from `parent` alone — so two conversations with the
        * same opening words stay two conversations instead of fusing on a shared content digest. */
-      var key = p.period_id ? rootOfKey(p.period_id) : null;
+      var key = p.conversation_id || (p.period_id ? rootOfKey(p.period_id) : null);
       if (!key) { return; }
       if (!by[key]) {
         by[key] = { conversation_id: key, periods: [], first_ts: p.first_ts || null, last_ts: p.last_ts || null, replied: 0 };

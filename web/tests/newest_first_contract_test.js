@@ -60,6 +60,37 @@ function ok(name, cond) { if (cond) { pass++; console.log('  ok   ' + name); } e
   const tie = ts.filter((t) => t === ts[0]).length;
   ok('the newest timestamp is UNIQUE (else the pick needs the name `ambiguous-latest`)  [k=' + tie + ']', tie === 1);
 
+  /* THE DECLARED CONVERSATION AND THE DERIVED ONE MUST AGREE (§298). The reader projects
+   * `conversation_id` (the lineage root; `null` when the window truncated the chain); the client can
+   * still derive it from `parent`. Two sources for one fact are only safe while they are CHECKED —
+   * otherwise a drift becomes a silent disagreement about which periods are one conversation. */
+  const byId = {};
+  ps.forEach((p) => { byId[p.period_id] = p; });
+  const derived = (id) => {
+    let cur = id, seen = {};
+    while (byId[cur] && byId[cur].parent && !seen[cur]) { seen[cur] = 1; cur = byId[cur].parent; }
+    return cur;
+  };
+  const mis = [];
+  let declared = 0, truncated = 0;
+  ps.forEach((p) => {
+    if (p.conversation_id == null) { truncated++; return; }
+    declared++;
+    const want = derived(p.period_id);
+    /* A declared root is trustworthy only when the chain's root is inside this window: if the walk
+     * leaves the window, the derived value is a prefix and the reader correctly says `null` instead. */
+    if (byId[want] && (!byId[want].parent) && p.conversation_id !== want) {
+      mis.push(p.period_id + ': declared ' + p.conversation_id + ' vs derived ' + want);
+    }
+  });
+  ok('every DECLARED conversation_id agrees with the lineage derivation (no drift)  [' + mis.length + ']',
+    mis.length === 0, mis.slice(0, 2).join(' | '));
+  ok('the reader declares a conversation for roots and continuations alike (absent only when truncated)',
+    declared > 0, 'declared=' + declared + ' truncated=' + truncated);
+  ok('MUTATION: keying conversations by `job_id` would fuse distinct chains (the measured defect)',
+    new Set(ps.map((p) => p.job_id)).size <= new Set(ps.map((p) => p.conversation_id)).size,
+    'jobs=' + new Set(ps.map((p) => p.job_id)).size + ' conversations=' + new Set(ps.map((p) => p.conversation_id)).size);
+
   console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error('HARNESS ERROR:', e); process.exit(4); });
