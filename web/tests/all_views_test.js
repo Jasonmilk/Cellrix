@@ -249,11 +249,11 @@ function skip(label, why) {
       const EFX = global.window.CxEventFamily, NORMX = global.window.CxNormalize;
       const RX = global.window.CxProveTrack.render;
       const list = ((await (await fetch(BASE + "/api/sessions?limit=500")).json()).periods) || [];
-      /* REVERTED (§272): changing this to `period_id` made the test's expectation and the panel's own
-       * default start agree on paper while the TRAJECTORY VIEW drew 2 of 8 — a live discrepancy between
-       * the expectation and the renderer that this suite cannot settle in one line. Restored so the gate
-       * keeps its known state; the discrepancy is NAMED in ADR §272 and needs the per-hop water meter. */
-      const start = list[0] && list[0].job_id;
+      /* THE PRODUCT'S KEY (§277): the loader defaults to `list[0].period_id`. Taking `job_id` here made
+       * `chainJobIds` return [] (it is keyed by period id), which sent this whole block into the skip
+       * branch below with the FALSE reason "this panel has no period to chain" — measured: 42 periods in
+       * the panel while four of the strongest assertions never ran. A false skip is worse than a red. */
+      const start = list[0] && list[0].period_id;
       const ids = start ? NORMX.chainJobIds(list, start) : [];
       const byJob = {};
       for (const id of ids) {
@@ -265,7 +265,9 @@ function skip(label, why) {
         const k = EFX.KIND_OF[e.type];
         return !!k && !!RX.SUMMARY[k];
       }).length;
+      /* `list` lives inside this try; the branch below needs its length, so carry it out explicitly. */
       expect = { periods: ids.length, drawn: drawn, rows: drawn + ids.length,
+                 listCount: list.length,
                  metering: merged.events.filter((e) => EFX.KIND_OF[e.type] === "metering").length };
       global.window = prevWindow;
     } catch (e) {
@@ -277,8 +279,15 @@ function skip(label, why) {
     const headsNow = () => doc.querySelectorAll("#eTbody [data-e-turntoggle]").length;
     for (let i = 0; i < 20 && !rowsNow(); i++) { await sleep(250); }
 
-    if (!expect || !expect.periods) {
-      skip("the trajectory opened on its own", "this panel has no period to chain");
+    if (!expect) {
+      skip("the trajectory opened on its own", "the expectation could not be recomputed");
+    } else if (expect.listCount > 0 && !expect.periods) {
+      /* AN EMPTY CHAIN WHILE THE PANEL HAS PERIODS IS A RED, NOT A SKIP (§277): the two causes
+       * ("nothing to chain" vs "the key was wrong") used to be the same reading — I(真因;观测)=0. */
+      check("a panel WITH periods must yield a NON-EMPTY chain (no false skip)", false,
+        "ids=" + expect.periods + " while the panel lists " + expect.listCount + " periods");
+    } else if (!expect.periods) {
+      skip("the trajectory opened on its own", "the panel genuinely has no period to chain");
     } else {
       console.log("     expected: " + expect.rows + " rows (" + expect.drawn +
         " drawn + " + expect.periods + " turn headers), " + expect.metering + " metering events not drawn");

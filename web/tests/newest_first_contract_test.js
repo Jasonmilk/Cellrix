@@ -48,9 +48,17 @@ function ok(name, cond) { if (cond) { pass++; console.log('  ok   ' + name); } e
   ok('the panel lists periods NEWEST FIRST (the order the panel start depends on)  [' + ts[0] + ' … ' + ts[ts.length - 1] + ']', newestFirst);
   ok('so `periods[0]` IS the latest round (what the loader calls the default start)',
     ps[0].first_ts === ts.slice().sort().reverse()[0]);
-  /* MUTATION: if the order flips, the default window silently becomes the OLDEST conversation. */
-  ok('MUTATION: an oldest-first list would fail the first assertion (this is the Cellrix half of the contract)',
-    newestFirst === true);
+  /* A REAL MUTATION (§277): feed a FLIPPED array to the same predicate and require it to fail. The
+   * previous version asserted `newestFirst === true` — the same boolean as assertion 1, i.e. no
+   * mutation at all (nominal/actual 1.50x, mutation contributes 0.0000 bits). */
+  const newestOf = (arr) => arr.every((t, i) => i === 0 || arr[i - 1] >= t);
+  const flipped = ts.slice().reverse();
+  ok('MUTATION: the SAME predicate returns false on a flipped (oldest-first) list  [' + newestOf(flipped) + ']',
+    newestOf(flipped) === false);
+  /* TIES MUST BE NAMED (§277): `>=` accepts equal stamps, so k periods sharing the newest timestamp make
+   * `periods[0]` an undeclared pick (Anaphase names ambiguity; the panel must not break that rule). */
+  const tie = ts.filter((t) => t === ts[0]).length;
+  ok('the newest timestamp is UNIQUE (else the pick needs the name `ambiguous-latest`)  [k=' + tie + ']', tie === 1);
 
   console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
   process.exit(fail ? 1 : 0);
