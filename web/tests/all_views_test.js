@@ -45,7 +45,18 @@ function check(label, cond, detail) {
 /* Counted separately from pass: a green run must not claim coverage it did not
  * have. Used where there is genuinely nothing to exercise — an empty panel is
  * not a product defect. */
+/* CRITICAL ASSERTIONS MAY NOT BE SKIPPED (§287.5). The rule we keep re-learning: when the input
+ * for an assertion EXISTS, not running it is a red — not a skip. These two are the ones that
+ * caught real problems, so they are named here and a skip becomes a failure with its reason. */
+const CRITICAL_LABELS = [
+  'the trajectory renders the WHOLE loaded window',
+  'every row is traceable to a period of THIS window + a sequence'
+];
 function skip(label, why) {
+  if (CRITICAL_LABELS.indexOf(label) >= 0) {
+    check(label + ' — CRITICAL: its inputs exist, so not running it is a failure', false, why);
+    return;
+  }
   skipped++;
   console.log("  SKIP  " + label + "  -> " + why);
 }

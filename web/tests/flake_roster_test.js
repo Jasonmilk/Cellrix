@@ -42,6 +42,10 @@ const noSkipClause = SRC.split(NO_SKIP_CLAUSE).join('');
 ok(!/skipped \(criteria that RAN NOTHING/.test(noSkipClause),
   'MUTATION: removing the verdict clause makes the check above fail (it is not a tautology)');
 
+/* THE SKIPPED ROSTER HAS MEMBERS, NOT JUST A NUMBER (§287.5). */
+ok(/for \(const entry of skippedRoster\)/.test(SRC), 'the runner PRINTS the skipped roster member by member');
+ok(/SKIP  ' \+ entry/.test(SRC), 'and each member is labelled SKIP with its count (a class, not a bare number)');
+
 console.log(bad === 0 ? 'OK — red, green, and FILED are three different things'
   : 'FAILED — ' + bad + ' check(s) red');
 process.exit(bad ? 1 : 0);

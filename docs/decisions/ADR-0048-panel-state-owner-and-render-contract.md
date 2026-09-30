@@ -11993,3 +11993,17 @@ yet this suite is unproven`。而它在**声明了能力**、面板也**在**的
      于是"变异"成了同义反复 ⇒ 改成**字面 split/join** 才真)
 ⇒ 于是"proven"不再可能同时意味着"没查"(0-bit 家族,这次长在门的计数里)
 ```
+
+
+### 287.5 **跳过独立成册** + **关键断言不得被跳过**
+
+```
+③ `run_all.js`:skipped 有了**自己的名册**(与 red / held / flaky / aborted / env 并列),
+   逐个成员打印 —— `SKIP  all_views_test.js (2)   passed, but this many criteria RAN NOTHING`
+   ⇒ "有数字没成员"正是名册存在的意义所反对的(计数必须带类)
+④ `all_views_test.js`:**关键断言清单** `CRITICAL_LABELS`(守恒律 · 溯源)——
+   若它们**输入存在却没跑**,`skip()` 不再记 skip,而是**红**并带上理由
+   ⇒ 这正是我们反复立的规则:**该断言的输入存在 ⇒ 不跑就是红**,不是"没东西可练"
+⇒ 判据(`flake_roster_test.js`,再 +2 条):名册**逐个成员**打印 · 每个成员**带类别标签 SKIP**
+⇒ 实测:门里 `SKIP  all_views_test.js (2)` 出现;守恒与溯源 **PASS**(两条关键断言确实跑了)
+```

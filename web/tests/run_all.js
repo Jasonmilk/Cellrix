@@ -732,6 +732,12 @@ for (const [file, kind, why] of heldAttempted) {
 }
 /* NEVER ATTEMPTED is not the same as ATTEMPTED BUT UNPROVEN — the first says
  * nothing about reachability, so it is the one that must carry an expiry. */
+/* SKIPPED IS ITS OWN ROSTER (§287.5): `proven` says the suite passed; this says HOW MUCH of it
+ * actually ran. Naming the class is what keeps the count auditable — a number in the verdict
+ * without its members is exactly the "count without its class" the rosters exist to prevent. */
+for (const entry of skippedRoster) {
+  console.log('  SKIP  ' + entry.padEnd(24) + 'passed, but this many criteria RAN NOTHING');
+}
 for (const [file, kind, why] of heldNever) {
   console.log('  HELD? ' + file.padEnd(24) + '[' + kind + '] NEVER ATTEMPTED — ' + why);
 }
