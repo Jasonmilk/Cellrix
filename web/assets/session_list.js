@@ -115,7 +115,11 @@
            * inherit the BEHAVIOUR, not only the markup — the fourth part of the same contract. */
           var p = (periods || []).filter(function (x) { return x && x.period_id === id; })[0] || {};
           if (window.Cx && typeof window.Cx.setNav === 'function') {
-            window.Cx.setNav({ period: id, meta: { job_id: p.job_id, period_id: id, name: p.name, preview: p.preview } });
+            window.Cx.setNav({ period: id });
+            /* THE REF MOVES EXPLICITLY (ADR-0048 §307): choosing a period says that the next message
+             * attaches THERE. A pointer, not a guess — and the same operation as forking from a middle
+             * node. The old metadata slot is left to `prove_track`, its actual owner. */
+            if (typeof window.Cx.setRef === 'function') { window.Cx.setRef(id); }
           }
           try { if (typeof loadPeriodToChat === 'function') { loadPeriodToChat(id); } } catch (e) { /* never block the click */ }
           try {
@@ -235,7 +239,8 @@
     div.onclick = function () {
       /* 一种语义（N-001）：把这段载进对话。证轨侧板若开着，它跟着 period 走——
        * 那是 shell 的 period 通知在做的事，不是这里的分支。 */
-      Cx.setNav({ period: p.period_id, meta: { job_id: p.job_id, period_id: p.period_id, name: p.name, preview: p.preview } });
+      Cx.setNav({ period: p.period_id });
+      if (typeof Cx.setRef === 'function') { Cx.setRef(p.period_id); }
       moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
       loadPeriodToChat(p.period_id);
       setBanner('续接经历「' + esc(autoName(p)) + '」<span class="tid">' + esc(p.period_id.slice(-6)) + '</span> —— 下一句话延续这段对话');
@@ -543,7 +548,8 @@
   // Fresh conversation: drop the resume anchor, clear the space, restore
   // the honest empty state. The next message opens a NEW period.
   function newChat() {
-    Cx.setNav({ period: null, meta: null });   /* clear the resume slot too: a new conversation continues nothing */
+    Cx.setNav({ period: null });
+    if (typeof Cx.setRef === 'function') { Cx.setRef(null); }   /* a NEW conversation: the ref points at nothing (ADR-0048 §307) */
     st.histSeq++; // 丢弃任何在途的历史加载
     var box = document.getElementById('chat-msgs');
     box.innerHTML = '<div class="empty"><div class="orb" aria-hidden="true">⌁</div><b>尚未开始的对话</b><p>说句话吧——这是给 Helix 的一段新经历。</p></div>';

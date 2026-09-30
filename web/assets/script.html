@@ -199,7 +199,15 @@
    * where we are, and nothing could report which one was current. */
   /* `panel` = 右栏侧板里开着哪个辅助面（N-001：主只有一个，其余是辅助）。
    * 它的语义在 N-001 落地时变了：以前是侧栏的"点击模式"，现在是"哪个辅助面开着"。 */
-  var STATE = { nav: { view: null, period: null, panel: null, sup: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
+  /* ── REFS: THE THIRD LAYER (ADR-0048 §307) ────────────────────────────────────────────────
+   * Objects (periods) and edges (parent) existed; what did NOT exist was a POINTER saying "this
+   * conversation continues from HERE". Three ad-hoc guesses stood in for it (auto-selection, a sticky
+   * metadata slot, a write-back after the reply). One explicit ref replaces all three:
+   *     ref.current = the period the NEXT message continues; null = a NEW conversation.
+   * It is NOT part of `nav` (the hashed LOCATION state): "where I am looking" and "where the next
+   * message attaches" are different facts, and a shared slot is how they kept colliding (§299).
+   * Persisted, because Git keeps refs in the repository, not in the window that happens to be open. */
+  var STATE = { nav: { view: null, period: null, panel: null, sup: null }, ref: { current: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
   var NAV = STATE.nav;
 
   function hashFor(state) {
@@ -208,6 +216,21 @@
 
   /* Writes nav, writes the address bar, renders. Nothing else writes nav —
    * not even the two paths that adopt what the address bar already says. */
+  /* THE ONLY WRITER OF THE REF (same discipline as `setNav`): every path that continues, forks or
+   * starts over goes through here, so "who moved the pointer" is answerable. */
+  function setRef(periodId) {
+    STATE.ref.current = periodId || null;
+    try {
+      if (STATE.ref.current) { window.localStorage.setItem('cx.ref', STATE.ref.current); }
+      else { window.localStorage.removeItem('cx.ref'); }
+    } catch (e) { /* storage may be unavailable; the in-memory ref still works */ }
+    return STATE.ref.current;
+  }
+  try {
+    var bootRef = window.localStorage.getItem('cx.ref');
+    if (bootRef) { STATE.ref.current = bootRef; }
+  } catch (e2) { /* no storage: start with no pointer = a new conversation */ }
+
   function setNav(patch, opts) {
     opts = opts || {};
     var before = NAV.view, beforePeriod = NAV.period, beforePanel = NAV.panel, beforeSup = NAV.sup;
@@ -359,6 +382,7 @@
     /* The single writer, and the renderer that reads it. A view is chosen by
      * setNav and by nothing else. */
     setNav: setNav,
+    setRef: setRef,
     showView: function (v) { setNav({ view: v }); },
     // Explicit continuation (ADR-0026): nav.period 置位时，下一句续接该经历。
     // No stream parameter: the trajectory reads the tape, and the tape is fed

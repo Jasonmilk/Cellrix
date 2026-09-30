@@ -164,13 +164,11 @@
      * period: "打开页面直接打字" could no longer start a conversation (the owner's report). The resume
      * target is only what an explicit CONTINUE action set (`nav.meta.job_id`, written by the sidebar
      * click) or what the ✗ / +新对话 control cleared. No target ⇒ the server starts a NEW conversation. */
-    /* THE READER MUST NAME THE SLOT THE WRITER WRITES (ADR-0048 §299.3). `setNav` stores the metadata
-     * in `window.__proveTrackMeta` (`script.html`), while this line read `nav.meta` — a name the writer
-     * never used, because the state shape is `{view, period, panel, sup}`. So the resume channel had a
-     * writer and NO reader: clicking a card could not continue anything (measured: 点击后发送仍是
-     * `job_id:null`). Two fixes were possible; the smaller one names the existing slot. The follow-up
-     * (splitting `nav.view` from `nav.resume`) is recorded in §299.2 and needs its own criteria pass. */
-    var job = (window.__proveTrackMeta && window.__proveTrackMeta.job_id) || null;
+    /* THE REF IS THE ONLY SOURCE OF "WHERE THE NEXT MESSAGE ATTACHES" (ADR-0048 §307). It replaces the
+     * sticky metadata slot that used to stand in for it: `ref.current` is written by exactly one function
+     * (`Cx.setRef`) when a period is chosen, when a conversation is started, or (after a reply lands) when
+     * the pointer advances. No target ⇒ the server starts a NEW conversation. */
+    var job = (Cx.state.ref && Cx.state.ref.current) || null;
     function finish() {
       if (done) return;
       done = true;
@@ -258,7 +256,11 @@
               /* The nav key is the period IDENTITY, not the digest: two runs of one
                * input share `job_id`, and the list is keyed by `period_id` (B16).
                * Falls back to the digest for a server that has not sent one yet. */
+              /* THE POINTER ADVANCES WHEN THE REPLY LANDS (ADR-0048 §307): one of the four ref
+               * operations (new / continue / fork / advance). It is not a guess about intent — the
+               * conversation that just answered IS where the next message attaches. */
               if (j.period_id || j.job_id) Cx.setNav({ period: j.period_id || j.job_id });
+              if (typeof Cx.setRef === 'function' && j.period_id) { Cx.setRef(j.period_id); }
               finish(); return;
             }
           }

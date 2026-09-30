@@ -175,14 +175,28 @@ check('and `chat.js` does NOT treat the viewed period as a resume target (§299)
  * `window.__proveTrackMeta`; the old reader looked for `nav.meta`, a name that never existed in the
  * state shape (`{view, period, panel, sup}`) — the channel had a writer and no reader, so clicking a
  * card could not continue anything. */
-check('`chat.js` resumes from the slot the writer uses (`__proveTrackMeta`, §299.3)',
-  /__proveTrackMeta/.test(sources['chat.js'] || '') && /__proveTrackMeta/.test(sources['script.html'] || ''),
-  'writer and reader must name the same slot');
-check('and `chat.js` must NOT read `nav.period` as a resume target (§299)',
-  !/state\.nav\.period/.test(sources['chat.js'] || ''),
-  (sources['chat.js'] || '').match(/var job = [^\n]*/)?.[0] || 'no `var job =` line');
-check('a NEW conversation CLEARS the resume slot (otherwise the next message continues)',
-  /meta: null/.test(sources['session_list.js'] || ''), 'newChat must clear the slot');
+/* ── THE THIRD LAYER: REFS (ADR-0048 §307) ────────────────────────────────────────────────
+ * Objects + edges existed; the POINTER did not. It is one explicit field with ONE writer, and the
+ * checks below pin the four operations down to the code that performs them. */
+check('the ref is its own state field, outside the hashed location state',
+  /ref:\s*\{\s*current:/.test(sources['script.html'] || '') && !/nav:\s*\{[^}]*ref/.test(sources['script.html'] || ''),
+  'ref must not share the `nav` slot');
+check('`setRef` is the ONLY writer of the pointer (same discipline as `setNav`)',
+  /function setRef\(/.test(sources['script.html'] || '')
+    && (sources['session_list.js'] || '').indexOf('ref.current =') < 0
+    && (sources['chat.js'] || '').indexOf('ref.current =') < 0,
+  'writers outside script.html would make the pointer untraceable');
+check('`chat.js` reads the pointer as the ONLY resume target (§307)',
+  /Cx\.state\.ref && Cx\.state\.ref\.current/.test(sources['chat.js'] || '')
+    && !/__proveTrackMeta/.test(sources['chat.js'] || ''),
+  'the sticky metadata slot must not come back');
+check('the four operations are present: new (✗) clears · choose sets · the reply ADVANCES',
+  /Cx\.setRef\(null\)/.test(sources['session_list.js'] || '')
+    && /Cx\.setRef\(id\)/.test(sources['session_list.js'] || '')
+    && /Cx\.setRef\(j\.period_id\)/.test(sources['chat.js'] || ''),
+  'new / continue / fork+advance');
+check('MUTATION: restoring the sticky slot would make these checks red (it is not a tautology)',
+  !/__proveTrackMeta/.test(sources['chat.js'] || ''), 'chat.js carries no metadata slot');
 
 /* ── 6. every declared view has a container ─────────────────────────────── */
 const declared = (sources['base.html'].match(/data-view="([^"]+)"/g) || [])
