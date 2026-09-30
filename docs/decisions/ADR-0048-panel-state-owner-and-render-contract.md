@@ -11818,3 +11818,50 @@ expected: **8** rows（7 drawn + 1 turn header)｜ rendered: **1 row + 1 header*
 ⇒ 规则(升级):**测试里的 skip 必须自带一个能区分的谓词**;当同类数据存在而非空时,**
    skip 一律改为红**。写下≠做到,这次长在两处:测试的 skip 理由、判据的变异位。
 ```
+
+
+## 278. 🔴 **撤回我的诊断**:SUMMARY 覆盖 100%(metering 按设计不画);那条红**不可复现**
+
+### 278.1 我的错（当场撤回)
+
+```
+我上一笔写"真因:`RX.SUMMARY` 只覆盖部分 kind" —— **错**。
+证据(正确加载顺序 `three_state → event_family → prove_track.data → prove_track.render`):
+  `SUMMARY` = **9** 键 [turn message context reasoning plan tool check verdict reply] ｜ `KINDS` = 10
+  ⇒ 唯一不在里面的是 **metering**,而它**按设计不画** —— 测试自己的日志逐字写着
+     "**1 metering events not drawn**" ⇒ 8 = 7 drawn + 1 turn header,账目本来就是平的。
+而 `render.js:328` 有一条校验:**若有 kind 既没画也没声明 ⇒ 直接 throw**
+  ⇒ 所以"真的覆盖不全"会表现为**证轨整个不可用**,而不是"画出 2 行"。
+我的假读数来自**我自己的 eval 少加载了 `prove_track.data.js`**(它显式 throw "requires … to load first")
+⇒ 教训:**加载顺序也是一种输入;输入错了,量到的是脚本的缺陷。**(与 §271 的探针错同族,第二次)
+```
+
+### 278.2 那条红**不可复现** ⇒ 记录进 ledger（第一次被行使)
+
+```
+同一面板连跑 5 次:`FAIL 数 = 0` ×5 ⇒ **当前环境不可复现**
+⇒ 已写入 `web/tests/docs/flaky-ledger.jsonl`(首行,具名 owner + 观测 + "candidates: expectation semantics
+   vs renderer / real gap / tape timing / fold state")
+⇒ 决策:**先定性,再诊断**。把它当"确定性缺陷"命名(`trajectory_undrawn`)是错的:
+   节点已改名 **`panel.trajectory_row_gap`**(只描述"取到与画出的差",不预设真因)。
+```
+
+### 278.3 我的 skip 规则**收窄**（原来的写法会吞掉"能力缺席")
+
+```
+原写:"同类数据非空时,skip 一律改为红" —— 太宽,会把 **NEEDS-INPUT(exit 3,能力缺席)** 也卷进来。
+改为:**"该断言的输入为空,而同一事实来源非空 ⇒ 红"**;三类保持分开:
+  NEEDS-INPUT(3) 能力缺席(面板不在)      ⇒ **held**
+  SKIP           该断言在此数据下不适用    ⇒ 须**自带可判别的谓词**
+  RED            该有而没有               ⇒ 红
+⇒ 三类 = 1.5850 bits;合并成两类 = 1.0000(丢 0.5850) ⇒ **缺席的种类也要具名**。
+```
+
+### 278.4 四个观测（判别力 0 → ~2.0000 bits）—— 逐步装上
+
+```
+已装:③ `expect.periods` 的值 = **1** ⇒ 证轨这条链是 1 个 period;
+      而 P2 修好的"4/4"是 **chat 路径** ⇒ **两条路径加载的不是同一条链**(这一条已定案)。
+待装:① tape 喂入 vs DOM 行数 ｜ ② 逐 kind (取到, 画出) 两列 ｜ ④ 折叠态 / `S.q` / 等待时长
+⇒ 只有装齐,才谈得上"哪一类";现在去查,只会查到空集。
+```
