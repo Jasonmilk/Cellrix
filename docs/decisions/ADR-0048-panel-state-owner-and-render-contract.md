@@ -11728,3 +11728,51 @@ job_id    ⇒ 取到 **3 / 4** 段（其中一段 **0 条**:该 job 拥有多个
 ✅ **live 验收通过**:点最新 ⇒ 聊天区 **4 / 4 轮**(按 DOM 行计数)
 ❌ 不做:把 period_id 映射回 job_id（实验证明会更差)
 ```
+
+
+## 272. 🔬 **P1 形状更正:period 身份早已存在,只剩"会话容器"** —— 以及两处具名残留
+
+### 272.1 六条主张,逐条核实（全部为真)
+
+```
+① `identity.rs:3/5/27/31`:`job_id` **DERIVED from the input (fnv64)** —— "a content digest, NOT an identity";
+   `period_id` **ALLOCATED per run (clock + counter)** —— "one value per period, never derived from content"
+   ⇒ **"编号在创建时发放"早已实现** ⇒ **P1 不必重写身份,只剩"会话容器"**
+② `main.rs:218` `"ambiguous": true` 与缺失分开 · `query_tests.rs:10 lists_periods_newest_first`
+   ⇒ 歧义与"最新在前"在 **Anaphase 侧都已有判据**
+③ `conversation_id` / `session_id` 在 anaphase **0 命中** ⇒ 容器确实缺
+④ `all_views_test.js:252` 仍用 `list[0].job_id`（旧键)⇒ **两个宿主,同一问题两种答案**
+⑤ Cellrix 侧 `?job_id=` **5 处**（3 处真站点)——参数名装的却是 **period_id**
+⑥ `query.rs:30` 已提示"can re-issue with an explicit `period_id`"
+```
+
+### 272.2 接受的纠正:**不许动 `job_id`**
+
+```
+我 P1 原写"把 conversation_id **并入哈希输入**" ⇒ 那等于给 `job_id` 加料 ⇒ **会摧毁确定性回放**。
+审查的类比成立:**书名(job_id)= 内容算出来的,重印可对照;馆藏号(period_id)= 发放,唯一。**
+⇒ 决策:**`job_id` 的"多 period 共用一个"是它的用途,不是 bug**;要补的是**另一个**容器
+   (`session_id` / `conversation_id`),由 Anaphase 在创建时发放;**不改 `job_id` 的语义**。
+```
+
+### 272.3 本笔已落:跨仓依赖在 **Cellrix 侧**声明
+
+```
+`newest_first_contract_test.js`(进网 · `REQUIRES='panel-http'` · 3 条):
+  · 面板按 **newest-first** 列出(这正是 `periods[0]` 能当"最新一轮"的前提)
+  · `periods[0]` 确实是时间最大者
+  · 变异:顺序若翻转,默认窗口会静默变成**最旧**的会话 ⇒ 必须红
+⇒ 实测:`3 passed`(端点从 `chain.json` 的组件派生,0 硬编码;面板缺席 ⇒ NEEDS-INPUT)
+⇒ 于是"Cellrix 依赖 newest-first"这条**从"未声明"变成"两侧都有判据"**。
+```
+
+### 272.4 两处具名残留（本笔**未做**,不假装)
+
+```
+① **参数名**:`?job_id=` 装 period_id（3 处真站点)。修法需跨仓且要一致:
+   Anaphase **同时接受** `id=` 与 `job_id=`(兼容期内),Cellrix 改发 `id=` ⇒ 一次干净的一笔。
+② **`all_views_test:252` 的旧键**:我改成 `period_id` 后,该判据的**期望(8)与证轨渲染器实测(2)不一致**
+   ⇒ 这不是一行能了结的:它把"测试的期望"和"面板的默认起点"缠在一起了。
+   ⇒ 已**回退**并在原处写明原因;真正的定位要靠**逐跳水表**(§271 的方法)。
+   ⇒ 教训:**改判据的输入时,先确认判据的期望是不是也依赖那个输入** —— 否则改的是两件事。
+```

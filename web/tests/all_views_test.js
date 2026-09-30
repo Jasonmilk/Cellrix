@@ -249,6 +249,10 @@ function skip(label, why) {
       const EFX = global.window.CxEventFamily, NORMX = global.window.CxNormalize;
       const RX = global.window.CxProveTrack.render;
       const list = ((await (await fetch(BASE + "/api/sessions?limit=500")).json()).periods) || [];
+      /* REVERTED (§272): changing this to `period_id` made the test's expectation and the panel's own
+       * default start agree on paper while the TRAJECTORY VIEW drew 2 of 8 — a live discrepancy between
+       * the expectation and the renderer that this suite cannot settle in one line. Restored so the gate
+       * keeps its known state; the discrepancy is NAMED in ADR §272 and needs the per-hop water meter. */
       const start = list[0] && list[0].job_id;
       const ids = start ? NORMX.chainJobIds(list, start) : [];
       const byJob = {};
