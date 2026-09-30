@@ -12140,3 +12140,39 @@ yet this suite is unproven`。而它在**声明了能力**、面板也**在**的
 ⇒ 1 bit(发没发生)+ **0 bit**(为什么)⇒ 已修:读 `e.stderr`,把首行记进 ABORT 名册
    (`abortedRoster.push(file + ' — ' + errOut首行)`)
 ```
+
+
+## 293. 审查裁定:**"搜索态必破"实测证伪** · 两条守卫吸收
+
+### 293.1 证伪(活页面,`#eQ` 里真的敲字)
+
+```
+① 无搜索  : visible=1  folded=6 声明和=7 ⇒ 守恒 ✅
+② 搜"你好": visible=**7** folded=**0** 声明和=7 ⇒ 守恒 ✅
+③ 搜"zzz" : visible=7  folded=0 声明和=7 ⇒ 守恒 ✅
+⇒ 原因:`S.q` 非空时**折叠替身被禁用**(`view.js:283` 的 `!S.q`)⇒ 被折叠的 6 步**重新成为可见行** ⇒ 1+6=7 ✓
+⇒ 而本构建里搜索**只做高亮,不做行过滤**(`:328 isHit` 服务于高亮)⇒ 它**不可能**靠过滤打破守恒
+   (`folded` 6→0 证明 jsdom 的输入派发确实生效 ⇒ 这不是"没跑到")
+⇒ 所以它的"q 非空 ⇒ 4/8 破"**不成立于本构建**;"8 态中已测 3"也随之更新为**已测 5 态(搜索两态也测了)**
+```
+
+### 293.2 吸收:作用域需要的两条**守卫**（已落,`all_views_test` 119 passed)
+
+```
+(a) **缺字段不得读作"开"**(`{run: false}` 家族,换了个字段):
+    `every declaring header carries data-e-open` —— 今天 0 例外,但从此有判据
+(b) **一个状态,两处效果**:表头的声明与行的可见必须同源 ——
+    `a COLLAPSED turn removes its rows AND flips its header together`
+    (实测:点一次 `data-e-turntoggle` ⇒ 表头 `data-e-open` 翻 `false` **且** visible 行 → 0)
+⇒ 关于它问的"`:250` 与 `:313` 是否同源":**同源**(都读 `S.openTurns`),但**键不同**
+   (`it.id` 在表头 · `it.turn` 在事件行)⇒ 实测二者一致;若将来 `it.id ≠ it.turn`,守(b)会先红
+```
+
+### 293.3 未吸收/待做
+
+```
+· **搜索态"(a) 声明适用条件"** 无需做:该态**不破**(见 293.1);若将来真的加了**行过滤**,再按它的 (a) 具名
+· **ABORT 出口"仍未行使"**:我手工喂过合成崩溃(**接住了**,判决行 `, 1 ABORTED (not red)` + stderr 首行)
+  但**门里没有常驻判据** ⇒ 待办:加一条 fixture 崩溃的判据(或把该路径的契约写成源码级断言)
+· 全库 `exit(2)` → `exit(4)`(chain_e2e / hit_targets / flows_suppliers / ledger_rows)仍待做
+```

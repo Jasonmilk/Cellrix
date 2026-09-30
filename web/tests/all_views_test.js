@@ -336,6 +336,20 @@ function skip(label, why) {
       check("CONSERVATION: visible rows + folded declarations == declared events (nothing vanishes)",
         rowsNow() + foldSum === evSum,
         rowsNow() + " visible + " + foldSum + " folded vs " + evSum + " declared  |  trajectory " + traj.join("\u2192"));
+      /* TWO GUARDS THE SCOPE NEEDS (293):
+       *   (a) an ABSENT `data-e-open` must not read as "open" — absence-as-presence is the
+       *       `{run: false}` family: every declaring header MUST carry the field;
+       *   (b) the header's declaration and the row's visibility must come from ONE state:
+       *       toggling a turn must flip the header AND remove its rows together (measured:
+       *       header `data-e-open` flips and visible rows drop to 0 in the same click). */
+      const declaringHeaders = Array.from(doc.querySelectorAll("#eTbody [data-e-events]"));
+      check("every declaring header carries `data-e-open` (absence must not read as open)",
+        declaringHeaders.every((h) => h.hasAttribute("data-e-open")),
+        "headers without the field: " + declaringHeaders.filter((h) => !h.hasAttribute("data-e-open")).length);
+      const collapsedNow = declaringHeaders.filter((h) => h.getAttribute("data-e-open") === "false").length;
+      check("a COLLAPSED turn removes its rows AND flips its header together (one state, two effects)",
+        collapsedNow === 0 || rowsNow() === 0,
+        "collapsed headers=" + collapsedNow + " visible rows=" + rowsNow());
       check("a window that SHOWS rows must DECLARE its events (the field cannot vanish)",
         rowsNow() === 0 || evSum > 0,
         "visible=" + rowsNow() + " declared=" + evSum);
