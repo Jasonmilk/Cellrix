@@ -145,15 +145,28 @@
     return fetch('/api/sessions?limit=500').then(function (r) { return r.json(); })
       .then(function (d) {
         var list = (d && d.periods) || [];
-        var start = jobId || (list[0] && list[0].job_id) || null;
+        /* TWO FACTS, TWO KEYS (ADR-0048 §270). `chainJobIds` is keyed by PERIOD id, but the default
+         * here passed `list[0].job_id` — a JOB id. The walk then reported `start-absent` and the next
+         * line SILENTLY substituted `[start]`, so the default window was ONE round while the data held
+         * the whole chain ("默认只读到 1/4"). The default start is the newest PERIOD now, and an absent
+         * start is a NAMED ending (`root | truncated | cycle | start-absent`) instead of a quiet
+         * one-round window — the same "a silent output merges causes" rule this cell keeps meeting. */
+        var start = jobId || (list[0] && list[0].period_id) || null;
         if (!start) { throw new Error('没有可用的经历'); }
         var ids = NORM ? NORM.chainJobIds(list, start) : [start];
-        if (!ids.length) { ids = [start]; }
+        var walk = (NORM && typeof NORM.lastWalk === 'function') ? NORM.lastWalk() : null;
+        var windowState = (walk && walk.kind) ? walk.kind : 'unnamed';
+        if (!ids.length) {
+          /* No silent substitution: the caller is TOLD which ending produced an empty window. */
+          return { parts: [], start: start, ordered: [], windowState: windowState, walk: walk };
+        }
         return Promise.all(ids.map(function (id) {
           return fetch('/api/events?job_id=' + encodeURIComponent(id))
             .then(function (r) { return r.json(); })
             .then(function (j) { return { id: id, events: (j && j.events) || [] }; });
-        })).then(function (parts) { return { parts: parts, start: start, ordered: ids }; });
+        })).then(function (parts) {
+          return { parts: parts, start: start, ordered: ids, windowState: windowState, walk: walk };
+        });
       })
       .then(function (w) {
         var byJob = {};

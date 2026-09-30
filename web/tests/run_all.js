@@ -60,6 +60,7 @@ const SELF_CONTAINED = [
   ['zero_report_test.js', 'a zero must carry its n (rule of three) and a verdict must carry its environment E'],
   ['flake_roster_test.js', 'FLAKY is a third roster: neither red nor proven, with an append-only ledger and K>=3 escalation'],
   ['open_turns_test.js', 'openTurns is derived, cleared on reset, and read as DEFAULT OPEN (rule ⑰)'],
+  ['chain_window_test.js', 'the window is NAMED and the default start is a PERIOD (§270)'],
   ['panel_roles_test.js', 'round role is NAMED: root=start, leaf=latest (open the leaf to see the whole chain, §269)'],
   ['chain_e2e_test.js', 'the chain, end to end — reply non-empty + model named (§261)'],
   ['capability_declaration_test.js', 'said and declared are two hosts: every jsdom suite declares REQUIRES, register records capability+probe'],
