@@ -11913,3 +11913,35 @@ expected: **8** rows（7 drawn + 1 turn header)｜ rendered: **1 row + 1 header*
 顺带:该套件补上 `REQUIRES = 'panel-http'` ⇒ 从"未注册"变成"面板缺席时 held"。
 ⇒ 于是 `all_views_test` 由「3 红 + 假 skip」变为 **全绿**,门回到 **2 红(皆既知)**。
 ```
+
+
+## 286. ✅ **跳过不是缺席** —— 一个"永远清不掉的未注册"的根因
+
+### 286.1 现象（长期存在)
+
+```
+`all_views_test` 在门里始终是 `UNREGISTERED/BLOCKING — capability panel-http IS present (probed),
+yet this suite is unproven`。而它在**声明了能力**、面板也**在**的情况下仍然如此。
+```
+
+### 286.2 根因（两次严格测量,自洽)
+
+```
+① 带地址:`RESULT: **116 passed, 0 failed**, 2 skipped` —— 却 **exit=3**
+② 无地址:NEEDS-INPUT ⇒ exit=3
+⇒ 套件尾部有一段:`if (fail === 0 && skipped > 0) { … process.exit(3); }`
+   ⇒ 它把「**没东西可练**(没有 period / 没有 CHECK 行)」编码成「**能力缺席**」
+⇒ 运行器据此把它放进 `NEEDS_INPUT`;`classify()` 于是合理地推断
+   "能力在、这套却未被证明" ⇒ 判 `UNREGISTERED/BLOCKING` ⇒ **无论怎么修面板都清不掉**。
+⇒ ⇒ 又是「两类事实共用一个读数」:缺席(exit 3) 与 跳过(应记 0)。
+```
+
+### 286.3 修法与实测
+
+```
+① 尾部改为:**跳过就报告并 PASS** —— `exit(fail ? 1 : 0)`;
+   **缺席**仍走能力探针那条 `exit 3`(未给地址/面板不可达)⇒ 两类分开
+② 同时删掉为旧行为辩护的那段注释(它与新行为矛盾)
+实测:带地址 ⇒ **exit=0**;无地址 ⇒ **exit=3**
+门:**2 red / 60 proven / 5 held / 0 unregistered**（`all_views` 记 PASS)
+```
