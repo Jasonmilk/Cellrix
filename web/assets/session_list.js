@@ -543,7 +543,7 @@
   // Fresh conversation: drop the resume anchor, clear the space, restore
   // the honest empty state. The next message opens a NEW period.
   function newChat() {
-    Cx.setNav({ period: null });
+    Cx.setNav({ period: null, meta: null });   /* clear the resume slot too: a new conversation continues nothing */
     st.histSeq++; // 丢弃任何在途的历史加载
     var box = document.getElementById('chat-msgs');
     box.innerHTML = '<div class="empty"><div class="orb" aria-hidden="true">⌁</div><b>尚未开始的对话</b><p>说句话吧——这是给 Helix 的一段新经历。</p></div>';

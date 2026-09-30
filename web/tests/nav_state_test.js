@@ -171,9 +171,18 @@ check('the views read the selection from the one state (N-003)',
 check('and `chat.js` does NOT treat the viewed period as a resume target (§299)',
   !readsPeriod('chat.js'),
   (sources['chat.js'] || '').match(/var job = [^\n]*/)?.[0] || 'no `var job =` line in chat.js');
-check('the resume target comes from the EXPLICIT metadata written by a continue action (§299)',
-  /var job = \(Cx\.state\.nav\.meta && Cx\.state\.nav\.meta\.job_id\)/.test(sources['chat.js'] || ''),
-  'chat.js must resume from `nav.meta.job_id` only');
+/* §299.3 — THE READER MUST NAME THE SLOT THE WRITER USES. `setNav` stores the metadata in
+ * `window.__proveTrackMeta`; the old reader looked for `nav.meta`, a name that never existed in the
+ * state shape (`{view, period, panel, sup}`) — the channel had a writer and no reader, so clicking a
+ * card could not continue anything. */
+check('`chat.js` resumes from the slot the writer uses (`__proveTrackMeta`, §299.3)',
+  /__proveTrackMeta/.test(sources['chat.js'] || '') && /__proveTrackMeta/.test(sources['script.html'] || ''),
+  'writer and reader must name the same slot');
+check('and `chat.js` must NOT read `nav.period` as a resume target (§299)',
+  !/state\.nav\.period/.test(sources['chat.js'] || ''),
+  (sources['chat.js'] || '').match(/var job = [^\n]*/)?.[0] || 'no `var job =` line');
+check('a NEW conversation CLEARS the resume slot (otherwise the next message continues)',
+  /meta: null/.test(sources['session_list.js'] || ''), 'newChat must clear the slot');
 
 /* ── 6. every declared view has a container ─────────────────────────────── */
 const declared = (sources['base.html'].match(/data-view="([^"]+)"/g) || [])

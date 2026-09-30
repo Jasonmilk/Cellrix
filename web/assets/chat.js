@@ -164,7 +164,13 @@
      * period: "打开页面直接打字" could no longer start a conversation (the owner's report). The resume
      * target is only what an explicit CONTINUE action set (`nav.meta.job_id`, written by the sidebar
      * click) or what the ✗ / +新对话 control cleared. No target ⇒ the server starts a NEW conversation. */
-    var job = (Cx.state.nav.meta && Cx.state.nav.meta.job_id) || null;
+    /* THE READER MUST NAME THE SLOT THE WRITER WRITES (ADR-0048 §299.3). `setNav` stores the metadata
+     * in `window.__proveTrackMeta` (`script.html`), while this line read `nav.meta` — a name the writer
+     * never used, because the state shape is `{view, period, panel, sup}`. So the resume channel had a
+     * writer and NO reader: clicking a card could not continue anything (measured: 点击后发送仍是
+     * `job_id:null`). Two fixes were possible; the smaller one names the existing slot. The follow-up
+     * (splitting `nav.view` from `nav.resume`) is recorded in §299.2 and needs its own criteria pass. */
+    var job = (window.__proveTrackMeta && window.__proveTrackMeta.job_id) || null;
     function finish() {
       if (done) return;
       done = true;
