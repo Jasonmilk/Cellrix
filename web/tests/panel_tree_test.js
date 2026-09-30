@@ -375,8 +375,20 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   ok(rows.length === P.length, 'and every period as a child  [' + rows.length + ']');
   ok(host.querySelector('.pt-group').getAttribute('data-count') === '4',
     'each header carries its own size (the fact that makes neighbours distinguishable)');
-  const kids = Array.prototype.filter.call(rows, (r) => r.getAttribute('data-conversation') === 'run-j1');
-  ok(kids.length === 4, 'children are attributed to their conversation  [' + kids.length + ']');
+  /* ATTRIBUTED TO THE LINEAGE ROOT, NOT TO A CONTENT DIGEST (§297): `run-j1` is a job id — the exact
+   * key this cell had to stop using. The expected key is DERIVED from the fixture's own lineage, so the
+   * assertion states the relationship instead of a literal that could drift. */
+  const byId = {};
+  P.forEach((q) => { byId[q.period_id] = q; });
+  const rootOf = (id) => {
+    let cur = id; const seen = {};
+    while (byId[cur] && byId[cur].parent && !seen[cur]) { seen[cur] = 1; cur = byId[cur].parent; }
+    return cur;
+  };
+  const chainRoot = rootOf(P[0].period_id);
+  const kids = Array.prototype.filter.call(rows, (r) => r.getAttribute('data-conversation') === chainRoot);
+  ok(kids.length === 4, 'children are attributed to their conversation — the LINEAGE ROOT, not the job id  ['
+    + kids.length + ' root=' + chainRoot + ']');
   dom.window.close();
 }
 

@@ -12295,3 +12295,38 @@ Cellrix:三个站点改发 `id=`;`loadPeriodToChat(jobId)` → `(periodId)`(参�
 并据此把 `all_views_test.js` 里的 TODO 注释换成**真声明**。
 ⇒ 门:**2 red(皆既知) / 62 proven / 5 held / 0 unregistered**
 ```
+
+
+## 297. ✅ **命名矛盾的根**:对话的键曾是"内容摘要" —— 改为**血缘根**
+
+### 297.1 前因后果（先理清,再改)
+
+```
+数据层**自己**写着(query.rs:113):`job_id`「may repeat across rows, so it is **NOT usable as a list key**」;
+而表现层(`panel_tree.js:198`)写着:`var conv = (n.row && (n.row.job_id || n.row.period_id))` —— **拿它当对话键**。
+⇒ 于是同一个开场白的两段对话被并成一段;而 `groupByConversation()` 的输出字段也叫 `job_id`
+  ⇒ **函数名说 conversation,键却是 job**:重复命名 + 矛盾语义。
+```
+
+### 297.2 定案的唯一规则（不新增 id 空间)
+
+```
+conversation_id := 该 period 的 **parent 链之根**(一个 period id)
+  · 根本身:conversation_id == period_id ｜ 续轮继承它
+  · 由**不可变的血缘**派生(不是内容、不是新发放、不是第二个名字空间)
+  · `job_id` 保持其诚实含义:**内容摘要 / 重放句柄**
+```
+
+### 297.3 落地与实测
+
+```
+`panel_tree.js`:`buildTree` 增 `rootOf`(memo,O(n)) · `render` 的 `conv = n.root` ·
+  `groupByConversation` 键改为派生根、字段改名 **`conversation_id`** · 消费处同步 · 两处与旧键矛盾的注释改写
+新判据 `conversation_identity_test.js`(8 条,进网):同开场白的两条链**仍是两段** ·
+  键是 `conversation_id`(无 `job_id` 字段) · **成员**:每段含**整条链**(`a1+a2 | b1+b2`) ·
+  **变异**:按 `job_id` 分组会**交叉**成 `a1+b1 | a2+b2` · 根即自身 · 续轮继承根 · 源码契约
+既有判据 `panel_tree_test` 里那条"children are attributed to their conversation"**编码的是旧键**
+  ⇒ 改为**关系式**(从 fixture 血缘推根),并注明 `run-j1` 正是那个不该再用的键
+live 实测:period=93 ｜ **真实对话数(链根)= 79** ｜ **job 数 = 22**(⇒ 22 个 job 曾"代表"79 段对话,少算 3.6×)
+        `data-conversation` 与链根不一致的行 = **0** ✓
+⇒ 门:旧判据(panel_tree)那条改为关系式后,PASS ⇒ **2 red(皆既知) / 63 proven / 5 held / 0 unregistered**

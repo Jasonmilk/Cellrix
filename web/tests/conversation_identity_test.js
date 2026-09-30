@@ -1,0 +1,73 @@
+#!/usr/bin/env node
+/* A CONVERSATION IS ITS LINEAGE ROOT — NEVER A CONTENT DIGEST (§297).
+ *
+ * Why: `job_id` is a hash of the first input, so two conversations that OPEN WITH THE SAME WORDS share
+ * it. The reader documents it as "NOT usable as a list key" (query.rs:113), yet the panel grouped the
+ * sidebar by it — measured: 11 roots fused into one "conversation". The fixture below is exactly that
+ * case: two chains whose every period shares a job_id with its counterpart in the other chain.
+ *
+ * Usage: node conversation_identity_test.js
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const { JSDOM } = require('jsdom');
+const REQUIRES = 'jsdom';   /* no live panel: the fixture is the evidence */
+
+let pass = 0, fail = 0;
+function ok(name, cond, detail) {
+  if (cond) { pass++; console.log('  ok   ' + name + (detail ? '  [' + detail + ']' : '')); }
+  else { fail++; console.log('  FAIL ' + name + (detail ? '  [' + detail + ']' : '')); }
+}
+
+const dom = new JSDOM('<!doctype html><div id="s-side"></div>', { runScripts: 'outside-only' });
+const w = dom.window;
+w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+const T = w.CxPanelTree;
+
+/* TWO conversations, SAME opening words ⇒ SAME job_id on both roots (and on both children). */
+const P = [
+  { period_id: 'a1', parent: null, job_id: 'J-same', preview: 'hello', first_ts: '2026-09-30T01:00:00Z', reply: 'r' },
+  { period_id: 'a2', parent: 'a1', job_id: 'J-same2', preview: 'again', first_ts: '2026-09-30T01:01:00Z', reply: 'r' },
+  { period_id: 'b1', parent: null, job_id: 'J-same', preview: 'hello', first_ts: '2026-09-30T02:00:00Z', reply: 'r' },
+  { period_id: 'b2', parent: 'b1', job_id: 'J-same2', preview: 'again', first_ts: '2026-09-30T02:01:00Z', reply: 'r' }
+];
+
+const groups = T.groupByConversation(P);
+ok('two conversations that OPEN WITH THE SAME WORDS stay TWO (not fused on a shared job_id)',
+  groups.length === 2, 'groups=' + groups.length + ' ids=' + groups.map((g) => g.conversation_id).join(','));
+ok('the group key is `conversation_id`, not `job_id` (one name, one fact)',
+  groups.every((g) => g.conversation_id && g.job_id === undefined),
+  JSON.stringify(Object.keys(groups[0] || {})));
+ok('a conversation is named by its LINEAGE ROOT (root id first)',
+  groups.map((g) => g.conversation_id).sort().join(',') === 'a1,b1',
+  groups.map((g) => g.conversation_id).join(','));
+
+const host = w.document.getElementById('s-side');
+T.mountSidebar(P, {});
+const rowOf = (id) => Array.from(host.querySelectorAll('.ses-item')).filter((e) => e.getAttribute('data-period') === id)[0];
+ok('a continuation carries its root as `data-conversation`',
+  rowOf('a2') && rowOf('a2').getAttribute('data-conversation') === 'a1',
+  rowOf('a2') && rowOf('a2').getAttribute('data-conversation'));
+ok('a root is its own conversation (conversation_id == period_id)',
+  rowOf('a1').getAttribute('data-conversation') === 'a1');
+/* MEMBERSHIP IS THE DISCRIMINATOR (the fixture's two chains share the SAME job_id set, so a count
+ * alone cannot tell the two groupings apart — measured: job-keying also yields 2 groups, but its
+ * members are {a1,b1} and {a2,b2}: two conversations CROSSED, which is the real defect). */
+const members = groups.map((g) => g.periods.map((p) => p.period_id).sort().join('+')).sort();
+ok('membership: each conversation holds a WHOLE chain',
+  members.join(' | ') === 'a1+a2 | b1+b2', members.join(' | '));
+const byJob = {};
+P.forEach((p) => { (byJob[p.job_id] = byJob[p.job_id] || []).push(p.period_id); });
+const jobMembers = Object.keys(byJob).map((k) => byJob[k].sort().join('+')).sort().join(' | ');
+ok('MUTATION: keying by job_id CROSSES the two conversations (membership differs)',
+  jobMembers !== members.join(' | '), 'by job_id: ' + jobMembers);
+
+/* CONTRACT (source-level, labelled): the conversation key must never come from `job_id`. */
+const SRC = fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8');
+ok('the sortable key is not taken from `job_id` anywhere in the grouping path',
+  !/var key = p\.job_id/.test(SRC) && !/var conv = \(n\.row && \(n\.row\.job_id/.test(SRC));
+dom.window.close();
+
+console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
+process.exit(fail ? 1 : 0);

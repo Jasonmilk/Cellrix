@@ -57,7 +57,24 @@
       }
     });
     var roots = order.filter(function (id) { return !byId[id].parent; });
-    return { byId: byId, order: order, edges: edges, roots: roots };
+    /* THE CONVERSATION IS THE LINEAGE ROOT (ADR-0048 §297). `job_id` is a CONTENT DIGEST — the reader
+     * documents it as "NOT usable as a list key" (query.rs:113) — yet the panel grouped by it, so two
+     * conversations that opened with the same words fused into one (measured: 11 roots under one job).
+     * ONE NAME, ONE FACT: conversation_id := the root of this node's parent chain. A root's own id is
+     * its conversation id; a continuation inherits it. Derived from the IMMUTABLE lineage, never from
+     * content, and never a second id space. */
+    var memo = {};
+    function rootOf(id) {
+      if (memo[id]) { return memo[id]; }
+      var guard = 0, cur = id, seen = {};
+      while (cur && byId[cur] && byId[cur].parent && !seen[cur] && guard++ < 10000) { seen[cur] = true; cur = byId[cur].parent; }
+      var root = cur || id;
+      for (var k in seen) { memo[k] = root; }
+      memo[id] = root;
+      return root;
+    }
+    order.forEach(function (id) { byId[id].root = rootOf(id); });
+    return { byId: byId, order: order, edges: edges, roots: roots, rootOf: rootOf };
   }
 
   /* ── the ancestor closure = "how did this experience come to be" (git-log, not git-log --all) ── */
@@ -104,7 +121,7 @@
     var doc = host.ownerDocument;
     host.textContent = '';
     var groupsById = {};
-    groupByConversation(periods).forEach(function (g) { groupsById[g.job_id] = g; });
+    groupByConversation(periods).forEach(function (g) { groupsById[g.conversation_id] = g; });
     var list = doc.createElement('div');
     list.className = 'pt-tree';
     list.setAttribute('role', 'tree');
@@ -183,8 +200,10 @@
     /* ENTRY SET IS A PARAMETER, NOT A NEW DEFAULT (ADR-0048 §240.3). Measured: the payload holds 52
      * periods of which **44 are roots** and only 8 are continuations, while one job carries 34 of
      * them — so a flat list makes 34 near-identical cards. `parent == null` is the TOPOLOGICAL entry
-     * set; `job_id` is provenance. Both can group, so which one is used must be DECLARED — and the
-     * declaration lives here, as an option, because changing the default broke dependent criteria. */
+     * set; `job_id` is provenance — a CONTENT DIGEST, identical across conversations that open with the
+     * same words, so it can never be the group key. The key is DECLARED and derived: `conversation_id`
+     * = this row's LINEAGE ROOT (ADR-0048 §297). */
+
     var visible = opts.rootsOnly === true ? tree.roots.slice() : tree.order.slice();
     /* WHEN THE ROOTS ARE THE LIST, GROUP HEADERS ARE A LEFTOVER (ADR-0048 §242): measured on the live
      * payload, the roots-only list emitted 9 headers for 13 jobs, because the tree's order is not
@@ -195,7 +214,7 @@
     visible.forEach(function (id) {
       var n = tree.byId[id];
       /* GROUP HEADER when the conversation changes: 13 first-level entries over 52 children (§238). */
-      var conv = (n.row && (n.row.job_id || n.row.period_id)) || null;
+      var conv = n.root || (n.row && n.row.period_id) || null;   /* §297: the lineage root, never the content digest */
       if (showGroups && conv && conv !== lastGroup) {
         var g = groupsById[conv];
         var head = doc.createElement('div');
@@ -364,12 +383,23 @@
    * two entries a reader cannot tell apart ARE a duplicate as far as the reader is concerned. */
   function groupByConversation(periods) {
     var order = [], by = {};
+    /* The conversation key is derived here too, from `parent` alone — the function must not need the
+     * tree, and it must never look at `job_id` (see §297). */
+    var parentOf = {};
+    (periods || []).forEach(function (p) { if (p && p.period_id) { parentOf[p.period_id] = p.parent || null; } });
+    function rootOfKey(id) {
+      var guard = 0, cur = id, seen = {};
+      while (cur && parentOf[cur] && !seen[cur] && guard++ < 10000) { seen[cur] = true; cur = parentOf[cur]; }
+      return cur || id;
+    }
     (periods || []).forEach(function (p) {
       if (!p) { return; }
-      var key = p.job_id || p.period_id;
+      /* KEYED BY THE LINEAGE ROOT (§297), computed from `parent` alone — so two conversations with the
+       * same opening words stay two conversations instead of fusing on a shared content digest. */
+      var key = p.period_id ? rootOfKey(p.period_id) : null;
       if (!key) { return; }
       if (!by[key]) {
-        by[key] = { job_id: key, periods: [], first_ts: p.first_ts || null, last_ts: p.last_ts || null, replied: 0 };
+        by[key] = { conversation_id: key, periods: [], first_ts: p.first_ts || null, last_ts: p.last_ts || null, replied: 0 };
         order.push(key);
       }
       var g = by[key];
