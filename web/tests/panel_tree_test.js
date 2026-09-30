@@ -371,7 +371,22 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   T.render(host, P, {});
   const heads = host.querySelectorAll('.pt-group');
   const rows = host.querySelectorAll('.pt-node');
-  ok(heads.length === 3, 'the sidebar renders 3 conversation headers  [' + heads.length + ']');
+  /* HEADERS ARE EARNED, NOT AUTOMATIC (§301): a header appears only for a conversation that groups TWO
+   * OR MORE visible rows. Measured live before this: 49 headers + 50 rows for 50 conversations — every
+   * ONE-ROUND conversation printed twice (a header saying "1 period · 1 with reply" above its only row),
+   * which is the duplication the owner reported. The expectation is DERIVED from this fixture. */
+  const parentOfHdr = {};
+  P.forEach((q) => { parentOfHdr[q.period_id] = q.parent || null; });
+  const rootOfHdr = (id) => {
+    let cur = id, seen = {};
+    while (parentOfHdr[cur] && !seen[cur]) { seen[cur] = 1; cur = parentOfHdr[cur]; }
+    return cur;
+  };
+  const perConv = {};
+  P.forEach((q) => { const r = rootOfHdr(q.period_id); perConv[r] = (perConv[r] || 0) + 1; });
+  const expectHeads = Object.keys(perConv).filter((k) => perConv[k] >= 2).length;
+  ok(heads.length === expectHeads,
+    'a header is rendered only where a conversation groups >=2 rows  [' + heads.length + ' vs ' + expectHeads + ']');
   ok(rows.length === P.length, 'and every period as a child  [' + rows.length + ']');
   ok(host.querySelector('.pt-group').getAttribute('data-count') === '4',
     'each header carries its own size (the fact that makes neighbours distinguishable)');

@@ -211,6 +211,18 @@
      * conversation is noise — and the ROOT already IS the conversation's entry, so nothing is lost.
      * With the full DAG (`rootsOnly:false`) the headers still separate conversations. */
     var showGroups = opts.rootsOnly !== true;
+    /* HEADERS ONLY WHERE THERE IS SOMETHING TO GROUP (ADR-0048 §301). Measured on the live payload:
+     * **49 headers + 50 rows expressed 50 conversations** — every ONE-ROUND conversation printed twice (a
+     * header saying "1 period · 1 with reply" and then its only row). That duplication is what the owner
+     * reported as "messy": the chain design is "one root = one conversation", so a one-round conversation's
+     * ROW is its entry and a header above it says nothing new. A header earns its line only when it groups
+     * TWO OR MORE rows of the same conversation. */
+    var convCount = {};
+    visible.forEach(function (id) {
+      var n0 = tree.byId[id];
+      var c0 = (n0.row && n0.row.conversation_id) || n0.root || (n0.row && n0.row.period_id) || null;
+      if (c0) { convCount[c0] = (convCount[c0] || 0) + 1; }
+    });
     visible.forEach(function (id) {
       var n = tree.byId[id];
       /* GROUP HEADER when the conversation changes: 13 first-level entries over 52 children (§238). */
@@ -219,7 +231,7 @@
        * payloads that predate the field — and a LIVE criterion asserts the two agree, so drift is red
        * rather than silently resolved. Never `job_id`: a digest is provenance, not a key. */
       var conv = (n.row && n.row.conversation_id) || n.root || (n.row && n.row.period_id) || null;
-      if (showGroups && conv && conv !== lastGroup) {
+      if (showGroups && conv && conv !== lastGroup && (convCount[conv] || 0) >= 2) {
         var g = groupsById[conv];
         var head = doc.createElement('div');
         head.className = 'pt-group';
@@ -227,8 +239,8 @@
         head.setAttribute('data-count', String((g && g.count) || 0));
         head.textContent = (g && g.label) || conv;
         list.appendChild(head);
-        lastGroup = conv;
       }
+      if (conv) { lastGroup = conv; }   /* the conversation was visited even when it needed no header */
       var row = doc.createElement('button');
       row.type = 'button';
       /* THE CONTRACT IS INHERITED, NOT INVENTED (ADR-0048 §247). Measured: the rest of the app drives

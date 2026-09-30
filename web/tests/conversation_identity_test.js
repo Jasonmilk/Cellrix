@@ -63,6 +63,27 @@ const jobMembers = Object.keys(byJob).map((k) => byJob[k].sort().join('+')).sort
 ok('MUTATION: keying by job_id CROSSES the two conversations (membership differs)',
   jobMembers !== members.join(' | '), 'by job_id: ' + jobMembers);
 
+/* A ONE-ROUND CONVERSATION MUST OCCUPY ONE LINE (§301). Measured live: 49 headers + 50 rows for 50
+ * conversations — a header saying "1 period · 1 with reply" above the only row it described. */
+{
+  const host2 = w.document.createElement('div');
+  host2.id = 'host-fixture-301';
+  w.document.body.appendChild(host2);
+  const F = [
+    { period_id: 'solo', parent: null, job_id: 'J', preview: 'one round', reply: 'r', first_ts: '2026-09-30T03:00:00Z' },
+    { period_id: 'c1', parent: null, job_id: 'K', preview: 'two rounds', reply: 'r', first_ts: '2026-09-30T04:00:00Z' },
+    { period_id: 'c2', parent: 'c1', job_id: 'K2', preview: 'second', reply: 'r', first_ts: '2026-09-30T04:01:00Z' }
+  ];
+  w.CxPanelTree.mountSidebar(F, { hostId: host2.id });
+  const groups2 = host2.querySelectorAll('.pt-group').length;
+  const rows2 = host2.querySelectorAll('.ses-item').length;
+  ok('a one-round conversation gets NO redundant header (one line per conversation)',
+    rows2 === 3 && groups2 === 1, 'rows=' + rows2 + ' headers=' + groups2);
+  ok('MUTATION: emitting a header per conversation would print them twice  [naive headers=2]',
+    groups2 !== 2, 'the check above would fail if headers were unconditional');
+  if (host2.parentNode) { host2.parentNode.removeChild(host2); }
+}
+
 /* CONTRACT (source-level, labelled): the conversation key must never come from `job_id`. */
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8');
 ok('the sortable key is not taken from `job_id` anywhere in the grouping path',
