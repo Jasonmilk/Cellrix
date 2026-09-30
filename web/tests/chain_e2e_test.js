@@ -99,4 +99,4 @@ function ok(name, cond, detail) {
 
   console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
   process.exit(fail ? 1 : 0);
-})().catch((e) => { console.error('HARNESS ERROR:', e); process.exit(2); });
+})().catch((e) => { console.error('HARNESS ERROR:', e); process.exit(4); });

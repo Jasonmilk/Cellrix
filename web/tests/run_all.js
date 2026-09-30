@@ -98,6 +98,7 @@ const SELF_CONTAINED = [
   ['ledger_rows_test.js', 'ledger rows — keyed reuse, not a whole-table rebuild'],
   ['prove_track_rows_test.js', 'trajectory rows — keyed reuse, not a whole-table rebuild (PANEL-PLAN §2)'],
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
+  ['abort_roster_test.js', 'the CRASH path is exercised: exit 4 is observable, distinct from ENV, and rosters (the fourth fact, §295)'],
   ['flows_suppliers_test.js', 'flows supplier config — panel proxy contract, key never echoed (PANEL-PLAN §3)'],
   /* The chain's wiring facts have ONE source (anaphase:ADR-0046). This asserts a
    * launcher *derives* rather than restates them — a restated port is a port that

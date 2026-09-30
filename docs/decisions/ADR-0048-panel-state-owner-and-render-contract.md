@@ -12218,3 +12218,44 @@ yet this suite is unproven`。而它在**声明了能力**、面板也**在**的
 ④ 能区分"崩溃" ⚠️ 有数字、有 stderr 首行、**手工验过接住**,但门里**无常驻判据**
 ⇒ 做完 ④ 的四类分辨,即可转线 2(P1'' → P1' → P3)。而在那之前,**线 2 已 8 轮未动** —— 这是当前最大的机会成本。
 ```
+
+
+## 295. ✅ **尺子封版**:四类事实可分辨 ⇒ 转线 2
+
+### 295.1 全库 `exit(2)` 分类与扫描（不搞一刀切)
+
+```
+规则:**`.catch()` 里的 exit(2) = harness 错 ⇒ 改 4**;缺模块/缺文件/缺 CDP ⇒ **保留 2**(真环境缺席)。
+扫描(按索引替换,5 处):
+  chain_e2e_test.js:102 · hit_targets_test.js:146 · newest_first_contract_test.js:65 ·
+  render_test.js:326 · snapshot_selftest.js:110
+保留(合法 env):hit_targets 的 CDP 缺席 · flows_suppliers 的 jsdom/HTML 缺失 · ledger_rows 的 jsdom/asset 缺失
+```
+
+### 295.2 新增常驻判据 `abort_roster_test.js`（7 条,已进网)
+
+```
+· 崩溃子进程**可观测**(spawn 一个 exit 4 的临时 fixture ⇒ status=4)
+· exit 4 与 exit 2 **可区分**(crash=4 · env=2)⇒ 崩溃不会再被洗成"环境缺失"
+· 运行器把 4 映射到 `abortedRoster` · **读 `e.stderr`** · 判决行具名 `ABORTED (not red)` · **不按 flaky 重试**
+· **扫库断言**:没有任何 harness-error catch 仍 `exit(2)` ⇒ 洗白入口**不会再回来**
+```
+
+### 295.3 门的四类事实(封版)
+
+```
+① 通过 ✅ `61 proven`（+1:abort_roster)
+② 没跑 ✅ `2 skipped`，且**具名**(`⇒ SWITCH UNVERIFIED TODAY: callsOpen` 等)
+③ 缺席 ✅ `exit 3` / `env-missing (not red)`（附 stderr 首行）
+④ 崩溃 ✅ `ABORTED (not red)`，**有常驻判据行使**，附 stderr 首行
+⇒ **尺子够用** —— 按 §294.4 的判词,现在转**线 2**。
+```
+
+### 295.4 线 2(身份) —— 已 8 轮未动,是当前最大机会成本
+
+```
+P1'' `?job_id=` → `id=`（Cellrix 3 处真站点 + 1 处测试旧键;Anaphase 兼容期内**同时接受** `job_id=`)
+     ⇒ 判据:请求发 `id=<period_id>` ⇒ 事件照常取到;变异:只认 `job_id=` ⇒ 必红
+P1'  Anaphase 加 `session_id`/`conversation_id`（**不动 `job_id` 语义**;§276 已裁定)
+P3   老数据具名"无血缘"，与"单轮会话"分开(今日不可判定 ⇒ 只能具名)
+```

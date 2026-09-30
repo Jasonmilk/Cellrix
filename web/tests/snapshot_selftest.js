@@ -107,4 +107,4 @@ function check(l, c, d) {
   console.log("RESULT: " + pass + " passed, " + fail + " failed");
   dom.window.close();
   process.exit(fail ? 1 : 0);
-})().catch((e) => { console.error("SELFTEST ERROR:", e); process.exit(2); });
+})().catch((e) => { console.error("SELFTEST ERROR:", e); process.exit(4); });

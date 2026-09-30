@@ -143,4 +143,4 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('');
   ws.close();
   process.exit(failed === 0 ? 0 : 1);
-})().catch((e) => { console.log('  FAIL  判据本身出错: ' + (e && e.message || e)); process.exit(2); });
+})().catch((e) => { console.log('  FAIL  判据本身出错: ' + (e && e.message || e)); process.exit(4); });

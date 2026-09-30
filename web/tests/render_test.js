@@ -323,4 +323,4 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   if (errors.length) console.log("captured errors:\n  " + errors.slice(0, 8).join("\n  "));
   dom.window.close();
   process.exit(fail ? 1 : 0);
-})().catch((e) => { console.error("HARNESS ERROR:", e); process.exit(2); });
+})().catch((e) => { console.error("HARNESS ERROR:", e); process.exit(4); });
