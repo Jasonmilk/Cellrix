@@ -248,7 +248,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
           '<button type="button" class="e-turn-btn" data-e-turntoggle="' + it.id + '" aria-expanded="' + isOpen + '">' +
           '<span style="display:inline-block;width:14px" aria-hidden="true">' + (isOpen ? '▾' : '▸') + '</span>' +
           '<span>Turn ' + it.index + ' · ' + esc(it.note) + '</span>' +
-          '<span class="cnt" data-e-events="' + cnt + '"> · ' + cnt + ' events · ' + fmtDur(tl) + '</span>' +
+          '<span class="cnt" data-e-events="' + cnt + '" data-e-open="' + (isOpen ? 'true' : 'false') + '"> · ' + cnt + ' events · ' + fmtDur(tl) + '</span>' +
           '</button></td></tr>' });
         /* The folded row, drawn where the steps it stands for would have been —
          * directly under its turn header. It borrows the turn header's own

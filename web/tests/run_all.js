@@ -376,6 +376,9 @@ for (const [file, what] of SELF_CONTAINED) {
     results.push(['PASS', file, what]);
   } catch (e) {
     const out = (e.stdout || Buffer.from('')).toString();
+    /* THE CRASH REASON WAS NEVER READ (292): the harness writes to stderr, so the ABORT roster could
+     * say THAT it crashed but never WHY. One line, and the roster carries the first reason. */
+    const errOut = (e.stderr || Buffer.from('')).toString();
     const lines = out.trim().split('\n').filter(Boolean);
     const why = lines.filter(function (l) { return l.indexOf('NEEDS-INPUT:') === 0; }).pop();
     if (e.status === NEEDS_INPUT_EXIT && why && !/\bFAIL\b/.test(out)) {
@@ -384,7 +387,7 @@ for (const [file, what] of SELF_CONTAINED) {
       continue;
     }
     if (e.status === 4) {          /* CRASH — an ABORTED run is not a red */
-      abortedRoster.push(file);
+      abortedRoster.push(file + (errOut ? ' — ' + (errOut.trim().split('\n')[0] || '').slice(0, 90) : ''));
       results.push(['ABORT', file, what]);
       console.log('  ABORT ' + file + '  — the suite crashed; nothing was asserted (rule ⑳)');
       continue;
