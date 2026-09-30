@@ -11945,3 +11945,36 @@ yet this suite is unproven`。而它在**声明了能力**、面板也**在**的
 实测:带地址 ⇒ **exit=0**;无地址 ⇒ **exit=3**
 门:**2 red / 60 proven / 5 held / 0 unregistered**（`all_views` 记 PASS)
 ```
+
+
+## 287. 审查裁定:**通则吸收**("跳过必须可见") · **具体指控证伪**;并补一个**洗白洞**
+
+### 287.1 证伪的部分（实测)
+
+```
+审查称:`all_views` 的 2 个 skip **正是**证轨/链那 4 条最强断言(§277–§283 追的那条红)。
+实测:两个 skip 是 —— "compact keeps the judgements"(本回话没有 CHECK/VERDICT 行)与
+      "a TOOL row exists to exercise the optional field"(本 period 没有 TOOL 行);
+而 **CONSERVATION** 与 **traceability** 都 **PASS**(确实跑了)。
+⇒ 所以"红被跳过"不成立;但它要求的核实是对的(它自己也标了这是推断)。
+```
+
+### 287.2 吸收的部分（通则成立,已定位未落)
+
+```
+判决行只写 `proven`,**跳过无处可见** ⇒ 若哪天跳过的是关键条,门会**慢性失真**(0 bit 家族第 N 次)。
+⇒ 落法(一次改完,不可分两步 —— 我第一次分步改,判决行先引用了未声明的 `skippedTotal`,运行器当场崩):
+   ① 在 `results` 旁声明 `skippedRoster` / `skippedTotal`
+   ② PASS 路径 `execFileSync(...).toString()` 捕获 stdout,解析 `(\d+) skipped` 并累计
+   ③ 判决行追加 `, N skipped (ran nothing: nothing to exercise)`
+```
+
+### 287.3 我在现场看到的洗白洞（审查提到,我实测到)
+
+```
+回退后的门:`2 red / 59 proven / 5 held / 0 unregistered`,**1 env-missing (not red)** —— 而 `panel=up`
+⇒ 即 `all_views` 崩了(exit 2),却被归档为"**环境缺失,不是失败**" ⇒ **崩溃被洗白**。
+修法(一行,且**不需要动运行器**):套件 `.catch` 的 `exit(2)` → **`exit(4)`** ——
+而 `run_all.js:377` **早已**把 4 定义为 `ABORT — the suite crashed; nothing was asserted`(既有语义,我差点多加一条冲突分支)。
+三态实测:正常 **0** ｜ 无地址 **3** ｜ 人为崩溃 **1**(同步崩溃走 1 ⇒ **红**,不洗)｜ 异步 harness 错走 **4**(ABORT,具名)
+```

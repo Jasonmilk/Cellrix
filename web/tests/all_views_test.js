@@ -1110,4 +1110,9 @@ function skip(label, why) {
       + " exercise (not an absent capability) — the run still PASSES");
   }
   process.exit(fail ? 1 : 0);
-})().catch((e) => { console.error("HARNESS ERROR:", e); process.exit(2); });
+/* A HARNESS ERROR IS NOT AN ENVIRONMENT ABSENCE (§287): exit 2 means "a module is missing", which
+ * the runner files as ENV — not a failure. Measured 2026-09-30: this suite crashed while the panel was
+ * UP and the run was reported as `1 env-missing (not red)`, i.e. a crash was laundered into "no
+ * environment". Exit 4 is the runner's existing "CRASH — an ABORTED run is not a red" (run_all.js:377),
+ * which names what happened instead of hiding it. No runner change is needed. */
+})().catch((e) => { console.error("HARNESS ERROR:", e); process.exit(4); });
