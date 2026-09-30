@@ -497,7 +497,8 @@ function skip(label, why) {
         check("compact keeps the deliverable (no judgement in this turn to keep)",
           kindsSet.indexOf("REPLY") > -1,
           "kinds under compact: " + JSON.stringify(kindsSet));
-        skip("compact keeps the judgements", "this turn carries no CHECK/VERDICT");
+        skip("compact keeps the judgements  ⇒ BRANCH UNVERIFIED TODAY: neverFolded(check/verdict)  [no CHECK/VERDICT row]",
+        "this turn carries no CHECK/VERDICT");
       }
       check("and turning it off restores every row it folded",
         backRows === onRows && backFold === onFold && offRows > onRows,
@@ -761,7 +762,7 @@ function skip(label, why) {
     } else {
       // Same class as K12: the panel is fine, this period simply has no tool
     // call to exercise. A red run for absent data trains people to ignore red.
-    skip("a TOOL row exists to exercise the optional field",
+    skip("a TOOL row exists to exercise the optional field  ⇒ SWITCH UNVERIFIED TODAY: callsOpen (view.js:322)",
       JOB ? "this period has no TOOL row" : "no period in this panel");
     }
   }

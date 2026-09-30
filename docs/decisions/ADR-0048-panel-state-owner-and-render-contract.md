@@ -12176,3 +12176,45 @@ yet this suite is unproven`。而它在**声明了能力**、面板也**在**的
   但**门里没有常驻判据** ⇒ 待办:加一条 fixture 崩溃的判据(或把该路径的契约写成源码级断言)
 · 全库 `exit(2)` → `exit(4)`(chain_e2e / hit_targets / flows_suppliers / ledger_rows)仍待做
 ```
+
+
+## 294. 审查裁定:**状态空间是 5 个开关(32 态),而"通过"还依赖数据的形状**
+
+### 294.1 它的方法论**吸收**:枚举不完备 + 数据形状
+
+```
+影响守恒律的开关:**compact · openTurns · q · callsOpen · foldedTurns** ⇒ 2^5 = **32 态**(它 §292/§293 只枚举 3 个)
+⇒ 而 `callsOpen` 正是它在 §281 **自己具名**过的那条,却在枚举时遗漏:
+   `view.js:322 if (it.cls === TOOL_CLS && !S.callsOpen) continue;`(工具行消失)
+   `neverFolded = reply | check | verdict`(`:126`)⇒ **tool 不在其中** ⇒ **没有折叠替身** ⇒ 结构上会破
+⇒ 但**本期实测它惰性**:`#eCallBtn` 切换前后数字**完全一样**(visible=1 其中 **TOOL 行 0** · folded=6 · 声明和=7)
+   ⇒ 本 period **没有 TOOL 行** ⇒ `:322` 无可移除 ⇒ 与那条 skip 的理由一致
+⇒ ⇒ 结论:**"通过"不只依赖状态遍历,还依赖数据的形状**;`skip` 名册就是"未验证状态空间"的**地图**
+```
+
+### 294.2 本笔已落:skip 理由**点名未验证的开关**
+
+```
+实测输出:
+  SKIP a TOOL row exists to exercise the optional field  ⇒ SWITCH UNVERIFIED TODAY: callsOpen (view.js:322)
+  SKIP compact keeps the judgements  ⇒ BRANCH UNVERIFIED TODAY: neverFolded(check/verdict)
+⇒ 于是"2 skipped"从**数字**变成**公告**:哪两个开关今天没人管
+```
+
+### 294.3 未落(已定位,下一格)
+
+```
+① **运行器传播**:把套件 stdout 里 `UNVERIFIED TODAY:` 的行带进判决/名册
+   (`run_all.js`:在 `skippedRoster` 旁声明 `unverifiedRoster`,在 PASS 路径用正则抽取,在 `SKIP` 名册循环后打印)
+   ⇒ 我这一笔试了,但**锚点没命中**;脚本是**原子写**,文件未被改动 ⇒ 下一格用**行号**做
+② 全库 `exit(2)` → `exit(4)`(四文件) ③ ABORT 常驻判据 ④ fixture 声明 kind 覆盖集 ⑤ `turn.id === event.turn` 的钉住
+   —— 其中 ⑤ 已由本 ADR §293.2 的守卫(b)"一个状态,两处效果"**行为上**覆盖
+```
+
+### 294.4 裁定:**尺子够用** ⇒ 可以转线 2
+
+```
+① 能区分"通过" ✅ 60 proven ｜ ② 能区分"没跑" ✅ 2 skipped(具名) ｜ ③ 能区分"缺席" ✅ exit 3/env ｜
+④ 能区分"崩溃" ⚠️ 有数字、有 stderr 首行、**手工验过接住**,但门里**无常驻判据**
+⇒ 做完 ④ 的四类分辨,即可转线 2(P1'' → P1' → P3)。而在那之前,**线 2 已 8 轮未动** —— 这是当前最大的机会成本。
+```
