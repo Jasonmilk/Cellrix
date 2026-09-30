@@ -321,29 +321,26 @@ function skip(label, why) {
         " drawn + " + expect.periods + " turn headers), " + expect.metering + " metering events not drawn");
       /* The name no longer over-promises (§280): it asserts what it measures — the rendered total
        * equals the EXPECTED total for the window that was loaded (`expect.periods` may be 1). */
-      /* THE COUNTING METHOD IS A CONSERVATION LAW (§283), not a prediction of how many rows the
-       * renderer will draw. Measured on the live panel: 1 visible REPLY row + a folded row DECLARING
-       * "6 internal steps" == the turn header's declared "7 events" — nothing was missing, the old
-       * assertion was counting physical rows and ignoring the declared contents.
-       *   visible event rows + Σ(folded declarations)  ==  Σ(turn declarations)
-       * It holds whether the panel folds or not, because it predicts nothing — it only forbids loss.
-       * PRECONDITION: the internal steps must be FOLDED for the declaration to exist; when the turn
-       * itself is collapsed the declarations are hidden too, so the method does not apply (skip). */
+      /* THE COUNTING METHOD IS A CONSERVATION LAW (283), AND THE PRECONDITION IS NOT GUESSED (288).
+       * The first version guarded this with `aria-pressed === "true"` -- ONE condition, when the renderer's
+       * fold state comes from `CxCellMetering.project()` (prove_track.view.js:129) and is not a boolean at
+       * all. The honest form needs NO precondition: it reads the renderer's OWN declarations, so it holds
+       * folded or not, and it still forbids loss:
+       *     visible event rows + SUM(folded declarations) == SUM(turn declarations)
+       * The two checks below are what keep it from being a tautology (`foldSum >= 0` could never fail):
+       * a window that shows rows MUST declare them, and the declaration MUST be a field. */
       const declared = (attr) => Array.from(doc.querySelectorAll("#eTbody [" + attr + "]"))
         .reduce((a, e) => a + Number(e.getAttribute(attr) || 0), 0);
       const foldSum = declared("data-e-fold-count");
       const evSum = declared("data-e-events");
-      const compactBtn = doc.getElementById("eCompactBtn");
-      const folded = !compactBtn || compactBtn.getAttribute("aria-pressed") === "true";
-      if (!folded) {
-        skip("the trajectory renders the WHOLE loaded window", "the compact view is OFF, so no folded declaration exists");
-      } else {
-        check("CONSERVATION: visible rows + folded declarations == declared events (nothing vanishes)",
-          rowsNow() + foldSum === evSum,
-          rowsNow() + " visible + " + foldSum + " folded vs " + evSum + " declared  |  trajectory " + traj.join("\u2192"));
-      }
+      check("CONSERVATION: visible rows + folded declarations == declared events (nothing vanishes)",
+        rowsNow() + foldSum === evSum,
+        rowsNow() + " visible + " + foldSum + " folded vs " + evSum + " declared  |  trajectory " + traj.join("\u2192"));
+      check("a window that SHOWS rows must DECLARE its events (the field cannot vanish)",
+        rowsNow() === 0 || evSum > 0,
+        "visible=" + rowsNow() + " declared=" + evSum);
       check("the folded declaration is a FIELD, not prose (no scraping)",
-        foldSum >= 0 && doc.querySelectorAll("#eTbody [data-e-fold-count], #eTbody [data-e-events]").length > 0,
+        foldSum === 0 || doc.querySelectorAll("#eTbody [data-e-fold-count]").length > 0,
         "declared fields: fold=" + foldSum + " events=" + evSum);
       check("every period of the chain has a turn header",
         headsNow() === expect.periods,
