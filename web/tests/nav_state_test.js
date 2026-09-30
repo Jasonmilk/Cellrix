@@ -159,10 +159,21 @@ check('the trajectory metadata is written inside `setNav` (N-003)',
   JSON.stringify(metaWriters));
 
 /* ── 5. the consumers read the one state ────────────────────────────────── */
-const consumers = ['prove_track.js', 'chat.js'].filter(
-  (f) => /state\.nav\.period/.test(sources[f] || ''));
+/* §299 — VIEWING IS NOT RESUMING. The original intent stands: whoever reads the selection reads it
+ * from the ONE state (no second field). What changed is WHO may read `nav.period`:
+ *   · `prove_track.js` reads it as a VIEW (what am I looking at) — unchanged;
+ *   · `chat.js` must NOT read it as its resume target, because the panel selects a default detail on
+ *     boot: falling back to it made every first message continue that period ("no new conversations").
+ * The second check pins the positive half — the resume target comes only from the explicit metadata. */
+const readsPeriod = (f) => /state\.nav\.period/.test(sources[f] || '');
 check('the views read the selection from the one state (N-003)',
-  consumers.length === 2, consumers.join(', '));
+  readsPeriod('prove_track.js'), 'prove_track=' + readsPeriod('prove_track.js'));
+check('and `chat.js` does NOT treat the viewed period as a resume target (§299)',
+  !readsPeriod('chat.js'),
+  (sources['chat.js'] || '').match(/var job = [^\n]*/)?.[0] || 'no `var job =` line in chat.js');
+check('the resume target comes from the EXPLICIT metadata written by a continue action (§299)',
+  /var job = \(Cx\.state\.nav\.meta && Cx\.state\.nav\.meta\.job_id\)/.test(sources['chat.js'] || ''),
+  'chat.js must resume from `nav.meta.job_id` only');
 
 /* ── 6. every declared view has a container ─────────────────────────────── */
 const declared = (sources['base.html'].match(/data-view="([^"]+)"/g) || [])

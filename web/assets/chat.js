@@ -159,7 +159,12 @@
      * conversation at all ("无法对话"). `meta.job_id` was already being passed by both the legacy card
      * click and the tree's click; it simply was not used here. Job for the scope, period for the
      * identity — the same two-facts rule as the lineage fix (§251), on the client side. */
-    var job = (Cx.state.nav.meta && Cx.state.nav.meta.job_id) || Cx.state.nav.period || null;
+    /* VIEWING IS NOT RESUMING (ADR-0048 §299). `nav.period` is WHAT I AM LOOKING AT — the panel
+     * selects a default detail on boot, so falling back to it made EVERY first message continue that
+     * period: "打开页面直接打字" could no longer start a conversation (the owner's report). The resume
+     * target is only what an explicit CONTINUE action set (`nav.meta.job_id`, written by the sidebar
+     * click) or what the ✗ / +新对话 control cleared. No target ⇒ the server starts a NEW conversation. */
+    var job = (Cx.state.nav.meta && Cx.state.nav.meta.job_id) || null;
     function finish() {
       if (done) return;
       done = true;
