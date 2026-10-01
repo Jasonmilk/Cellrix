@@ -13782,3 +13782,38 @@ P43:D2 的**作用域**在报告里具名:`scope = ["period streams (<id>.events
 ④ ⏳ `mode` 进 payload（界面可显示"Partner(带记忆)")
 ⑤ ⏳ 载荷里**空串 vs 缺席**分名(`think.text === ''` ⇒ "有但为空")
 ```
+
+
+## 338. 📌 **M3④ `mode` 进 payload:已量清两端,落点待一次定位**（不做半截改动)
+
+### 338.1 已确认的事实（实测)
+
+```
+**后端**:`anaphase-helix/src/run_cycle/mod.rs:77  pub mode: Mode`（`Mode::Partner` 是其默认,见 :452)
+  ⇒ 运行模式**存在于运行上下文**,但**没有写进任何事件载荷** —— 与早先量到的 `payload.mode = None × 23` 一致。
+**界面**:`cell_metering.js:87  MODE_PATHS = ['/data/mode', '/mode']`（读事件载荷的 `mode`)
+  ⇒ `panel_tree.js:29 modeFacts(mode)`:有且已声明 ⇒ `{kind:'declared', label, mind, writesExperience, implemented}`;
+     否则 ⇒ `{kind:'undeclared', label:'模式未声明', note:'the period carries no run mode; do not read this as mode ①'}`
+  ⇒ 所以界面**已经准备好**:只要事件载荷带上 `mode`,那一行就会显示三种模式之一(③ `Survive` 会显示"已声明、未实现"),否则仍旧具名。
+```
+
+### 338.2 还剩**一次定位**(不许猜)
+
+```
+① `Mode` 的**线名**:枚举定义位置未在 `run_cycle/mod.rs` 的预期处找到 ⇒ 先定位它,并确认三种模式的**协议字符串**
+   （一旦确定,必须同时进 ADR-0026 D2 文档 + 客户端 `PAYLOAD_MAP`/`DATA_SCHEMA`,否则词表与单一来源两条判据会红）
+② **首个事件的 emit 点**:`turn/start` 不在 `run_cycle/*.rs`/`pipeline/*.rs` 的预期处 ⇒ 定位它
+   （或在 `context/inject` 上写,因为它已携带 `resume_from` 这类"周期事实"）
+③ 落地后判据:
+   `a_periods_mode_is_in_its_stream`（Rust:某事件的 `data.mode` 等于该次运行的 `Mode` 字符串) ·
+   客户端:`modeFacts(modeOf(that event))` ⇒ `kind === 'declared'`(且 `Survive` ⇒ `implemented === false`)
+   变异:`mode` 缺席 ⇒ 回落 `undeclared`（**那条 note 就是"未声明"的具名,不是空字符串**)
+```
+
+### 338.3 M3 状态
+
+```
+① ✅ 三态具名(§335) ｜ ② ✅ 详情头友好标签(§336) ｜ ③ ✅ 「+ 新对话」按钮(§337)
+④ 📌 `mode` 进 payload —— **两端已量清,只差一次枚举/emit 点定位**(本条)
+⑤ ⏳ 载荷里**空串 vs 缺席**分名(`think.text === ''` ⇒ "有但为空")
+```
