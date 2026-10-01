@@ -41,6 +41,12 @@
       "reason": "The criterion pins the DERIVED leaf id run-0537fb101ecccb5e. That recording was lost in the machine migration, and a hash cannot be inverted — so this is not 'not yet proven', it is UNREACHABLE: the criterion demands evidence that no longer exists in the world. INPUT IS DECLARED, NOT DISCOVERED (measured 2026-09-24): this suite flips between unproven (exit 3) and RED (exit 1) depending on what happens to be in .helix/events, because other runs write there. A scanned input is a hidden input; the shared events directory is now declared here and hashed into the gate report.",
       "retirement_plan": "Rewrite prove_track_nodes_test.js to assert SHAPE (a lineage of N periods) instead of the pinned derived leaf run-0537fb101ecccb5e, then delete the entry recorded-10-period-chain. Mutation proof REQUIRED first: breaking the lineage must turn it red, or the rewrite is only moved goalposts.",
       "depends_on": ".helix/events"
+    },
+    {
+      "id": "fresh-e2e-chain",
+      "suite": "chain_wiring_test.js",
+      "depends_on": "a SUCCESSFUL ./e2e_chain.sh --self-check entry younger than 7 days: a DATED artifact of a real chain run, not a live probe. Measured 2026-10-01: the last success was 7.1 days old, so the suite correctly answered NEEDS-INPUT.",
+      "retirement_plan": "Run ./e2e_chain.sh --self-check (it writes the dated entry the suite reads); the suite then has its input and this fresh-e2e-chain deferral can be retired by deleting this entry. The criterion itself is NOT weakened: it still refuses to judge without a fresh run."
     }
   ],
   "pending": [
