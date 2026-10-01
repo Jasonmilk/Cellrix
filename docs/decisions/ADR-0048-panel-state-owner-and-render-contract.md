@@ -13950,3 +13950,44 @@ JS `mode_vocabulary_test.js`(进网,**4 passed**)——
 ① ✅ 三态具名 ｜ ② ✅ 详情头友好标签 ｜ ③ ✅ 「+ 新对话」按钮 ｜ ④ 🚧 **词汇已统一(§340),线程化待落(本条,锚点齐)**
 ⑤ ⏳ 载荷里**空串 vs 缺席**分名(`think.text === ''` ⇒ "有但为空")
 ```
+
+
+## 342. 审查裁定（M3 开支前):**它三条全中** —— (a)(c) 是墙,已并入细化后的计划
+
+### 342.1 (a) 🔴 `None` 分支**永不可达** —— 判据会永远红不了
+
+```
+实测:`config.rs:242` 的 `RunCycleConfig.mode` 带 **`#[serde(default)]`**
+  ⇒ 配置不写 mode ⇒ 得到 `Mode::default() = Partner` ⇒ **"未声明"这个状态在运行期不可表示**。
+⇒ 后果:我原计划的"变异:写 `Mode::default()` ⇒ 红"**不可能红** —— 正是我自己的规则:
+  **判据的每个分支必须证明自己会执行**。
+⇒ 更正:字段改为 `Option<Mode>`(= 缺字段就是**未声明**,不再回落) ⇒ `None` 分支可达,
+  载荷才可能出现"无 `mode` 键",界面才可能走到 `undeclared`。
+```
+
+### 342.2 (c) 🔴 **P64:坏环境下的"红"是环境的属性,不是代码的属性**
+
+```
+实测(去掉 `NODE_PATH` 跑门):被记成**红**的 6 条全是 jsdom/面板依赖者 ——
+  `chain_window_test` · `wayout_test` · `three_state_rows_test` · `refs_round_trip_test` ·
+  `conversation_identity_test` · `all_views_test`
+⇒ 那一刻的"红"说的是"这台机器上没有 jsdom",不是"代码坏了" ⇒ 必须记 `env-missing`/`unregistered`。
+⇒ 列为 **M3-P0(先于 M3 开支)**:runner 的能力声明与探针链要覆盖 jsdom 依赖者,并附判据
+  (`p64_env_class_test`:无 jsdom 时这些套件**不得**计红;变异:按红计 ⇒ 红)。
+```
+
+### 342.3 (b) 🟡 读取粒度未声明（幽灵率 ~75% 成立)
+
+```
+界面**按事件**读 mode(`modeOf(e)` → `MODE_PATHS`),`panel_tree` 也读**行**的 `mode` ⇒
+若只把 mode 写在 `turn/start` ⇒ 其余行显示"模式未声明"。
+⇒ 更正:**声明为周期级**,并新增**解析器** `periodMode(events)`(取 `turn/start`),
+  界面与 inspector **一律经它**;判据含"任一非首事件经解析器仍得同一值"。
+```
+
+### 342.4 计划已细化（`CELLRIX-PLAN.md` 的「M3 细化」一节)
+
+```
+M3-P0 先修 runner 分类(墙) → M3④(Option<Mode> + 周期级 + 解析器 + 三条变异) → M3⑤(空串/缺席分名)
+攒着:P58(已并入) · P62 · P63(死字段) · P61(三模式只出现一种 ⇒ 变异空转,须具名或造齐)
+```
