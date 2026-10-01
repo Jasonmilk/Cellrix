@@ -13528,3 +13528,38 @@ M2-B ✅ **全部完成**:纯核心(§328) · 存储接线+purge 事实(§329) �
 M2-C ⏳ D2 销毁内容（清 q/a/ch,**保 id 与 parent**)
 M2-D ⏳ 腾位的**对外可见性**（"保护到 <时刻>"必须可读,且必须经 `check_retention_covers_grace`)
 ```
+
+
+## 332. ✅ **M2-C:D2 内容销毁**（清正文,**保 id 与 parent**)
+
+### 332.1 两条规则决定形状
+
+```
+· **ID 与 PARENT 存活（C7)**:整删文件会**断链** —— 子节点的 `resume_from` 会指向一个**无人能解析**的 id,
+  读者(正确地)报告悬垂父。所以销毁**重写行**,身份/血缘/`seq`/`time` **一字不动**。
+· **销毁必须自己具名**:被销毁的行不能看起来像"从来没有正文" ⇒ 每个受影响的行获得
+  `data.content = "destroyed"` —— 正是本项目反复遇到的**三态律**(缺席 ≠ 空 ≠ 已销毁)。
+· 重写是本存储**唯一**非追加的地方 ⇒ 因此它在**写者锁**内发生。
+内容键是**声明式清单**:`text`/`reply`/`reason`/`summary`/`args`/`result`/`preview`/`content_body`。
+```
+
+### 332.2 判据（`cargo test --lib` **289 passed**,+3)
+
+```
+`content_destruction_keeps_identity_and_lineage_and_names_itself`:
+  三行含内容 ⇒ `destroyed_rows == 3` · **`SECRET-PARENT`/`SECRET-REPLY` 消失**(不可复原) ·
+  每行含 `"content":"destroyed"` · 销毁后 `list_periods` 仍列出父(**身份与血缘不变**) ·
+  子节点的 `parent` **仍解析为父** ✓
+`deleting_the_file_instead_of_the_content_would_break_the_chain`（**C7 的反证**):
+  删掉父的**文件** ⇒ 子节点的 `parent` 变成 `None`(读者正确地拒绝悬垂)⇒ **这就是 D2 重写而非删文件的原因**
+`a_missing_object_is_refused_by_name_when_destroying_content`（不存在的对象 ⇒ **具名拒绝**)
+实机(非破坏):`{"period_ids":[]}` ⇒ `destroyed_rows: 0`;不存在的 id ⇒ 具名拒绝;
+  盘上**没有任何** `"content":"destroyed"` 标记 ⇒ **未触碰真实数据** ✓
+```
+
+### 332.3 M2 进度
+
+```
+M2-A ✅ D0 · M2-B ✅ 全部 · **M2-C ✅ D2** · M2-D ⏳ 腾位的对外可见性（"保护到 <时刻>"可读,经 `check_retention_covers_grace`)
+⇒ 三旋钮(D0/D1/D2)**各有能红的判据**,DoD 只剩 M2-D 与"门 no worse than 2 既知红"的复核
+```
