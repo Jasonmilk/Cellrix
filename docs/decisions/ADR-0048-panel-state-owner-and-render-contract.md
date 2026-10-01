@@ -13278,3 +13278,38 @@ Cellrix `refs_round_trip_test` 新增三条:
   否则坏数据会以"**别人的套件红了**"的形式出现 ⇒ 归因时**先看数据,再看调用**。
 · K≥3 实测在此**救了一次**:它证明三条是**确定性**的,排除"偶发",才逼出"共同输入坏了"这一层。
 ```
+
+
+## 326. ✅ **M2-A:D0 写入端**（墓碑**追加而不覆盖**)
+
+### 326.1 为什么现在才敢写
+
+```
+§311 的第一版用 `SessionEventStream::open`(seq 从 0、偏移 0 写)⇒ **覆盖了该 period 的历史**,
+判据 `every byte stays on disk` 当场抓到 ⇒ 撤回。现在四道守卫齐备且**各自都有判据**:
+  ① `open_append` **从 max+1 续编**（§319)  ② 缺尾换行 ⇒ **先补**（§325,否则两行拼一行)
+  ③ 半行 ⇒ **具名拒绝** + `repair_torn_tail` 显式修复（§320)  ④ 写者锁 ⇒ 第二写者**具名拒绝**（§322)
+```
+
+### 326.2 实现与判据
+
+```
+`query.rs::tombstone_period(dir, key, reason)`:
+  取写者锁 ⇒ `resolve_one`(未知/歧义 ⇒ 具名拒绝) ⇒ `count_tombstoned_of` 已墓碑 ⇒ **幂等返回**
+  ⇒ `open_append` + `emit(EventType::Tombstone, {reason})`
+路由:`POST /v1/periods/tombstone`（`{period_id, reason}`;失败 ⇒ `{ok:false, error}`)
+判据 `the_tombstone_writer_appends_without_destroying_history`（`cargo test --lib` **267 passed**):
+  写墓碑后 —— **行数 ≥ 3**(追加,不覆盖) · 每行**各自可解析** · `turn/end` **仍在** ·
+  `list_periods` **隐藏**它 · `count_tombstoned == 1` · **seq 无重复** · **再调一次不新增行**(幂等)
+实机(非破坏):对**不存在**的 id 调路由 ⇒ **具名拒绝**,且事件文件数 **before == after** ✓
+```
+
+### 326.3 M2 计划已细化落盘
+
+```
+`CELLRIX-PLAN.md` 新增「M2 细化」一节(抗上下文积压),每条写明 **文件/函数/判据名/变异/验收证据**:
+  M2-A ✅ D0 写入端(本条) · M2-B D1 GC+purge(判据先行,C5–C16/P15 逐条点名)
+  M2-C D2 销毁内容(保 id/parent) · M2-D 腾位的**对外可见性**(宽限截止必须可读,且经 `check_retention_covers_grace`)
+  DoD:三旋钮各有能红的判据 · C5–C14/C16/P15 全部进网并点名 · 一次"删除→重放→不复活"端到端 ·
+       门 no worse than 2 既知红 · 全程**不出现第二本账/跨流时间戳比较**
+```
