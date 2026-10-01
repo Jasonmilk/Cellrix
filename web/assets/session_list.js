@@ -119,7 +119,7 @@
             /* THE REF MOVES EXPLICITLY (ADR-0048 §307): choosing a period says that the next message
              * attaches THERE. A pointer, not a guess — and the same operation as forking from a middle
              * node. The old metadata slot is left to `prove_track`, its actual owner. */
-            if (typeof window.Cx.setRef === 'function') { window.Cx.setRef(id); }
+            if (typeof window.Cx.setRef === 'function') { window.Cx.setRef(id, p.conversation_id || null); }
           }
           try { if (typeof loadPeriodToChat === 'function') { loadPeriodToChat(id); } } catch (e) { /* never block the click */ }
           try {
@@ -240,7 +240,7 @@
       /* 一种语义（N-001）：把这段载进对话。证轨侧板若开着，它跟着 period 走——
        * 那是 shell 的 period 通知在做的事，不是这里的分支。 */
       Cx.setNav({ period: p.period_id });
-      if (typeof Cx.setRef === 'function') { Cx.setRef(p.period_id); }
+      if (typeof Cx.setRef === 'function') { Cx.setRef(p.period_id, p.conversation_id || null); }
       moveSelection();          /* 就地搬选中态：列表不动，位置不丢 */
       loadPeriodToChat(p.period_id);
       setBanner('续接经历「' + esc(autoName(p)) + '」<span class="tid">' + esc(p.period_id.slice(-6)) + '</span> —— 下一句话延续这段对话');

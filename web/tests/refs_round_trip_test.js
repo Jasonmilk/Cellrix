@@ -85,6 +85,53 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('MUTATION: the client really asks the server at boot (source contract, §310)',
     /fetch\('\/api\/refs'\)/.test(fs.readFileSync(path.join(__dirname, '..', 'assets', 'script.html'), 'utf8')));
 
+  /* ②b M1d — A REF PER CONVERSATION: after a period is chosen, the conversation's OWN ref must exist and
+   * point at it, and the listing must carry both names. With a single fixed name the conversation set is
+   * unaddressable — this is the check that says so. */
+  const cid = (await call('/api/sessions?limit=5')).periods[0].conversation_id || '';
+  if (cid) {
+    const branch = await call('/api/refs/conversations/' + encodeURIComponent(cid), {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ period_id: period })
+    });
+    ok('M1d: a NAMED ref per conversation is writable and reported', branch.ok === true, JSON.stringify(branch).slice(0, 70));
+    const listing = await call('/api/refs');
+    ok('M1d: the listing carries BOTH the HEAD (`current`) and the conversation ref',
+      (listing.refs || []).filter((x) => x.name === 'current').length === 1
+        && (listing.refs || []).filter((x) => x.name === 'conversations/' + cid).length === 1,
+      (listing.refs || []).map((x) => x.name).join(',').slice(0, 90));
+    const nested = await call('/api/refs/conversations/..%2Fescape', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ period_id: period }) });
+    ok('M1d: nesting is allowed and TRAVERSAL is still refused',
+      nested.ok === false && /segment/.test(String(nested.error || '')), String(nested.error || '').slice(0, 60));
+  } else {
+    console.log('  UNVERIFIED TODAY: no conversation_id in the payload — the named-ref half cannot be judged');
+  }
+
+  /* ②c M1e — THE CACHE MUST DECLARE ITSELF: with the refs endpoint unreachable the client falls back to
+   * localStorage, and it must SAY SO (`source === 'cache'`) rather than pass a possibly-stale pointer off
+   * as current. */
+  const domOffline = new JSDOM(await (await fetch(base + '/')).text(), {
+    url: base, runScripts: 'dangerously', resources: 'usable', virtualConsole: new VirtualConsole(),
+    beforeParse(x) {
+      x.fetch = (u, o) => {
+        const s2 = String(u);
+        if (/\/api\/refs/.test(s2)) { return Promise.reject(new Error('offline (test)')); }
+        return fetch(new URL(u, base).href, o);
+      };
+      try { x.localStorage.setItem('cx.ref', 'run-from-cache'); } catch (e) { }
+    }
+  });
+  let w3 = 0, src3 = null, val3 = null;
+  while (w3 < BOOT_SETTLE_MS) {
+    await sleep(300); w3 += 300;
+    const st = domOffline.window.Cx && domOffline.window.Cx.state && domOffline.window.Cx.state.ref;
+    src3 = st && st.source; val3 = st && st.current;
+    if (src3) { break; }
+  }
+  ok('M1e: an unreachable server leaves the client on the CACHE, and it DECLARES that',
+    src3 === 'cache' && val3 === 'run-from-cache', 'source=' + String(src3) + ' value=' + String(val3));
+  ok('M1e MUTATION: a client that claimed "server" while offline would fail this check',
+    src3 !== 'server', 'the declaration is falsifiable');
+
   /* ③ clearing on the server clears it for every reader. */
   const del = await call('/api/refs/current', { method: 'DELETE' });
   ok('DELETE /api/refs/current removes it (a named absence afterwards)',

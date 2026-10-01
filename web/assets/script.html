@@ -207,7 +207,7 @@
    * It is NOT part of `nav` (the hashed LOCATION state): "where I am looking" and "where the next
    * message attaches" are different facts, and a shared slot is how they kept colliding (§299).
    * Persisted, because Git keeps refs in the repository, not in the window that happens to be open. */
-  var STATE = { nav: { view: null, period: null, panel: null, sup: null }, ref: { current: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
+  var STATE = { nav: { view: null, period: null, panel: null, sup: null }, ref: { current: null, source: null }, sesSeq: 0, histSeq: 0, chatBusy: false };
   var NAV = STATE.nav;
 
   function hashFor(state) {
@@ -218,20 +218,35 @@
    * not even the two paths that adopt what the address bar already says. */
   /* THE ONLY WRITER OF THE REF (same discipline as `setNav`): every path that continues, forks or
    * starts over goes through here, so "who moved the pointer" is answerable. */
-  function setRef(periodId) {
+  /* M1d: A REF PER CONVERSATION (ADR-0048 §317). `current` is HEAD ("where I am"); the named ref under
+   * `conversations/<lineage root>` is the BRANCH ("what that conversation looks like"). Git separates the
+   * two, and so must we: with one fixed name the conversation set is not addressable at all.
+   * M1e: `source` DECLARES where the pointer came from — a cached pointer is POSSIBLY STALE and must not
+   * read as an equal fact. */
+  function setRef(periodId, conversationId) {
     STATE.ref.current = periodId || null;
     /* THE SERVER IS THE HOME OF THE POINTER (ADR-0048 §310): Git keeps refs in the repository, so a
      * restart — or another reader — sees the same one. localStorage stays as a CACHE, never the source. */
     try {
+      var write = function (name, pid) {
+        return fetch('/api/refs/' + name, {
+          method: 'PUT', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ period_id: pid })
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j && j.ok) { STATE.ref.source = 'server'; }
+          return j;
+        }).catch(function () { STATE.ref.source = 'cache'; });
+      };
       if (STATE.ref.current) {
         window.localStorage.setItem('cx.ref', STATE.ref.current);
-        fetch('/api/refs/current', {
-          method: 'PUT', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ period_id: STATE.ref.current })
-        }).catch(function () { /* the cache still holds it; the next set retries */ });
+        /* HEAD, then the conversation's own branch tip (only when the caller knows the conversation). */
+        write('current', STATE.ref.current);
+        if (conversationId) { write('conversations/' + encodeURIComponent(conversationId), STATE.ref.current); }
       } else {
         window.localStorage.removeItem('cx.ref');
-        fetch('/api/refs/current', { method: 'DELETE' }).catch(function () { /* idem */ });
+        fetch('/api/refs/current', { method: 'DELETE' })
+          .then(function () { STATE.ref.source = 'server'; })
+          .catch(function () { STATE.ref.source = 'cache'; });
       }
     } catch (e) { /* storage or fetch unavailable: the in-memory ref still works */ }
     return STATE.ref.current;
@@ -246,11 +261,12 @@
     fetch('/api/refs').then(function (r) { return r.json(); }).then(function (j) {
       var cur = ((j && j.refs) || []).filter(function (x) { return x && x.name === 'current'; })[0];
       STATE.ref.current = (cur && cur.period_id) || null;
+      STATE.ref.source = 'server';   /* declared: this came from the server, so it is current */
       try {
         if (STATE.ref.current) { window.localStorage.setItem('cx.ref', STATE.ref.current); }
         else { window.localStorage.removeItem('cx.ref'); }
       } catch (e3) { /* idem */ }
-    }).catch(function () { /* offline: the cached pointer stands */ });
+    }).catch(function () { STATE.ref.source = 'cache'; /* POSSIBLY STALE, and it says so (M1e) */ });
   } catch (e4) { /* fetch unavailable: the cached pointer stands */ }
 
   function setNav(patch, opts) {
