@@ -48,5 +48,17 @@ ok('the enum names are not accepted as wire values (so the drift cannot come bac
   /mode_from_wire\("Partner"\)/.test(rustSrc) || /"Partner" => Some/.test(rustSrc) === false,
   'no arm maps an enum name');
 
+/* THE CONFIG SIDE MUST SPEAK THE SAME WORDS (ADR-0048 §349): the variants carry EXPLICIT renames, because
+ * `rename_all` alone had drifted (`snake_case` gave `drive`/`survive` while the wire says
+ * `driving`/`survival`). A source scan is the right test here: it pins the DECLARATION, and the Rust test
+ * `the_config_speaks_the_wire_vocabulary_for_modes` pins the BEHAVIOUR. */
+const renames = Array.from(rustSrc.matchAll(/#\[serde\(rename = "([a-z]+)"\)\]/g)).map((m) => m[1]).sort();
+ok('the config vocabulary is declared EXPLICITLY and equals the wire vocabulary',
+  renames.length >= MIN_MODES && renames.join(',') === rustValues.join(','),
+  'renames=[' + renames.join(',') + '] wire=[' + rustValues.join(',') + ']');
+ok('MUTATION: `rename_all` alone would NOT be enough (snake_case drifts on driving/survival)',
+  renames.indexOf('driving') >= 0 && renames.indexOf('survival') >= 0,
+  'the two names that drift are explicitly present');
+
 console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
 process.exit(fail ? 1 : 0);

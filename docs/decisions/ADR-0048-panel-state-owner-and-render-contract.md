@@ -14248,3 +14248,38 @@ P62 一致性不变量 · P63 死字段(声明了但无人读) —— 与 ④ �
      并补一条跨语言判据(配置词 == 线名词);否则须**声明**"配置词汇 ≠ 协议词汇,由 `mode_wire` 单点翻译"。
    今天链路配置无 `mode` ⇒ 所有运行显示"未声明"（**真话**)
 ```
+
+
+## 349. ✅ **M3④ ②:配置词汇 == 协议词汇**（逐个显式 rename)
+
+### 349.1 抓到的**真漂移**（不是理论问题)
+
+```
+`Mode` 原本 `#[serde(rename_all = "snake_case")]` ⇒ 配置词 `drive`/`partner`/`survive`
+**线名**(`mode_wire` · `ci144` · 面板 `MODES`)⇒ `driving`/`partner`/**`survival`**
+⇒ **三个里两个不一致** —— 配置按一种词写、系统按另一种词读,正是"同一事实两种拼写"的漂移,
+   而且它**静默**:两边各自都"对"。
+```
+
+### 349.2 改法与判据
+
+```
+`#[serde(rename_all = "lowercase")]` **并且逐个变体显式 rename**(`driving`/`partner`/`survival`)
+  ⇒ 配置词汇与协议词汇**由构造保证一致**（`rename_all` 单独不够:`snake_case` 就会漂)。
+**实测安全**:今天没有任何发布的配置声明 mode ⇒ 拒绝旧拼写不破坏任何东西。
+`cargo test --lib` **301 passed** —— `the_config_speaks_the_wire_vocabulary_for_modes`:
+  接受三个线名 · **拒绝枚举名** · **拒绝大小写猜测** · 三模式 **config ⇄ wire 往返一致**。
+JS `mode_vocabulary_test.js` 扩到配置侧(**6 passed**):
+  从 `config.rs` 扫出**显式 renames** ⇒ 与线名词汇**集合相等**;并断言
+  **`rename_all` 单独不够**（`driving`/`survival` 正是会漂的那两个)⇒ 这条与 Rust 的**行为**判据互补。
+门:**2 red（皆既知) / 70 proven / 5 held / 0 unregistered** ✓
+```
+
+### 349.3 M3④ **收口**；M3 只剩 ⑤
+
+```
+① ✅ `mode_wire` 唯一映射(§340) ｜ ①′ ✅ 不回落的可选映射(§345) ｜ ② ✅ 字段 `Option<Mode>`(§346)
+③ ✅ 声明与生效值分开、载荷只报声明(§347,300→301) ｜ ④ ✅ 周期级解析器 + 真变异(§348)
+⑤ ✅ **配置词汇 == 协议词汇**(本条)
+⇒ **M3④ 完成**。剩余:**M3⑤ 载荷里空串 vs 缺席分名**(`think.text === ''`)。
+```
