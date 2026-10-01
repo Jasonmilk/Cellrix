@@ -14208,3 +14208,43 @@ P62 一致性不变量 · P63 死字段(声明了但无人读) —— 与 ④ �
    ⇒ 今天链路配置里**没有** `mode`(默认 `None`)⇒ 所有运行都是"未声明"(**真话**),不是 bug;
      要让界面显示 `partner`,需在链路配置里显式声明一次(或走 (a) 后写 `mode = "partner"`)
 ```
+
+
+## 348. ✅ **M3④ ①:周期级 mode 解析器** `periodMode(events)`（防 ~75% 幽灵）
+
+### 348.1 落地 + 判据
+
+```
+`cell_metering.js` 新增并导出 **`periodMode(events)`** —— **唯一的**周期级解析器:
+  只在 `turn/start` 上取 `mode`;两种诚实的结局都为 `null`:
+    · 窗口里没有 `turn/start` ⇒ 没有任何东西声明过模式;
+    · `turn/start` 存在但不带 `mode` ⇒ 声明存在而**为空**。
+  `null` **不是** `Mode::default()`:由调用方具名(`modeFacts(null) => undeclared`)。
+判据 `period_mode_resolver_test.js`(进网,**7 passed**):
+  ① 夹具**只在首行**带 mode ② `periodMode` 解出 `'partner'`
+  ③ **变异**:朴素"逐事件找"在**非首事件**上给不出值(`.k === 'a'`)⇒ 与解析器**答案不同** ⇒ 解析器不是装饰
+  ④ 无 `turn/start` ⇒ `null` ⑤ 有 `turn/start` 但无 `mode` ⇒ `null` ⑥ 缺席可被调用方具名
+```
+
+### 348.2 过程中**量了两次**才配对（都留档)
+
+```
+① 第一版用 `isPresent(t)` 判"存在" ⇒ **实测为 false**（该谓词**不是**"字符串存在"）⇒
+   我以为的"p 是数值存在、ps 是字符串存在"**只能靠猜** ⇒ 改为**从该层自己的构造器推导**:
+   `t.k === TS.Pstr('').k`（kind 由构造器给出,代数变了也不会漂移）。
+② 我曾顺手加了 `TS.P('').k` 分支 ⇒ 该层**自己的定义域守卫**当场抛错:
+   "P(): a measured quantity must be a FINITE NUMBER" ⇒ 删掉该分支（mode 是**叙述性**事实,只可能是字符串)。
+③ `growth_probe_test` 立刻抓到"**新的按形状分支的函数未登记**" ⇒ 在 `CONSUMERS` 登记
+   `periodMode: { handle: ['ps'], refuse: [], degrade: ['p','n','a'] }`（**具名三分类**）⇒ 转绿。
+   —— 这条判据正是本项目"新语义必须被分类"的形态,我**没有**去绕过它。
+门:**2 red（皆既知) / 70 proven / 5 held / 0 unregistered** ✓
+```
+
+### 348.3 M3④ 剩余（一件)
+
+```
+② **配置词汇**二选一(§347.2):serde 默认用**枚举名**(`mode = "Partner"`)而线名是 `partner`
+   ⇒ 建议给 `Mode` 加 `#[serde(rename_all = "lowercase")]` ⇒ 配置与协议**同词**,
+     并补一条跨语言判据(配置词 == 线名词);否则须**声明**"配置词汇 ≠ 协议词汇,由 `mode_wire` 单点翻译"。
+   今天链路配置无 `mode` ⇒ 所有运行显示"未声明"（**真话**)
+```

@@ -127,6 +127,32 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
   function tokOf(e) { return readChain(e, TOK_PATHS, true); }
   function durOf(e) { return readChain(e, DUR_PATHS, true); }
   function modeOf(e) { return readChain(e, MODE_PATHS, false); }   /* narrative fact */
+
+  /* THE MODE IS A PERIOD-LEVEL FACT, AND THIS IS THE ONLY RESOLVER (ADR-0048 §348).
+   * It is written ONCE, on the period's first event (`turn/start`); every reader must come through here.
+   * MEASURED failure mode it prevents: reading `mode` PER EVENT makes most rows look "undeclared" while the
+   * period declares one — the ghost the reviewer put at ~75%. Two honest endings, both `null`:
+   *   · no `turn/start` in the window  ⇒ nothing declares a mode;
+   *   · a `turn/start` that carries no mode ⇒ the declaration exists and is EMPTY.
+   * `null` is NOT `Mode::default()`: the caller names the absence (`modeFacts(null) => undeclared`). */
+  function periodMode(events) {
+    var list = events || [];
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (!e) { continue; }
+      if (e.type === 'turn/start' || e.event_type === 'turn/start') {
+        /* THE KIND IS DERIVED FROM THE LAYER'S OWN CONSTRUCTOR, never typed as a literal and never guessed
+         * from a predicate: MEASURED, `modeOf` returns `{k:'ps',v:'partner'}` for a declared mode, while
+         * `isPresent` answered FALSE for it (it is not "a string is present"). `TS.Pstr('').k` is the kind this
+         * very layer produces for a present string, so the comparison cannot drift when the algebra changes. */
+        var t = modeOf(e);
+        if (!t) { return null; }
+        if (t.k === TS.Pstr('').k) { return t.v; }
+        return null;   /* absent or not-measured: no declaration reached the payload */
+      }
+    }
+    return null;
+  }
   /* INPUT SCOPE (ADR-0048 §41/§43): this cell aggregates ONE period.
    * Missing period_id normalises to "" (PromQL: an undefined label matches the
    * empty label value — it is not an error); two DISTINCT non-empty periods is a
@@ -427,6 +453,12 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
      * "accept but mark" case into `handle` — which is how a silent fallback is born. */
     allocate:  { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] },
     stateText: { handle: ['p', 'n', 'a'], refuse: ['ps'], degrade: [] },
+    /* The period-level mode resolver (ADR-0048 §348): it CONSUMES exactly one shape — a present STRING
+     * (`ps`) on the declaration row. Everything else (numeric present, not-measured, absent) is DEGRADED to
+     * `null`, i.e. "no declaration reached the payload", which the caller names as `undeclared`. Nothing is
+     * refused: a mode that is not a string cannot be a declaration, and returning `null` is the honest
+     * reading rather than an error. */
+    periodMode: { handle: ['ps'], refuse: [], degrade: ['p', 'n', 'a'] },
     /* SCENARIO D (ADR-0048 §142): the scan found SEVEN shape-branching functions and only two
      * were registered, so a new consumer was invisible. These four are registered from what
      * they actually do: they consume magnitudes, and a narrative fact DEGRADES (it is marked
@@ -683,7 +715,7 @@ var TOK_PATHS = ['/data/completion_tokens', '/data/output_tokens', '/tok'];
   var DEGRADED_REASONS = Object.keys(REASONS).filter(function (r) { return REASONS[r] === 2; });
   function isDegraded(reason) { return DEGRADED_REASONS.indexOf(reason) >= 0; }
 
-  return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf, REASONS: REASONS, DEGRADED_REASONS: DEGRADED_REASONS, isDegraded: isDegraded,
+  return { P: TS.P, Pstr: TS.Pstr, N: TS.N, A: TS.A, isPresent: isPresent, isFiniteNumber: isFiniteNumber, modeOf: modeOf, periodMode: periodMode, REASONS: REASONS, DEGRADED_REASONS: DEGRADED_REASONS, isDegraded: isDegraded,
            SHAPES: SHAPES, isKnownShape: isKnownShape, unclassified: unclassified,
            CONSUMERS: CONSUMERS, REGISTRY_EXEMPT: REGISTRY_EXEMPT,
            assertExhaustive: assertExhaustive,
