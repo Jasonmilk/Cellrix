@@ -42,7 +42,8 @@
     ASSISTANT_REPLY: 'assistant/reply',
     ASSISTANT_USAGE: 'assistant/usage',
     TURN_END: 'turn/end',
-    REF_MOVE: 'ref/move'   /* the third layer's own act: ADR-0026 D2 (ADR-0048 §321) */
+    REF_MOVE: 'ref/move',
+    PURGE: 'period/purge'   /* the third layer's own act: ADR-0026 D2 (ADR-0048 §321) */
   };
 
   /* Semantic kinds — what a fact IS, after interpretation.
@@ -69,6 +70,7 @@
   };
 
   var KIND_OF = {
+    'period/purge': KINDS.CONTEXT,   /* a lineage/retention fact, not a message (§329) */
     'ref/move': KINDS.CONTEXT,   /* lineage metadata, not a message: ADR-0048 §321 */
     'turn/start': KINDS.TURN,
     'turn/end': KINDS.TURN,
@@ -106,6 +108,7 @@
    *   ['?literal', 'lit:value']    a constant; the '?' marks it as not a field
    */
   var PAYLOAD_MAP = {
+    'period/purge': { at: ['at'] },
     'ref/move': { name: ['name'], old: ['old'], new: ['new'] },
     'turn/start': { start: ['?turn/start', 'lit:true'] },
     'turn/end': {
@@ -254,6 +257,7 @@
    * explicitly because typeof alone cannot tell them apart from 'object'.
    */
   var DATA_SCHEMA = {
+    'period/purge': { required: { at: ['string'] }, optional: {} },
     'ref/move': { required: { name: ['string'] }, optional: { old: ['string'], new: ['string'] } },
     /* The third layer's own act (ADR-0048 §321): written INTO the target period's stream. */
     'turn/start': { required: {}, optional: {} },

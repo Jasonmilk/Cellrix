@@ -33,12 +33,13 @@ console.log('event family contract (' + EF.VERSION + ')');
 // ---- vocabulary is the frozen protocol list from anaphase:ADR-0026 D2
 const EXPECTED = [
   'turn/start',
-  'ref/move',   /* the third layer's own act: ADR-0026 D2 (added with ADR-0048 §321) */ 'user/message', 'context/inject', 'assistant/think',
+  'ref/move',   /* the third layer's own act: ADR-0026 D2 (ADR-0048 §321) */
+  'period/purge', /* D1: a physical delete HAPPENED (ADR-0048 §329) */ 'user/message', 'context/inject', 'assistant/think',
   'assistant/attempt', 'tool/call', 'tool/result', 'check/status',
   'verdict/status', 'assistant/reply', 'turn/end',
   'assistant/usage'
 ];
-check('vocabulary has 13 types', EF.KNOWN_TYPES.length === 13, 'got ' + EF.KNOWN_TYPES.length);
+check('vocabulary has 14 types', EF.KNOWN_TYPES.length === 14, 'got ' + EF.KNOWN_TYPES.length);
 EXPECTED.forEach(function (t) {
   check('vocabulary contains ' + t, EF.KNOWN_TYPES.indexOf(t) >= 0);
 });

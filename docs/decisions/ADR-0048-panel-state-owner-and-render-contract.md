@@ -13400,3 +13400,51 @@ D0 = **读端**（§311,`d54b7c2` 系列)+ **写端**（§326,`580d363`)⇒ 它�
 ③ **P15**:悬垂检查与收拢必须在**同一临界区**（否则 TOCTOU —— 检查完就有人挂上来)
 ④ **端到端**:一次"删除 → 重放 → **不复活**"的实测（C8 的实机版)
 ```
+
+
+## 329. ✅ **M2-B ①②:purge 事实进流 + 存储接线**（一条流 · 一把锁 · 不销毁字节)
+
+### 329.1 新事件 `period/purge`（D1 的"物理删已发生")
+
+```
+为什么不写它会坏:重放会**复活**被删对象(审查方沙盘实测 [4,5,6] 回来)⇒ 这个事实必须是**事件**。
+一次对齐**六处**(上次 §321.4 的歧路已成规格):
+  Rust `EventType::Purge` + 线名 · ADR-0026 D2 文档行 · 客户端 `TYPES`/`KIND_OF`/`PAYLOAD_MAP`/`DATA_SCHEMA`
+  · 契约 `EXPECTED` + 计数 13→**14** ·（kind 取 `KINDS.CONTEXT`:它是**血缘/留存事实**,不是消息)
+验收:`event_family_test` **OK — all passed** · `wordlist_parity` **双向一致** · `js_family_source_test` 5/5
+```
+
+### 329.2 存储接线（`collect_garbage(dir, now, grace)`)
+
+```
+· **读重放态（在锁内 —— P15)**:对象(从各 `*.events.jsonl` 的 stem + `context/inject.resume_from` 取父
+  + `period/tombstone` 取章) · refs(`list_refs`,投影) · 腾位(`ref/move` 中 `new == null` ⇒ `{id: old, at: time}`)
+  · **pins = 空,且是具名缺席**(没有 pin 存储 ⇒ C14b 未落;不许假装"无人持有")
+· **决定**:`plan(state, now)` 纯函数
+· **记录**:对每个 `collected` ⇒ `open_append` 往**它自己的流**写一行 `period/purge`（同一把写者锁)
+  ⇒ **D1 不销毁任何字节**(那是 D2)
+· 路由 `POST /v1/periods/collect`(`grace_secs?`,默认 = **声明常量** `REF_MOVE_GRACE_SECS`;
+  且每次调用先 `check_retention_covers_grace()` —— 留存关系**先查再用**)
+· 顺带补上 `rfc3339_to_secs`(Hinnant 的 days-from-civil)并用**账本自己的写者**做往返判据
+```
+
+### 329.3 判据（`cargo test --lib` **280 passed**,+4)
+
+```
+`the_rfc3339_reader_agrees_with_the_writer_the_ledger_owns`(往返 0/1000/1788393600/1800000000;畸形 ⇒ None) ·
+`collecting_records_a_purge_fact_in_the_objects_own_stream_without_destroying_bytes`
+  (**有 purge 行** 且 **user/message 仍在**) ·
+`a_stamped_object_with_a_kept_child_is_protected_and_not_purged`(保住子 ⇒ 不收父,**理由具名**,**无 purge**) ·
+`a_stamped_object_without_a_vacancy_fact_is_named_and_not_purged`(**锚缺席 ⇒ 具名**,不收)
+实机(**非破坏**):`POST /v1/periods/collect {grace_secs: 315360000}` ⇒
+  `{"collected":[],"ghosts":[],"no_anchor":[],"protected_by_descendant":[],"ok":true}`,137 个文件**不变**、**0 个 purge** ✓
+```
+
+### 329.4 M2-B 剩余（具名)
+
+```
+② 🔴 **C14b**:引脚存储 + owner **可重启识别**（声明式) + 孤儿引脚**具名且可显式回收**
+③ ⏳ **P15 的第二半**:目前"检查与收拢"已在**同一把锁**内(见 329.2),但当 `pins` 有存储后,
+   引脚的**读取**也必须进这一临界区 —— 随 ② 一起给判据
+④ ⏳ **端到端**:一次"删除 → 重放 → **不复活**"的实测（C8 的实机版;需要重放器接线)
+```
