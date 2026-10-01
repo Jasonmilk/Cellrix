@@ -220,16 +220,38 @@
    * starts over goes through here, so "who moved the pointer" is answerable. */
   function setRef(periodId) {
     STATE.ref.current = periodId || null;
+    /* THE SERVER IS THE HOME OF THE POINTER (ADR-0048 §310): Git keeps refs in the repository, so a
+     * restart — or another reader — sees the same one. localStorage stays as a CACHE, never the source. */
     try {
-      if (STATE.ref.current) { window.localStorage.setItem('cx.ref', STATE.ref.current); }
-      else { window.localStorage.removeItem('cx.ref'); }
-    } catch (e) { /* storage may be unavailable; the in-memory ref still works */ }
+      if (STATE.ref.current) {
+        window.localStorage.setItem('cx.ref', STATE.ref.current);
+        fetch('/api/refs/current', {
+          method: 'PUT', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ period_id: STATE.ref.current })
+        }).catch(function () { /* the cache still holds it; the next set retries */ });
+      } else {
+        window.localStorage.removeItem('cx.ref');
+        fetch('/api/refs/current', { method: 'DELETE' }).catch(function () { /* idem */ });
+      }
+    } catch (e) { /* storage or fetch unavailable: the in-memory ref still works */ }
     return STATE.ref.current;
   }
+  /* BOOT: THE SERVER WINS, THE CACHE IS THE FALLBACK (ADR-0048 §310). A pointer that only exists in
+   * one browser is exactly the "guess" the third layer replaces. */
   try {
     var bootRef = window.localStorage.getItem('cx.ref');
     if (bootRef) { STATE.ref.current = bootRef; }
   } catch (e2) { /* no storage: start with no pointer = a new conversation */ }
+  try {
+    fetch('/api/refs').then(function (r) { return r.json(); }).then(function (j) {
+      var cur = ((j && j.refs) || []).filter(function (x) { return x && x.name === 'current'; })[0];
+      STATE.ref.current = (cur && cur.period_id) || null;
+      try {
+        if (STATE.ref.current) { window.localStorage.setItem('cx.ref', STATE.ref.current); }
+        else { window.localStorage.removeItem('cx.ref'); }
+      } catch (e3) { /* idem */ }
+    }).catch(function () { /* offline: the cached pointer stands */ });
+  } catch (e4) { /* fetch unavailable: the cached pointer stands */ }
 
   function setNav(patch, opts) {
     opts = opts || {};

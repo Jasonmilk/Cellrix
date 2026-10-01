@@ -129,6 +129,7 @@ pub fn unhealthy_names(body: &str) -> Vec<String> {
 /// connected stream. Shared by the buffered and streamed paths — one
 /// request shape, two transports.
 fn post_open(
+    method: &str,
     base: &str,
     path: &str,
     body: &str,
@@ -145,7 +146,7 @@ fn post_open(
         .set_read_timeout(Some(std::time::Duration::from_secs(READ_TIMEOUT_SECS)))
         .map_err(|e| e.to_string())?;
     let mut req = format!(
-        "POST {path} HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n",
+        "{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n",
         body.len()
     );
     if accept_sse {
@@ -160,8 +161,15 @@ fn post_open(
     Ok(stream)
 }
 
+/// A METHOD-GENERIC JSON call (ADR-0048 §310): the refs layer needs PUT and DELETE, and copying the
+/// request builder per verb is exactly how two clients of one protocol drift apart.
+pub fn send_json(method: &str, base: &str, path: &str, body: &str, bearer: Option<&str>) -> Result<String, String> {
+    let mut stream = post_open(method, base, path, body, bearer, false)?;
+    read_http_body(&mut stream)
+}
+
 pub fn post_json(base: &str, path: &str, body: &str, bearer: Option<&str>) -> Result<String, String> {
-    let mut stream = post_open(base, path, body, bearer, false)?;
+    let mut stream = post_open("POST", base, path, body, bearer, false)?;
     read_http_body(&mut stream)
 }
 
@@ -177,7 +185,7 @@ pub fn post_stream(
     bearer: Option<&str>,
     on_chunk: &mut dyn FnMut(&[u8]) -> std::io::Result<()>,
 ) -> Result<(), String> {
-    let mut stream = post_open(base, path, body, bearer, true)?;
+    let mut stream = post_open("POST", base, path, body, bearer, true)?;
 
     // 1. Read the response head (up to the blank line) and discard it.
     let mut head = Vec::new();

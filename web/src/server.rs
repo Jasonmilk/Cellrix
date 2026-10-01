@@ -14,6 +14,7 @@ use std::net::TcpStream;
 use crate::config::PanelConfig;
 use crate::routes::{
     route_audit, route_chat, route_ecosystem, route_events, route_flows, route_flows_suppliers,
+    route_refs,
     route_index, route_sessions, route_sessions_rename, route_snapshot, route_trace,
 };
 
@@ -27,6 +28,7 @@ pub enum Route {
     Sessions,
     SessionsRename,
     Events,
+    Refs,
     Ecosystem,
     Flows,
     FlowsSuppliers,
@@ -46,10 +48,12 @@ pub fn route(path: &str) -> Route {
         "/api/sessions" => Route::Sessions,
         "/api/sessions/rename" => Route::SessionsRename,
         "/api/events" => Route::Events,
+        "/api/refs" => Route::Refs,
         "/api/ecosystem" => Route::Ecosystem,
         "/api/flows" => Route::Flows,
         "/api/flowmodus/suppliers" | "/api/flowmodus/suppliers/probe" => Route::FlowsSuppliers,
         "/api/chat" => Route::Chat,
+        other if other.starts_with("/api/refs/") => Route::Refs,   /* refs/<name> (ADR-0048 §310) */
         _ => Route::NotFound,
     }
 }
@@ -90,6 +94,7 @@ pub fn handle(
         Route::Sessions => route_sessions(&mut stream, cfg, &text)?,
         Route::SessionsRename => route_sessions_rename(&mut stream, cfg, &text)?,
         Route::Events => route_events(&mut stream, cfg, &text)?,
+        Route::Refs => route_refs(&mut stream, cfg, &text)?,
         Route::Flows => route_flows(&mut stream, cfg, &text)?,
         Route::FlowsSuppliers => route_flows_suppliers(&mut stream, cfg, &text)?,
         Route::Ecosystem => route_ecosystem(&mut stream, cfg, &text)?,

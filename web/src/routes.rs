@@ -220,6 +220,39 @@ pub fn route_events(
     Ok(())
 }
 
+/// `Refs` — the third layer's pointer, proxied verbatim (ADR-0048 §310).
+///
+/// `/api/refs` (GET) lists them; `/api/refs/<name>` (PUT / DELETE) writes or clears one. The METHOD is
+/// forwarded as it arrives so the browser's verb is the verb Anaphase sees — no translation table.
+/// The browser never sees the bearer token (it is added here, one place, like every other call).
+pub fn route_refs(
+    stream: &mut TcpStream,
+    cfg: &PanelConfig,
+    text: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let head = text.lines().next().unwrap_or("");
+    let mut parts = head.split_whitespace();
+    let method = parts.next().unwrap_or("GET");
+    let target_path = parts.next().unwrap_or("/api/refs");
+    let suffix = target_path.strip_prefix("/api/refs").unwrap_or("");
+    let upstream = format!("/v1/refs{suffix}");
+    let body = text.split("\r\n\r\n").nth(1).unwrap_or("");
+    let auth = cellrix_web::client_bearer();
+    let out = if method.eq_ignore_ascii_case("GET") {
+        cellrix_web::fetch_json(&cfg.anaphase_endpoint, &upstream, auth.as_deref())
+    } else {
+        cellrix_web::send_json(method, &cfg.anaphase_endpoint, &upstream, body, auth.as_deref())
+    };
+    match out {
+        Ok(b) => respond(stream, 200, "application/json", b.as_bytes())?,
+        Err(e) => {
+            let msg = format!("{{\"ok\":false,\"error\":\"refs proxy: {e}\"}}");
+            respond(stream, 502, "application/json", msg.as_bytes())?;
+        }
+    }
+    Ok(())
+}
+
 /// `Flows`.
 pub fn route_flows(
     stream: &mut TcpStream,

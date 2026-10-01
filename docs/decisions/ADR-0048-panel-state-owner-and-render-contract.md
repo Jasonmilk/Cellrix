@@ -12731,3 +12731,44 @@ M5 适配器 ADR(CI-144 ↔ AG-UI,`STATE_DELTA` 四类)+ Tauri 壳 spike(UI 一�
   要接上:① Cellrix 代理加 `/api/refs` 透传 ② `Cx.setRef` 写服务器(并保留本地缓存) ③ 启动时以服务器为准。
 · 判据(接上时写):清空 localStorage ⇒ 刷新 ⇒ 指针仍从服务器恢复;变异:只写本地 ⇒ 红
 ```
+
+
+## 310. ✅ **M1 收口:客户端改吃服务器 ref** —— 指针的家在"仓库"
+
+### 310.1 落地
+
+```
+· Cellrix 代理新增 **方法原样透传** 的 refs 通道:
+    `web/src/http.rs` 增 `send_json(method, …)`（照 `post_json` 抄,差别只有一个动词 ——
+    否则"同一协议两个客户端"必然漂移)
+    `web/src/server.rs` 增 `Route::Refs`（`/api/refs` 精确 + `/api/refs/…` 前缀)
+    `web/src/routes.rs` 增 `route_refs`:GET ⇒ `/v1/refs`;PUT/DELETE ⇒ `/v1/refs/<name>`,**动词不翻译**
+· 客户端(`script.html`):`setRef` **写服务器**(`PUT /api/refs/current` / `DELETE`),
+  `localStorage` 降为**缓存**;启动时 **`GET /api/refs` 以服务器为准**,缓存只是离线兜底。
+```
+
+### 310.2 判据（`refs_round_trip_test.js`,8 passed,已进网）
+
+```
+① PUT 经代理 ⇒ 存下并**回报解析后的 period**   ② GET ⇒ 可发现(不是藏着)
+③ **悬垂目标 ⇒ 具名拒绝**（经代理也如此)        ④ **空 localStorage 的浏览器 ⇒ 从服务器恢复**(300ms)
+⑤ **变异**:客户端启动确实去问服务器（源码契约)  ⑥ DELETE ⇒ `removed:true` ·
+⑦ 列表不再含它 · ⑧ 全新浏览器在服务器已清空时看到 **null**
+⇒ 第 ④ 条是**判别性的**:只写 localStorage 的客户端**通不过**它。
+```
+
+### 310.3 过程教训(判据抓到的一次真错)
+
+```
+我改了 `script.html` 却**没有重建**:面板资产是 `include_str!` 内嵌的 ⇒ 服务端仍是旧页面,
+于是第 ④ 条红在"客户端没去问服务器"。⇒ `cargo build -p cellrix-web` + 重启后 300ms 内即恢复。
+(规矩重申:**资产改动 ⇒ 重建 + 重启**,否则量到的是旧页面。)
+```
+
+### 310.4 里程碑状态
+
+```
+M0 ✅ 分层与不变量进网 ｜ **M1 ✅ 服务器侧 refs(§309) + 客户端改吃服务器(本条)** ｜
+M2 删除三旋钮 + 腾位/宽限(判据先行) ｜ M3 体验收尾(mode/详情头/新对话按钮/三态具名) ｜
+M4 线 3 语义(能力过滤+失败转移 · `loop.impl`) ｜ M5 适配器 ADR + Tauri 壳 spike
+```
