@@ -13448,3 +13448,48 @@ D0 = **读端**（§311,`d54b7c2` 系列)+ **写端**（§326,`580d363`)⇒ 它�
    引脚的**读取**也必须进这一临界区 —— 随 ② 一起给判据
 ④ ⏳ **端到端**:一次"删除 → 重放 → **不复活**"的实测（C8 的实机版;需要重放器接线)
 ```
+
+
+## 330. ✅ **M2-B ②③:C14b 引脚存储（声明式 owner · 孤儿具名 · 显式回收)**
+
+### 330.1 为什么随机身份是**永久泄漏**
+
+```
+C14(引用计数)只答"几个持有者",不答"**谁的**持有者"。若 owner 是**每进程随机 UUID**:
+重启后旧引脚**无人认领** ⇒ 永久保护 ⇒ 审查方算的 ~39% 泄漏成立。
+⇒ 因此:`owner` 必须是**声明式名字**(`panel` / `tui` / `m5-shell`),
+  **UUID 形状的 owner 一律具名拒绝**,理由写在错误里("restart-stable") —— 拒绝本身才是名字有意义的原因。
+```
+
+### 330.2 实现（沿用本项目的法:追加式 WAL · 子目录 · 具名出口)
+
+```
+· **WAL**:`<events>/.pins/pins.events.jsonl`（append-only;`open_append` 的 max+1 / 尾换行 / 半行拒绝全在)
+  —— 放在**子目录**里,因为 `list_periods` 只扫一层 ⇒ 内部流**永远不会被当成 period**
+  （实测踩过:写到 `pins.jsonl` 而流写的是 `pins.events.jsonl` ⇒ 计数全读成 0 ⇒ 判据当场抓到)
+· **状态即历史**:`replay()` 逐行 `pin`/`unpin` 累加 ⇒ **对象级计数**(C14)—— 重启只意味着**再读一遍**
+· **活着的 owner**:`.pins/.owners` **声明**;不在其中 ⇒ **孤儿**,**具名**、**仍然保护**
+  （"具名泄漏"优于"静默收掉别人的对象"),**只能显式回收**
+· 路由:`POST /v1/pins/release {owner}`(返回释放了几笔,0 = **具名缺席**);
+  `POST /v1/periods/collect` 的响应新增 `orphan_pins`
+```
+
+### 330.3 判据（`cargo test --lib` **285 passed**,+5)
+
+```
+`pin_refcounts_add_and_survive_a_reopen`（两个持有者 ⇒ 2;**重读即重启**,计数仍在;释放一个 ⇒ 1) ·
+`a_per_process_looking_owner_is_refused_by_name`（UUID 型 / 裸 hex / 空 / 含空格 ⇒ 拒绝,且理由含
+  "restart-stable";声明式名接受) ·
+`an_undeclared_owner_is_named_as_an_orphan_and_still_protects`（**.owners 只声明 `tui`** ⇒ `panel` **具名孤儿**,
+  计数仍为 1 ⇒ **保护仍在**) ·
+`releasing_an_orphan_is_explicit_and_reported`（释放 1 笔 ⇒ 计数消失;再释放 ⇒ **0(具名缺席)**) ·
+`the_pin_wal_is_internal_and_never_read_as_a_period`（WAL 有自己的文件,**且不出现为 period**)
+实机(非破坏):`collect` 返回 `orphan_pins: []` 且 **0 个 purge**;`release {owner:"nonexistent"}` ⇒ `released: 0`
+```
+
+### 330.4 P15 第二半**随本条关闭**
+
+```
+`collect_garbage` 在**取得写者锁之后**才读 pins(`pins::replay`)⇒ **引脚的读取与收拢在同一临界区** ✓
+⇒ P15 的"第二半"(引脚读取也必须进临界区)已满足;剩余只有 ④ 端到端"删除→重放→不复活"。
+```
