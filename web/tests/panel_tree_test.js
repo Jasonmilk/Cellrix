@@ -20,7 +20,7 @@ ok(!!PT, 'panel_tree.js loads and exports CxPanelTree');
 
 /* fixture: one root, a linear run, and a fork with two children */
 const PERIODS = [
-  { period_id: 'r', parent: null, name: 'root', mode: 'Partner' },
+  { period_id: 'r', parent: null, name: 'root', mode: 'partner' },
   { period_id: 'a', parent: 'r', name: 'a' },
   { period_id: 'b', parent: 'a', name: 'b' },
   { period_id: 'c', parent: 'a', name: 'c-fork' },
@@ -49,9 +49,12 @@ ok(sel.rows === null, 'and its rows are NOT pulled until the reader selects it (
 ok(PT.selection(t, 'nope').kind === 'missing', 'selecting an unknown id is a named state');
 
 /* ── the run modes: three declared, and absence is NAMED ── */
-ok(PT.modeFacts('Drive').label.indexOf('harness') >= 0, 'Drive ⇒ Anaphase Only (harness)');
-ok(PT.modeFacts('Partner').writesExperience === true, 'Partner ⇒ memory-bearing (writes experience)');
-const sv = PT.modeFacts('Survive');
+/* THESE ARE WIRE VALUES, NOT ENUM NAMES (ADR-0048 §340): the payload vocabulary is
+ * `driving`/`partner`/`survival` (`config::mode_wire`), and the panel keys on exactly those. A test that
+ * keyed on the enum names would pass while the live panel reported a declared mode as undeclared. */
+ok(PT.modeFacts('driving').label.indexOf('harness') >= 0, 'driving ⇒ Anaphase Only (harness)');
+ok(PT.modeFacts('partner').writesExperience === true, 'Partner ⇒ memory-bearing (writes experience)');
+const sv = PT.modeFacts('survival');
 ok(sv.kind === 'declared' && sv.implemented === false && /保留|未实现/.test(sv.note || ''),
   'Survive ⇒ DECLARED but unimplemented (enum reserved): ' + sv.note);
 const un = PT.modeFacts(undefined);
@@ -96,7 +99,7 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
 
   const host2 = w.document.createElement('div');
   w.document.body.appendChild(host2);
-  T.render(host2, [{ period_id: 'p1', parent: null, name: 'one', mode: 'Survive' }], { selected: 'p1' });
+  T.render(host2, [{ period_id: 'p1', parent: null, name: 'one', mode: 'survival' }], { selected: 'p1' });
   ok(host2.querySelector('.pt-mode').textContent.indexOf('reserved') >= 0
     || host2.querySelector('.pt-mode').textContent.indexOf('\u4fdd\u7559') >= 0,
     'mode ③ renders as DECLARED BUT UNIMPLEMENTED: ' + host2.querySelector('.pt-mode').textContent);
