@@ -13360,3 +13360,43 @@ D0 = **读端**（§311,`d54b7c2` 系列)+ **写端**（§326,`580d363`)⇒ 它�
      （与 D0 的"具名拒绝 + 显式修复"同一纪律)
 ⇒ 与 C14(引用计数)**成对**:计数解决"多持有者",owner 解决"持有者没了"。
 ```
+
+
+## 328. ✅ **M2-B 第一步:D1 的纯核心**（判据先行,9 条全绿)
+
+### 328.1 形状决定性质（三条不变量**由形状保证**,不靠纪律)
+
+```
+`session_events/gc.rs`:`pub fn plan(input: &GcInput, now: u64) -> GcPlan` —— **纯函数**
+· **C13**:`now` 是**入参** ⇒ 压缩不会丢锚,且**没有人在调用者背后读钟**
+· **C16**:可达性从**重放后的值**算,拿不到 store 句柄 ⇒ 写临界区**不可能**顺手调用它
+· **C9**:宽限锚来自**腾位事实**(`ref/move` 事件记录的 `Vacancy`),不来自收集器自己的账;
+  **锚缺席 ⇒ 具名**(`no_anchor`),不猜
+输出:`{ kept, collected, ghosts, no_anchor, protected_by_descendant }` —— 四种结局**各有名字**
+```
+
+### 328.2 判据（`gc_tests.rs`,**每条一个不变量,均可红**)
+
+```
+`a_stamped_unheld_object_past_grace_is_collected`（C5+主路径) ·
+`a_stamped_object_with_a_holder_is_a_ghost_and_is_kept`（**C6 幽灵**:不收集且**具名**) ·
+`pin_refcounts_survive_one_release`（**C14**:两个持有者 ⇒ 释放一个仍受保护;两次 `(a,1)` **相加**;
+  变异:集合模型下第一次释放就会被收 —— 计数正是禁止它) ·
+`an_absent_anchor_is_named_not_guessed`（**C9** 前半) ·
+`the_grace_window_is_measured_from_the_vacancy_fact`（5<10 保护 · 10 恰好可收 · 999 可收) ·
+`the_plan_is_a_pure_function_of_state_and_now`（**C13**:同参同果;更晚的钟**只会多收,不会反悔**) ·
+`a_kept_child_protects_its_stamped_parent`（**悬垂不可能**:保住子 ⇒ 保护父,且**理由具名**) ·
+`a_ref_is_a_root_and_nothing_it_names_is_collected`（ref 是根,不是收集器的地盘) ·
+`an_unstamped_object_is_never_collected`（**C5**:无章、无案)
+⇒ `cargo test --lib` **276 passed**
+```
+
+### 328.3 M2-B 剩余（具名)
+
+```
+① **存储接线**:把重放态(对象/ref/引脚/腾位)从**各条流**读出来喂给 `plan`,并把 `purge` **事件**
+   写进**被删对象所属的那条流**（与 D0 同一条流、同一把写者锁)
+② **C14b**:引脚 owner 必须**可重启识别**（声明式,不是随机 UUID)+ 孤儿引脚**具名且可显式回收**
+③ **P15**:悬垂检查与收拢必须在**同一临界区**（否则 TOCTOU —— 检查完就有人挂上来)
+④ **端到端**:一次"删除 → 重放 → **不复活**"的实测（C8 的实机版)
+```
