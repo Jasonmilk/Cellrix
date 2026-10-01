@@ -14144,3 +14144,37 @@ P62 一致性不变量 · P63 死字段(声明了但无人读) —— 与 ④ �
    载荷 == 该次配置线名 · 未声明 ⇒ `!contains_key("mode")` · 写 `{"mode": null}` **必被抓** ·
    回落 `partner` ⇒ **红** · P68:旧 period 无 `mode` ⇒ `undeclared` **天然可达**(不必造夹具)
 ```
+
+
+## 346. 🚧 **M3④ ①:配置字段改 `Option<Mode>`**（缺字段 = **未声明**,不再回落)
+
+### 346.1 落地（编译器逐条列出落点,四处）
+
+```
+`RunCycleConfig.mode: Mode` → **`Option<Mode>`**（保留 `#[serde(default)]` ⇒ **缺字段 ⇒ `None`**) ·
+`config.rs` 的两处默认值 `Mode::Partner` → **`None`**（"未声明"就是未声明)
+落的四处:
+  ① `up.rs:280/314` 启动行 ⇒ `mode_wire_opt(…)` 为 `None` 时打印 **`undeclared`**（**具名缺席**,不是默认)
+  ② `main.rs:1032` ⇒ `if let Some(m) = … { agent.mode = m; }`
+     —— **agent 保有运行状态,payload 保有声明**:agent 必须有值才能跑,但**缺配置不得变成声明**;
+     只有显式的 `Some` 才被复制,而 **payload 直接读配置的 `Option`** ⇒ "未声明"一路不带默认地进入事件。
+  ③ `up.rs` 是 **bin** ⇒ 走库路径 `anaphase::session_events::mode_wire_opt`(不是 `crate::`)
+  ④ 一条**治理判据**要求新 `Option` 字段被分类 ⇒ `mode` 登记为 **NOT_A_PRECONDITION** 并写明理由:
+     "它命名运行的形态;缺席被作为 **UNDECLARED** 一路带进载荷(具名缺席,非默认),既不授予也不取消治理"
+```
+
+### 346.2 判据
+
+```
+`cargo test --lib` **298 passed / 0 failed**（含 `an_undeclared_mode_stays_undeclared_and_never_falls_back`
+  与治理判据 `every_option_config_field_is_classified` ⇒ **两条都必须绿**:前者证明不回落,后者证明新语义被分类)
+```
+
+### 346.3 M3④ 剩余（具名)
+
+```
+② `types_and_stream.rs` 的 `turn/start` emit 增形参 `mode: Option<&str>`（**仅 `Some` 时写**;`None` ⇒ `json!({})`)
+③ 客户端**周期级解析器** `periodMode(events)`(取 `turn/start`)⇒ 界面与 inspector 一律经它
+④ 判据(含变异):载荷 == 该次配置线名 · 未声明 ⇒ `!contains_key("mode")` · 写 `{"mode": null}` **必被抓** ·
+   回落 `partner` ⇒ **红** · **P68**:旧 period 无 `mode` ⇒ `undeclared` **天然可达**(不必造夹具)
+```
