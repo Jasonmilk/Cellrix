@@ -14033,3 +14033,50 @@ P66 `requires` 缺席也要**具名** · **P68**:旧数据没有 `mode` ⇒ `und
   ⇒ ④ 的判据可直接用**现有 period**,不必先造合成夹具(P70 的必要性随之下降) ·
 P62 一致性不变量 · P63 死字段(声明了但无人读) —— 与 ④ 收口一起提。
 ```
+
+
+## 344. 🚧 **M3-P0 执行记录:P64 修了一半 —— 剩下的真因已定位到行**
+
+### 344.1 已落（两个安全修法)
+
+```
+① `classify()` 增**实测式** jsdom 依赖判定(ADR-0048 §343 ② 的落地):
+   读过套件源码后,凡 `require('jsdom')` 者 ⇒ 探测到 jsdom 缺席即返回 `requires`(**held**,不是红);
+   若未声明 `REQUIRES=jsdom-dom` ⇒ 打 `NOTE` **具名**(声明缺失可见,不静默)。
+② **词汇别名(具名)**:套件写的是 `REQUIRES='jsdom'`,而登记册 id 是 **`jsdom-dom`**
+   ⇒ 查表落空 ⇒ 被归为 UNKNOWN ⇒ **照样运行 ⇒ 在无 jsdom 的机器上计红**。
+   ⇒ `classify` 增加 `jsdom → jsdom-dom` 别名,并把原因写在注释里。
+```
+
+### 344.2 效果（两次门对照,同一份代码)
+
+```
+**好环境**:`FAILED — 2 red, 68 proven, 6 held, 0 unregistered`  ← **未受影响** ✓
+**坏环境**(删掉 `NODE_PATH`):`FAILED — 6 red, 49 proven, **17 held**, 0 unregistered, 4 env-missing`
+   ⇒ `held` 从 **6 → 17** ⇒ 分类修法**生效**(多出的 11 条正确地记成"能力缺席"而非红)✓
+   ⇒ 但**仍有 6 条计红** ⇒ P64 **只修了一半**。
+```
+
+### 344.3 🔴 剩下的真因（已定位到行,下次直接改)
+
+```
+那 6 条(`chain_window` · `wayout` · `three_state_rows` · `refs_round_trip` · `conversation_identity` ·
+`all_views`)**活在旧的硬清单 `SELF_CONTAINED`(run_all.js:37 定义,循环在 :)`里**,
+而该循环**绕过 `classify`** ⇒ 于是"能力缺席"这条规则对它们**不生效**。
+   · 其中 `wayout_test.js` **完全没有 `REQUIRES`** ⇒ 需要**声明**(或由实测判定)
+   · `three_state_rows`/`refs_round_trip`/`all_views` 声明 `panel-http`(面板在 ⇒ 探测通过 ⇒ 运行 ⇒ 因缺 jsdom 而红)
+⇒ 修法:让 `SELF_CONTAINED` 循环**也走 `classify`**,并沿用**该循环自己的记账数组**
+  （我第一次尝试用了 `results.push(['HELD', …]) + continue` ⇒ runner **不再输出判决**
+    ⇒ 说明那里的记账/作用域不同 ⇒ 下次先读该循环如何记 skip,再接线)。
+⇒ 附带的 `--only <files>`(判据要在**坏环境子进程**里跑子集)也必须**同时**过滤两条路径
+  （`SELF_CONTAINED` 与登记列表)⇒ 我第一次插错了循环,已回退并记在此处。
+```
+
+### 344.4 判据（写好,等上面的接线完成再落)
+
+```
+`p64_env_class_test.js`:**自己 spawn** 子进程(env 删 `NODE_PATH`,带 `CX_NO_SPAWN=1` 防递归),
+  跑 `node run_all.js --only <这 6 条>` ⇒ 断言它们落在 **held/env-missing**、**不得计红**;
+  **变异**:子进程环境改回带 jsdom ⇒ 判据**仍须能分辨**(否则它只是"总是通过")。
+三列验收(§343 ③):red 集合相同(仅既知 2 条) ∧ env-missing 名册 == 声明的 jsdom 依赖者 ∧ proven 差集具名。
+```

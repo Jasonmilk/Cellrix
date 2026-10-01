@@ -563,11 +563,32 @@ function declaredRequires(file) {
     return m ? m[1] : null;
   } catch (e) { return null; }
 }
+global.__jsdomUndeclaredNoted = global.__jsdomUndeclaredNoted || {};
 function classify(file) {
   if (!DEFERRALS) { return { kind: 'unknown', why: 'no deferrals.json — nothing is registered' }; }
   const cap = declaredRequires(file);
+  /* P64 (ADR-0048 §344): JSDOM DEPENDENCE IS MEASURED, NOT MERELY DECLARED. Measured: on a machine without
+   * jsdom SIX suites were counted as RED — a red that is a property of the ENVIRONMENT, not of the code
+   * (they `require('jsdom')` but declared only `panel-http`, whose probe passed). Two things happen here:
+   * the suite is treated as jsdom-dependent, and an UNDECLARED dependency is NAMED so it can be fixed. */
+  let needsJsdom = false;
+  try { needsJsdom = /require\(['"]jsdom['"]\)/.test(fs.readFileSync(path.join(__dirname, file), 'utf8')); } catch (e) {}
+  if (needsJsdom) {
+    if (cap !== 'jsdom-dom' && !global.__jsdomUndeclaredNoted[file]) {
+      global.__jsdomUndeclaredNoted[file] = true;
+      console.log('  NOTE  ' + file + ': uses jsdom without declaring REQUIRES=jsdom-dom — counted as '
+        + 'jsdom-dependent anyway (P64); declare it to keep this visible');
+    }
+    if (probeOk('jsdom') === false) {
+      return { kind: 'requires', why: 'jsdom absent (probed) — this suite requires it' };
+    }
+  }
   if (cap) {
-    const entry = (DEFERRALS.requires || []).filter(function (r) { return r.id === cap; })[0];
+    /* VOCABULARY ALIAS, NAMED (ADR-0048 §344): suites declare `REQUIRES='jsdom'` while the register's id is
+     * `jsdom-dom`. Without this the lookup misses, the suite is classified UNKNOWN, and it RUNS on a machine
+     * with no jsdom — i.e. it is counted RED for an environment reason. */
+    const alias = (cap === 'jsdom') ? 'jsdom-dom' : cap;
+    const entry = (DEFERRALS.requires || []).filter(function (r) { return r.id === alias; })[0];
     if (!entry) {
       return { kind: 'unknown', why: 'the suite declares REQUIRES=' + cap
         + ' but the register has no such capability' };
