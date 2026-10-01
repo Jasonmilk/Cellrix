@@ -13611,3 +13611,43 @@ P43:D2 的**作用域**在报告里具名:`scope = ["period streams (<id>.events
 ② **P40 已绿** ⇒ D2 的"真跑"门禁**已解除**(不再是"未做";判据与反证都在)
 ③ P41/P43:已声明;若将来要"真删副本",必须**各副本分别声明 + 判据**,不许一次性默认全删
 ```
+
+
+## 334. ✅ **M2-D:腾位可读** + **M2 收口（DoD 逐条)**
+
+### 334.1 腾位成为**可读事实**（不是 GC 内部状态)
+
+```
+`read_vacancies(dir)` —— **唯一的**腾位读取实现;`collect_garbage` 与读取面**共用它**
+  （第二份实现就是"同一事实两个答案",本项目反复抓到的漂移)
+`vacancies(dir, grace, now) -> Vec<VacancyView>`,每个视图三件:
+  `at`（**事实**的时刻)· `protected_until = at + grace`（它蕴含的**截止**) ·
+  `state ∈ {protected, expired, object-gone}` —— **具名状态**,不是一个要调用者自己解释的时间戳
+· **宽限必须被检查,不许被假设**:`grace > REF_MOVE_RETENTION_SECS` ⇒ **具名拒绝**
+  （"would be trimmed before the window it promises — refusing to report a deadline the store cannot keep")
+  ⇒ 这就是 `check_retention_covers_grace` 落到**读取面**的方式
+路由:`GET /v1/periods/vacancies[?grace_secs=]`
+判据(`cargo test --lib` **296 passed**,+3):
+  `a_vacancy_is_readable_with_its_deadline_and_a_named_state`（事实 + 截止 + `protected`,且**随钟变 `expired`**) ·
+  `asking_for_more_grace_than_the_declared_retention_is_refused_by_name` ·
+  `a_vacancy_whose_object_is_gone_is_named_object_gone`（**主体没了**的腾位不许自称 protected)
+实机:`{"grace_secs":1209600,…,"protected_until":1792078836,"state":"protected"}` ✓;
+  `?grace_secs=99999999999` ⇒ **具名拒绝**(`exceeds the declared retention 2592000s`) ✓
+```
+
+### 334.2 **M2 收口**:DoD 逐条
+
+```
+① **三旋钮各有能红的判据**:
+   D0 墓碑 —— §311 读端 + §326 写端(追加不覆盖/幂等/seq 不复用)
+   D1 收集 —— §328 纯核心(9 条)· §329 接线 + `period/purge` 事实 · §330 C14b 引脚 · §330.4 P15
+   D2 销毁 —— §332 保 id/parent + 自具名 · §333 **P40 原子重写**(+故障注入 +反证)· **P42** 存活清单(fail-closed)
+② **C5–C14/C16/P15 进网并点名**:C5/C6/C9/C13/C14/C14b 在 `gc_tests`/`pins_tests` 逐条;
+   **C16** 要说准:`write_ref`/`emit` 这些**写路径**从不计算可达性 ✓(纯 `plan` 只吃重放值);
+   而"收集器持锁期间不阻塞其它写"**不是**它的要求 —— 收集器**可以慢**,但它**不是写路径**
+③ **端到端"删除 → 重放 → 不复活"**:§331(含**反证**:忽略 `purge` ⇒ 复活 ⇒ 事实承重)
+④ **门 no worse than 2 既知红**:当前 **2 red(皆既知) / 66 proven / 0 unregistered** ✓
+⑤ **不出现第二本账 / 跨流时间戳比较**:ref/move 进**目标 period 的流**(§321)· 可比性规则"跨流不可比"
+   写进 §320 · 腾位只有**一份**读取实现(§334.1) ✓
+⇒ **M2 完成**;下一步可进 M3(体验收尾)或 M4(线 3 语义)
+```
