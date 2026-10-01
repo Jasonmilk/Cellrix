@@ -92,27 +92,28 @@ if (!base) { console.log('NEEDS-INPUT: no panel address declared'); process.exit
 
   /* M3③ AN ENTRY THAT NEEDS NO SELECTION (ADR-0048 §337): measured before the fix, with nothing selected
    * there was NO way to start a new conversation (the banner and its ✗ only exist once something is chosen). */
-  /* THE DISCRIMINATING PREDICATE (the skip rule requires one): the button can only be judged when the list
-   * actually rendered. Measured: with an EMPTY payload the sidebar shows its empty state and there is no tree
-   * or button to inspect — that is "nothing to exercise", not "the criterion failed". */
-  /* A SKIP THAT ALWAYS FIRES IS NOT A CRITERION (measured the hard way): the first version waited for
-   * `.ses-item`, which after a service restart arrives LATER than `[data-period]`, so the check reported
-   * "UNVERIFIED TODAY" while the sidebar was in fact fine (bisect: rows=50, newBtn=1 with the change,
-   * newBtn=0 without it). Wait for the marker the criterion actually uses, with a real budget. */
-  let waited = 0;
-  while (waited < SIDEBAR_SETTLE_MS && w.document.querySelectorAll('#s-side [data-period]').length === 0) {
-    await sleep(500); waited += 500;
+  /* M3③ MUST BE JUDGED ON THE REAL PAGE (measured mistake): the block above renders rows into a SYNTHETIC
+   * document that has no `#s-side` at all, so a "sidebar has no rows" guard there can never pass — a skip that
+   * fires unconditionally is not a criterion. This second document is the panel the server actually serves. */
+  const page = new JSDOM(await (await fetch(base + '/')).text(), {
+    url: base, runScripts: 'dangerously', resources: 'usable', virtualConsole: new VirtualConsole(),
+    beforeParse(x) { x.fetch = (u, o) => fetch(new URL(u, base).href, o); }
+  });
+  const pw = page.window;
+  let settle = 0;
+  while (settle < SIDEBAR_SETTLE_MS && pw.document.querySelectorAll('#s-side [data-period]').length === 0) {
+    await sleep(500); settle += 500;
   }
-  const sidebarHasRows = w.document.querySelectorAll('#s-side [data-period]').length >= 1;
-  if (!sidebarHasRows) {
-    console.log('  UNVERIFIED TODAY: the sidebar rendered no rows (empty payload) — the tree/button mount '
-      + 'cannot be judged on an empty list');
+  const sidebarRows = pw.document.querySelectorAll('#s-side [data-period]').length;
+  const newBtn = pw.document.querySelector('[data-new-chat]');
+  if (sidebarRows === 0) {
+    console.log('  UNVERIFIED TODAY: the real page rendered no sidebar rows after ' + settle + 'ms — the '
+      + 'button mount cannot be judged (this is the one case where that is honest)');
   } else {
-    const newBtn = w.document.querySelector('[data-new-chat]');
-    ok('M3③: a `+ 新对话` entry exists even with NOTHING selected', !!newBtn,
-      newBtn ? String(newBtn.textContent).trim() : 'missing');
+    ok('M3③: a `+ 新对话` entry exists on the real page with NOTHING selected', !!newBtn,
+      newBtn ? String(newBtn.textContent).trim() : ('missing after ' + sidebarRows + ' rows'));
     ok('M3③: it carries its own marker, so the sidebar re-render cannot orphan it',
-      !!w.document.querySelector('[data-panel-new]'));
+      !!pw.document.querySelector('[data-panel-new]'), sidebarRows + ' row(s), waited ' + settle + 'ms');
   }
 
   console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
