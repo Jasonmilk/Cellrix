@@ -13207,3 +13207,38 @@ Cellrix `refs_round_trip_test` 新增三条:
 ⑨ ✅ refs 是根集(判据)  ⑩ 🟡 仅剩 **P15 悬垂检查跨流 TOCTOU**,它必须**随 D1(GC)一起**给判据
 ⇒ **M2 本体的下一步:追加模式已备好 ⇒ D0 写入端可安全落**(§311 撤回的原因已消除)
 ```
+
+
+## 324. 归因（K≥3 证据):三条**确定性红**,并暴露"**调用不一致**"这个更根本的缺口
+
+### 324.1 实测（每条 3 次,直接调用)
+
+```
+`value_criterion_test.js`   3/3 exit 1,且**点名失配**:`b1b-2 breadth: every metering-bearing sample
+                            matches the oracle (1 mismatch)`
+`chain_legs_test.js`        3/3 exit 1（**无判决行**)
+`prove_track_nodes_test.js` 3/3 exit 1（**无判决行**)
+`flaky.jsonl`               **不存在** ⇒ harness 从未把它们记为不稳定 ⇒ 与"确定性"一致
+```
+
+### 324.2 🔴 新缺口:**跑者调用 ≠ 直接调用**
+
+```
+跑者的主判决说 `LEDGER STALE — 1 registered deferral PASSED, **63 proven**, …`
+（即 `prove_track_nodes_test.js` 在**它**的调用下**通过**),而**直接**跑同一套件 **3/3 失败**。
+⇒ 同一套件、同一数据,判决随**调用方式**改变 ⇒ 这不是"不稳定",是**调用不一致**。
+⇒ 规则(据本项目自己的纪律):**一个套件的判决必须是调用无关的**,否则它**不是事实**。
+   正解:让跑者与直接调用**走同一契约**(同一 base URL 来源、同一 env、同一参数默认值),
+   并把"两种调用给出同一判决"落成**判据**;在此之前,这三条的归类**悬置**,不许写成"既知"或"不稳定"。
+```
+
+### 324.3 待办（具名,按优先级)
+
+```
+① **调用一致性**:查明跑者给 `prove_track_nodes_test.js` 的调用与直接调用差在哪(参数/env/base URL),
+   统一之,并加判据"两种调用同判决"（这解释了 `LEDGER STALE` 的真正来源)
+② `value_criterion_test.js` 的 **1 处失配**是**确定性**的 ⇒ 按真实红处理(测量 → 归因 → 修或退役),
+   **不是**"偶发"
+③ `chain_legs_test.js` / `prove_track_nodes_test.js` 直接调用**无判决行** ⇒ 先确认它们的**调用契约**
+   （缺参数?缺 fixture?),再谈红绿
+```
