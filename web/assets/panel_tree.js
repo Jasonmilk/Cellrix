@@ -398,13 +398,20 @@
       /* THREE STATES, NOT TWO (ADR-0048 §335; §52 / Codd's fourth state). A dimension that a type NEVER
        * carries is INAPPLICABLE — not "unmeasured" and not "no data". The decision uses the FAMILY's own
        * declaration (`PAYLOAD_MAP[type].completionTokens`), so no second list of types exists here: measured
-       * behaviour was `assistant/reply · 无数据`, which read as "the record is missing" when the column simply
-       * does not apply to it. */
+       * behaviour was that the reply row read as "no data", which says "the record is missing" when the
+       * column simply does not apply to that type. */
       var family = (typeof window !== 'undefined' && window.CxEventFamily) || null;
       var familyMap = (family && family.PAYLOAD_MAP && family.PAYLOAD_MAP[e && e.type]) || null;
+      /* ONLY A DECLARED TYPE MAY BE CALLED INAPPLICABLE. If the family is absent, or does not know this type,
+       * the honest reading is the old one (`no data`), not a claim about applicability we cannot support —
+       * "we do not know" and "it does not apply" are different facts, and guessing between them is what this
+       * project keeps fixing. Measured: without this guard a harness that had not loaded the family turned
+       * every absent token into `—`. */
+      var familyKnowsType = !!(family && family.PAYLOAD_MAP
+        && Object.prototype.hasOwnProperty.call(family.PAYLOAD_MAP, e && e.type));
       var carriesTokens = !!(familyMap && familyMap.completionTokens);
       var measured = !!t && (t.k === 'p' || t.k === 'n');
-      var inapplicable = !measured && !carriesTokens;
+      var inapplicable = !measured && familyKnowsType && !carriesTokens;
       tok.setAttribute('data-state', inapplicable ? 'na' : stateOf(t));
       tok.textContent = inapplicable ? '\u2014' : textOf(t);
       var dur = cell(row, 'pt-dur');
