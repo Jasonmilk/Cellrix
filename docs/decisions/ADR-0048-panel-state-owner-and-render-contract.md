@@ -13817,3 +13817,61 @@ P43:D2 的**作用域**在报告里具名:`scope = ["period streams (<id>.events
 ④ 📌 `mode` 进 payload —— **两端已量清,只差一次枚举/emit 点定位**(本条)
 ⑤ ⏳ 载荷里**空串 vs 缺席**分名(`think.text === ''` ⇒ "有但为空")
 ```
+
+
+## 339. 审查裁定（`mode` ④):它的规则**认**;而落到实处时我量出**真正的墙 = 两套词汇**
+
+### 339.1 它说的规则（墙)
+
+```
+"有默认值的字段,不得声称'已声明'" —— 成立。落地纪律:`mode` 只许写**这一次运行的真实选择**,
+不许写 `Mode::default()`;若真实选择不可得 ⇒ **继续 `None`**（界面那句"模式未声明"就是它的具名,不是空串)。
+```
+
+### 339.2 决定性事实:**真实选择存在**,所以 ④ 可以诚实地落
+
+```
+`config.rs:13 pub enum Mode { Drive, Partner(default), Survive }`
+`main.rs:1032  agent.mode = config.anaphase.run_cycle.mode`  ⇒ **运行时取自配置**,不是每次 default
+`adapters/mind.rs:220 mode: a.mode` · `ci144/mod.rs:230 let mode_str = match snap.mode { … }`
+⇒ **线名字符串已经存在**(ci144),应当**复用那一处**,不许新造第二份。
+```
+
+### 339.3 🔴 **真正的墙:两套词汇**（落地前必须先统一）
+
+```
+后端线名(ci144 在用):  "driving" / "partner" / "survival"
+界面 `MODES` 的键:      Drive    / Partner   / Survive      ← 字面完全不同
+⇒ 若把 ci144 的线名写进载荷,`modeFacts("partner")` ⇒ `MODES["partner"]` **查不到** ⇒
+   回落 `undeclared` ⇒ 界面显示"**模式未声明**",而它**明明已声明**。
+   —— 这正是"有默认值/有声明却查不到"那面墙的**真实形态**,也是本项目反复抓到的"SAME FACT, TWO VOCABULARIES"。
+⇒ 处置(二选一,**必须具名**):
+   ① 线名用 ci144 的三个字符串,界面 `MODES` 的键改为它们(或加显式映射) + D2 文档加行;
+   ② 线名用枚举名(`Drive`/`Partner`/`Survive`),则 ci144 的映射与 D2 文档同时改。
+   **建议 ①**(小写协议值与 `turn/start`、`assistant/reply` 的风格一致)。
+⇒ 判据(落 ④ 时一起绿):
+   Rust:`a_periods_mode_is_in_its_stream` —— 某事件的 `data.mode` == **该次运行配置里的 mode 线名**;
+   客户端:`modeFacts(modeOf(event)) ⇒ kind === 'declared'`(`Survive`/`survival` ⇒ `implemented === false`);
+   **变异**:写 `Mode::default()`(或写另一套词汇)⇒ **必须红**。
+```
+
+### 339.4 它的三条顺手项
+
+```
+P54 ✅ **采纳**:`MODE_PATHS` 目前是 `['/data/mode', '/mode']` —— 第二条是**投机**的第二读法 ⇒
+    声明**一条**为准(留 `/data/mode`),否则"同一事实两种读法"再次出现。
+P55 ✅ **已满足(有证据)**:界面的 mode 只从**载荷**读(`modeOf(e)` → `MODE_PATHS`);资产里**没有任何**
+    读 `config.toml`/配置接口的地方 ⇒ "历史以载荷为准,config 只管当下"**现在就是事实**。
+P56 ✅ **已满足(有证据)**:`panel_tree.js:32` 对 `implemented === false` 返回
+    `note: '已声明、未实现（enum reserved）'` ⇒ 第四态**有名字**;`Survive` 的 label 亦为"生存（Mind 自治）"。
+```
+
+### 339.5 落地配方（下一步照此执行)
+
+```
+① 定词汇(建议 ①):`driving`/`partner`/`survival` 写进 ADR-0026 D2 文档;
+   客户端 `MODES` 键改为同一套(或显式映射),并进 `js_family_source_test`/词表两条判据。
+② 找**运行时的 emit 点**(周期首个事件)⇒ 从 `config.anaphase.run_cycle.mode` 取线名写进 `data.mode`;
+   复用 `ci144/mod.rs:230` 的映射函数(**抽成一处**,不许复制)。
+③ 判据三条(见 339.3),含**变异**:默认值/异套词汇 ⇒ 红。
+```
