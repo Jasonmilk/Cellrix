@@ -100,6 +100,7 @@ const SELF_CONTAINED = [
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
   ['events_param_contract_test.js', 'the event endpoint: `id=` honest, `job_id=` compatible, same events, missing names the spellings (§296)'],
   ['p64_env_class_test.js', 'P64: red is a property of the CODE, not the machine — spawns a gate with NODE_PATH removed and mutates it back (§343/§344)'],
+  ['body_state_test.js', 'empty is not absent: three named states for a text body, with the naive placeholder as its mutation (§350)'],
   ['period_mode_resolver_test.js', 'the MODE resolves at PERIOD level (turn/start), not per event — with the per-event ghost as its mutation (§348)'],
   ['mode_vocabulary_test.js', 'ONE mode vocabulary across languages: the panel keys on the same values the payload carries (§340)'],
   ['three_state_rows_test.js', 'THREE states, not two: `—` (inapplicable) / `· 未计量` / `· 无数据`, decided by the family (§335)'],

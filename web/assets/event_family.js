@@ -389,6 +389,20 @@
     return true;
   }
 
+  /* THREE STATES FOR A TEXT BODY, NEVER TWO (ADR-0048 §350; the same law as §335/§304.5).
+   * MEASURED: `assistant/think` rows carry `text: ''` when the model produced no reasoning, and rows carry
+   * NO `text` at all when nothing was recorded — rendering both as one placeholder ("—") merges a produced
+   * emptiness with an absence of evidence. Each has its own name, and the difference is observable. */
+  function bodyState(data, key) {
+    var k = key || 'text';
+    var has = data && Object.prototype.hasOwnProperty.call(data, k);
+    if (!has) { return { kind: 'absent', label: '未记录' }; }
+    var v = data[k];
+    if (typeof v === 'string' && v.trim() !== '') { return { kind: 'present', label: null, text: v }; }
+    if (typeof v === 'string') { return { kind: 'empty', label: '有但为空' }; }
+    return { kind: 'present', label: null, text: String(v) };
+  }
+
   window.CxEventFamily = {
     VERSION: VERSION,
     TYPES: TYPES,
@@ -400,6 +414,7 @@
     interpret: interpret,
     PAYLOAD_MAP: PAYLOAD_MAP,
     DATA_SCHEMA: DATA_SCHEMA,
+    bodyState: bodyState,
     KNOWN_TYPES: Object.keys(DATA_SCHEMA),
     isKnownType: isKnownType,
     isValidEvent: isValidEvent

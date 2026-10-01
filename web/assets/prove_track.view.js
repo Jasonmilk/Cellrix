@@ -609,6 +609,22 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
   }
 
   /* ---------- Inspector ---------- */
+
+  /* EMPTY IS NOT ABSENT (ADR-0048 §350). The inspector used `ev.payload || '—'`, which rendered a produced
+   * emptiness and a missing record as the same dash. The decision uses the FAMILY's declaration of which kinds
+   * carry a text body, so no second list lives here; kinds that carry none keep the plain dash. */
+  function payloadBody(ev) {
+    if (!ev) { return '\u2014'; }
+    var EF = (typeof window !== 'undefined' && window.CxEventFamily) || null;
+    var map = (EF && EF.PAYLOAD_MAP && EF.PAYLOAD_MAP[ev.type]) || null;
+    var carriesText = !!(map && map.text);
+    if (ev.payload && String(ev.payload).trim() !== '') { return String(ev.payload); }
+    if (!carriesText || !EF || typeof EF.bodyState !== 'function') { return ev.payload || '\u2014'; }
+    var bs = EF.bodyState(ev.data || {}, 'text');
+    if (bs.kind === 'empty' || bs.kind === 'absent') { return bs.label; }
+    return '\u2014';
+  }
+
   function openInsp(id) {
     var ev = null;
     S.session.forEach(function (e) { if (e.id === id) ev = e; });
@@ -650,7 +666,7 @@ var LANE_WRITES = 0;   /* OBSERVABLE (ADR-0048 §153): "same data ⇒ 0 writes" 
       '<dt>Reference</dt><dd><code>' + esc(ev.id) + '</code></dd>' +
       (ev.repeat ? '<dt>Stuck streak</dt><dd style="color:var(--e-warn);font-weight:700">' + ev.repeat + ' consecutive identical calls</dd>' : '') +
       '</dl></div>' +
-      '<div class="e-sec"><h4>Payload</h4><pre>' + esc(ev.payload || '—') + '</pre></div>' +
+      '<div class="e-sec"><h4>Payload</h4><pre>' + esc(payloadBody(ev)) + '</pre></div>' +
       '<div class="e-sec"><h4>Result</h4>' + resultHtml + '</div>' +
       '<div class="e-sec"><h4>Schema</h4><dl class="e-kv">' +
       '<dt>Kind</dt><dd>' + esc(ev.kindNote || '—') + '</dd>' +
