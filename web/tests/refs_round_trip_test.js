@@ -132,6 +132,25 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('M1e MUTATION: a client that claimed "server" while offline would fail this check',
     src3 !== 'server', 'the declaration is falsifiable');
 
+  /* ②d THE REF ACT IS AN EVENT IN THE TARGET'S OWN STREAM (ADR-0048 §321): one book, not two, and the
+   * anchor therefore lives beside the object it protects. */
+  const ev = await call('/api/events?id=' + encodeURIComponent(period));
+  const moves = (ev.events || []).filter((x) => x && x.type === 'ref/move');
+  ok('M2-③: the ref act was written INTO the target period\'s stream (one book, not two)',
+    moves.length >= 1, moves.length + ' ref/move row(s) in ' + period.slice(-8));
+  /* The invariant is "no second book is WRITTEN", not "no legacy file exists": the §315-era side log is
+   * kept, renamed `.log.legacy-v315`, and it must stay UNTOUCHED. A criterion that demanded the file's
+   * absence would have been measuring history instead of the implementation. */
+  const legacyDir = path.join(__dirname, '..', '..', '..', '.helix', 'events', '.refs', '.log');
+  const legacy = path.join(__dirname, '..', '..', '..', '.helix', 'events', '.refs', '.log.legacy-v315');
+  const stream = path.join(__dirname, '..', '..', '..', '.helix', 'events', period + '.events.jsonl');
+  const mt = (f) => (fs.existsSync(f) ? fs.statSync(f).mtimeMs : -1);
+  ok('M2-③: the SECOND book is no longer written (the legacy side log stays untouched, and the writing path is gone)',
+    mt(legacy) <= mt(stream) && !fs.existsSync(legacyDir),
+    'legacy ' + new Date(mt(legacy)).toISOString() + ' <= stream ' + new Date(mt(stream)).toISOString());
+  ok('M2-③ MUTATION: the client DECLARES the new event kind (an undeclared kind would throw in the renderer)',
+    /'ref\/move'/.test(fs.readFileSync(path.join(__dirname, '..', 'assets', 'event_family.js'), 'utf8')));
+
   /* ③ clearing on the server clears it for every reader. */
   const del = await call('/api/refs/current', { method: 'DELETE' });
   ok('DELETE /api/refs/current removes it (a named absence afterwards)',

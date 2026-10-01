@@ -79,6 +79,7 @@
     'check/status': KINDS.CHECK,
     'verdict/status': KINDS.VERDICT,
     'assistant/reply': KINDS.REPLY,
+    'ref/move': KINDS.SYSTEM,   /* the third layer's own act (ADR-0048 §321) */
     'assistant/usage': KINDS.METERING
   };
 
@@ -140,6 +141,7 @@
       checks: ['checks', 'maybe'], reason: ['reason', 'maybe']
     },
     'assistant/reply': { text: ['text'], chars: ['chars'], model: ['model', 'maybe'] },
+    'ref/move': { name: ['name'], old: ['old'], new: ['new'] },
     'assistant/usage': {
       promptTokens: ['prompt_tokens', 'snake'], completionTokens: ['completion_tokens', 'snake'],
       cachedTokens: ['cached_tokens', 'snake', 'maybe'],
@@ -317,6 +319,7 @@
       optional: { checks: ['array', 'number'], reason: ['string'] }
     },
     'assistant/reply': {
+    'ref/move': { name: ['name'], old: ['old'], new: ['new'] },
       required: { text: ['string'], chars: ['number'] },
       optional: { model: ['string', 'null'] }
     },
