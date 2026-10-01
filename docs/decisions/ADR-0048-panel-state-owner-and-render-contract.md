@@ -13912,3 +13912,41 @@ JS `mode_vocabulary_test.js`(进网,**4 passed**)——
         客户端 `modeFacts(modeOf(event)).kind === 'declared'`(survival ⇒ implemented === false) ·
         **变异**:写 `Mode::default()` ⇒ 红(它说的那条墙)
 ```
+
+
+## 341. 📌 **M3④ 最后一步:线程化 mode 到 `turn/start`**（锚点已全部定位,不做半截改动)
+
+### 341.1 精确锚点（本轮实测)
+
+```
+**载荷的落点**:`session_events/types_and_stream.rs:275`
+    self.emit(time, EventType::TurnStart, json!({}))?;      ← 周期首个事件,载荷是**空对象**
+    （它在一个 stream 的方法里 ⇒ **stream 自己不知道 mode** ⇒ 必须由调用者传入)
+**mode 的来源**(两处都可用):
+    `main.rs:1032   agent.mode = config.anaphase.run_cycle.mode`   ← 运行期真实值
+    `config.rs`     `mode_wire(mode)` = **唯一线名映射**(§340 已落)
+**配置字段**:`config.anaphase.run_cycle.mode: Mode`（`config.rs:286` 默认 `Partner`）
+```
+
+### 341.2 落地步骤（一次贯通,不许半截)
+
+```
+① `types_and_stream.rs:275` 的那个方法增加形参 `mode: Option<&str>`（`None` = **未声明**,不填默认)
+   ⇒ 载荷:`json!({ "mode": mode })` 仅在 `Some` 时插入;`None` 时**保持空对象**
+   ⇒ **这就是"有默认值的字段不得声称已声明"的代码形态**
+② 调用链一路上传 `config.anaphase.run_cycle.mode`（从 `main.rs` 到该方法的每个调用点),
+   用 `config::mode_wire(...)` 转换 ⇒ **不复制映射**
+③ 判据:
+   · Rust `a_periods_mode_is_in_its_stream`:某次的 `turn/start.data.mode` == **该次配置的线名**;
+     `mode` 为 `None` 时该键**不存在**（而非 `"partner"`)
+   · **变异**:把 `Mode::default()` 写进去 ⇒ **红**（它说的那条墙)
+   · 客户端 `modeFacts(modeOf(turn_start_event)).kind === 'declared'`,`survival` ⇒ `implemented === false`
+   · 跨语言:`mode_vocabulary_test.js` 已保证两侧词汇相等(§340) ⇒ 此处只需断言"载荷值与配置值一致"
+```
+
+### 341.3 M3 状态
+
+```
+① ✅ 三态具名 ｜ ② ✅ 详情头友好标签 ｜ ③ ✅ 「+ 新对话」按钮 ｜ ④ 🚧 **词汇已统一(§340),线程化待落(本条,锚点齐)**
+⑤ ⏳ 载荷里**空串 vs 缺席**分名(`think.text === ''` ⇒ "有但为空")
+```
