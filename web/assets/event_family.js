@@ -253,6 +253,8 @@
    * explicitly because typeof alone cannot tell them apart from 'object'.
    */
   var DATA_SCHEMA = {
+    /* The third layer's own act (ADR-0048 §321): written INTO the target period's stream. */
+    'ref/move': { required: {}, optional: { name: ['string'], old: ['string'], new: ['string'] } },
     'turn/start': { required: {}, optional: {} },
     'user/message': { required: { text: ['string'] }, optional: {} },
     'context/inject': {
