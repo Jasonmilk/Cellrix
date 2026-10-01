@@ -99,6 +99,7 @@ const SELF_CONTAINED = [
   ['prove_track_rows_test.js', 'trajectory rows — keyed reuse, not a whole-table rebuild (PANEL-PLAN §2)'],
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
   ['events_param_contract_test.js', 'the event endpoint: `id=` honest, `job_id=` compatible, same events, missing names the spellings (§296)'],
+  ['asset_parity_test.js', 'the build artifact is NEWER than its sources — the rebuild rule as a judgement, not prose (§316, ledger P4)'],
   ['refs_round_trip_test.js', 'the POINTER lives in the server: round-trip, dangling refusal, and a browser with EMPTY localStorage recovers it (§310)'],
   ['layering_test.js', 'the LAYERS are enforced, not assumed: L0 knows no view, the write path cannot see it, and kept is ancestor-closed (§308)'],
   ['conversation_identity_test.js', 'a conversation is its LINEAGE ROOT, never a content digest: two chains sharing a job_id stay two (§297)'],
