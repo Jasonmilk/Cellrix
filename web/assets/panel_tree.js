@@ -536,6 +536,31 @@
       box = document.createElement('div');
       box.className = 'pt-mount';
       box.setAttribute('data-panel-tree', '1');
+    }
+    /* THE ONE ENTRY THAT NEEDS NO SELECTION (ADR-0048 §337). Measured: with nothing selected the banner — and
+     * its ✗ — are absent, so starting a new conversation had NO entry point anywhere. The button is mounted
+     * AFTER the tree marker, carries its own marker (so the host's wholesale re-render cannot orphan it via
+     * the retirement filter), and calls the SAME action the banner calls (`newChat`): one host for the act. */
+    if (!host.querySelector('[data-panel-new]')) {
+      /* `doc` is NOT in this scope (it lives in `renderRows`): using it here threw a ReferenceError and the
+       * whole sidebar rendered its EMPTY state — the criterion's named skip is what kept that visible instead
+       * of turning it into a mysterious red. Take the document from the host that is being mounted into. */
+      var doc = host.ownerDocument || document;
+      var newBox = doc.createElement('div');
+      newBox.className = 'pt-new';
+      newBox.setAttribute('data-panel-new', '1');
+      var newBtn = doc.createElement('button');
+      newBtn.type = 'button';
+      newBtn.className = 'btn sm';
+      newBtn.setAttribute('data-new-chat', '1');
+      newBtn.textContent = '+ 新对话';
+      newBtn.onclick = function (ev) {
+        ev.stopPropagation();
+        var sessions = (typeof window !== 'undefined' && (window.CxSessions || window.Cx)) || null;
+        if (sessions && typeof sessions.newChat === 'function') { sessions.newChat(); }
+      };
+      newBox.appendChild(newBtn);
+      host.appendChild(newBox);
       host.appendChild(box);
     }
     /* The sidebar asks for the ROOTS explicitly (44 of 52 measured) — its entry set, declared. */

@@ -13,7 +13,9 @@ const path = require('path');
 const REQUIRES = 'panel-http';
 const { JSDOM, VirtualConsole } = require('jsdom');
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MIN_ROWS = 1;             /* declared threshold (ADR-0022 §2.5) */
+const SIDEBAR_SETTLE_MS = 20000; /* declared budget: the sidebar appears AFTER the service restarts */
 let pass = 0, fail = 0;
 function ok(name, cond, detail) {
   if (cond) { pass++; console.log('  ok   ' + name + (detail ? '  [' + detail + ']' : '')); }
@@ -87,6 +89,31 @@ if (!base) { console.log('NEEDS-INPUT: no panel address declared'); process.exit
   const rawInHeader = /——\s*经历\s*run-[0-9a-f]{16}-p[0-9a-f]{16}/.test(heads);
   ok('M3②: the chat header does NOT print the raw period id as its name',
     !rawInHeader, 'the naming rule is read from the row the list rendered');
+
+  /* M3③ AN ENTRY THAT NEEDS NO SELECTION (ADR-0048 §337): measured before the fix, with nothing selected
+   * there was NO way to start a new conversation (the banner and its ✗ only exist once something is chosen). */
+  /* THE DISCRIMINATING PREDICATE (the skip rule requires one): the button can only be judged when the list
+   * actually rendered. Measured: with an EMPTY payload the sidebar shows its empty state and there is no tree
+   * or button to inspect — that is "nothing to exercise", not "the criterion failed". */
+  /* A SKIP THAT ALWAYS FIRES IS NOT A CRITERION (measured the hard way): the first version waited for
+   * `.ses-item`, which after a service restart arrives LATER than `[data-period]`, so the check reported
+   * "UNVERIFIED TODAY" while the sidebar was in fact fine (bisect: rows=50, newBtn=1 with the change,
+   * newBtn=0 without it). Wait for the marker the criterion actually uses, with a real budget. */
+  let waited = 0;
+  while (waited < SIDEBAR_SETTLE_MS && w.document.querySelectorAll('#s-side [data-period]').length === 0) {
+    await sleep(500); waited += 500;
+  }
+  const sidebarHasRows = w.document.querySelectorAll('#s-side [data-period]').length >= 1;
+  if (!sidebarHasRows) {
+    console.log('  UNVERIFIED TODAY: the sidebar rendered no rows (empty payload) — the tree/button mount '
+      + 'cannot be judged on an empty list');
+  } else {
+    const newBtn = w.document.querySelector('[data-new-chat]');
+    ok('M3③: a `+ 新对话` entry exists even with NOTHING selected', !!newBtn,
+      newBtn ? String(newBtn.textContent).trim() : 'missing');
+    ok('M3③: it carries its own marker, so the sidebar re-render cannot orphan it',
+      !!w.document.querySelector('[data-panel-new]'));
+  }
 
   console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
   process.exit(fail ? 1 : 0);
