@@ -13651,3 +13651,44 @@ P43:D2 的**作用域**在报告里具名:`scope = ["period streams (<id>.events
    写进 §320 · 腾位只有**一份**读取实现(§334.1) ✓
 ⇒ **M2 完成**;下一步可进 M3(体验收尾)或 M4(线 3 语义)
 ```
+
+
+## 335. ✅ **M3 第一格:三态具名**（`—` 不适用 / `· 未计量` / `· 无数据`)
+
+### 335.1 修的是什么
+
+```
+实测(判据落地前):`assistant/reply · 无数据` —— 那一列是**计量列**(token 数),而 reply **从不携带**
+  completion_tokens(携带它的是 `assistant/usage`)⇒ 显示"无数据"把**"维度不适用"**读成了**"记录缺失"**。
+这正是 §52 / Codd 第四态与 §304.5 的承诺:三种事实必须**各有名字**。
+```
+
+### 335.2 修法与"唯一来源"
+
+```
+`panel_tree.js` 的行值渲染新增第三态:
+  · 判据来自**家族的声明** `PAYLOAD_MAP[type].completionTokens` ⇒ **此处不再有第二份类型清单**
+  · 三态:`measured`(p/n)⇒ 原样;`不适用`(类型不携带且未测量)⇒ **`—`**(em dash,
+    与 `prove_track.view.js:80` 的约定一致);其余 ⇒ `· 无数据`
+  · `data-state` 同步为 `na`,于是"看起来"与"机器可读"是同一个事实
+```
+
+### 335.3 判据（`three_state_rows_test.js`,进网,**5 passed**;实机)
+
+```
+在 jsdom 里按面板的方式渲染**真实**事件行(94 格):
+  ✅ `INAPPLICABLE rows say —, not · 无数据` —— 实测 **93 个 `—` · 0 个 `· 无数据`** ·
+     **1 个真实数字**(那条 `assistant/usage`)
+  ✅ `a metering-bearing type is NOT marked inapplicable`(家族决定,不是猜)
+  ✅ `MUTATION: the family DECLARES metering for assistant/usage`(若缺该声明,所有行都会变成"不适用"而判据**空过**)
+  ✅ 行确实被渲染(≥ `MIN_ROWS`)
+```
+
+### 335.4 M3 剩余（具名)
+
+```
+② 详情头用**友好标签**替代原始 `period_id`（与侧栏同一套 `autoName`)
+③ 「+ 新对话」按钮回到树面（插到 `data-panel-tree` 标记**之后**)
+④ `mode` 进 payload（界面可显示"Partner(带记忆)",不再是"模式未声明")
+⑤ 载荷里的**空串**与**缺席**分名(`think.text === ''` ⇒ "有但为空")
+```

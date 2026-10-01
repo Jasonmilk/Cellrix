@@ -99,6 +99,7 @@ const SELF_CONTAINED = [
   ['prove_track_rows_test.js', 'trajectory rows — keyed reuse, not a whole-table rebuild (PANEL-PLAN §2)'],
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
   ['events_param_contract_test.js', 'the event endpoint: `id=` honest, `job_id=` compatible, same events, missing names the spellings (§296)'],
+  ['three_state_rows_test.js', 'THREE states, not two: `—` (inapplicable) / `· 未计量` / `· 无数据`, decided by the family (§335)'],
   ['js_family_source_test.js', 'JS consumers may not keep their own protocol list — every wire name traces to event_family.js (§327, ㉖)'],
   ['asset_parity_test.js', 'the build artifact is NEWER than its sources — the rebuild rule as a judgement, not prose (§316, ledger P4)'],
   ['refs_round_trip_test.js', 'the POINTER lives in the server: round-trip, dangling refusal, and a browser with EMPTY localStorage recovers it (§310)'],

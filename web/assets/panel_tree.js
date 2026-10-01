@@ -395,8 +395,18 @@
       sem.textContent = (M && M.semOf) ? M.semOf(e) : '';
       var tok = cell(row, 'pt-tok');
       var t = (M && M.tokOf) ? M.tokOf(e) : null;
-      tok.setAttribute('data-state', stateOf(t));
-      tok.textContent = textOf(t);
+      /* THREE STATES, NOT TWO (ADR-0048 §335; §52 / Codd's fourth state). A dimension that a type NEVER
+       * carries is INAPPLICABLE — not "unmeasured" and not "no data". The decision uses the FAMILY's own
+       * declaration (`PAYLOAD_MAP[type].completionTokens`), so no second list of types exists here: measured
+       * behaviour was `assistant/reply · 无数据`, which read as "the record is missing" when the column simply
+       * does not apply to it. */
+      var family = (typeof window !== 'undefined' && window.CxEventFamily) || null;
+      var familyMap = (family && family.PAYLOAD_MAP && family.PAYLOAD_MAP[e && e.type]) || null;
+      var carriesTokens = !!(familyMap && familyMap.completionTokens);
+      var measured = !!t && (t.k === 'p' || t.k === 'n');
+      var inapplicable = !measured && !carriesTokens;
+      tok.setAttribute('data-state', inapplicable ? 'na' : stateOf(t));
+      tok.textContent = inapplicable ? '\u2014' : textOf(t);
       var dur = cell(row, 'pt-dur');
       var d = (M && M.durOf) ? M.durOf(e) : null;
       dur.setAttribute('data-state', stateOf(d));
