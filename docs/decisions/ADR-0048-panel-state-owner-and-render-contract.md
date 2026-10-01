@@ -13111,7 +13111,7 @@ Cellrix `refs_round_trip_test` 新增三条:
 ```
 
 
-### 321.4 🔴 **具名的未决项**:客户端尚未声明 `ref/move`（我试过,越改越糟,已回退)
+### 321.4 ✅ **已闭合**:客户端声明 `ref/move`（此前被我误改又回退;现按契约规格补齐)
 
 ```
 事实:`ref/move` 行现在**会出现在 period 流里**(这正是 §321 要的),而**证轨渲染器对未声明的 kind 会抛**
@@ -13121,6 +13121,12 @@ Cellrix `refs_round_trip_test` 新增三条:
     (我第一次写的 `DATA_SCHEMA` 形状也错:`{name:'string'}` ≠ 契约的 `{required:{}, optional:{}}`)
   · 形状改对后仍 3 红 ⇒ 说明契约自己的"协议类型"清单**不在我改的两处**
   · ⇒ **按纪律回退**(`git checkout -- web/assets/event_family.js`),不留坏状态
-⇒ 正解:以 `web/tests/event_family_test.js` **为规格**(第 55/136 行就是它的形状约定)去补声明,
-   并让那份契约**自己变绿**;在此之前,判据里保留一行**具名 `UNVERIFIED TODAY`**,不假装通过。
+⇒ **正解已执行并变绿**:契约**自己就是规格**,而且它有**四处**必须同时对齐(我先前只找到三处):
+   ① `KIND_OF`（子句的 kind) ② `PAYLOAD_MAP`（读哪些字段) ③ `DATA_SCHEMA`（`{required:{}, optional:{}}` 形状)
+   ④ `TYPES`（"名字 → 线名"的冻结清单) —— 再加上契约测试自己的 `EXPECTED` 长度 12→13。
+   还有两处**只有跑测试才会暴露**的规则:
+   · `required` **不得为空**:否则"空数据只有 `turn/start` 能通过"这条契约被破(实测 `got 2 accepted`)
+   · `kind` 必须是**存在的** `KINDS` 之一:我先写了 `KINDS.SYSTEM`(不存在 ⇒ `interpret()` 返回 null ⇒ 红),
+     改为 `KINDS.CONTEXT`(ref 动作是**血缘元数据**,不是消息)后才绿
+⇒ 结果:`event_family_test` **OK — all passed**;客户端判据 15/15;契约与文档(ADR-0026 D2)与代码三方一致。
 ```

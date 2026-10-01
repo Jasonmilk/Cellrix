@@ -41,7 +41,8 @@
     VERDICT_STATUS: 'verdict/status',
     ASSISTANT_REPLY: 'assistant/reply',
     ASSISTANT_USAGE: 'assistant/usage',
-    TURN_END: 'turn/end'
+    TURN_END: 'turn/end',
+    REF_MOVE: 'ref/move'   /* the third layer's own act: ADR-0026 D2 (ADR-0048 §321) */
   };
 
   /* Semantic kinds — what a fact IS, after interpretation.
@@ -68,6 +69,7 @@
   };
 
   var KIND_OF = {
+    'ref/move': KINDS.CONTEXT,   /* lineage metadata, not a message: ADR-0048 §321 */
     'turn/start': KINDS.TURN,
     'turn/end': KINDS.TURN,
     'user/message': KINDS.MESSAGE,
@@ -79,7 +81,6 @@
     'check/status': KINDS.CHECK,
     'verdict/status': KINDS.VERDICT,
     'assistant/reply': KINDS.REPLY,
-    'ref/move': KINDS.SYSTEM,   /* the third layer's own act (ADR-0048 §321) */
     'assistant/usage': KINDS.METERING
   };
 
@@ -105,6 +106,7 @@
    *   ['?literal', 'lit:value']    a constant; the '?' marks it as not a field
    */
   var PAYLOAD_MAP = {
+    'ref/move': { name: ['name'], old: ['old'], new: ['new'] },
     'turn/start': { start: ['?turn/start', 'lit:true'] },
     'turn/end': {
       end: ['?turn/end', 'lit:true'], done: ['done'], success: ['success'],
@@ -141,7 +143,6 @@
       checks: ['checks', 'maybe'], reason: ['reason', 'maybe']
     },
     'assistant/reply': { text: ['text'], chars: ['chars'], model: ['model', 'maybe'] },
-    'ref/move': { name: ['name'], old: ['old'], new: ['new'] },
     'assistant/usage': {
       promptTokens: ['prompt_tokens', 'snake'], completionTokens: ['completion_tokens', 'snake'],
       cachedTokens: ['cached_tokens', 'snake', 'maybe'],
@@ -253,8 +254,8 @@
    * explicitly because typeof alone cannot tell them apart from 'object'.
    */
   var DATA_SCHEMA = {
+    'ref/move': { required: { name: ['string'] }, optional: { old: ['string'], new: ['string'] } },
     /* The third layer's own act (ADR-0048 §321): written INTO the target period's stream. */
-    'ref/move': { required: {}, optional: { name: ['string'], old: ['string'], new: ['string'] } },
     'turn/start': { required: {}, optional: {} },
     'user/message': { required: { text: ['string'] }, optional: {} },
     'context/inject': {
@@ -321,7 +322,6 @@
       optional: { checks: ['array', 'number'], reason: ['string'] }
     },
     'assistant/reply': {
-    'ref/move': { name: ['name'], old: ['old'], new: ['new'] },
       required: { text: ['string'], chars: ['number'] },
       optional: { model: ['string', 'null'] }
     },
