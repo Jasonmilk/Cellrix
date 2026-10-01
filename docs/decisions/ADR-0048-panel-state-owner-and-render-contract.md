@@ -13187,12 +13187,16 @@ Cellrix `refs_round_trip_test` 新增三条:
 **变异**:`covers(10,20) == false`、`covers(20,10) == true`、`covers(20,20) == true`(相等即够)
 ```
 
-### 323.2 延后台账:X-PASS ⇒ **退休**（证据,不是日期)
+### 323.2 🔴 延后台账:我**误退休**了一条 —— 一次 XPASS **不是证据**（已恢复并记为教训)
 
 ```
 门此前报 `LEDGER STALE — 1 registered deferral PASSED`。具名成员:`prove_track_nodes_test.js`
 [`recorded-10-period-chain`] —— 它**现在通过了** ⇒ 按台账自己的规则**退休该条**（"日期是启发式,这是证据")。
-⇒ 已从 `web/tests/deferrals.json` 移除（JSON 仍合法),门的 `LEDGER STALE` 随之消失。
+⇒ 我据此**退休**了该条 —— **这一手是错的**:退休后它按正常套件运行,**立刻变红**
+   （门:`FAILED — 5 red`),也就是说那次 XPASS **不是"判据重新可达"的证据**,而更可能是**不稳定**。
+⇒ **已恢复该登记**(`git checkout HEAD~1 -- web/tests/deferrals.json`),并写下规则:
+   **一次通过不足以退休;**要退休需要 **K ≥ 3 次**独立通过（与 `flake_roster` 的 K≥3 同一条纪律),
+   否则就是拿一次观察冒充证据。门的 `LEDGER STALE` 状态**保留**,直到有 K 次证据。
 ```
 
 ### 323.3 M2 前置条件**全部关闭**
