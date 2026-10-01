@@ -437,10 +437,26 @@
   // user turns and answers render as messages, then the next sentence
   // continues the period (resume_from on the backend). seq-guarded: a slow
   // earlier fetch must not overwrite a session the user switched to.
+  /* THE HEADER NAMES THE PERIOD THE WAY THE LIST DOES (ADR-0048 §336). The raw id is an IDENTIFIER, not a
+   * name a person can use — measured on the live panel: the chat header read `—— 经历 run-233a…-p006… ——`.
+   * The label is READ BACK from the row the list already rendered, so the naming rule still has ONE host
+   * (`autoName`); a short id stays as a dimmed technical suffix, exactly like the resume banner. */
+  function periodLabelOf(id) {
+    try {
+      var card = document.querySelector('#s-side [data-period="' + String(id).replace(/"/g, '\\"') + '"]');
+      if (!card) { return null; }
+      /* Prefer the NAME element: the card also carries status annotations ("has a reply", "newest"), and a
+       * header that repeats them is noise. The text fallback keeps the rule working if the markup changes. */
+      var named = card.querySelector('.nm, .ses-name, .name, .ses-title');
+      var txt = String((named || card).textContent || '').replace(/\s+/g, ' ').trim();
+      return txt ? txt.slice(0, 60) : null;
+    } catch (e) { return null; }
+  }
+
   function loadPeriodToChat(periodId) {
     var seq = ++st.histSeq;
     var box = document.getElementById('chat-msgs');
-    box.innerHTML = '<div class="period-head">—— 正在加载 ' + esc(periodId.slice(0, 12)) + ' 的历史 ——</div>';
+    box.innerHTML = '<div class="period-head">—— 正在加载 ' + esc(periodLabelOf(periodId) || ('…' + periodId.slice(-6))) + ' 的历史 ——</div>';
     /* ONE read, two projections (ADR-0018 T4). The shell merges the chain
      * through the assembly and hands ONE window to the tape; this view renders
      * the events off that window, and the trajectory reads the same window as
@@ -471,7 +487,7 @@
                             // only backfills periods written before it existed
       var d = document.createElement('div');
       d.className = 'period-head';
-      d.textContent = '—— 经历 ' + periodId + ' 的历史 ——'
+      d.textContent = '—— 经历 ' + (periodLabelOf(periodId) || '未命名') + ' · ' + periodId.slice(-6) + ' ——'
         + (win.jobs.length > 1 ? '（含 ' + win.jobs.length + ' 段）' : '');
       box.appendChild(d);
       events.forEach(function (e) {

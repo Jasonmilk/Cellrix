@@ -47,9 +47,10 @@
 | `.nav` | script.html |
 | `nledger` | cockpit.html, cockpit.js |
 | `.nm` | flows.html, session_list.js |
+| `.nm,` | session_list.js |
 | `.pt-model` | panel_tree.js |
 | `.pt-steps` | panel_tree.js |
-| `s-side` | base.html, prove_track.view.js, session.html |
+| `s-side` | base.html, prove_track.view.js, session.html, session_list.js |
 | `.ses-edit` | session_list.js |
 | `.ses-head` | session_list.js |
 | `.ses-item` | panel_tree.js |

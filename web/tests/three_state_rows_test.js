@@ -79,6 +79,15 @@ if (!base) { console.log('NEEDS-INPUT: no panel address declared'); process.exit
   ok('MUTATION: without the family declaration every row would be `—` (so the check is not vacuous)',
     numbers >= 1 || unmetered >= 1 || nodata >= 1, 'some row still carries a real state');
 
+  /* M3② THE HEADER MUST NOT SHOW A RAW ID (ADR-0048 §336): measured before the fix, the chat header read
+   * `—— 经历 run-233a86e49afbc98c-p006abd2783000003 ——`. A person cannot use that as a name. */
+  const heads = Array.from(w.document.querySelectorAll('#s-side, .panel, .chat-msgs'))
+    .map((el) => String(el.textContent || ''))
+    .join(' ');
+  const rawInHeader = /——\s*经历\s*run-[0-9a-f]{16}-p[0-9a-f]{16}/.test(heads);
+  ok('M3②: the chat header does NOT print the raw period id as its name',
+    !rawInHeader, 'the naming rule is read from the row the list rendered');
+
   console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error('HARNESS ERROR:', e); process.exit(4); });
