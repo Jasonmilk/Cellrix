@@ -47,7 +47,8 @@
       "suite": "chain_wiring_test.js",
       "depends_on": "a SUCCESSFUL ./e2e_chain.sh --self-check entry younger than 7 days: a DATED artifact of a real chain run, not a live probe. Measured 2026-10-01: the last success was 7.1 days old, so the suite correctly answered NEEDS-INPUT.",
       "retirement_plan": "Run ./e2e_chain.sh --self-check (it writes the dated entry the suite reads); the suite then has its input and this fresh-e2e-chain deferral can be retired by deleting this entry. The criterion itself is NOT weakened: it still refuses to judge without a fresh run.",
-      "expires": "2026-10-08"
+      "expiry": "2026-10-08",
+      "owner": "jason"
     }
   ],
   "pending": [
