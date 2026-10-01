@@ -13563,3 +13563,51 @@ M2-D ⏳ 腾位的**对外可见性**（"保护到 <时刻>"必须可读,且必�
 M2-A ✅ D0 · M2-B ✅ 全部 · **M2-C ✅ D2** · M2-D ⏳ 腾位的对外可见性（"保护到 <时刻>"可读,经 `check_retention_covers_grace`)
 ⇒ 三旋钮(D0/D1/D2)**各有能红的判据**,DoD 只剩 M2-D 与"门 no worse than 2 既知红"的复核
 ```
+
+
+## 333. 审查裁定（P40–P43):**P40 成立且是 D2 真跑的门禁 —— 已当场闭合**;P42 已反转;P41/P43 已声明
+
+### 333.1 🔴 P40（原子重写)——**成立,已修**
+
+```
+它说对了:追加崩 ⇒ 半行 ⇒ 尾换行守卫能恢复;而**重写**崩 ⇒ 落点不在尾部 ⇒ **整条流不可解析**。
+我的实现当时是 `fs::write(&path, out)` = **原地截断重写** ⇒ 崩在中间 ⇒ 该流**全部对象不可读**
+（审查方算的爆炸半径 1154× 成立;而且 §325 已实证:**1 行坏 ⇒ 三个套件全崩**)。
+修法:`rewrite_atomically(path, body)` —— **临时文件 + `sync_all` + `rename`**（同一文件系统上原子)
+判据(3 条,均已绿):
+  `a_rewrite_leaves_no_temporary_file_and_the_stream_still_parses`（无 `.tmp` 残留 ∧ 每行仍可解析) ·
+  `a_partial_temporary_write_does_not_touch_the_target`（**故障注入**:往 `.tmp` 写半行 ⇒ **目标一字未动**,
+    旧内容仍完整可读) ·
+  `an_in_place_truncating_rewrite_would_corrupt_the_stream`（**反证**:复现旧写法 ⇒ 该流**不再可解析**)
+⇒ **D2 真跑的门禁已绿**(此前的"实机非破坏"检查只是没碰到真数据,并不能替代这条)
+```
+
+### 333.2 🟡 P42（白名单 fail-open)⇒ **已反转成存活清单 + 未分类具名**
+
+```
+它说对了:内容清单**漏一个键** ⇒ 残留而 UI 仍显示"已销毁"。
+修法:**声明幸存清单**(`SURVIVING_KEYS`:血缘 `resume_from` · 审计计数 `completion_tokens`/`cached_tokens`/
+`prompt_tokens` · 决策事实 `verdict`/`done`/`success`/`impasse` · `model`/`choice`/`nodes`/`chars`/
+`injected_chars`/`at`),**其余一律销毁**(fail-closed);既不在幸存也不在已知内容清单的键 ⇒
+**销毁 + 具名 `unclassified`** ⇒ 新字段**两个方向都无法静默通过**。
+判据:`an_unknown_key_is_destroyed_and_named_as_unclassified`（`body` 那个新键 ⇒ **内容消失** ∧
+  `unclassified` 里**点名** `pid.body` ∧ 声明幸存的 `resume_from` **未动**)
+```
+
+### 333.3 🟡 P41（`ch` 若存活 ⇒ 销毁是化妆品)· P43（作用域未声明)⇒ **已声明,不假装**
+
+```
+P41:我们的内容摘要是 `job_id`(也是**连接键**,清掉会断 join)⇒ 因此**声明**:
+   **`job_id` 不是保密边界**;D2 移除的是**内容**,不是**可推断性**(字典攻击的抵抗力不在这一层)。
+   ⇒ 报告里返回 `retained`(幸存字段**逐个列出**),所以"销毁"**不会被读成"一切都消失了"**。
+P43:D2 的**作用域**在报告里具名:`scope = ["period streams (<id>.events.jsonl)"]`
+   ⇒ 明确**不覆盖** snapshot 与 Tuck 审计链;要覆盖它们必须**各自声明**(不许默认)。
+```
+
+### 333.4 顺序（采纳它的门禁思路)
+
+```
+① M2-D 按计划做（腾位可见性)—— 不阻塞
+② **P40 已绿** ⇒ D2 的"真跑"门禁**已解除**(不再是"未做";判据与反证都在)
+③ P41/P43:已声明;若将来要"真删副本",必须**各副本分别声明 + 判据**,不许一次性默认全删
+```
