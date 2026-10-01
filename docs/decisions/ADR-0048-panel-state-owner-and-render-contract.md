@@ -14103,3 +14103,44 @@ P62 一致性不变量 · P63 死字段(声明了但无人读) —— 与 ④ �
   **变异**:子进程环境改回带 jsdom ⇒ 判据**仍须能分辨**(否则它只是"总是通过")。
 三列验收(§343 ③):red 集合相同(仅既知 2 条) ∧ env-missing 名册 == 声明的 jsdom 依赖者 ∧ proven 差集具名。
 ```
+
+
+## 345. 🚧 **M3④ 第一步:可选 mode 的映射（不回落)+ 变异判据**
+
+### 345.1 落地（Anaphase,`cargo test --lib` **298 passed / 0 failed**)
+
+```
+`session_events::mode_wire_opt(Option<Mode>) -> Option<&'static str>` —— **`None` 保持 `None`**,
+  **绝不替换成 `Mode::default()`**。这正是审查方那条墙的代码形态:
+  有默认值的字段不得声称已声明;界面 `undeclared` 状态存在的意义就是这个值。
+放在**写事件载荷的那一层**(`types_and_stream.rs`),而不是 `config.rs`:config 是"运行被配置成什么",
+  这里才是"载荷可以带什么" —— 而且下面这条治理判据说明了为什么不能放在 config.rs。
+判据(含**变异**):`an_undeclared_mode_stays_undeclared_and_never_falls_back`
+   · `mode_wire_opt(None) == None` · 三种模式各自映射正确
+   · **反证**:一个 `unwrap_or_default()` 的"回落版"对 `None` 会给出 `Some("partner")`
+     ⇒ `assert_ne!(回落版(None), 诚实版(None))` ⇒ **两者可分辨**,判据不是装饰。
+```
+
+### 345.2 一条**治理判据**当场抓到我的改动（值得记)
+
+```
+`governance_tests::every_option_config_field_is_classified` 报:
+   "new Option config field(s) ["fn mode_wire_opt(mode"] are in neither the governance preconditions
+    nor the not-a-precondition list"
+⇒ 它的扫描把**函数参数** `mode: Option<Mode>` 误认成"新的 Option 配置字段"。
+⇒ 处置(不削弱判据):把这个**纯函数移出 `config.rs`** ⇒ 治理扫描恢复干净,判据绿;
+   并把这个理由写进函数的文档注释(下一个人会知道为什么它不在 config.rs)。
+   —— 我**没有**去放宽那条判据:它抓的是"新出现的 Option 语义必须被分类",方向是对的。
+```
+
+### 345.3 M3④ 剩余（具名,下一步)
+
+```
+① `RunCycleConfig.mode` 改 `Option<Mode>`（去掉 `#[serde(default)]` 的回落)⇒ 缺字段 = **未声明**
+   ⇒ 需要同时改:`config.rs` 的两处默认(286/443) · `main.rs:1032` · `ci144` 的 `snap.mode` 取值
+② `types_and_stream.rs` 里 `turn/start` 的 emit 增加形参 `mode: Option<&str>`(仅 `Some` 时写;`None` ⇒ `{}`)
+③ 客户端**周期级解析器** `periodMode(events)`(取 `turn/start`),界面与 inspector 一律经它
+④ ④ 的判据(含变异,已写进 §343/§344):
+   载荷 == 该次配置线名 · 未声明 ⇒ `!contains_key("mode")` · 写 `{"mode": null}` **必被抓** ·
+   回落 `partner` ⇒ **红** · P68:旧 period 无 `mode` ⇒ `undeclared` **天然可达**(不必造夹具)
+```
