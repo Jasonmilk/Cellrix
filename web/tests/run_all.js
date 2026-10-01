@@ -99,6 +99,7 @@ const SELF_CONTAINED = [
   ['prove_track_rows_test.js', 'trajectory rows — keyed reuse, not a whole-table rebuild (PANEL-PLAN §2)'],
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
   ['events_param_contract_test.js', 'the event endpoint: `id=` honest, `job_id=` compatible, same events, missing names the spellings (§296)'],
+  ['p64_env_class_test.js', 'P64: red is a property of the CODE, not the machine — spawns a gate with NODE_PATH removed and mutates it back (§343/§344)'],
   ['mode_vocabulary_test.js', 'ONE mode vocabulary across languages: the panel keys on the same values the payload carries (§340)'],
   ['three_state_rows_test.js', 'THREE states, not two: `—` (inapplicable) / `· 未计量` / `· 无数据`, decided by the family (§335)'],
   ['js_family_source_test.js', 'JS consumers may not keep their own protocol list — every wire name traces to event_family.js (§327, ㉖)'],
@@ -367,7 +368,29 @@ const NEEDS_INPUT_EXIT = 3;
 
 
 
+/* HOISTED ABOVE THE LEGACY LIST (ADR-0048 §344.6): this loop runs BEFORE the file's later
+ * initialisers, so `classify()` (which reads the register, the probe cache and the note map)
+ * threw TDZ three times — a CRASH, not a red, and therefore no verdict at all. */
+const DEFERRALS = (function () {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'deferrals.json'), 'utf8')); }
+  catch (e) { return null; }
+})();
+const PROBE_CACHE = {};
+global.__jsdomUndeclaredNoted = global.__jsdomUndeclaredNoted || {};
+
 for (const [file, what] of SELF_CONTAINED) {
+  /* P64 (ADR-0048 §344): THE LEGACY LIST OBEYS THE SAME CAPABILITY RULE AS THE REGISTER. A suite whose
+   * declared capability is absent must NOT be spawned — it would fail for an ENVIRONMENT reason and be
+   * counted RED (measured: six jsdom users did exactly that). It is NAMED, because a suite that silently
+   * stops running is indistinguishable from one that passes. */
+  {
+    const cl = classify(file);
+    if (cl && cl.kind === 'requires') {
+      console.log('  HELD  ' + file.padEnd(24) + '[requires] ' + cl.why + '  (legacy list — P64)');
+      results.push(['HELD', file, what]);
+      continue;
+    }
+  }
   const target = path.join(__dirname, file);
   /* Addresses are passed IN, so no suite needs a default of its own. */
   /* ADDRESS PASSING IS DECLARATION-DRIVEN (ADR-0048 §296): the suite SAYS what it needs
@@ -463,16 +486,11 @@ for (const [file, what] of SELF_CONTAINED) {
  * A `requires` entry is decided by its PROBE, not by the register: if the
  * probe says the capability IS here, the suite has no excuse and falls back to
  * unknown. Probe failure is never read as capability-absent. */
-const DEFERRALS = (function () {
-  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'deferrals.json'), 'utf8')); }
-  catch (e) { return null; }
-})();
 /* ONE PROBE PER CAPABILITY PER GATE RUN (ADR-0048 §203): measured, 10+ suites each spawned a
  * process to discover the same fact (jsdom absent), ~164ms apiece — 11% of the gate spent
  * repeatedly learning one thing. The file already had the right precedent (`PANEL_UP`): probe
  * once, decide a batch. Caching does NOT violate the header's rule, because the capability
  * conclusion is DECLARED (REQUIRES + probe + HELD), not silently skipped. */
-const PROBE_CACHE = {};
 /* ONE HOST FOR "WHERE IS THE PANEL" (§245): the probe and the argument passed to the panel suite
  * both ask this function, so they can never disagree about the address. Reads chain.json; env wins. */
 function panelUrl() {
@@ -565,7 +583,6 @@ function declaredRequires(file) {
     return m ? m[1] : null;
   } catch (e) { return null; }
 }
-global.__jsdomUndeclaredNoted = global.__jsdomUndeclaredNoted || {};
 function classify(file) {
   if (!DEFERRALS) { return { kind: 'unknown', why: 'no deferrals.json — nothing is registered' }; }
   const cap = declaredRequires(file);
