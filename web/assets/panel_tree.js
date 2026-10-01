@@ -18,10 +18,14 @@
    * ② Partner — memory-bearing partner (default; requires Helix-Mind)
    * ③ Survive — Mind autonomous; **the enum is reserved**: declared, not implemented
    * Unknown or absent ⇒ NAMED as undeclared (§215/§216 discipline: absence is not a blank). */
+  /* THE KEYS ARE THE WIRE VALUES, NOT THE ENUM NAMES (ADR-0048 §340). Measured before this change: the
+   * payload vocabulary (`driving`/`partner`/`survival`, `config::mode_wire`) and these keys (`Drive`/…)
+   * were different, so a declared mode read as "undeclared" — a field that claims to be declared while the
+   * reader cannot find it. The labels stay human; the KEYS are the protocol. */
   var MODES = {
-    Drive: { label: 'Anaphase Only（harness）', mind: 'absent', writesExperience: false, implemented: true },
-    Partner: { label: '伙伴（带记忆）', mind: 'required', writesExperience: true, implemented: true },
-    Survive: { label: '生存（Mind 自治）', mind: 'required', writesExperience: true, implemented: false }
+    driving: { label: 'Anaphase Only（harness）', mind: 'absent', writesExperience: false, implemented: true },
+    partner: { label: '伙伴（带记忆）', mind: 'required', writesExperience: true, implemented: true },
+    survival: { label: '生存（Mind 自治）', mind: 'required', writesExperience: true, implemented: false }
   };
 
   function modeFacts(mode) {

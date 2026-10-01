@@ -13875,3 +13875,40 @@ P56 ✅ **已满足(有证据)**:`panel_tree.js:32` 对 `implemented === false` 
    复用 `ci144/mod.rs:230` 的映射函数(**抽成一处**,不许复制)。
 ③ 判据三条(见 339.3),含**变异**:默认值/异套词汇 ⇒ 红。
 ```
+
+
+## 340. ✅ **M3④ 第一步:统一 mode 词汇**（真墙已砌:一处映射 + 跨语言判据)
+
+### 340.1 落地
+
+```
+**后端**:`config.rs` 新增 **唯一的** 映射
+  `pub fn mode_wire(Mode) -> &'static str` ⇒ `Drive|Partner|Survive` → `driving|partner|survival`
+  `pub fn mode_from_wire(&str) -> Option<Mode>` ⇒ 反查;**未知值 ⇒ `None`(具名未知,不猜)**
+  `ci144/mod.rs` **改用它** ⇒ 那一处自带的三行映射删除(同一事实不再有两个来源)
+**界面**:`panel_tree.js` 的 `MODES` **键改为线名**(`driving`/`partner`/`survival`),label 保持人话
+  ⇒ 于是"载荷带 `partner` ⇒ 界面查得到 ⇒ `declared`"成立;此前是**查不到 ⇒ 显示"模式未声明"**
+```
+
+### 340.2 判据（两侧都绿)
+
+```
+Rust `cargo test --lib` **297 passed** ——
+  `the_mode_wire_vocabulary_is_one_mapping_and_round_trips`:
+    三个值**恰好**是 `driving/partner/survival` · 每个都**往返一致** ·
+    **`mode_from_wire("Partner") == None`**(枚举名**不是**线名 —— 收下它就会把漂移重新藏起来) ·
+    `"partner "`(近似)亦为未知
+JS `mode_vocabulary_test.js`(进网,**4 passed**)——
+  从 Rust 的 `mode_wire` 分支**扫出**协议值 · 从 `panel_tree.js` 的 `MODES` **扫出**键 ⇒ **两个集合相等**;
+  **变异**:把键改成枚举名 ⇒ 集合不等 ⇒ **红**(且注释里写明这正是修前的事实)
+```
+
+### 340.3 ④ 剩余（一步)
+
+```
+把**真实配置值**写进载荷的那个 emit 点(周期首个事件):
+  从 `config.anaphase.run_cycle.mode` 取 `mode_wire(...)` ⇒ 写进 `data.mode`
+  判据:Rust 侧 `a_periods_mode_is_in_its_stream`(载荷 == 该次运行的配置值) ·
+        客户端 `modeFacts(modeOf(event)).kind === 'declared'`(survival ⇒ implemented === false) ·
+        **变异**:写 `Mode::default()` ⇒ 红(它说的那条墙)
+```
