@@ -14178,3 +14178,33 @@ P62 一致性不变量 · P63 死字段(声明了但无人读) —— 与 ④ �
 ④ 判据(含变异):载荷 == 该次配置线名 · 未声明 ⇒ `!contains_key("mode")` · 写 `{"mode": null}` **必被抓** ·
    回落 `partner` ⇒ **红** · **P68**:旧 period 无 `mode` ⇒ `undeclared` **天然可达**(不必造夹具)
 ```
+
+
+## 347. ✅ **M3④ ③:声明与生效值分开,载荷只报声明**（300 passed)
+
+### 347.1 落地（Anaphase `cargo test --lib` **300 passed / 0 failed**)
+
+```
+· `AgentContext.declared_mode: Option<Mode>`（**derive(Default) ⇒ `None` = 未声明**）
+  —— 与 `AgentLoop.mode`（**生效值**,运行必须有值)**并列**:两个事实,不是一个
+· `main.rs`:把 `config.anaphase.run_cycle.mode` **写进 context**(声明随运行走,但不冒充生效值)
+· `reasoning.rs:202` 的调用点:由 `None` 改为 **`mode_wire_opt(self.context.declared_mode)`**
+  ⇒ 配置声明了 ⇒ 载荷带线名;配置没声明 ⇒ 载荷**什么都不带**（缺席)
+判据:`the_declared_mode_is_carried_separately_from_the_effective_one`
+  · `AgentContext::default().declared_mode == None` ⇒ 且 `mode_wire_opt(…) == None`（缺席到载荷)
+  · `declared_mode: Some(Partner)` ⇒ `mode_wire_opt(...) == Some("partner")`
+  ⇒ 这条钉的是**接线**,不只是叶子(§345 的判据钉叶子,这条钉传导)
+```
+
+### 347.2 两处遗留（具名,下一步）
+
+```
+① **客户端周期级解析器** `periodMode(events)`（取 `turn/start`)⇒ 界面与 inspector **一律经它**;
+   判据:任一非首事件经它仍得同值;**变异**:直接对非首事件调 `modeOf` 当"声明" ⇒ 红(幽灵率 ~75% 的形态)
+② **配置词汇**:`Mode` 的 serde 默认解析用**枚举名**(`mode = "Partner"`),而**线名**是 `partner`
+   ⇒ 配置侧与协议侧又出现了"两套词汇"的影子 ⇒ 二选一具名:
+   (a) 给 `Mode` 加 `#[serde(rename_all = "lowercase")]` ⇒ 配置也用线名 ✓(**推荐**,词汇唯一)
+   (b) 保持枚举名并**声明**"配置词汇 ≠ 协议词汇,由 `mode_wire` 单点翻译" ✓
+   ⇒ 今天链路配置里**没有** `mode`(默认 `None`)⇒ 所有运行都是"未声明"(**真话**),不是 bug;
+     要让界面显示 `partner`,需在链路配置里显式声明一次(或走 (a) 后写 `mode = "partner"`)
+```
