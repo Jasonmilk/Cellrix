@@ -192,7 +192,7 @@ check('`chat.js` reads the pointer as the ONLY resume target (§307)',
   'the sticky metadata slot must not come back');
 check('the four operations are present: new (✗) clears · choose sets · the reply ADVANCES',
   /Cx\.setRef\(null\)/.test(sources['session_list.js'] || '')
-    && /Cx\.setRef\(id\)/.test(sources['session_list.js'] || '')
+    && /Cx\.setRef\(id[,)]/.test(sources['session_list.js'] || '')   /* the optional 2nd arg is the conversation (M1d) */
     && /Cx\.setRef\(j\.period_id\)/.test(sources['chat.js'] || ''),
   'new / continue / fork+advance');
 check('MUTATION: restoring the sticky slot would make these checks red (it is not a tautology)',
