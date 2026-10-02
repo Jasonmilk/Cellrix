@@ -14598,3 +14598,34 @@ M4⓪ 新增第一步:在**具名选定的一处**（`capability_tags`,或 `sema
 判据(它给的,采纳):点**中间**一段 ⇒ 新段的 `parent == 那段`;
   变异:若点击只切显示、不写 ref/parent ⇒ **红**;另需一条:点**最后一段**等价于"继续"(不产生分叉)。
 ```
+
+
+## 360. 🟡 **(B) 分叉入口:机制已存在(`resume_job`),缺的只是**逐段点击点**
+
+### 360.1 实测（后端**已经**分开了两个事实)
+
+```
+`anaphase-helix/src/main.rs:575-582` 原文:
+   "TWO FACTS, TWO FIELDS (§251): `resume_job` is the SCOPE whose history gets injected
+    (a job id is the right value there); `resume_period` is the LINEAGE …"
+   ⇒ `built.agent.context.resume_job = …` · `built.agent.context.resume_period = resolved`
+⇒ 所以"**从某一段继续**"（上下文范围锚在**那一段的 job**)后端**已支持**;
+客户端侧的现状(`chat.js:155-171`):发送 `{ message, job_id: job }`,`job = Cx.state.ref.current`;
+   `ref.current` 由**唯一的写者** `Cx.setRef` 写(卡片点击写 `period_id` + `conversation_id`)。
+⇒ **(B) 的唯一缺口 = 聊天区缺一个"从这里继续"的点击点**,把 **ref 的那个 job** 指向**被点的那一段**,
+   而 `nav.period` 仍是"我在看哪一段"(§299:viewing ≠ resuming —— 两个事实两处存,与后端同构)。
+```
+
+### 360.2 落点与判据（下一笔实现)
+
+```
+落点:`session_list.js::loadPeriodToChat` 的事件循环里,对 **`turn/start`**（= 每段的边界,
+   `cell_metering.js` 的 `TURN_MARKS` 已把两种词汇声明在一处)渲染一个**小按钮**「从这里继续」:
+   点击 ⇒ `Cx.setRef(<该段的 job id>, <period id>)` + 横幅（与卡片点击同款文案,但指明"第 N 段")。
+判据 `fork_entry_test`（三条,含变异):
+  ① 点**中间**一段 ⇒ 续接目标(ref)= **那一段的 job**（且 ≠ 首段、≠ 末段的目标)
+  ② **变异**:若点击**只切显示**而不写 ref ⇒ **红**
+  ③ 点**最后一段** ⇒ 等价于"继续"（目标 = 最新一段），**不产生分叉**
+⇒ 注意(与 §359 的分工):(A) 是"**整段 period** 可寻址"(已通);(B) 是"**period 内某一段**"的锚点,
+   二者判据**互不替代** —— (A) 的判据不会因 (B) 缺失而红,反之亦然。
+```
