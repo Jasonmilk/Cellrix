@@ -14463,3 +14463,35 @@ M4⓪ 新增第一步:在**具名选定的一处**（`capability_tags`,或 `sema
    ③ 名字规则若用 ⇒ 声明**唯一来源**还是**兜底**,不许两套并存。
 ⇒ 判据(此刻才可能红):清空该栏 ⇒ **必红**;按 tag 存在与否不算过滤 ⇒ 必红;`unknown` 当作文本 ⇒ 必红。
 ```
+
+
+## 356. ✅ **M4⓪ 第一步:能力来源填表 + 命名空间**（判据当场抓到那个陷阱)
+
+### 356.1 落点（**已存在**的字段,不新造)
+
+```
+注册表 `FlowModus/flowmodus-rs/registry/free/<supplier>.json` 的**每个模型条目**本就有
+**`capability_tags`** 字段 ⇒ 以它为**唯一来源**（代码里**没有**名字规则 ⇒ 不可能两套并存)。
+填表(一次,作为**声明**):
+  `agnes-ai.json`  12/12 —— **6 `modality:text` + 6 `modality:non-text`**(现场那 6 个 video/image)
+  `mock-llm.json`   2/2 —— `modality:text`
+  `local-llama.json` 1/1 —— `["local"]` ⇒ **`["local","modality:text"]`**(保留它自己的事实,另加模态)
+```
+
+### 356.2 判据 `capability_source_test.js`（进网)
+
+```
+① 每个模型都有**显式**且**命名空间化**的能力态 ② **混装确实存在**:text 与 non-text **各有具名样本**
+   （现场数据 `agnes-ai`,不造夹具) ③ **三条变异**:缺失 ⇒ `absent` · 只有**非命名空间**标签 ⇒
+   `unnamespaced` · 第四种状态 ⇒ `unknown-state` ⇒ **三者都被拒**。
+⇒ **它当场红过一次**:`local-llama:coder-7b` 当时只有 `["local"]` ⇒ 判据报
+   "a capability MUST be namespaced (`modality:`…), because `local`/`fast` are not modality" ✓
+   —— 即:那个"存在 ≠ 模态"的陷阱**在真实数据里本来就存在**,是判据把它逼出来的。
+```
+
+### 356.3 为什么用命名空间（设计要点)
+
+```
+若只要求"该栏非空" ⇒ 一次 `["local"]` 就能让它绿 ⇒ 于是"过滤存在"与"没有过滤"**观测同形**。
+⇒ 命名空间 `modality:` 使**存在**永远无法冒充**模态**;`unknown` 也必须**写出来**,不许默认成 text。
+```
