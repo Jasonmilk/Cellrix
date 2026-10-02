@@ -14324,3 +14324,52 @@ JS `mode_vocabulary_test.js` 扩到配置侧(**6 passed**):
 ⑤ ✅ 空串/缺席分名 + 接线(本条) ｜ M3-P0 ✅(§344)
 ⇒ **M3 全部完成**;下一步 M4(线 3 语义:flowmodus 能力过滤 + 集合内健康失败转移 · `loop.impl`)
 ```
+
+
+## 351. 审查裁定（M3 收口后）:①数目修正（真碰撞在**侧栏**）· ②已过时 · ③④成立
+
+### 351.1 ① **数目与"撞车"不成立,但担忧在**另一处**真的成立**
+
+```
+实测:用旧占位的**只有一个文件** —— `prove_track.view.js`,而且那一处是我 `payloadBody` 里
+  "**该类型不携带正文 ⇒ 保持 `—`**"的**有意回落**;
+  `panel_tree.js:420` 的 `—` 是**另一个事实**(维度不适用),与 §335 的 93 个 `—` 同源,不是"空"。
+⇒ 所以"接线 1/5 = 20%"与"可能与 93 个 `—` 撞车"两条**不成立**
+  （它自己已标注"5 个渲染点是按已知模块枚举的估计")。
+🟡 **真碰撞点（我实测到的)**:`panel_tree.js:472` 的 `replyState` 用**另一套词**表达**同样三个事实**:
+     present / **"本轮无产出"**(空) / **"· 无数据"**(缺席),而 `bodyState` 是 **"有但为空" / "未记录"**。
+  ⇒ 同一事实两套词 ⇒ 应**统一**（或**声明**映射);它的判据值得采纳,只把**范围**换成实测的那一处:
+     **同一条空 payload ⇒ 所有渲染点给出同一个词**;**变异**:任一处回落别的词 ⇒ 红。
+```
+
+### 351.2 ② **已过时**（本条之前已处置,有提交为证)
+
+```
+它写"'M3 全部完成'与 1 unregistered 自相矛盾" —— 成立;
+但现在:`HELD chain_wiring_test.js [deferral] fresh-e2e-chain (owner jason, expires 2026-10-08)`
+      门 = **0 unregistered** ✓（登记册连续三次否掉我的写法:要到期日 → 要 `expiry` 且可解析 → 要 owner)
+⇒ **采纳它的措辞规则**:以后写"M3 六格全绿 · 门有 N 处既存阻塞待决定",
+  不把 unregistered/skip/held 藏进"完成"（与"skip 计为 proven"同族)。
+```
+
+### 351.3 ③④ **成立**:好环境那 5 held 的**名册**（实测)
+
+```
+HELD chain_e2e_test.js         [requires] local-llm absent (probed, not dated)   ← 能力缺席
+HELD chain_e2e_test.js         the chain, end to end …                           ← **同名重复一行**
+HELD prove_track_nodes_test.js [deferral] recorded-10-period-chain (expires 2026-11-30)
+HELD chain_wiring_test.js      [deferral] fresh-e2e-chain (expires 2026-10-08)
+HELD? layout/measure/perf/hit_targets  [requires] NEVER ATTEMPTED — cdp-browser absent
+HELD  sentinel_held.js         [sentinel] unproven on purpose, NOT counted
+⇒ 全部**能力/有日期输入**相关 ⇒ "70 proven 的分母其实是 75"**基本成立** ✓
+⇒ 两条小改进:① **判决行具名 held**（与 env-missing 同款) ② 修掉 `chain_e2e` 的**重复行**。
+```
+
+### 351.4 现场待办（M4 细化之前,都很小)
+
+```
+① 统一"空/缺席"的**词表**:侧栏 `replyState`（本轮无产出 / · 无数据)与 `bodyState`（有但为空 / 未记录)
+   ⇒ 二选一:统一词,或**声明**映射;判据:**同一条空 payload ⇒ 所有渲染点同一个词**;**变异**:任一处别的词 ⇒ 红
+② 判决行**具名 held**;③ 修 `chain_e2e` 重复行
+④ 之后才做 **M4 任务细化**(flowmodus 能力过滤 + 集合内健康失败转移 · `loop.impl`)
+```
