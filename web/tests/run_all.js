@@ -388,7 +388,13 @@ for (const [file, what] of SELF_CONTAINED) {
   {
     const cl = classify(file);
     if (cl && cl.kind === 'requires') {
-      console.log('  HELD  ' + file.padEnd(24) + '[requires] ' + cl.why + '  (legacy list — P64)');
+      /* PRINTED ONCE (ADR-0048 §352). A suite that DECLARES its capability is also reported by the register
+       * phase, and printing here as well produced two HELD lines for one suite (measured:
+       * `chain_e2e_test.js` appeared twice). Only an undeclared suite — which the register cannot name —
+       * is printed from here. */
+      if (!declaredRequires(file)) {
+        console.log('  HELD  ' + file.padEnd(24) + '[requires] ' + cl.why + '  (legacy list — P64)');
+      }
       results.push(['HELD', file, what]);
       continue;
     }

@@ -53,5 +53,28 @@ ok('the inspector actually uses it (payloadBody → bodyState)',
 ok('MUTATION: the old rendering (`ev.payload || \'—\'`) is GONE from that spot',
   !/esc\(ev\.payload \|\| '—'\)/.test(VIEW), 'the placeholder that merged two facts');
 
+/* ONE WORD PER FACT, ACROSS RENDER POINTS (ADR-0048 §352). MEASURED before this: the sidebar said
+ * "本轮无产出"/"· 无数据" while the family said "有但为空"/"未记录" — two vocabularies for one fact, so the
+ * same empty payload could read differently on one screen. The mutation: a hard-coded word on either side
+ * would differ from the shared one. */
+for (const f of ['cell_metering.js', 'panel_tree.js']) {
+  w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', f), 'utf8'));
+}
+const PT = w.CxPanelTree;
+const words = EF.BODY_WORDS;
+ok('the family owns the words (one host)', !!words && !!words.empty && !!words.absent,
+  JSON.stringify(words));
+ok('the sidebar renders the SAME word for an empty reply',
+  PT.replyState('', false).label.indexOf(words.empty) === 0,
+  PT.replyState('', false).label);
+ok('the sidebar renders the SAME word for an absent reply',
+  PT.replyState(undefined, false).label === words.absent,
+  PT.replyState(undefined, false).label);
+ok('MUTATION: the old sidebar words would DIFFER from the shared ones',
+  '本轮无产出' !== words.empty && '· 无数据' !== words.absent,
+  'old=本轮无产出/· 无数据 new=' + words.empty + '/' + words.absent);
+ok('and a present reply still has NO label (it is its own text)',
+  PT.replyState('hello', true).label === null);
+
 console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
 process.exit(fail ? 1 : 0);

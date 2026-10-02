@@ -491,13 +491,17 @@
   }
 
   function replyState(reply, model) {
+    /* ONE VOCABULARY FOR "EMPTY" AND "ABSENT" (ADR-0048 §352): the words come from the family, so this
+     * renderer and `bodyState` cannot drift into naming the same fact differently on one screen. */
+    var words = (typeof window !== 'undefined' && window.CxEventFamily && window.CxEventFamily.BODY_WORDS)
+      || { empty: '有但为空', absent: '未记录' };
     if (typeof reply === 'string' && reply.trim() !== '') {
       return { kind: 'present', label: null };
     }
     if (typeof reply === 'string') {
-      return { kind: 'empty', label: '本轮无产出' + (model ? '' : '（模型未报）') };
+      return { kind: 'empty', label: words.empty + (model ? '' : '（模型未报）') };
     }
-    return { kind: 'absent', label: '· 无数据' };
+    return { kind: 'absent', label: words.absent };
   }
 
   function mountSidebar(periods, opts) {
