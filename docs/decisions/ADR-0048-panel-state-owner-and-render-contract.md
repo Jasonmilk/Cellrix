@@ -14566,3 +14566,35 @@ M4⓪ 新增第一步:在**具名选定的一处**（`capability_tags`,或 `sema
        判据:点**中间**一段 ⇒ 新段 `parent == 那段`
 ✅ **M4② 集合内失败转移**仍做(它同时兜住"选错模型",前提是 358.2 那条规则一并落)。
 ```
+
+
+## 359. ✅ **(A) 会话列表可寻址 —— 实测已经通了**（判据进网)· (B) 的精确缺口
+
+### 359.1 实测（它对 (A) 的判断**不成立**)
+
+```
+判据 `session_addressable_test.js`（进网,**5 passed**)在**清空 localStorage** 的真页面上:
+  ① 空本地仍列出 **50 个**会话（§310 的"空 localStorage 仍从服务器恢复"在这里再次成立)
+  ② 点**第二个**卡片 ⇒ `Cx.state.ref.current` **就是那一段**（`target=…57000004`）
+  ③ **变异**:点**第一个** ⇒ 目标随之改变（`first=…2c000001 ≠ second=…57000004`）⇒ 不是常量
+  ④ 聊天区标题随之切换（"—— 经历 ref-B · … ——（含 4 段）")
+源码侧:`session_list.js:239` 的卡片点击本就在做
+  `setNav({period})` + **`Cx.setRef(period_id, conversation_id)`** + `moveSelection()` + `loadPeriodToChat(period_id)` + 横幅。
+⇒ "客户端只认 `current` ⇒ 打开对话没有对象"**不成立**:
+  `ref.current` **只有一个写者**(ADR-0048 §307)是**设计**,而**读**它来定位"下一句接哪儿"正是它该做的事;
+  缺陷只会在"列表点击**不改变** ref"时出现 —— 实测**改变了**。
+⇒ 价值仍成立:该行为现在**被判据钉住**,将来谁破坏它就会红。
+```
+
+### 359.2 **(B) 的精确缺口**（比我上一轮写的更准)
+
+```
+实测:`web/assets/*.js` 里**没有** `continue_from`;**后端也没有**（它不在 anaphase 的源码里)
+  ⇒ 计划里的名字应更正:真正的机制是 **`resume_from`**（`session_list.js` 注释:"resume_from on the backend")。
+客户端已有"分叉"的**概念**:`chat.js:260` 提到 "new / continue / **fork** / advance";
+  `session_list.js:120` 说"the same operation as forking from a middle" ⇒ 但**没有**点击点。
+⇒ 真正缺的**只有一件事**:聊天区里**逐段**的"**从这里继续**"点击点
+  （今天的粒度是**整段 period** —— 卡片一行 = 一个 period ⇒ 想从某一段**中间**续接时无处可点)。
+判据(它给的,采纳):点**中间**一段 ⇒ 新段的 `parent == 那段`;
+  变异:若点击只切显示、不写 ref/parent ⇒ **红**;另需一条:点**最后一段**等价于"继续"(不产生分叉)。
+```
