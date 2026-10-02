@@ -14436,3 +14436,30 @@ HELD  sentinel_held.js         [sentinel] unproven on purpose, NOT counted
 · **撤钉死的顺序要判据守着**:`failover_before_unpinning` —— ②未绿前删钉死 ⇒ **必红**
 · **`loop.impl` 判据先行**:分支 / 预算 / 继续 / 终止 四探针各一条能红判据 + 变异,再实现
 ```
+
+
+## 355. 审查裁定（M4⓪ 之前):**新表也是空的 ⇒ 我的判据今天不会红**（它说对了）
+
+### 355.1 实测（三条)
+
+```
+① `capability_tags: vec![]` 出现在**三处**:`registry.rs:280` · `serve_cmd.rs:183` · `supplier_cmd.rs:95`
+   （proto `supplier.proto:25` 有该字段,但**永远构造成空**)⇒ 它说"换表之前先确认新表不是空的"**成立**;
+   我提的"清空能力声明 ⇒ 必红"**今天不变红**(它从未绿过)⇒ 与"用空字段做过滤"**同族**。
+② 数据有**第三个**落点:模型数据来自注册表 `FlowModus/flowmodus-rs/registry/free/<supplier>.json`;
+   API 的 `model_tags` 反映 **`semantic_tags`**(`serve_cmd.rs:297` 过滤"非空者");`capability_tags` 是
+   **另一个恒空字段** ⇒ 三者**不许混为一谈**(它的"模态 vs 容量"正指此处)。
+③ 现场夹具:`agnes-ai` = **6 文本 + 6 video/image** ⇒ 两类各有具名样本,填表与立判据都用**现场数据**。
+```
+
+### 355.2 处置:**先填表,再立判据**
+
+```
+M4⓪ 新增第一步:在**具名选定的一处**（`capability_tags`,或 `semantic_tags` 里的 `modality` 键 ——
+   二选一必须**声明**)为 `agnes-ai` 填上**至少一个文本 + 一个非文本**具名样本;
+   然后才立 `capability_source_is_named`（混装清单两类各≥1 具名样本)。
+三条补完:① `context_window` 是**容量**,不得当"能否文本"的代理;
+   ② **三态**:`text` / `non-text` / **`unknown`** —— 未知**不许默认**;
+   ③ 名字规则若用 ⇒ 声明**唯一来源**还是**兜底**,不许两套并存。
+⇒ 判据(此刻才可能红):清空该栏 ⇒ **必红**;按 tag 存在与否不算过滤 ⇒ 必红;`unknown` 当作文本 ⇒ 必红。
+```
