@@ -15,6 +15,9 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox);
+/* THE WORDS COME FROM THE FAMILY (ADR-0048 §352): this suite used to assert the sidebar's own wording
+ * ("本轮无产出" / "· 无数据"), which is exactly the second vocabulary the review found. It now asserts the
+ * SHARED words, so a future rename has to happen in one host and this suite follows. */
 const PT = sandbox.window.CxPanelTree;
 ok(!!PT, 'panel_tree.js loads and exports CxPanelTree');
 
@@ -423,14 +426,15 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   const empty = T2.replyState('', null);
   const absent = T2.replyState(undefined, null);
   ok(present.kind === 'present' && present.label === null, 'a real reply is `present` with no label');
-  ok(empty.kind === 'empty' && /\u65e0\u4ea7\u51fa/.test(empty.label) && /\u6a21\u578b\u672a\u62a5/.test(empty.label),
+  /* THE WORDS COME FROM THE FAMILY (ADR-0048 §352) — this asserts the SHARED word, so a future rename happens in one host. */
+  ok(empty.kind === 'empty' && empty.label.indexOf('\u6709\u4f46\u4e3a\u7a7a') === 0 && /\u6a21\u578b\u672a\u62a5/.test(empty.label),
     'an EMPTY reply is a NAMED state that carries the model fact: ' + empty.label);
-  ok(absent.kind === 'absent' && absent.label === '\u00b7 \u65e0\u6570\u636e',
+  ok(absent.kind === 'absent' && absent.label === '\u672a\u8bb0\u5f55',
     'an ABSENT field is the other named state: ' + absent.label);
   ok(new Set([present.kind, empty.kind, absent.kind]).size === 3,
     'THREE kinds stay three (mutation: merging empty into absent makes this 2 and fails)');
   ok(T2.replyState('   ', 'm').kind === 'empty', 'whitespace counts as empty, not as a reply');
-  ok(T2.replyState('', 'agnes-3.0-flash').label === '\u672c\u8f6e\u65e0\u4ea7\u51fa',
+  ok(T2.replyState('', 'agnes-3.0-flash').label === '\u6709\u4f46\u4e3a\u7a7a',
     'when the model IS reported, the label does not claim it was not');
 }
 
