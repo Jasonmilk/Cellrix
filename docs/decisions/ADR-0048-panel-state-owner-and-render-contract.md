@@ -14798,3 +14798,34 @@ M4⓪ 新增第一步:在**具名选定的一处**（`capability_tags`,或 `sema
 端到端判据(今天**:失败**):真死端口 ⇒ 集合内**另一个文本**供应商答出**非空** reply;
 随后 `failover_before_unpinning`（②未绿前删钉死 ⇒ 必红)。
 ```
+
+
+## 366. ✅ **M4② ①:有序候选已暴露（同源,不改首选语义)**· 附带成果:那个 crate 的测试套件复活
+
+### 366.1 为什么是"暴露"而不是"重算"
+
+```
+`auto()` 内部本就算出硬过滤后的集合,再由 `score_and_entropy_sample` 挑**一个**
+  ⇒ 运行时转移需要的是**那张已算过的集合**(同一顺序),**不是**第二套过滤(那会漂)。
+· 抽出 `fn eligible_candidates(&self, request)`（**原样**搬出 auto 的前四步:normalize → eligible →
+  estimate → hard filters,**不加不减**)
+· `pub fn auto_candidates(...)` 返回它 ⇒ `auto()` 的**首选语义完全不变**(仍走同一采样)
+· 另外:`RoutingDecision` 是 **proto 生成类型**(`..Default::default()`)⇒ **不能加字段**,
+  所以"暴露"只能走**并列函数**这条路(这也解释了为什么不是"给 Decision 加一个 candidates")。
+```
+
+### 366.2 判据（**同源不变量**,并入既有 auto 测试)
+
+```
+`auto()` 的首选 **必须** 出现在 `auto_candidates()` 的集合里（集合非空 + 成员包含)
+⇒ **变异**:若存在第二套、过滤不同的列表 ⇒ 首选不在其中 ⇒ **红**。
+`cargo test --lib router` **8 passed**。
+```
+
+### 366.3 附带成果（值得记)
+
+```
+先前那条 `cognitive_mode` 编译修复,让**这个 crate 的整个测试套件**从"编译不过"变成
+**`cargo test --lib` 96 passed** —— 在那之前,它是一群**静默消失**的判据(所有断言都执行不到)。
+⇒ 与本项目反复强调的同一条:**"跑不了"与"跑过了"必须能分辨**。
+```
