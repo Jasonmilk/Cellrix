@@ -14766,3 +14766,35 @@ M4⓪ 新增第一步:在**具名选定的一处**（`capability_tags`,或 `sema
 （该字段"未声明"的值,与 §346 一致)。
 ⇒ 教训同族:**"跑不了"与"跑过了"必须能分辨** —— 一个编译不过的测试构建会让所有判据静默消失。
 ```
+
+
+## 365. ✅ **M4② 接线第一段:IO 分类器**（8 passed)· 一处**具名局限**
+
+### 365.1 新增（纯规则 ⇒ 可判据化)
+
+```
+· `classify_status(code, body)` ⇒ 5xx 归 `Http5xx`;其余归 `UpstreamStatus{status, body}`,
+  **body 逐字透传**（§358.1:不替上游造词)⇒ 判据断言**同一字符串原样穿过**。
+· `classify_transport_kind(io::ErrorKind)` ⇒ `ConnectionRefused`/`TimedOut`/其它 = **三个不同的事实**;
+  判据要求三名字**互不相同**（变异:把 `TimedOut` 映射到 `Unreachable` ⇒ 红)。
+· `classify_ureq` 外壳 —— **实测**:`ureq::Transport::kind()` 返回 `ureq::ErrorKind`(**不是** io 的),
+  且它把若干传输事实**合并**成 `ConnectionFailed` ⇒ 故 refused/silent 由 ureq 自己的 message 识别。
+```
+
+### 365.2 具名的局限（不藏)
+
+```
+那是**字符串匹配**:上游改一次措辞,就可能把某次尝试**换一个名字**。
+它**不会静默合并类别** —— 兜底是 `Unreachable`,即**第三个名字**;
+判据 `the_ureq_shell_keeps_the_three_transport_names_distinct` 把这一点钉住。
+```
+
+### 365.3 M4② 的最后一段（把链条接到底)
+
+```
+把纯核心接进真实路径:`serve_cmd.rs:369`(决策) 与 `grpc_cmd.rs:113`(唯一上游调用) 之间调用
+`try_candidates`,每次尝试用 `classify_ureq`/`classify_status`/`body_is_empty` 判定;
+候选序需从 `Decision` 取（若未暴露,补暴露而**不改过滤语义**)。
+端到端判据(今天**:失败**):真死端口 ⇒ 集合内**另一个文本**供应商答出**非空** reply;
+随后 `failover_before_unpinning`（②未绿前删钉死 ⇒ 必红)。
+```
