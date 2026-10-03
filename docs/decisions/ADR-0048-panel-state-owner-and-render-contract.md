@@ -14911,3 +14911,43 @@ M4⓪ 新增第一步:在**具名选定的一处**（`capability_tags`,或 `sema
 ④ **变异**:把转移去掉(只调首选) ⇒ 必须得到 `Status::aborted` 且含 `refused` ⇒ 判据**必红**;
 ⑤ 随后 **`failover_before_unpinning`**:②未绿前删掉 `reasoning_model` 钉死 ⇒ **必红**。
 ```
+
+
+## 369. 🧪 **端到端判据的完整配方（全部实测,下一笔照做)**
+
+### 369.1 好消息:**不需要真端口、真 key、gRPC 客户端**
+
+```
+`ReasonService::new(store: RegistryStore)`（`grpc_cmd.rs:81`)· `RegistryStore::new(root)`（`registry.rs:85`)
+⇒ 集成测试里可以**直接进程内调用**:`FlowModus::reason(&svc, Request::new(req)).await`
+   （把 trait 引入作用域即可,**不必**起服务、不必连端口)。
+注册表布局（实测):`<root>/free/<id>.json` 与 `<root>/paid/<id>.json`（**一声明一文件**,`registry.rs:3`)
+密钥:`store.set_api_key(Tier::Free, "<id>", "k")` 是**公开 API**（`registry.rs:194`)
+   ⇒ 测试**不必**知道 `secret_path` 的公式(`<secrets_dir>/<tier.dir()>-<id>.json`,同处有注释)。
+```
+
+### 369.2 配方（写成 `tests/failover_e2e.rs`)
+
+```
+① 临时目录 `<tmp>`（`std::env::temp_dir()` + pid,照 `registry.rs:245` 的既有测试写法);
+② 写两个声明到 `<tmp>/free/`:
+     · `dead.json`  ⇒ `endpoints[0].base_url = "http://127.0.0.1:1/v1"`（**死端口**)
+     · `live.json`  ⇒ base_url 指向 ③ 的本地 mock
+   （`SupplierDeclaration` 的字段照 `tests/pipeline_e2e.rs:39` 的 fixture 抄)
+③ 起一个**极小**的 `TcpListener` 线程,对任何请求回 `200` +
+   `{"choices":[{"message":{"content":"pong"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`;
+④ 给**两个**供应商都 `set_api_key(..., "k")` ⇒ 这样失败**只**可能来自传输(不是 `no-credential`);
+⑤ `reason(ReasonRequest{prompt:"hi", model:"", max_tokens:16, cognitive_mode:"auto"})` ⇒
+   **断言 Ok 且 content 非空**（集合里有一个死供应商,**不**使请求失败）;
+⑥ **变异**:把死供应商作为**唯一**候选（不写 live.json)⇒
+   必须 `Err(aborted)` 且**含** `refused` 或 `unreachable`（逐个具名的报告)⇒ 判据**必红**;
+⑦ 之后 **`failover_before_unpinning`**:②未绿前删 `reasoning_model` 钉死 ⇒ **必红**。
+```
+
+### 369.3 与 §368 的关系（诚实)
+
+```
+M4② 到今天为止:**逻辑层闭环**（`cargo test --lib` 96 passed,含 failover 8)。
+**端到端判据尚未落地** —— 本节的配方是它的**全部前提**,已逐项实测,下一笔可直接写。
+⇒ 在它落地前,**不许**把 M4② 记作"完成";按 §351 的措辞规则,这是一个**具名的待办**。
+```
