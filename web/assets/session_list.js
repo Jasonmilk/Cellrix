@@ -483,7 +483,14 @@
 
       box.innerHTML = '';
       var pendingTool = null;
-      var sawReply = false; // assistant/reply is the deliverable; turn/end
+      var sawReply = false;
+      /* THE SEGMENTS OF ONE EXPERIENCE, MADE ADDRESSABLE (ADR-0048 §360). Each `turn/start` is a segment
+       * boundary, and `win.jobs` is the window's ordered segment list (the header counts it: "含 N 段").
+       * The mapping is POSITIONAL — the i-th `turn/start` belongs to `win.jobs[i]` — and the criterion
+       * `fork_entry_test` verifies it end to end (each button's click must move the ref to THAT job, and the
+       * last one must equal "continue"). `Cx.setRef` remains the ONLY writer of the continuation ref (§307);
+       * `nav.period` keeps saying what is on screen (§299), so viewing and resuming stay two facts. */
+      var segIndex = -1; // assistant/reply is the deliverable; turn/end
                             // only backfills periods written before it existed
       var d = document.createElement('div');
       d.className = 'period-head';
@@ -491,6 +498,25 @@
         + (win.jobs.length > 1 ? '（含 ' + win.jobs.length + ' 段）' : '');
       box.appendChild(d);
       events.forEach(function (e) {
+        if (e.type === 'turn/start') {
+          segIndex++;
+          var job = (win.jobs && win.jobs[segIndex]) || null;
+          if (!job) { return; }
+          var row = document.createElement('div');
+          row.className = 'seg-fork';
+          var isLast = (segIndex === (win.jobs.length - 1));
+          row.innerHTML = '<button type="button" class="seg-fork-btn" data-job="' + esc(String(job))
+            + '">' + (isLast ? '继续这一段' : '从这里继续') + '</button>'
+            + '<span class="seg-fork-note">第 ' + (segIndex + 1) + ' 段 · 之后的对话会从这一段续接</span>';
+          var b = row.querySelector('button');
+          b.onclick = function () {
+            if (typeof Cx.setRef === 'function') { Cx.setRef(String(job), periodId); }
+            setBanner('已选「' + (isLast ? '继续这一段' : '从这里继续') + '」· 第 ' + (segIndex + 1)
+              + ' 段 —— 下一句话从这一段续接');
+          };
+          box.appendChild(row);
+          return;
+        }
         if (e.type === 'user/message') { Cx.addMsg('user', e.data.text || '', false); }
         else if (e.type === 'assistant/think') { Cx.foldRow('思考', e.data.text || ''); }
         else if (e.type === 'assistant/attempt') {
