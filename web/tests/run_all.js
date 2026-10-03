@@ -100,6 +100,7 @@ const SELF_CONTAINED = [
   ['session_list_test.js', 'session list — keyed reuse of cards, not a whole-sidebar rebuild (PANEL-PLAN §2)'],
   ['events_param_contract_test.js', 'the event endpoint: `id=` honest, `job_id=` compatible, same events, missing names the spellings (§296)'],
   ['p64_env_class_test.js', 'P64: red is a property of the CODE, not the machine — spawns a gate with NODE_PATH removed and mutates it back (§343/§344)'],
+  ['failover_before_unpinning_test.js', 'ORDER GUARD: the pinned reasoning model may be removed only once the failover can carry the load — with the forbidden state as its mutation (§371)'],
   ['fork_entry_test.js', 'fork from a MIDDLE segment: every segment exposes a control, an early click moves the continuation target to that job, the last one equals continue (§360)'],
   ['session_addressable_test.js', 'any conversation is OPENABLE: with EMPTY local storage, clicking the second row makes the continuation target that row — and the first row gives a different one (§359)'],
   ['capability_source_test.js', 'M4⓪: the capability source is FILLED, NAMESPACED and three-state — a tag that merely exists is not a modality (§356)'],

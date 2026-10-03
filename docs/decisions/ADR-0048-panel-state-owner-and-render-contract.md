@@ -14988,3 +14988,36 @@ M4② 到今天为止:**逻辑层闭环**（`cargo test --lib` 96 passed,含 fai
 **端到端**:`tests/failover_e2e.rs` **2 passed**(含变异)⇒ **闭环** ✓
 两条**具名限制**仍在(§368.2):手动/分组选择不做转移 · `modality:` 过滤为**声明式空转**(归 Rhizax)。
 ```
+
+
+## 371. ✅ **M4③:顺序判据 `failover_before_unpinning`**（5 passed,含变异)
+
+### 371.1 它读的两个**锚点**（先核,后写)
+
+```
+· **钉死**:`Cellrix/web/tests/e2e_chain.sh:122`
+    `( cd "$WS/anaphase-helix" && env $(env_of) ANAPHASE_REASONING_MODEL="$CHAIN_MODEL" …`
+    ⇒ 链跑时**显式点名**一个模型（`anaphase-helix/src/config.rs:86` 是它的字段,`:435` 是 env 读取）;
+· **拐杖**:`FlowModus/flowmodus-rs/src/failover.rs` + `tests/failover_e2e.rs`,
+    且后者必须仍含**两条证明**(`a_dead_supplier_in_the_set_does_not_fail_the_request` ·
+    `an_exhausted_set_fails_by_name`)—— **文件在但证明没了 ≠ 就绪**。
+```
+
+### 371.2 规则与变异
+
+```
+规则:`pinned || failover_ready`
+  ⇒ **在 failover 就绪之前撤掉钉死 ⇒ 红**（那正是"死供应商让请求失败"的状态,也就是钉死一直在遮的事)。
+变异(自检):`rule(F,F)=false` · `rule(F,T)=true` · `rule(T,F)=true` ⇒ 判据**能区分禁止态**,
+  而不是仅仅断言今天的绿。
+三态律:launcher **读不到** ⇒ `NEEDS-INPUT`（**不是**"未钉死"）—— 猜测在这里被明确拒绝。
+```
+
+### 371.3 今天的真实状态（实测)
+
+```
+`pinned=true`（钉死仍在) · `failover_ready=true`（两件产物 + 两条证明都在)
+⇒ 规则绿是**因为两者都真**,而不是因为规则空洞。
+⇒ 下一步才是**真正的"撤"**:删掉 `e2e_chain.sh:122` 的 `ANAPHASE_REASONING_MODEL` 注入 ⇒
+   复跑 M4② 的端到端判据（`tests/failover_e2e.rs`）⇒ 仍绿 ⇒ 撤除才算完成。
+```
