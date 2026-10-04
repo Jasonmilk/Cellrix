@@ -192,8 +192,15 @@ check('`chat.js` reads the pointer as the ONLY resume target (§307)',
   'the sticky metadata slot must not come back');
 check('the four operations are present: new (✗) clears · choose sets · the reply ADVANCES',
   /Cx\.setRef\(null\)/.test(sources['session_list.js'] || '')
+  /* THE ADVANCE MARKER WAS ITSELF THE BUG (ADR-0048 §303, corrected). This check used to require the literal
+   * `Cx.setRef(j.period_id)` — a field the server NEVER sends (measured: the terminal line is
+   * `{"done":true,…,"job_id":"run-…"}`, and `period_id` appears zero times in `web/src/routes.rs`). The check
+   * therefore pinned the broken line: ANY fix for S303 had to turn it red. The INTENT stands — the reply
+   * advances the pointer and that write is visible from `chat.js` — so the marker now names the RESOLVED
+   * period and also demands the wiring call; deleting either half fails. */
     && /Cx\.setRef\(id[,)]/.test(sources['session_list.js'] || '')   /* the optional 2nd arg is the conversation (M1d) */
-    && /Cx\.setRef\(j\.period_id\)/.test(sources['chat.js'] || ''),
+      
+    && /advancePointer\(j, sentAnchor\)/.test(sources['chat.js'] || '') && /Cx\.setRef\(periodId[,)]/.test(sources['chat.js'] || ''),
   'new / continue / fork+advance');
 check('MUTATION: restoring the sticky slot would make these checks red (it is not a tautology)',
   !/__proveTrackMeta/.test(sources['chat.js'] || ''), 'chat.js carries no metadata slot');
