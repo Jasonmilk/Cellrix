@@ -380,6 +380,8 @@ const NEEDS_INPUT_EXIT = 3;
 /* HOISTED ABOVE THE LEGACY LIST (ADR-0048 §344.6): this loop runs BEFORE the file's later
  * initialisers, so `classify()` (which reads the register, the probe cache and the note map)
  * threw TDZ three times — a CRASH, not a red, and therefore no verdict at all. */
+const deferred = [], unknown = [];
+const HELD_PRINTED = new Set();
 const DEFERRALS = (function () {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'deferrals.json'), 'utf8')); }
   catch (e) { return null; }
@@ -399,7 +401,15 @@ for (const [file, what] of SELF_CONTAINED) {
        * phase, and printing here as well produced two HELD lines for one suite (measured:
        * `chain_e2e_test.js` appeared twice). Only an undeclared suite — which the register cannot name —
        * is printed from here. */
-      if (!declaredRequires(file)) {
+      /* COUNT IT AND PRINT IT IN THE SAME BREATH (owner order, 2026-10-04). MEASURED (Pi): this branch
+       * printed a HELD line but pushed only into `results`, so the verdict's `deferred.length` did NOT include
+       * the suite — "printed 7, counted 6", and the reason mattered because it gets cited. The dedupe set is
+       * shared with the register phase, so one suite = one line = one count. */
+      if (!deferred.some(function (d) { return d[0] === file; })) {
+        deferred.push([file, cl.kind, cl.why]);
+      }
+      if (!HELD_PRINTED.has(file)) {
+        HELD_PRINTED.add(file);
         console.log('  HELD  ' + file.padEnd(24) + '[requires] ' + cl.why + '  (legacy list — P64)');
       }
       results.push(['HELD', file, what]);
@@ -738,7 +748,6 @@ const DEFERRAL_INPUTS = (DEFERRALS.deferrals || []).map(function (d) {
   return d.id + '@' + (d.depends_on || '?') + '=' + inputSha(d.depends_on || '.');
 });
 
-const deferred = [], unknown = [];
 /* XPASS — the semantic of `test.failing()` / `xfail(strict=True)`: a registered
  * deferral that PASSES means the criterion became reachable again, so the entry
  * must be retired NOW. A DATE is a heuristic (expiring is not the same as
@@ -762,7 +771,9 @@ for (const d of (DEFERRALS.deferrals || [])) {
 for (const [file, why] of NEEDS_INPUT) {
   const c = classify(file);
   if (c.kind === 'unknown') { unknown.push([file, why, c.why]); }
-  else { deferred.push([file, c.kind, c.why]); }
+  else if (!deferred.some(function (d) { return d[0] === file; })) {
+    deferred.push([file, c.kind, c.why]);
+  }
 }
 
 /* Derived AFTER the loop populates `deferred`. Computing these earlier made every
@@ -803,7 +814,13 @@ for (const [status, file, what] of results) {
   console.log('  ' + status + '  ' + file.padEnd(24) + what);
 }
 for (const [file, kind, why] of heldAttempted) {
-  console.log('  HELD  ' + file.padEnd(24) + '[' + kind + '] ' + why);
+  /* ONE LINE PER SUITE (verdict = printed roster): the legacy branch prints through the same set, so a
+   * suite that both declares a capability and sits on the legacy list cannot appear twice (measured:
+   * `s303_continuation_test.js` printed twice before this guard). */
+  if (!HELD_PRINTED.has(file)) {
+    HELD_PRINTED.add(file);
+    console.log('  HELD  ' + file.padEnd(24) + '[' + kind + '] ' + why);
+  }
 }
 /* NEVER ATTEMPTED is not the same as ATTEMPTED BUT UNPROVEN — the first says
  * nothing about reachability, so it is the one that must carry an expiry. */
