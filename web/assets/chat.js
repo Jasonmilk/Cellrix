@@ -140,6 +140,77 @@
     return d;
   }
 
+  /* S303 / ADR-0048 §303: AFTER A SUCCESSFUL SEND THE POINTER MUST BECOME THE **NEW PERIOD**.
+   *
+   * WHY THE OBVIOUS FIX IS WRONG (all three links measured, not inferred):
+   *  · the terminal line carries `job_id` and NO `period_id`
+   *    — `{"done":true,…,"job_id":"run-843f646b0baa396f",…}`, and `period_id` appears zero times in
+   *    `web/src/routes.rs`;
+   *  · anaphase resolves `job_id` to a PERIOD (`resolve_one` + `is_period_id`, `main.rs:553`/`:569`) and its
+   *    own comment says "Unresolvable or ambiguous yields no parent" ⇒ feeding it a job digest yields
+   *    `resume_period = None` ⇒ `parent: null`;
+   *  · MEASURED live: two sends in a row produced TWO different job ids — i.e. a brand-new conversation each
+   *    time, the silent behaviour the pin was hiding.
+   *
+   * OWNER RULING (2026-10-04, option A): re-read the period list and locate the new period BY LINEAGE, so no
+   * backend contract is touched during the P1 churn. FOUR GUARDRAILS, each visible below:
+   *   1. bounded retry 3 × 2s; on timeout the pointer KEEPS ITS OLD VALUE and the miss is RECORDED
+   *      (`Cx.state.s303`) — a silent null is exactly what this fix exists to remove;
+   *   2. DUAL KEY — `job_id === j.job_id` AND `parent === the anchor that was sent`; several hits are an
+   *      ANOMALY, reported, and the highest `-p` serial wins;
+   *   3. NO "newest period" fallback anywhere: taking the newest is precisely the regression mutation ③ catches;
+   *   4. duplicates are reported, never silently broken as a tie. */
+  var S303_ATTEMPTS = 3;
+  var S303_DELAY_MS = 2000;
+  function periodSerial(pid) {
+    var m = String(pid).match(/-p([0-9a-fA-F]+)$/);
+    return m ? parseInt(m[1], 16) : -1;
+  }
+  function noteS303(state) { Cx.state.s303 = state; }
+  function advancePointer(j, sentAnchor) {
+    var anchor = sentAnchor || null;
+    var attempt = 0;
+    function tryOnce() {
+      attempt++;
+      return fetch('/api/sessions?limit=50')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var rows = (d && d.periods) || [];
+          var hits = rows.filter(function (p) {
+            return p.job_id === j.job_id && (p.parent || null) === anchor;
+          });
+          if (hits.length > 1) {
+            /* GUARDRAIL 4: a duplicate is an anomaly to REPORT, not a tie to break in silence. */
+            console.warn('[S303] ' + hits.length + ' periods matched job_id+parent; taking the highest -p serial');
+          }
+          if (!hits.length) {
+            if (attempt <= S303_ATTEMPTS) {
+              return new Promise(function (res) { setTimeout(res, S303_DELAY_MS); }).then(tryOnce);
+            }
+            /* GUARDRAIL 1 + 3: keep the old value, RECORD the miss, never invent a target. */
+            noteS303({ resolved: false, reason: 'no period matched job_id+parent',
+                       attempts: attempt, job_id: j.job_id, sent_parent: anchor, at: Date.now() });
+            return null;
+          }
+          hits.sort(function (a, b) { return periodSerial(b.period_id) - periodSerial(a.period_id); });
+          var target = hits[0].period_id;
+          Cx.setNav({ period: target });
+          if (typeof Cx.setRef === 'function') { Cx.setRef(target, j.conversation_id || null); }
+          noteS303({ resolved: true, period_id: target, matched: hits.length,
+                     job_id: j.job_id, sent_parent: anchor, at: Date.now() });
+          return target;
+        })
+        /* GUARDRAIL 1 ALSO COVERS ERRORS (measured need: a rejected re-read was invisible — the pointer stayed
+         * null and nothing said why). An exception is a NAMED miss here, never a silent one. */
+        .catch(function (err) {
+          noteS303({ resolved: false, reason: 're-read failed: ' + (err && err.message ? err.message : String(err)),
+                     attempts: attempt, job_id: j.job_id, sent_parent: anchor, at: Date.now() });
+          return null;
+        });
+    }
+    return tryOnce();
+  }
+
   function sendChat() {
     var input = document.getElementById('chat-text');
     var text = input.value.trim();
@@ -259,8 +330,16 @@
               /* THE POINTER ADVANCES WHEN THE REPLY LANDS (ADR-0048 §307): one of the four ref
                * operations (new / continue / fork / advance). It is not a guess about intent — the
                * conversation that just answered IS where the next message attaches. */
-              if (j.period_id || j.job_id) Cx.setNav({ period: j.period_id || j.job_id });
-              if (typeof Cx.setRef === 'function' && j.period_id) { Cx.setRef(j.period_id); }
+              /* ONE IDENTIFIER FOR **BOTH** (ADR-0048 §303). MEASURED on the live panel: the terminal line is
+               * `{"done":true,…,"job_id":"run-843f646b0baa396f",…,"reply":"…"}` — it carries `job_id` and
+               * NO `period_id` (`period_id` appears zero times in `web/src/routes.rs`). The nav had the
+               * fallback and the POINTER did not, so the pointer never advanced: every message became a new
+               * experience and "continue this conversation" was impossible. Nav and pointer now use the SAME
+               * rule, so they cannot disagree about which conversation is current. */
+              /* S303 (ADR-0048 §303, owner ruling A): locate the NEW PERIOD by lineage. The response carries
+               * only `job_id`, and a job digest is not a lineage anchor (measured: it yields `parent: null`),
+               * so the pointer is resolved from the period list with the FOUR GUARDRAILS documented above. */
+              advancePointer(j, sentAnchor);
               finish(); return;
             }
           }
