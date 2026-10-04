@@ -811,6 +811,12 @@ const heldNever = deferred.filter(function (r) { return EXECUTED.indexOf(r[0]) =
 
 console.log('regression net');
 for (const [status, file, what] of results) {
+  /* ONE LINE PER SUITE, ACROSS **ALL THREE** PRINT SITES (owner order 2026-10-04; Pi measured the count right
+   * but the roster long): the classification line and the `heldAttempted` loop already share `HELD_PRINTED`,
+   * while this loop printed unconditionally — so `s303_continuation_test.js` appeared once here AND once
+   * there. A HELD row whose suite was already named is skipped; the others are named here and marked. */
+  if (status === 'HELD' && HELD_PRINTED.has(file)) { continue; }
+  if (status === 'HELD') { HELD_PRINTED.add(file); }
   console.log('  ' + status + '  ' + file.padEnd(24) + what);
 }
 for (const [file, kind, why] of heldAttempted) {
