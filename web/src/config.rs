@@ -1,11 +1,11 @@
 //! Panel configuration: argv → env → protocol defaults.
 //!
 //! Zero-hardcoding: endpoint defaults are the documented protocol defaults
-//! (ADR-0010 / Tuck gateway); `--tuck-limit` default 200 matches the CLI
+//! (**anaphase:ADR-0010** / Tuck gateway); `--tuck-limit` default 200 matches the CLI
 //! contract; unset tuck -> ProveTrack shows a setup hint.
 
 
-/// Anaphase cap_http protocol default (ADR-0010).
+/// Anaphase cap_http protocol default (**anaphase:ADR-0010**).
 pub const ANAPHASE_ENDPOINT_DEFAULT: &str = "http://127.0.0.1:50061";
 
 /// FlowModus supplier pool / router protocol default — the port its own

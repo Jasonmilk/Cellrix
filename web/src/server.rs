@@ -1,9 +1,9 @@
 //! HTTP serving layer: route → proxy the truth sources (Anaphase / Tuck),
 //! one std-only listener. The browser is never given credentials — Bearer
-//! injection happens here (proxy pattern, ADR-0010/0014).
+//! injection happens here (proxy pattern: **Cellrix:ADR-0014** = web-panel; **anaphase:ADR-0010** = the snapshot/transport contract it proxies).
 //!
 //! Two projections of one truth: the **Cockpit** view (Anaphase
-//! `/v1/agent/snapshot`, ADR-0010) and the **ProveTrack** imprint view (Tuck
+//! `/v1/agent/snapshot`, **anaphase:ADR-0010**) and the **ProveTrack** imprint view (Tuck
 //! `/v1/audit` chain). The browser renders the *same data model* the TUI
 //! shows, so the silicon and carbon sides read the same picture with no
 //! ambiguity (TUI=Web isomorphic projection).
@@ -106,7 +106,7 @@ pub fn handle(
     Ok(())
 }
 
-/// Anaphase snapshot protocol path (ADR-0010 contract): the panel's
+/// Anaphase snapshot protocol path (**anaphase:ADR-0010** contract): the panel's
 /// `--anaphase-endpoint` is the cap_http host:port; this path is fixed.
 pub const SNAPSHOT_PATH: &str = "/v1/agent/snapshot";
 
