@@ -160,51 +160,74 @@
    *      ANOMALY, reported, and the highest `-p` serial wins;
    *   3. NO "newest period" fallback anywhere: taking the newest is precisely the regression mutation ③ catches;
    *   4. duplicates are reported, never silently broken as a tie. */
-  var S303_ATTEMPTS = 3;
+  /* THREE RETRIES AFTER THE FIRST READ (owner guardrail 1: "3 次 × 2s"): 1 initial + 3 retries = 4 calls. */
+  var S303_RETRIES = 3;
   var S303_DELAY_MS = 2000;
   function periodSerial(pid) {
     var m = String(pid).match(/-p([0-9a-fA-F]+)$/);
     return m ? parseInt(m[1], 16) : -1;
   }
   function noteS303(state) { Cx.state.s303 = state; }
-  function advancePointer(j, sentAnchor) {
+  function s303dbg() {
+    /* DEBUG-GATED (owner requirement): silent unless the harness sets window.CX_S303_DEBUG, so production
+     * carries no chatter. It exists because a SYNCHRONOUS throw here would be swallowed by the pump chain and
+     * look exactly like "the branch never ran" — the two must be distinguishable. */
+    try { if (typeof window !== 'undefined' && window.CX_S303_DEBUG) { console.log.apply(console, ['[S303]'].concat([].slice.call(arguments))); } } catch (e) {}
+  }
+  /* THE TRANSPORT IS INJECTABLE (ADR-0048 §303, owner ruling 5). The rule below — dual key, bounded retry,
+   * no "newest" fallback — is pure decision logic, so it must be judgeable WITHOUT a panel, a chain or a
+   * browser. `deps` carries the four effects (read the list, move the pointer, record the verdict, warn);
+   * every field defaults to the real one, so callers pass nothing. */
+  function defaultS303Deps() {
+    return {
+      fetchJson: function (url) { return fetch(url).then(function (r) { return r.json(); }); },
+      setPointer: function (periodId, conversationId) {
+        Cx.setNav({ period: periodId });
+        if (typeof Cx.setRef === 'function') { Cx.setRef(periodId, conversationId || null); }
+      },
+      note: noteS303,
+      warn: function (msg) { try { console.warn(msg); } catch (e) {} }
+    };
+  }
+  function advancePointer(j, sentAnchor, deps) {
+    var d = deps || defaultS303Deps();
+    s303dbg('enter', 'job_id=' + j.job_id, 'sentAnchor=' + String(sentAnchor));
     var anchor = sentAnchor || null;
     var attempt = 0;
     function tryOnce() {
       attempt++;
-      return fetch('/api/sessions?limit=50')
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          var rows = (d && d.periods) || [];
+      return d.fetchJson('/api/sessions?limit=50')
+        .then(function (payload) {
+          var rows = (payload && payload.periods) || [];
           var hits = rows.filter(function (p) {
             return p.job_id === j.job_id && (p.parent || null) === anchor;
           });
           if (hits.length > 1) {
             /* GUARDRAIL 4: a duplicate is an anomaly to REPORT, not a tie to break in silence. */
-            console.warn('[S303] ' + hits.length + ' periods matched job_id+parent; taking the highest -p serial');
+            d.warn('[S303] ' + hits.length + ' periods matched job_id+parent; taking the highest -p serial');
           }
           if (!hits.length) {
-            if (attempt <= S303_ATTEMPTS) {
+            if (attempt <= S303_RETRIES) {
               return new Promise(function (res) { setTimeout(res, S303_DELAY_MS); }).then(tryOnce);
             }
             /* GUARDRAIL 1 + 3: keep the old value, RECORD the miss, never invent a target. */
-            noteS303({ resolved: false, reason: 'no period matched job_id+parent',
-                       attempts: attempt, job_id: j.job_id, sent_parent: anchor, at: Date.now() });
+            d.note({ resolved: false, reason: 'no period matched job_id+parent',
+                     attempts: attempt, job_id: j.job_id, sent_parent: anchor, at: Date.now() });
             return null;
           }
+          s303dbg('rows=' + rows.length, 'hits=' + hits.length, 'anchor=' + String(anchor));
           hits.sort(function (a, b) { return periodSerial(b.period_id) - periodSerial(a.period_id); });
           var target = hits[0].period_id;
-          Cx.setNav({ period: target });
-          if (typeof Cx.setRef === 'function') { Cx.setRef(target, j.conversation_id || null); }
-          noteS303({ resolved: true, period_id: target, matched: hits.length,
-                     job_id: j.job_id, sent_parent: anchor, at: Date.now() });
+          d.setPointer(target, j.conversation_id || null);
+          d.note({ resolved: true, period_id: target, matched: hits.length,
+                   job_id: j.job_id, sent_parent: anchor, at: Date.now() });
           return target;
         })
         /* GUARDRAIL 1 ALSO COVERS ERRORS (measured need: a rejected re-read was invisible — the pointer stayed
          * null and nothing said why). An exception is a NAMED miss here, never a silent one. */
         .catch(function (err) {
-          noteS303({ resolved: false, reason: 're-read failed: ' + (err && err.message ? err.message : String(err)),
-                     attempts: attempt, job_id: j.job_id, sent_parent: anchor, at: Date.now() });
+          d.note({ resolved: false, reason: 're-read failed: ' + (err && err.message ? err.message : String(err)),
+                   attempts: attempt, job_id: j.job_id, sent_parent: anchor, at: Date.now() });
           return null;
         });
     }
@@ -299,6 +322,7 @@
               msgs().scrollTop = msgs().scrollHeight;
             }
             if (j.done) {
+              s303dbg('done-branch reached', 'job_id=' + String(j.job_id), 'sentAnchor=' + String(sentAnchor));
               if (!bodyEl) bodyEl = addStreamMsg();
               // reply is the authoritative full text — overwrite the
               // typewriter accumulation so a dropped delta can never leave
@@ -384,6 +408,8 @@
 
   // Inline `onclick` attributes resolve against the global scope.
   window.sendChat = sendChat;
+  /* The injectable seam, exported so its RULE can be judged without a browser (owner ruling 5). */
+  window.CxAdvancePointer = advancePointer;
   Cx.addMsg = addMsg;
   Cx.addReplyMsg = addReplyMsg;
   Cx.foldRow = foldRow;

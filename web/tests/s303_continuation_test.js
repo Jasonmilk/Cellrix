@@ -17,6 +17,11 @@
  *
  * Usage: node s303_continuation_test.js          (needs the live panel; ~4 real sends)
  */
+/* REQUIRES='cdp-browser' — this layer can only be judged in a real browser: measured, under this jsdom+Node
+ * harness the streaming terminal line never reaches the page's `j.done` branch (the debug gate produced
+ * NOTHING while the request itself went out). Per P64 it is HELD here, never red, and is the 5th member of
+ * the cdp family. The rule itself is pinned by s303_advance_unit_test.js; the chain by s303_http_e2e_test.js. */
+const REQUIRES = 'cdp-browser';
 'use strict';
 const { JSDOM, VirtualConsole } = require('jsdom');
 const PANEL = process.env.CX_PANEL || 'http://127.0.0.1:50050';
@@ -38,10 +43,20 @@ const isPeriod = (v) => typeof v === 'string' && /-p[0-9a-fA-F]+$/.test(v);
       try { w.localStorage.clear(); } catch (e) {}
       const real = fetch;
       w.__calls = [];
+      /* HARNESS NOTE (measured): with `Accept: text/event-stream` the server holds an SSE stream open, and this
+       * jsdom+Node-fetch harness never saw the terminal line — the page's own `[S303]` debug produced NOTHING
+       * while the request itself went out (captured on the wire). Asking for JSON exercises the SAME client
+       * code path (the pump parses one line and takes `j.done`) without depending on stream delivery here. */
       w.fetch = function (u, o) {
         var url = String(u);
         w.__calls.push(((o && o.method) || 'GET') + ' ' + url);
-        return real(new URL(url, PANEL + '/'), o);
+        var opts = o;
+        if (o && o.headers) {
+          var h = Object.assign({}, o.headers);
+          if (h.Accept) { h.Accept = 'application/json'; }
+          opts = Object.assign({}, o, { headers: h });
+        }
+        return real(new URL(url, PANEL + '/'), opts);
       };
     }
   });
