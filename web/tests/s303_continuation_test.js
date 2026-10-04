@@ -33,7 +33,7 @@ function ok(n, c, d) { if (c) { pass++; console.log('  ok   ' + n + (d ? '  [' +
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isPeriod = (v) => typeof v === 'string' && /-p[0-9a-fA-F]+$/.test(v);
 
-(async function main() {
+async function main() {
   let html;
   try { html = await (await fetch(PANEL + '/')).text(); } catch (e) { console.log('NEEDS-INPUT: panel unreachable'); process.exit(3); }
   const vc = new VirtualConsole();
@@ -142,4 +142,24 @@ const isPeriod = (v) => typeof v === 'string' && /-p[0-9a-fA-F]+$/.test(v);
 
   console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
   process.exit(fail ? 1 : 0);
+}
+
+/* ── SELF-GUARD (contract fix 2026-10-04, Pi's finding) ────────────────────────────────────────────────
+ * THIS FILE DECLARES `REQUIRES='cdp-browser'`, so when the browser is absent it must SAY SO and exit 3.
+ * It used to do the opposite: it drove the LIVE panel, sent ~4 real messages and exited 1 (6 red) — i.e.
+ * "declared HELD, behaved red", with REAL side effects (periods written by a suite that proves nothing).
+ * The probe mirrors `run_all.js`'s own cdp probe (fetch `$CELLRIX_CDP/json/version`, 1.5s timeout) so the
+ * suite and the runner cannot disagree about what "absent" means. Beyond this point — when cdp is absent —
+ * there is NO panel interaction and NO send. Real-browser adjudication is left to the day cdp is enabled. */
+const CDP_URL = process.env.CELLRIX_CDP || 'http://127.0.0.1:9222';
+(async function guard() {
+  try {
+    const r = await fetch(CDP_URL.replace(/\/$/, '') + '/json/version', { signal: AbortSignal.timeout(1500) });
+    if (!r.ok) { throw new Error('HTTP ' + r.status); }
+  } catch (e) {
+    console.log("NEEDS-INPUT: REQUIRES='cdp-browser' is absent (" + CDP_URL + " → " + e.message
+      + ") — the three DAG v4.2 criteria need a real browser; nothing was sent to the panel.");
+    process.exit(3);
+  }
+  main();
 })();
