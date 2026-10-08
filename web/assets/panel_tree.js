@@ -291,6 +291,45 @@
         tag.textContent = isStart ? ' · 起点(仅此一轮)' : ' · 最新(点它看整段)';
         row.appendChild(tag);
       }
+      /* ── ADR-0049 只读投影（人类 2026-10-09）─────────────────────────────────
+       * 活动区 / 沉淀区 / 被驳回支线。**碳硅同构（Cellrix:ADR-0021）**：每个可见元素
+       * 必须可被 AI 寻址 —— 所以每块都带 `data-role`，流水账**逐行**带
+       * `data-action|when|who`。纯装饰对 ta 不存在，那就不该画。
+       * **render 纯**：只读 `n.row` 的字段，**不碰 Date.now()/Math.random()** ——
+       * 同一 state 渲染两次必须逐字节相同，否则 AI 指不稳镜子里那一块。 */
+      var pr = n.row || {};
+      var stEl = doc.createElement('span');
+      stEl.className = 'pt-st';
+      stEl.setAttribute('data-role', 'converge-status');
+      stEl.setAttribute('data-status', pr.status || 'derived');
+      stEl.textContent = pr.status || '按龄期';
+      row.appendChild(stEl);
+      if (pr.gist) {
+        var gEl = doc.createElement('div');
+        gEl.className = 'pt-gist';
+        gEl.setAttribute('data-role', 'gist');
+        gEl.textContent = pr.gist;
+        row.appendChild(gEl);
+      }
+      if (pr.rejection_log && pr.rejection_log.length) {
+        /* **整本流水账**，不是当前状态 —— 反悔不是擦除；面板只显示当前状态
+         * 就等于**替用户把历史擦了**（人类 2026-10-09）。 */
+        var ul = doc.createElement('ul');
+        ul.className = 'pt-rej';
+        ul.setAttribute('data-role', 'rejection-ledger');
+        ul.setAttribute('data-current', pr.rejected ? 'rejected' : 'revoked');
+        for (var li = 0; li < pr.rejection_log.length; li++) {
+          var q = String(pr.rejection_log[li]).split(' | ');
+          var item = doc.createElement('li');
+          item.setAttribute('data-action', q[2] || '');
+          item.setAttribute('data-when', q[0] || '');
+          item.setAttribute('data-who', q[1] || '');
+          item.textContent = (q[2] || '') + '（' + (q[0] || '') + ' / ' + (q[1] || '') + '）'
+            + q.slice(3).join(' | ');
+          ul.appendChild(item);
+        }
+        row.appendChild(ul);
+      }
       row.addEventListener('click', function () {
         selectOne(id);
         /* The prove-track view has its own gesture so the PRIMARY click can stay "continue this

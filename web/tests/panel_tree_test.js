@@ -39,6 +39,69 @@ ok(t.byId.a.children.join(',') === 'b,c', 'the fork has two children (a ⇒ b,c)
 ok(t.byId.x.truncated === 'ghost',
   'a parent outside the list is a TRUNCATED walk, not a second root (declared)');
 
+/* ── ADR-0049 只读投影 / 目标 2+3 ── **不需要 jsdom 的渲染断言**（人类 2026-10-09）
+ * 原定落点 all_views_test.js 在本机**不执行**：jsdom 未安装 ⇒ 那个族只肯打印
+ * NEEDS-INPUT 并 exit 3（本文件下面自己重复了三处）。写在那里 = 写一条**永不运行**的测试。
+ * 所以这里手写最小 DOM stub，断言落在 **stub 上的渲染输出** —— 不是落在"我写的那个函数"上
+ * （第 7 条陷阱：测错对象）。 */
+function stubDoc() {
+  function el(tag) {
+    return {
+      tagName: tag, children: [], attrs: {}, _text: '', className: '', style: {},
+      setAttribute(k, v) { this.attrs[k] = String(v); },
+      getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
+      appendChild(c) { this.children.push(c); return c; },
+      removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) { this.children.splice(i, 1); } return c; },
+      insertBefore(c) { this.children.unshift(c); return c; },
+      addEventListener() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      get textContent() { return this._text; },
+      set textContent(v) { this._text = String(v); this.children.length = 0; }
+    };
+  }
+  const d = { createElement: el, createTextNode(t) { return { _text: String(t), children: [] }; } };
+  d.ownerDocument = d;
+  return d;
+}
+function serialize(node, out) {
+  out = out || [];
+  if (!node) { return out; }
+  const a = node.attrs
+    ? Object.keys(node.attrs).sort().map((k) => k + '=' + node.attrs[k]).join(';') : '';
+  out.push((node.tagName || '') + '[' + a + ']' + (node._text || ''));
+  (node.children || []).forEach((c) => serialize(c, out));
+  return out;
+}
+const PROJECTED = [{
+  period_id: 'p1', parent: null, name: 'A', status: 'converged', gist: '沉底摘要',
+  rejected: false,
+  rejection_log: ['2026-10-09T00:00:00Z | human | reject | 因为X，所以不吸收',
+                  '2026-10-09T03:00:00Z | human | revoke | 因为Y，所以撤销']
+}];
+const h1 = stubDoc(); const host1 = h1.createElement('div'); host1.ownerDocument = h1;
+PT.render(host1, PROJECTED, {});
+const h2 = stubDoc(); const host2 = h2.createElement('div'); host2.ownerDocument = h2;
+PT.render(host2, PROJECTED, {});
+const s1 = serialize(host1).join('\n');
+const s2 = serialize(host2).join('\n');
+
+/* 目标 3 —— render 纯。变异：渲染里注入 Date.now()/Math.random() ⇒ 这条红。 */
+ok(s1 === s2, 'PURE: 同一 state 渲染两次 ⇒ 输出逐字节相同（目标 3）');
+/* 目标 1 —— 碳硅同构：人类看到几块，AI 就能指到几块。 */
+ok(s1.indexOf('data-role=converge-status') >= 0 && s1.indexOf('data-status=converged') >= 0,
+  'ADDRESSABLE: 收敛状态块（data-role + data-status）');
+ok(s1.indexOf('data-role=gist') >= 0 && s1.indexOf('沉底摘要') >= 0,
+  'ADDRESSABLE: 沉淀区 gist');
+ok(s1.indexOf('data-role=rejection-ledger') >= 0 && s1.indexOf('data-current=revoked') >= 0,
+  'ADDRESSABLE: 被驳回支线 + 当前态（最后一行 = revoke ⇒ revoked）');
+const ledgerLines = (s1.match(/data-action=(reject|revoke)/g) || []).length;
+ok(ledgerLines === 2,
+  'LEDGER: 整本流水账逐行可寻址（' + ledgerLines + ' 行）—— 面板不得替用户把历史擦了');
+ok(s1.indexOf('data-when=2026-10-09T00:00:00Z') >= 0 && s1.indexOf('data-who=human') >= 0,
+  'LEDGER: 每行带 when/who');
+
+
 const cl = PT.ancestorClosure(t, 'd');
 ok(cl.path.join('>') === 'r>a>c>d', 'ancestor closure is the single root path, root-first  [' + cl.path.join('>') + ']');
 ok(cl.truncated === null && cl.cycle === false, 'and it is neither truncated nor cyclic');
@@ -69,6 +132,14 @@ ok(PT.modeFacts('Nonsense').kind === 'undeclared', 'a made-up mode is undeclared
 const broken = PT.buildTree(PERIODS.concat([{ period_id: 'z', parent: null }]));
 ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   'MUTATION scope: adding a root changes roots, not edges — so the edge equality is about parents');
+/* 纯段（上面的全部断言）**不需要 jsdom**，所以它的失败必须**以失败的身份出场**：
+ * 否则文件会在下面因 jsdom 缺失而 `exit 3`（NEEDS-INPUT），把纯段的红**吞成"没跑"** ——
+ * 正是 GROWTH 第 10 条（检查会静默吞行）。jsdom 缺失是**环境**事实，不是**这条**的红。 */
+if (bad) {
+  console.log('\nPURE SECTION FAILED: ' + bad + ' assertion(s) — 这不是 NEEDS-INPUT，是 FAIL');
+  process.exit(1);
+}
+
 
 /* ── DOM: overview first, details ON DEMAND (§227 / Shneiderman) ── */
 {
