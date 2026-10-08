@@ -291,12 +291,15 @@
         tag.textContent = isStart ? ' · 起点(仅此一轮)' : ' · 最新(点它看整段)';
         row.appendChild(tag);
       }
-      /* ── ADR-0049 只读投影（人类 2026-10-09）─────────────────────────────────
-       * 活动区 / 沉淀区 / 被驳回支线。**碳硅同构（Cellrix:ADR-0021）**：每个可见元素
-       * 必须可被 AI 寻址 —— 所以每块都带 `data-role`，流水账**逐行**带
-       * `data-action|when|who`。纯装饰对 ta 不存在，那就不该画。
-       * **render 纯**：只读 `n.row` 的字段，**不碰 Date.now()/Math.random()** ——
-       * 同一 state 渲染两次必须逐字节相同，否则 AI 指不稳镜子里那一块。 */
+      /* ADR-0049 read-only projection (human, 2026-10-09): active zone / sediment zone /
+       * rejected branch. CARBON-SILICON ISOMORPHISM (Cellrix:ADR-0021) — every visible element
+       * must be addressable by the AI, so each block carries `data-role` and every ledger line
+       * carries `data-action|when|who`. An element that is purely decorative does not exist for
+       * the AI, so it must not be drawn.
+       * RENDER PURITY: this reads only `n.row`'s fields and never Date.now()/Math.random() —
+       * the same state rendered twice must be byte-identical, or the AI cannot point at the same
+       * block in the mirror twice. */
+
       var pr = n.row || {};
       var stEl = doc.createElement('span');
       stEl.className = 'pt-st';
@@ -312,8 +315,10 @@
         row.appendChild(gEl);
       }
       if (pr.rejection_log && pr.rejection_log.length) {
-        /* **整本流水账**，不是当前状态 —— 反悔不是擦除；面板只显示当前状态
-         * 就等于**替用户把历史擦了**（人类 2026-10-09）。 */
+        /* THE WHOLE LEDGER, not the current state: a reversal is not an erasure, and a panel
+         * showing only the current state erases the history on the user's behalf
+         * (human, 2026-10-09). */
+
         var ul = doc.createElement('ul');
         ul.className = 'pt-rej';
         ul.setAttribute('data-role', 'rejection-ledger');

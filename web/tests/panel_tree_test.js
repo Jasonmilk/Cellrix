@@ -39,11 +39,12 @@ ok(t.byId.a.children.join(',') === 'b,c', 'the fork has two children (a ⇒ b,c)
 ok(t.byId.x.truncated === 'ghost',
   'a parent outside the list is a TRUNCATED walk, not a second root (declared)');
 
-/* ── ADR-0049 只读投影 / 目标 2+3 ── **不需要 jsdom 的渲染断言**（人类 2026-10-09）
- * 原定落点 all_views_test.js 在本机**不执行**：jsdom 未安装 ⇒ 那个族只肯打印
- * NEEDS-INPUT 并 exit 3（本文件下面自己重复了三处）。写在那里 = 写一条**永不运行**的测试。
- * 所以这里手写最小 DOM stub，断言落在 **stub 上的渲染输出** —— 不是落在"我写的那个函数"上
- * （第 7 条陷阱：测错对象）。 */
+/* ADR-0049 read-only projection / targets 2+3 — RENDER ASSERTIONS THAT NEED NO jsdom
+ * (human, 2026-10-09).
+ * The intended home, all_views_test.js, does not execute here: without jsdom that family only
+ * prints NEEDS-INPUT and exits 3 (this file repeats that three times below). Writing the
+ * assertions there would produce a test that NEVER RUNS. So this hand-rolled minimal DOM stub
+ * keeps the assertions on the RENDER OUTPUT, not on "the function I wrote" (trap 7). */
 function stubDoc() {
   function el(tag) {
     return {
@@ -132,9 +133,10 @@ ok(PT.modeFacts('Nonsense').kind === 'undeclared', 'a made-up mode is undeclared
 const broken = PT.buildTree(PERIODS.concat([{ period_id: 'z', parent: null }]));
 ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   'MUTATION scope: adding a root changes roots, not edges — so the edge equality is about parents');
-/* 纯段（上面的全部断言）**不需要 jsdom**，所以它的失败必须**以失败的身份出场**：
- * 否则文件会在下面因 jsdom 缺失而 `exit 3`（NEEDS-INPUT），把纯段的红**吞成"没跑"** ——
- * 正是 GROWTH 第 10 条（检查会静默吞行）。jsdom 缺失是**环境**事实，不是**这条**的红。 */
+/* The pure section above needs no jsdom, so its failure must appear AS A FAILURE: otherwise the
+ * file exits 3 below for missing jsdom (NEEDS-INPUT) and swallows a pure-section red as "did not
+ * run" — GROWTH trap 10 (a checker silently swallowing a line). A missing jsdom is an ENVIRONMENT
+ * fact, not this section's red. */
 if (bad) {
   console.log('\nPURE SECTION FAILED: ' + bad + ' assertion(s) — 这不是 NEEDS-INPUT，是 FAIL');
   process.exit(1);
