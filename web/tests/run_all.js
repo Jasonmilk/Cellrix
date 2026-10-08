@@ -550,8 +550,15 @@ function panelUrl() {
 function probeOk(name) {
   if (Object.prototype.hasOwnProperty.call(PROBE_CACHE, name)) { return PROBE_CACHE[name]; }
   if (name === 'jsdom') {
-    let okJsdom = false;
-    try { require.resolve('jsdom'); okJsdom = true; } catch (e) { okJsdom = false; }
+    /* THE SIMULATION SEAM IS EXPLICIT, NOT `NODE_PATH` (2026-10-09). `CX_NO_JSDOM` exists so a gate
+     * can ask "what does this repo look like WITHOUT the capability?" — P64's whole point. It used to
+     * be simulated by deleting `NODE_PATH`, which stopped working the moment jsdom could be installed
+     * LOCALLY (`web/tests/node_modules`): Node resolves a bare require from the REQUIRING FILE's
+     * directory, so no amount of `NODE_PATH` scrubbing removes it, and P64's simulation silently
+     * became a no-op (`0 suite(s) held`). A correct repair that breaks the simulation is a real
+     * finding: the seam, not the dependency, was wrong. */
+    let okJsdom = !process.env.CX_NO_JSDOM;
+    if (okJsdom) { try { require.resolve('jsdom'); } catch (e) { okJsdom = false; } }
     PROBE_CACHE[name] = okJsdom;
     return okJsdom;
   }
@@ -986,7 +993,10 @@ console.log(failed === 0
         var names = ['Helix-Mind', 'Anaphase-Helix', 'FlowModus'];
         return names.filter(function (n) { return fsx.existsSync(px.join(root, n)); }).length + '/' + names.length;
       })()
-    + ' jsdom=' + (function () { try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })()
+    + ' jsdom=' + (function () {
+        if (process.env.CX_NO_JSDOM) { return 'no (simulated)'; }
+        try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; }
+      })()
     + ']'
     + (abortedRoster.length ? ', ' + abortedRoster.length + ' ABORTED (not red)' : '')
     + (envMissingRoster.length ? ', ' + envMissingRoster.length + ' env-missing (not red)' : '')

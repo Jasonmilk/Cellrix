@@ -78,6 +78,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 return Ok(());
             }
+            /* LOUD AND NAMED (2026-10-09). The port is a shared resource and the occupant is
+             * someone else's process: "Address already in use" alone sends the reader hunting, and a
+             * banner printed just above it can read as "it started". So: say which port, say that a
+             * FOREIGN process holds it, and try to name that process. `lsof` is best-effort — absence
+             * of a name must not become absence of a failure. */
+            eprintln!("cellrix-web: FAILED TO START — port {port} is held by another process.");
+            eprintln!("             (this is not the panel; the panel is not running)");
+            if let Ok(out) = std::process::Command::new("lsof")
+                .args(["-nP", &format!("-iTCP:{port}"), "-sTCP:LISTEN"])
+                .output()
+            {
+                let listed = String::from_utf8_lossy(&out.stdout);
+                let lines: Vec<&str> = listed.lines().skip(1).take(3).collect();
+                if lines.is_empty() {
+                    eprintln!("             occupant: (lsof found none — the port may have just been freed)");
+                } else {
+                    eprintln!("             occupant:");
+                    for l in lines {
+                        eprintln!("               {l}");
+                    }
+                }
+            }
+            eprintln!("             fix: choose a free port, e.g. --port 18932");
             return Err(e.into());
         }
     };
