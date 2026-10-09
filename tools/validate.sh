@@ -5,6 +5,7 @@ set -uo pipefail
 # 除路径前缀外，本脚本与 template/tools/validate.sh 一致 —— 只有一处行为补充，见下方"零闸门"。
 mode=check; target=""; only_timing=""
 case "${1:-}" in
+  --probe-all) mode=probe; target="";;
   --probe) mode=probe; target="$2";;
   --timing) only_timing="$2";;
   --override) printf '{"ts":"%s","gate_id":"%s","verdict":"block","override":true,"source":"cli","event_id":"manual","note":"%s"}\n' "$(TZ=CST-8 date +%Y-%m-%dT%H:%M:%S%z)" "$2" "${4:-无理由}" >> ledger/hits-2026.jsonl; echo "override 已留痕"; exit 0;;
@@ -35,17 +36,42 @@ if [ "$NG" = 0 ]; then
   exit 2
 fi
 
-if [ "$mode" = probe ]; then
-  F=$(glob_first "$target")
-  [ -f "$F" ] || { echo "  [B] 拓扑失配: $F 不存在" >&2; exit 2; }
-  fx="fixtures/$target/inject.sh"
-  [ -f "$fx" ] || { echo "  [A] 缺 fixture inject.sh" >&2; exit 2; }
+# ---- 变异测试的闭环：注入 → 检查 → **记录** → 还原 ------------------------------
+# 缺"记录"就不算闭环：一次探针跑完不留痕，等于"我没跑过它也说得通"。
+# 承 template/ledger/README.md 的 schema（kind: probe 是模板已定义的类别）。
+rec(){ # rec <gate_id> <verdict> <note>
+  [ -d ledger ] || return 0
+  printf '{"ts":"%s","gate_id":"%s","verdict":"%s","override":false,"source":"probe","event_id":"probe-%s-%s","kind":"probe","note":"%s"}\n' \
+    "$(TZ=CST-8 date +%Y-%m-%dT%H:%M:%S%z)" "$1" "$2" "$1" "$(date +%s)-$$-$RANDOM" "$3" >> ledger/hits-2026.jsonl
+}
+probe_one(){ # probe_one <gate-id> => 0 RED（闸门活着）· 2 腐化/拓扑失配
+  local id="$1" F fx out
+  F=$(glob_first "$id")
+  if [ ! -f "$F" ]; then echo "  [B] 拓扑失配: $F 不存在（applies-to 展开后无可检对象）" >&2
+    rec "$id" block "topology-mismatch: $F"; return 2; fi
+  fx="fixtures/$id/inject.sh"
+  if [ ! -f "$fx" ]; then echo "  [A] 缺 fixture: $fx（无夹具就无法证明闸门能红）" >&2
+    rec "$id" block "no-fixture"; return 2; fi
   cp "$F" /tmp/inj.bak
   F="$F" bash "$fx" >/dev/null 2>&1
-  out=$(F="$F" bash -c "$(check_of "$target")" 2>/dev/null)
+  out=$(F="$F" bash -c "$(check_of "$id")" 2>/dev/null)
   cp /tmp/inj.bak "$F" 2>/dev/null; rm -f /tmp/inj.bak
-  if [ -n "$out" ]; then echo "  心跳 RED — 检出: $out"; exit 0
-  else echo "  心跳 NOT RED — 闸门已腐化" >&2; exit 2; fi
+  if [ -n "$out" ]; then echo "  心跳 RED — 检出: $out"; rec "$id" pass "probe: $out"; return 0
+  else echo "  心跳 NOT RED — 闸门已腐化（夹具没能越过阈值）" >&2
+    rec "$id" block "corrupted: fixture did not cross the threshold"; return 2; fi
+}
+
+if [ "$mode" = probe ]; then
+  if [ -n "$target" ]; then probe_one "$target"; exit $?; fi
+  # 无 target = 全部：闭环的默认动作。没有夹具的闸门**具名跳过**，不静默略过。
+  rc=0; ran=0; skipped=""
+  while read -r g; do [ -n "$g" ] || continue
+    if [ -f "fixtures/$g/inject.sh" ]; then ran=$((ran+1)); probe_one "$g" || rc=2
+    else skipped="$skipped $g"; fi
+  done < <(gates)
+  [ -n "$skipped" ] && echo "  [具名跳过] 无夹具的闸门:$skipped" >&2
+  echo "  probe-all: 跑了 $ran 个闸门$( [ -n "$skipped" ] && echo "，跳过 $(echo $skipped | wc -w | tr -d ' ')" )"
+  exit $rc
 fi
 
 input=$(cat)
