@@ -1050,6 +1050,34 @@ console.log(failed === 0
       var names = ['Helix-Mind', 'Anaphase-Helix', 'FlowModus'];
       return { present: names.filter(function (n) { return fsx.existsSync(px.join(root, n)); }).length, of: names.length };
     })();
+    /* ★ THE MULTIMETER'S SECOND AXIS (phyt-DNA BACKFLOW P11, 2026-10-09).
+     * A verdict is not one value. `pass | block` cannot tell these four apart:
+     *   TRUE GREEN   passed AND can be shown to fail (a fixture exists that crosses the threshold)
+     *   FALSE GREEN  passed but no fixture — nobody ever proved it can go red
+     *   TRUE RED     failed for a nameable reason (the criterion)
+     *   FALSE RED    failed for a reason that is NOT the criterion (tool usage error, missing
+     *                precondition, or — the nastiest — the same command answering differently)
+     * The fence that makes it more than advice: `pass` ALONE IS NOT REPORTABLE. A green set with no
+     * fixtures is not green, it is UNMEASURED (the same rule as the zero-gate BLOCK in validate.sh).
+     * `fingerprint` is the timing axis: it names this run's verdict so TWO runs can be compared —
+     * if the same command yields two fingerprints, the verdict is FLAKY and is neither red nor green. */
+    var cryptoL = require('crypto');
+    var redRosterSorted = (typeof redRoster !== 'undefined' ? redRoster : []).map(function (r) { return typeof r === 'string' ? r : (r && (r.name || r.file)) || String(r); }).sort();
+    var fp = cryptoL.createHash('sha256').update(JSON.stringify({
+      proven: proven, red: failed, held: deferred.length, unregistered: unknown.length,
+      reds: redRosterSorted
+    })).digest('hex').slice(0, 12);
+    var withFixture = 0;
+    try {
+      var fsF = require('fs'), pxF = require('path');
+      var fxDir = pxF.join(__dirname, '..', '..', 'fixtures');
+      if (fsF.existsSync(fxDir)) {
+        withFixture = fsF.readdirSync(fxDir, { withFileTypes: true })
+          .filter(function (e) { return e.isDirectory() && fsF.existsSync(pxF.join(fxDir, e.name, 'inject.sh')); })
+          .length;
+      }
+    } catch (e) { /* a count we cannot read is left at 0, and `alive` says so */ }
+
     var rec = {
       ts: new Date().toISOString(),
       gate_id: 'suite',
@@ -1061,6 +1089,15 @@ console.log(failed === 0
       kind: 'scan',
       counts: { proven: proven, red: failed, held: deferred.length, unregistered: unknown.length,
                 aborted: abortedRoster.length, envMissing: envMissingRoster.length },
+      fingerprint: fp,
+      validity: {
+        /* TRUE GREEN candidates = gates that have a fixture (they can be shown to fail).
+         * Anything counted `proven` beyond this is a FALSE GREEN candidate: unproven, not measured. */
+        gatesWithFixture: withFixture,
+        provenWithoutFixture: Math.max(0, proven - withFixture),
+        falseGreenRisk: proven > 0 && withFixture === 0 ? 'ALL' : (proven > withFixture ? 'PARTIAL' : 'NONE'),
+        redIsAttributable: failed === 0 ? null : 'see RED ROSTER (a count is not attributable)'
+      },
       env: { cdp: probeOk('cdp') ? 'up' : 'down',
              panel: envPanel === true ? 'up' : (envPanel === null ? 'unknown' : 'down'),
              jsdom: (function () { if (process.env.CX_NO_JSDOM) { return 'no (simulated)'; }
