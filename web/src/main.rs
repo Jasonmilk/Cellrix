@@ -25,7 +25,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
      * `start-panel.sh`) derive it from there and pass it. A literal here would be a
      * fourth restatement of a fact that already had four (measured 2026-09-24:
      * 18932 in the shell launcher, 8080 in this binary and the test runner, 18932
-     * in two suites). Refusing to guess is what makes the declaration the source. */
+     * in two suites). Refusing to guess is what makes the declaration the source.
+     *
+     * HISTORY, NOT BEHAVIOUR (2026-10-09): the `8080` above is the number this binary
+     * USED TO default to, and it is the port `not_ecosystem.llama-server` owns in
+     * `Helix-Mind/docs/helixECO/ports.json` — i.e. the default once put the panel on
+     * llama-server's port, which is the collision this project actually hit. It was
+     * removed by `Cellrix:ADR-0046`; the SSOT says `panel = 50050`. Read the sentence
+     * above as a measurement, never as a current default: there is no default here to
+     * change, only this refusal. */
     let port = match args
         .windows(2)
         .find(|w| w[0] == "--port")
@@ -100,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            eprintln!("             fix: choose a free port, e.g. --port 18932");
+            eprintln!("             fix: choose a free port, e.g. --port 50050 (SSOT `panel`); 8080 is llama-server's");
             return Err(e.into());
         }
     };
