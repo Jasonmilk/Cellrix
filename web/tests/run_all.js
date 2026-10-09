@@ -54,15 +54,11 @@ const SELF_CONTAINED = [
   ['compact_fold_test.js', 'the fold must be able to happen at all (the container row must not veto it)'],
   ['agent_loop_skeleton_test.js', 'the EIGHT Agent Loop criteria, written BEFORE the Loop (4 live homes, 4 declared absent with assertion+mutation)'],
   ['panel_tree_test.js', 'DAG navigation core: edges == parents, structural closures, three NAMED modes'],
-  /* REGISTERED 2026-10-09 (human ruling: "全部注册进 roster"). These four were on disk and in NO
-   * register — the runner filed them UNREGISTERED/BLOCKING, which is a CLASS, not a verdict: they are
-   * the four pieces of "the session DAG is usable" (fork from a middle segment / any conversation is
-   * openable / newest-first ordering / the chain end to end), i.e. exactly the ones the runner could
-   * not see. A suite whose proposition is false must be RED, never skipped. */
-  ['fork_entry_test.js', 'fork from a MIDDLE segment: every segment exposes a control, an early click moves the continuation target to that job, the last one equals continue (§360)'],
-  ['session_addressable_test.js', 'any conversation is OPENABLE: with EMPTY local storage, clicking the second row makes the continuation target that row — and the first row gives a different one (§359)'],
-  ['newest_first_contract_test.js', 'the newest-first dependency is DECLARED, so the list order is a contract and not an accident (§272)'],
-  ['chain_e2e_test.js', 'THE CHAIN, END TO END — automatically (§261)'],
+  /* DUPLICATES REMOVED 2026-10-09: those four were ALREADY in this roster (fork_entry:116,
+   * session_addressable:117, newest_first:72, chain_e2e:75) — the insert was a REPEAT, and a repeat
+   * is a double count: one suite = one line = one count (runner's own rule, line ~408). Measured
+   * consequence: `newest_first_contract_test` reported BOTH "PASS" and "UNREGISTERED/BLOCKING",
+   * which read as "the classifier lies" but was one member counted twice. */
   ['code_language_test.js', 'code and comments are English: declared-clean files asserted, backlog counted, detector mutates'],
   ['plan_dag_test.js', 'the plan is a DAG: acyclic, deps exist, single focus, frontier printed'],
   ['agent_loop_probe_test.js', 'THE FOUR PROBES: red until the Loop exists (a declaration with a name, not a disease)'],

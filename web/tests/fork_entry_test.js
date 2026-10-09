@@ -7,6 +7,13 @@
  *
  * Usage: node fork_entry_test.js
  */
+/* DECLARED 2026-10-09: this suite needs the live panel. `declaredRequires()` reads this
+ * line, and a suite that declares NOTHING gets `extra = []` — no panel address — answers NEEDS-INPUT
+ * from that, and is then filed UNREGISTERED/BLOCKING (`run_all.js:789`). The runner's own comment
+ * (~line 433) records this exact trap with events_param_contract_test.js as the precedent: the fix
+ * is the DECLARATION here, not a roster entry and not a deferrals entry. */
+const REQUIRES = 'panel-http';
+
 'use strict';
 const { JSDOM, VirtualConsole } = require('jsdom');
 const PANEL = process.env.CX_PANEL || 'http://127.0.0.1:50050';
