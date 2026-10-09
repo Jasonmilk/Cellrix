@@ -1,23 +1,30 @@
 #!/usr/bin/env node
-/* THE SERVED PAGE MUST BE THE SOURCE ASSETS (ADR-0048 §316, ledger P4).
+/* THE BUILT ARTIFACT MUST CARRY THE SOURCE ASSETS, BYTE FOR BYTE (ADR-0048 §316, ledger P4).
  *
- * "Edit an asset, then rebuild and restart" was PROSE, and prose does not hold: twice this session the
- * panel served a STALE embedded page (assets are `include_str!`d at compile time) and only a behavioural
- * criterion caught it by luck. This is that rule turned into a judgement:
- *   · parse the boot manifest (`web/src/boot.rs`) — name -> asset file;
- *   · fetch the page the SERVER actually serves;
- *   · every asset's content must appear in it, byte for byte.
- * A stale embed differs from its source, so this goes red on exactly the mistake it names.
+ * Assets are `include_str!`d at compile time, so a stale embed serves a stale page — this session hit
+ * that twice. The first design compared the SERVED PAGE with each asset and went red for the wrong
+ * reason (the page is assembled by placeholder substitution, so `boot.json`/`base.html` must NOT appear
+ * verbatim). The second design compared MTIMES, and that is a false green:
  *
- * Usage: node asset_parity_test.js [panel_base_url]
+ *   · mtime is the attribute of the CHECKOUT, not of the CONTENT — `touch target/debug/cellrix-web`
+ *     turns it green while the page is still stale, and a fresh clone carries content without mtime;
+ *   · `include_str!` embeds the BYTES, so the property that actually holds is "the asset's bytes are
+ *     IN the built artifact" — mechanism-agnostic, and unfakeable by a timestamp.
+ *
+ * So: parse the compile-time manifest in `web/src/boot.rs`, then require every asset's bytes to be
+ * found in the binary. Nothing is compared against "now", so no clock can satisfy it.
+ *
+ * WHAT THIS DOES NOT CATCH (named, not hidden): a rebuilt binary whose RUNNING PROCESS is old — that
+ * is a restart check, and it needs the served page, which is a different judgement (see boot.rs:29
+ * `BOOT_JSON`, the assembly spec, which must not appear verbatim in the page).
+ *
+ * Usage: node asset_parity_test.js
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const REQUIRES = 'panel-http';
 
 const MIN_ASSETS = 10;        /* declared threshold (ADR-0022 §2.5): the manifest is a real list, not one row */
-const SENTINEL_CHARS = 80;    /* enough to name WHICH asset is stale without printing a whole file */
 
 let pass = 0, fail = 0;
 function ok(name, cond, detail) {
@@ -25,46 +32,57 @@ function ok(name, cond, detail) {
   else { fail++; console.log('  FAIL ' + name + (detail ? '  [' + detail + ']' : '')); }
 }
 
-/* THE INVARIANT IS "THE ARTIFACT IS NEWER THAN ITS SOURCES", NOT "THE PAGE CONTAINS THE FILES".
- * The first design compared the served page with each asset byte for byte and went red — correctly, and
- * for the wrong reason: the page is assembled by PLACEHOLDER SUBSTITUTION (`boot.json` is the assembly
- * spec, `base.html` is the template), so those files must NOT appear verbatim. The property that actually
- * matters is: the running binary was built AFTER the newest asset was edited. That is mechanism-agnostic
- * and it is exactly the trap this session hit twice (a stale `include_str!` page). */
-/* THE COMPARISON IS NAMED, so the mutation can test IT rather than today's clock (a mutation that
- * cannot fail is worse than none — the first version made exactly that mistake). */
-const isStale = (artifactMtime, sourceMtime) => artifactMtime < sourceMtime;
+/* THE COMPARISON IS NAMED, so the mutation below tests IT rather than today's filesystem. */
+const contentPresent = (artifactBytes, assetBytes) =>
+  assetBytes.length > 0 && artifactBytes.includes(assetBytes);
 
-const ASSETS_DIR = path.join(__dirname, '..', 'assets');
-const BINARIES = [
-  path.join(__dirname, '..', '..', 'target', 'debug', 'cellrix-web'),
-  path.join(__dirname, '..', '..', 'target', 'debug', 'up'),
-];
+const BOOT_RS = path.join(__dirname, '..', 'src', 'boot.rs');
+const BINARY = path.join(__dirname, '..', '..', 'target', 'debug', 'cellrix-web');
 
-function newestAsset(dir) {
-  let newest = { file: '', mtime: 0 };
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (!e.isFile()) { continue; }
-    const st = fs.statSync(path.join(dir, e.name));
-    if (st.mtimeMs > newest.mtime) { newest = { file: e.name, mtime: st.mtimeMs }; }
+/* One manifest line per asset: ("name", include_str!("../assets/file")). Paths are relative to web/src. */
+function readManifest() {
+  const src = fs.readFileSync(BOOT_RS, 'utf8');
+  const out = [];
+  const re = /\(\s*"([^"]+)"\s*,\s*include_str!\(\s*"([^"]+)"\s*\)\s*\)/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    out.push({ name: m[1], file: path.resolve(path.dirname(BOOT_RS), m[2]) });
   }
-  return newest;
+  /* `boot.json` is the assembly spec, embedded on its own line — not a tuple, so the loop above misses it. */
+  const bj = /const\s+BOOT_JSON:\s*&str\s*=\s*include_str!\(\s*"([^"]+)"\s*\)/.exec(src);
+  if (bj) { out.push({ name: 'boot.json', file: path.resolve(path.dirname(BOOT_RS), bj[1]) }); }
+  return out;
 }
 
-const newest = newestAsset(ASSETS_DIR);
-const binary = BINARIES.filter((b) => fs.existsSync(b)).map((b) => ({ path: b, mtime: fs.statSync(b).mtimeMs }))
-  .sort((a, b) => b.mtime - a.mtime)[0];
-if (!binary) {
-  console.log('NEEDS-INPUT: no built binary found (build the panel first: cargo build -p cellrix-web)');
+const assets = readManifest().map((a) => Object.assign(a, { bytes: fs.existsSync(a.file) ? fs.readFileSync(a.file) : null }));
+ok('the manifest is a real list, not one row (the criterion is not vacuous)',
+  assets.length >= MIN_ASSETS, assets.length + ' entries declared, threshold ' + MIN_ASSETS);
+ok('every declared asset exists on disk (a renamed file is named here, not skipped)',
+  assets.every((a) => a.bytes !== null),
+  assets.filter((a) => a.bytes === null).map((a) => a.name).join(',') || 'all present');
+
+if (!fs.existsSync(BINARY)) {
+  console.log('NEEDS-INPUT: no built panel binary at ' + BINARY + ' (build it first: cargo build -p cellrix-web)');
   process.exit(3);
 }
-ok('the build artifact is NOT older than the newest asset (a stale page is refused)',
-  !isStale(binary.mtime, newest.mtime),
-  'binary ' + path.basename(binary.path) + ' ' + new Date(binary.mtime).toISOString()
-    + ' vs newest asset ' + newest.file + ' ' + new Date(newest.mtime).toISOString());
-/* MUTATION: the comparison must be able to go red — an asset edited AFTER the build is detected. */
-ok('MUTATION: the comparison itself can go red (artifact older than source ⇒ stale)',
-  isStale(1000, 2000) === true && isStale(2000, 1000) === false, 'stale detection is falsifiable');
+const artifact = fs.readFileSync(BINARY);
 
-  console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
-  process.exit(fail ? 1 : 0);
+/* THE CHECK: content in artifact. A stale embed differs from its source, so this goes red on exactly
+ * the mistake it names — and no timestamp can make it pass. */
+const missing = assets.filter((a) => a.bytes && !contentPresent(artifact, a.bytes))
+  .map((a) => a.name + '(' + a.bytes.length + 'B)');
+ok('every manifest asset is carried by the built artifact, byte for byte',
+  missing.length === 0,
+  missing.length ? ('STALE: ' + missing.join(' ')) : (assets.length + ' assets found in ' + path.basename(BINARY)));
+
+/* MUTATION: the comparison must be able to go red, and it must not be satisfiable by a size match. */
+const probe = assets.find((a) => a.bytes && a.bytes.length > 200) || assets[0];
+const altered = Buffer.concat([probe.bytes, Buffer.from('\n/* a byte that is not in the artifact */\n')]);
+ok('MUTATION: the comparison itself can go red (altered source ⇒ absent)',
+  contentPresent(artifact, probe.bytes) === true && contentPresent(artifact, altered) === false,
+  'probe ' + probe.name);
+ok('MUTATION: an empty asset is refused rather than trivially "found"',
+  contentPresent(artifact, Buffer.alloc(0)) === false, 'empty buffer is not presence');
+
+console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));
+process.exit(fail ? 1 : 0);
