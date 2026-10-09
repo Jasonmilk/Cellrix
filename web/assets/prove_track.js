@@ -285,7 +285,10 @@
     var holds = t.watermark() !== null && (want === null || Cx.tapeJob() === want);
     if (holds) { t.activate(TARGET); t.flush(); return; }
     window.__proveTrackLoad(want, window.__proveTrackMeta || null);
-    Cx.loadWindow(want).then(function () {
+    /* THE PROVE-TRACK TABLE IS A DISPLAY, so it asks for the SEGMENT, not the lineage path:
+     * `scope='period'`. Before this it consumed the same root->leaf window as the chat, so the table
+     * mixed five periods and the round the reader had opened was the last thing in it, not the subject. */
+    Cx.loadWindow(want, 'period').then(function () {
       t.activate(TARGET);
       t.flush();
     }).catch(function (e) {
