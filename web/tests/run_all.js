@@ -1025,4 +1025,36 @@ console.log(failed === 0
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
  * ledger". Merging them into exit 1 would guarantee the wrong remedy, so XPASS
  * rides the register channel (3 = the checker's own bookkeeping is stale). */
+/* THE RESULT IS WRITTEN WHERE A READER CAN CHECK IT (phyt-DNA ledger/ · append-only).
+ * WHY: this harness has been printing, every run, that its own criterion count is read from a
+ * HAND-WRITTEN table — "structurally a claim, not evidence". That was true because the run left no
+ * record. A generated line per run is evidence; a typed-in table is a claim.
+ * `kind: scan` on purpose: the template counts only `kind: task` as a production metric, and a
+ * suite sweep is not a task. Absent ledger/ is not an error (a checkout may not carry one). */
+(function () {
+  try {
+    var fsL = require('fs'), pxL = require('path');
+    var dir = pxL.join(__dirname, '..', '..', 'ledger');
+    if (!fsL.existsSync(dir)) { return; }
+    var rec = {
+      ts: new Date().toISOString(),
+      gate_id: 'suite',
+      task: 'run_all',
+      verdict: failed === 0 ? 'pass' : 'block',
+      override: false,
+      source: 'cli',
+      event_id: 'suite-' + Date.now(),
+      kind: 'scan',
+      note: 'proven=' + proven + ' red=' + failed + ' held=' + deferred.length
+        + ' unregistered=' + unknown.length + ' aborted=' + abortedRoster.length
+        + ' env: cdp=' + (probeOk('cdp') ? 'up' : 'down')
+        + ' panel=' + (probeOk('panel') === true ? 'up' : (probeOk('panel') === null ? 'unknown' : 'down'))
+        + ' jsdom=' + (function () { try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })()
+    };
+    fsL.appendFileSync(pxL.join(dir, 'hits-2026.jsonl'), JSON.stringify(rec) + '\n');
+  } catch (e) {
+    /* A WRITE FAILURE MUST NEVER DECIDE THE VERDICT: it is printed, not thrown. */
+    console.error('  WARN  ledger append failed: ' + (e && e.message));
+  }
+})();
 process.exit(failed > 0 ? 1 : (xpass.length > 0 ? 3 : (unknown.length > 0 ? 2 : 0)));
