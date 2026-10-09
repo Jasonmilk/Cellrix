@@ -560,7 +560,7 @@
      * nothing); the PANEL was choosing for the reader.
      *
      * EXPLICIT IS NOT AUTO-INJECTED (trap 18). Recent experiences stay VISIBLE in the list — that is what
-     * 显性 means — without becoming the next turn's parent. Selection may only come from a click.
+     * being visible means — without becoming the next turn's parent. Selection may only come from a click.
      *
      * The alternative ("keep a display-only default, add a second field for inheritance") was REJECTED:
      * giving one slot two meanings (look-with vs carry-forward) is exactly what trap 16 forbids, and a
