@@ -465,8 +465,17 @@
      *
      * L0 (temporary, retired when anaphase provides session_id) lives with the
      * read, in script.html's loadWindow.
+     *
+     * WHICH WINDOW (revised 2026-10-09 · ADR-0049). This call site took the default — the LINEAGE
+     * PATH — so clicking an experience card loaded the whole chain: measured live on
+     * `run-f911e602dcba3236…`, 24 segments / 405 events for a round of 16, the newest round last and
+     * "Turn 1" a five-day-old sentence. That IS the long-standing "the experience card does not
+     * display properly": the card was right, the window was the chain.
+     * This is a DISPLAY read (it renders into #chat-msgs; the model's context is assembled by
+     * anaphase from its own `context/inject` + `resume_from`). ADR-0021's lineage path remains
+     * correct for CONTEXT LOADING — that read is server-side and untouched here.
      */
-    Cx.loadWindow(periodId).then(function (win) {
+    Cx.loadWindow(periodId, 'period').then(function (win) {
       if (seq !== st.histSeq) return;
       var events = win.events;
       if (!events.length) {
