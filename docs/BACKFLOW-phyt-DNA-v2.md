@@ -156,7 +156,9 @@
 **⚠️ 未做**：① ② 的改动**均未落地** ⇒ 那条 flaky 仍在。**登记待做，不阻塞。**
 ---
 
-## P11 · ★★ 测电仪：裁决需要**第二根轴**（"是否真绿/真红"）✅ **已回流**（template/docs/MULTIMETER.md + tools/validate.sh（probe 写账本 / --probe-all / counter.sh））
+## P11 · ★★ 测电仪：裁决需要**第二根轴**（"是否真绿/真红"）✅ **已回流**（4 处：`template/docs/MULTIMETER.md`（主文）· `template/tools/validate.sh`（probe 写账本 / `--probe-all` / `counter.sh`）·
+`README.md` §The second axis（含实测：79 proven 中 78 无夹具；同环境 8 次运行 6 种指纹）·
+`template/VISION.md`《判断力本身也要被判断》· `docs/PROTECTION.md` §第二根轴（承其"有名、能红"））
 
 **人类原话**：*"用 phyt-DNA 完成类似测电仪的工作，让它可以测量诊断是否真'绿'与真'红'。"*
 
@@ -199,6 +201,22 @@ validity: alive | unproven | unattributable | flaky
 `--probe` 的"闸门已腐化"），但**未统一成第二根轴**。
 
 ---
+
+## 待人类裁决 · Cellrix `docs/VISION.md` 加一笔（**受封顶约束，故不由我擅动**）
+
+phyt-DNA 侧已加（`template/VISION.md`）。**Cellrix 侧不同**：其 VISION 头部声明
+
+> *"资产封顶（**〇–七共八节**）…后续新增概念必须采用**等量替换原则**"*
+
+而"测电仪"属**概念层**（不是被豁免的意图层）⇒ **不能直接加节。**
+**⇒ 我给等量替换的候选（供你选）**，任选其一：
+
+1. **并入 §一「判据的宪法」**（Ω + A0 + T1 所在）—— 最贴：T1（可拒绝性）与"读数可信"是同族。
+   拟加一句：*"T1 保证判据**可以拒绝**；本轴保证它的**拒绝/通过都可信**：`pass` 单独不可报告，必须是 `pass + alive`。"*
+2. **并入 §四「判据文化」** —— 那里讲方法，改动最小。
+3. **只留指针**（不新增概念）：在 §一 加一行指向 `docs/BACKFLOW-phyt-DNA-v2.md` 的 P11 与 `phyt-DNA/docs/MULTIMETER.md`。
+
+**⇒ 我倾向 1**（并入 T1，是同一族的自然延伸，**不新增概念**）。
 
 ## 已回流一览（2026-10-09）
 
