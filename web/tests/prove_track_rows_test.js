@@ -78,6 +78,17 @@ w.document.createElement = function (t) {
   return origCreate(t);
 };
 
+/* A MISSING INPUT IS NOT A CRASH (2026-10-09). This suite crashed with
+ * `TypeError: Cannot read properties of undefined (reading 'project')` — the view it loads calls
+ * `window.CxCellMetering.project(...)`, and `cell_metering.js` was never loaded into the sandbox.
+ * A crash reads as "environment missing" to anyone skimming, but it is a HARNESS gap: the suite
+ * named its subject and forgot one of its inputs. Load the dependency the view actually needs. */
+/* TWO inputs were missing, and the second only became visible after the first was fixed: the view
+ * calls `CxCellMetering.project(...)` (cell_metering.js), and cell_metering.js calls into
+ * `CxThreeState` (three_state.js). So the load order is a CHAIN, not a list:
+ * three_state -> cell_metering -> the view. A crash per missing input is a slow way to learn it. */
+w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'three_state.js'), 'utf8'));
+w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'cell_metering.js'), 'utf8'));
 w.eval(fs.readFileSync(ASSET, 'utf8'));
 const C = w.CxProveTrack;
 if (!C || typeof C.renderTable !== 'function' || typeof C.renderStats !== 'function') {
