@@ -1036,6 +1036,20 @@ console.log(failed === 0
     var fsL = require('fs'), pxL = require('path');
     var dir = pxL.join(__dirname, '..', '..', 'ledger');
     if (!fsL.existsSync(dir)) { return; }
+    /* STRUCTURED, NOT PROSE (human ruling 2026-10-09 · P6+P7).
+     * WHY: a free-text `note` cannot be compared between two runs, so the ledger recorded history
+     * without being able to answer "did anything change". The counts and the environment move into
+     * fields a machine reads.
+     * AND THE ENVIRONMENT IS PROBED, NEVER TYPED: a hand-written env is the same disease as a
+     * hand-written note — it would happily say `panel=up` while the panel is down. These values are
+     * the SAME probes the verdict line already uses (ADR-0048 §200: a count without its environment
+     * is not comparable across commits). */
+    var envPanel = probeOk('panel');
+    var envSiblings = (function () {
+      var fsx = require('fs'), px = require('path'), root = px.join(__dirname, '..', '..', '..');
+      var names = ['Helix-Mind', 'Anaphase-Helix', 'FlowModus'];
+      return { present: names.filter(function (n) { return fsx.existsSync(px.join(root, n)); }).length, of: names.length };
+    })();
     var rec = {
       ts: new Date().toISOString(),
       gate_id: 'suite',
@@ -1043,13 +1057,17 @@ console.log(failed === 0
       verdict: failed === 0 ? 'pass' : 'block',
       override: false,
       source: 'cli',
-      event_id: 'suite-' + Date.now(),
+      event_id: 'suite-' + Date.now() + '-' + process.pid,
       kind: 'scan',
+      counts: { proven: proven, red: failed, held: deferred.length, unregistered: unknown.length,
+                aborted: abortedRoster.length, envMissing: envMissingRoster.length },
+      env: { cdp: probeOk('cdp') ? 'up' : 'down',
+             panel: envPanel === true ? 'up' : (envPanel === null ? 'unknown' : 'down'),
+             jsdom: (function () { if (process.env.CX_NO_JSDOM) { return 'no (simulated)'; }
+                                   try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })(),
+             siblings: envSiblings },
       note: 'proven=' + proven + ' red=' + failed + ' held=' + deferred.length
         + ' unregistered=' + unknown.length + ' aborted=' + abortedRoster.length
-        + ' env: cdp=' + (probeOk('cdp') ? 'up' : 'down')
-        + ' panel=' + (probeOk('panel') === true ? 'up' : (probeOk('panel') === null ? 'unknown' : 'down'))
-        + ' jsdom=' + (function () { try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })()
     };
     fsL.appendFileSync(pxL.join(dir, 'hits-2026.jsonl'), JSON.stringify(rec) + '\n');
   } catch (e) {
