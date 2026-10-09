@@ -56,9 +56,27 @@ probe_one(){ # probe_one <gate-id> => 0 RED（闸门活着）· 2 腐化/拓扑�
   F="$F" bash "$fx" >/dev/null 2>&1
   out=$(F="$F" bash -c "$(check_of "$id")" 2>/dev/null)
   cp /tmp/inj.bak "$F" 2>/dev/null; rm -f /tmp/inj.bak
-  if [ -n "$out" ]; then echo "  心跳 RED — 检出: $out"; rec "$id" pass "probe: $out"; return 0
-  else echo "  心跳 NOT RED — 闸门已腐化（夹具没能越过阈值）" >&2
+  if [ -z "$out" ]; then echo "  心跳 NOT RED — 闸门已腐化（夹具没能越过阈值）" >&2
     rec "$id" block "corrupted: fixture did not cross the threshold"; return 2; fi
+  echo "  心跳 RED — 检出: $out"
+  # 反例守卫（人类裁决 2026-10-09）：**内容不变**的改动必须**不**触发判据。
+  # 只有正例时，一个读时钟的判据照样能红（inject 追加字节同时改了内容与 mtime）⇒ 退化无人发现。
+  cf="fixtures/$id/counter.sh"
+  if [ ! -f "$cf" ]; then
+    echo "  [具名] 无反例夹具 $cf —— 该闸门只证了'该红的红'，没证'不该红的不红'" >&2
+    rec "$id" pass "probe: $out（no counter-fixture: negative direction unproven）"; return 0
+  fi
+  cp "$F" /tmp/cnt.bak
+  F="$F" bash "$cf" >/dev/null 2>&1
+  out2=$(F="$F" bash -c "$(check_of "$id")" 2>/dev/null)
+  cp /tmp/cnt.bak "$F" 2>/dev/null; rm -f /tmp/cnt.bak
+  if [ -n "$out2" ]; then
+    echo "  [假阳性] 内容未变却红: $out2" >&2
+    echo "          判据在'变了'与'没变'两个世界都能红 ⇒ 按 Ω 是装饰品，按 G5 是伪证" >&2
+    rec "$id" block "false-positive: fires on a content-preserving change"; return 2
+  fi
+  echo "  反例守住 — 内容未变时不红 ✅"
+  rec "$id" pass "probe: $out; counter: not tripped by content-preserving change"; return 0
 }
 
 if [ "$mode" = probe ]; then
