@@ -54,6 +54,13 @@ const SELF_CONTAINED = [
   ['compact_fold_test.js', 'the fold must be able to happen at all (the container row must not veto it)'],
   ['agent_loop_skeleton_test.js', 'the EIGHT Agent Loop criteria, written BEFORE the Loop (4 live homes, 4 declared absent with assertion+mutation)'],
   ['panel_tree_test.js', 'DAG navigation core: edges == parents, structural closures, three NAMED modes'],
+  /* REGISTERED 2026-10-09 — three suites that were ON DISK and in NO register, i.e. never ran.
+   * Two of them test exactly the defects this month hit: the port table (8080 vs llama-swap) and the
+   * reply line naming the model that ACTUALLY served the turn (C1's `model` leg). Their criteria
+   * existed; only the instrument was switched off. */
+  ['port_table_test.js', 'THE PORT TABLE IS THE SINGLE SOURCE — the colliding legacy default put back is its mutation'],
+  ['chat_model_test.js', 'the reply line names the model that ACTUALLY served the turn (C1 model leg, front half)'],
+  ['render_test.js', 'the LIVE panel page through the real render path (jsdom + panel-http)'],
   /* DUPLICATES REMOVED 2026-10-09: those four were ALREADY in this roster (fork_entry:116,
    * session_addressable:117, newest_first:72, chain_e2e:75) — the insert was a REPEAT, and a repeat
    * is a double count: one suite = one line = one count (runner's own rule, line ~408). Measured
@@ -429,9 +436,16 @@ for (const [file, what] of SELF_CONTAINED) {
    * suite silently got nothing, answered NEEDS-INPUT, and was filed `UNREGISTERED/BLOCKING — capability
    * IS present (probed), yet this suite is unproven` (measured with `events_param_contract_test.js`).
    * The explicit list below stays only as a fallback for suites that have not declared yet. */
-  const req = declaredRequires(file);
-  const extra = (req === 'cdp-browser') ? [PANEL, CDP]
-    : (req === 'panel-http') ? [PANEL]
+  /* MULTI-CAPABILITY (2026-10-09). A suite may need MORE THAN ONE capability: `render_test.js` needs
+   * jsdom AND the panel address. `declaredRequires` returns the raw declaration, so the capabilities
+   * are read as a LIST (`'jsdom,panel-http'`). Before this, a suite declaring only `jsdom` got
+   * `extra = []`, never received the panel address, answered NEEDS-INPUT for that reason, and was then
+   * filed UNREGISTERED/BLOCKING — "registered but does not run", which is the same dead end as before.
+   * ADDING IT TO THE ROSTER ALONE WOULD NOT HAVE MADE IT RUN. */
+  const reqs = String(declaredRequires(file) || '').split(/[,\s]+/).filter(Boolean);
+  const req = reqs[0] || null;
+  const extra = reqs.indexOf('cdp-browser') >= 0 ? [PANEL, CDP]
+    : reqs.indexOf('panel-http') >= 0 ? [PANEL]
     : (file === 'layout_test.js' || file === 'measure_test.js'
        || file === 'perf_measure.js' || file === 'hit_targets_test.js') ? [PANEL, CDP] : [];
   try {
@@ -622,7 +636,8 @@ function declaredRequires(file) {
 }
 function classify(file) {
   if (!DEFERRALS) { return { kind: 'unknown', why: 'no deferrals.json — nothing is registered' }; }
-  const cap = declaredRequires(file);
+  const caps = String(declaredRequires(file) || '').split(/[,\s]+/).filter(Boolean);
+  const cap = caps[0] || null;
   /* P64 (ADR-0048 §344): JSDOM DEPENDENCE IS MEASURED, NOT MERELY DECLARED. Measured: on a machine without
    * jsdom SIX suites were counted as RED — a red that is a property of the ENVIRONMENT, not of the code
    * (they `require('jsdom')` but declared only `panel-http`, whose probe passed). Two things happen here:

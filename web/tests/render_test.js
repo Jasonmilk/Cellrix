@@ -12,7 +12,7 @@
 /* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
  * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
  * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
-const REQUIRES = 'jsdom';
+const REQUIRES = 'jsdom,panel-http';;
 
 let JSDOM, VirtualConsole;
 try { ({ JSDOM, VirtualConsole } = require("jsdom")); }
