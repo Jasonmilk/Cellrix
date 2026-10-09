@@ -21,7 +21,7 @@
 
 ---
 
-## P1 · ADR 的"双契约"写法 ⚠️ 部分
+## P1 · ADR 的"双契约"写法 ✅ **已回流**（template/decisions/README.md §BACKFLOW P1）
 
 **症状**：Cellrix 的 pre-commit 钩子要求**首行是 ADR 头**；模板把元数据放**文件开头**的 YAML front-matter
 ⇒ **首次提交被 REJECT**（`REJECT: 首行不是 ADR 头`）。
@@ -31,21 +31,24 @@
 **判例**：`Cellrix/docs/decisions/ADR-0049-asset-parity.md`
 
 ---
+---
 
-## P2 · 路径必须声明式，不得硬编码 ✅ 已裁决回流
+## P2 · 路径必须声明式，不得硬编码 ✅ **已回流**（template/tools/validate.sh（DECISIONS_DIR/FIXTURES_DIR/LEDGER_DIR 可覆盖））
 
 **症状**：模板用 `decisions/`（仓库根），Cellrix 用 `docs/decisions/` ⇒ 我**不得不改脚本**。
 **人类裁决**：*"改脚本 = 分叉 = 漂移。这正是我们这一个月的老病（ports.json、store 路径、两个 up）。"*
 ⇒ **模板硬编码路径本身就是缺陷。**（人类同时**撤回**了自己先前"P2 不回流"的判断。）
 
 ---
+---
 
-## P3 · 「零闸门」必须具名 ✅ 已裁决回流
+## P3 · 「零闸门」必须具名 ✅ **已回流**（template/tools/validate.sh（零闸门 ⇒ [BLOCK] + exit 2））
 
 **症状**：`validate.sh` 在**未登记任何 `hard: true` ADR** 的项目上**静默 pass**（`scanned:0`）。
 **人类裁决**：*"空集合上的全通过 = 伪证"*。
 **已落地（Cellrix）**：`gates` 为空 ⇒ 打印 `[BLOCK] 零闸门 …` 并 **exit 2**（实测生效）。
 
+---
 ---
 
 ## P4 · ADR 需要三类，不是过渡期 ✅ 已裁决（换真解）
@@ -57,16 +60,18 @@
 **⏸ 缓（ROI）**：人类 2026-10-09 判定这是过程工作、不砍树 ⇒ **不排期**。
 
 ---
+---
 
-## P5 · 夹具目录名应由脚本**生成** ⚠️ 升级
+## P5 · 夹具目录名应由脚本**生成** ✅ **已回流**（template/fixtures/README.md §P5）
 
 **症状**：我把夹具目录命名成 `asset_parity` 而非**闸门 id** ⇒ `--probe` 才报"缺 fixture"。
 **我的原提议**：lint 事后报错。
 **人类升级**：*"别靠 lint 事后报错，由脚本生成目录名（G9：确定性归脚本）"*。
 
 ---
+---
 
-## P6 · ★ 账本行必须带**环境**，且环境由脚本探测 ✅ 已裁决回流
+## P6 · ★ 账本行必须带**环境**，且环境由脚本探测 ✅ **已回流**（template/ledger/README.md §P6（环境由探测得到））
 
 **证据（本会话最硬的一条）**：同一 commit，`proven 55 → 77 → 80`、`held 31 → 1`、`red 2 → 8 → 6`，
 **只因为 `panel/cdp` 从 down 变 up** ⇒ **没有环境的计数跨 commit 不可比**（Cellrix ADR-0048 §200 同论）。
@@ -75,12 +80,14 @@
 **已落地（Cellrix）**：`env: {cdp, panel, jsdom, siblings:{present,of}}`，全部**由探测得到**。
 
 ---
+---
 
-## P7 · 账本计数应**结构化**，不只放 `note` ✅ 已裁决回流（与 P6 合并）
+## P7 · 账本计数应**结构化**，不只放 `note` ✅ **已回流**（template/ledger/README.md §P7（counts 结构化））
 
 **理由**：自由文本 `note` **无法在两行之间比较** ⇒ 账本记了历史却答不出"变了没有"。
 **已落地（Cellrix）**：`counts: {proven, red, held, unregistered, aborted, envMissing}`。
 
+---
 ---
 
 ## P8 · 被委派的产物必须**存在于仓库** ✅ 已裁决（有前置）
@@ -91,6 +98,7 @@
 **已落地（Cellrix）**：`docs/vision/{architecture-v12.html, dag-v5.0-milestones.md, README.md}`。
 
 ---
+---
 
 ## P9 · 契约应当有位置，不只写在注释里 ⏸（本会话新提，待裁决）
 
@@ -99,6 +107,7 @@
 **提议**：`applies-to` 的兄弟（例如 `contract-of`），让"这句契约管什么"有机器可读的位置。
 **⏸ 待人类裁决。**
 
+---
 ---
 
 ## P10 · ★ gate 的输入必须是**产物**，不得是**活对象** ⏸（本会话新提，待裁决）
@@ -149,8 +158,9 @@
 **为什么这样不丢**：坑**发现时**登记 ⇒ 不必靠任何人记住；模板**回流时**回填 commit ⇒ 可追溯。
 
 ---
+---
 
-## P11 · ★★ 测电仪：裁决需要**第二根轴**（"是否真绿/真红"）⏸（本会话新提，待裁决）
+## P11 · ★★ 测电仪：裁决需要**第二根轴**（"是否真绿/真红"）✅ **已回流**（template/docs/MULTIMETER.md + tools/validate.sh（probe 写账本 / --probe-all / counter.sh））
 
 **人类原话**：*"用 phyt-DNA 完成类似测电仪的工作，让它可以测量诊断是否真'绿'与真'红'。"*
 
@@ -191,3 +201,20 @@ validity: alive | unproven | unattributable | flaky
 
 **⚠️ 未做**：本条**只登记**。Cellrix 侧的雏形已存在（`flakyRoster` / `self-declared` 的 YELLOW /
 `--probe` 的"闸门已腐化"），但**未统一成第二根轴**。
+
+## 已回流一览（2026-10-09）
+
+| 条 | 落到模板的哪一处 |
+|---|---|
+| P1 | `template/decisions/README.md` §双契约写法（H1 首行 + front-matter 紧随） |
+| P2 | `template/tools/validate.sh` 顶部（`DECISIONS_DIR`/`FIXTURES_DIR`/`LEDGER_DIR` 可覆盖） |
+| P3 | `template/tools/validate.sh`（零闸门 ⇒ `[BLOCK]` + exit 2） |
+| P5 | `template/fixtures/README.md` §P5（目录名 = gate-id，脚本定位） |
+| P6 | `template/ledger/README.md` §P6（环境由**探测**得到，绝不手写） |
+| P7 | `template/ledger/README.md` §P7（`counts` 结构化） |
+| **P11** | **`template/docs/MULTIMETER.md`**（第二根轴）+ `validate.sh`（probe 写账本 / `--probe-all` / `counter.sh`） |
+| P4 · P8 · P9 · P10 | 未回流（P4 人类判 ⏸ 不排期；P8 需前置结构化引用；P9/P10 待裁决） |
+
+**版本追溯**：`phyt-DNA/` 不是 git 仓 ⇒ 回流的**内容**以本册为准，**时点**以本仓 commit 为准。
+
+## 如何进行一次反哺
