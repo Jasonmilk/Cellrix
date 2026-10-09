@@ -382,12 +382,16 @@ if (bad) {
   const host = w.document.getElementById('s-side');
   w.CxPanelTree.mountSidebar(P3, {});
   const marked = host.querySelectorAll('.ses-item[aria-current="true"]');
-  ok(marked.length === 1, 'exactly ONE rendered row carries aria-current at load  [' + marked.length + ']');
-  ok(marked.length === 1 && marked[0].getAttribute('data-period') === 'root-1',
-    'and it is the ROOT of the newest continuation — a row that is actually rendered  ['
-    + (marked[0] && marked[0].getAttribute('data-period')) + ']');
-  ok(marked.length === 1,
-    'MUTATION: whether or not the newest period is rendered, the marker stays EXACTLY ONE  [' + marked.length + ']');
+  /* REWRITTEN 2026-10-09 (human ruling: no default selection). These three used to demand that the
+   * mount mark EXACTLY ONE row — the newest — as the default detail. That contract is GONE: a bare
+   * open selects nothing, because the selection is the panel's continuation target and the panel may
+   * not choose it for the reader (measured live: a brand-new conversation inherited a five-day-old
+   * period). Not deleted — turned around, so they still guard a real property and still go red if a
+   * default comes back. */
+  ok(marked.length === 0,
+    'NO row carries aria-current at load — a bare open selects NOTHING  [' + marked.length + ']');
+  ok(marked.length === 0,
+    'MUTATION: restoring a default selection puts a marked row back ⇒ this goes red  [' + marked.length + ']');
   dom.window.close();
 }
 
@@ -569,10 +573,14 @@ if (bad) {
   T.mountSidebar(PERIODS, { fetchRows: function (id) { calls.push(id); return []; } });
   const box = w.document.querySelector('[data-panel-tree]');
   ok(!!box, 'the mount creates its OWN container under the host (the list is untouched)');
-  ok(calls.length === 1, 'opening the panel fetches detail for EXACTLY ONE period  [' + calls + ']');
+  /* REWRITTEN 2026-10-09: the mount must fetch NO detail, because it selects nothing. The old
+   * "EXACTLY ONE" was the default selection seen from the fetch side — same contract, same removal. */
+  ok(calls.length === 0,
+    'opening the panel fetches NO detail — nothing is selected to fetch it for  [' + calls + ']');
   const selected = box.querySelector('[aria-selected="true"]');
-  ok(!!selected && selected.getAttribute('data-period') === PERIODS[0].period_id,
-    'and the default selection is the newest experience  [' + (selected && selected.getAttribute('data-period')) + ']');
+  ok(!selected,
+    'and there is NO default selection — the newest experience is NOT chosen for the reader  ['
+    + (selected && selected.getAttribute('data-period')) + ']');
   /* SEMANTICS UPDATED WITH THE CODE (§240.3 ⑤): the SIDEBAR's entry set is the forest's ROOTS —
    * the full DAG is still one call away (`render(..., {rootsOnly:false})`), and that is asserted in
    * the block below. Exactly ONE assertion moved, because the change was confined to ONE caller. */
@@ -640,3 +648,46 @@ setTimeout(function () {
     : 'FAILED — ' + bad + ' check(s) red');
   process.exit(bad ? 1 : 0);
 }, 0);
+
+/* ── 默认不选中（人类裁决 2026-10-09）────────────────────────────────────────────
+ * 这一对守卫落在**被消费的那一层**：选中态就是面板的续接目标（它流进 nav.meta.job_id，
+ * 而 chat.js 把它当 job_id 发出）。可观测 = detail 区出现 `[data-path]`。
+ * 第一条：**裸开面板 ⇒ 无选中**（新开一轮不得继承）。变异=把默认选中加回去 ⇒ 红。
+ * 第二条：**显式选中 ⇒ 有选中**（证明"继续"这条路没被一起改坏）。 */
+{
+  let JSDOM2;
+  try { ({ JSDOM: JSDOM2 } = require('jsdom')); } catch (e) {
+    console.log('NEEDS-INPUT: jsdom not installed (default-selection guard)');
+  }
+  if (JSDOM2) {
+    const dom = new JSDOM2('<!DOCTYPE html><body><div id="s-side"></div><div id="pt-detail"></div></body>',
+      { runScripts: 'outside-only' });
+    const w = dom.window;
+    w.document.getElementById('pt-detail');
+    w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'three_state.js'), 'utf8'));
+    w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+    const PTB = w.CxPanelTree;
+    ok(!!PTB && typeof PTB.mountSidebar === 'function', 'panel_tree mounts in a real document (jsdom)');
+
+    const PERIODS2 = [
+      { period_id: 'p2', parent: 'p1', name: 'newest', first_ts: '2026-10-09T02:22:00Z' },
+      { period_id: 'p1', parent: null, name: 'older', first_ts: '2026-10-04T07:00:00Z' }
+    ];
+    const marked = (id) => {
+      const host = w.document.getElementById(id);
+      return !!host && host.querySelectorAll('[data-path]').length > 0;
+    };
+
+    PTB.mountSidebar(PERIODS2, { hostId: 's-side' });
+    ok(!marked('s-side'),
+      'NO DEFAULT SELECTION: a bare open leaves nothing selected (so a new turn inherits nothing)');
+
+    /* 第二条：显式选中仍然工作 —— 否则"一并改坏"不会被发现。 */
+    const host2 = w.document.createElement('div');
+    host2.id = 's-side-2';
+    w.document.body.appendChild(host2);
+    PTB.mountSidebar(PERIODS2, { hostId: 's-side-2', selected: 'p2' });
+    ok(marked('s-side-2'),
+      'EXPLICIT SELECTION still selects: clicking a segment is the only way to carry it forward');
+  }
+}
