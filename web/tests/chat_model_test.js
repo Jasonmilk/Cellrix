@@ -12,6 +12,13 @@
  */
 const { JSDOM, VirtualConsole } = require("jsdom");
 
+/* DECLARED 2026-10-09. This suite reads its panel address from `argv[2]` or `CELLRIX_PANEL`, but it
+ * declared NOTHING — so the runner passed `extra = []`, the address arrived only when the CALLER
+ * happened to export `CELLRIX_PANEL`, and the same defect was RED in one invocation and HELD in the
+ * next. A criterion whose redness depends on how the gate was invoked is not a criterion: it produced
+ * two different accounts of C1's model leg from the same code. The declaration is what makes the
+ * runner hand the address over. */
+const REQUIRES = 'panel-http';
 const BASE = process.argv[2] || process.env.CELLRIX_PANEL || process.env.PANEL || "";
 if (!BASE) { console.log('NEEDS-INPUT: 未给面板地址（argv[2] / CELLRIX_PANEL）—— 端口见 chain.json 的 `panel` 条目'); process.exit(3); }
 const MODEL = "agnes-2.5-flash";
