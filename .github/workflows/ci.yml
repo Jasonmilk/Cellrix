@@ -30,6 +30,8 @@ jobs:
           #   CI logs 要 admin（403）· artifact 下载要凭据（401）⇒ **两者我都读不到**。
           #   而 **job summary 是公开可读的**（网页上直接看）⇒ **从此不依赖任何凭据**。
           if [ "$rc" != 0 ]; then
+          # ★ 失败具名 → annotations（公开可读）—— 本仓自带脚本（引擎纪律：不跨仓取文件）
+          bash tools/emit-failures.sh /tmp/test.log || true
             { echo '## 失败尾部（前 120 行）'; echo '```'; tail -120 /tmp/*.log 2>/dev/null | head -120; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
           fi
           exit $rc
