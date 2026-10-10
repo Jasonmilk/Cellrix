@@ -144,6 +144,23 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const legacyDir = path.join(__dirname, '..', '..', '..', '.helix', 'events', '.refs', '.log');
   const legacy = path.join(__dirname, '..', '..', '..', '.helix', 'events', '.refs', '.log.legacy-v315');
   const stream = path.join(__dirname, '..', '..', '..', '.helix', 'events', period + '.events.jsonl');
+  /* A MISSING PREREQUISITE IS NOT A FUNCTIONAL FAILURE (2026-10-09, GROWTH trap 13). This assertion
+   * reads the store at the WORKSPACE DEFAULT path, so it can only judge a chain that was pointed at
+   * that store. Measured: an anaphase running with a different `session_events_path` leaves `stream`
+   * absent, `mt(stream)` became -1, and `2026-10-01 <= -1` reported a FUNCTIONAL red for what is in
+   * fact an UNMET PRECONDITION — "the thing is broken" and "I did not place it right" rendered as the
+   * same reading. So the precondition is checked FIRST, by name, and the suite goes HELD.
+   * A SECOND, SEPARATE WEAKNESS OF THE MECHANISM ITSELF, named rather than fixed here: `mtime` is a
+   * property of the CHECKOUT, not of the code — on a fresh clone every file's mtime is the clone time,
+   * so `mt(legacy) <= mt(stream)` is meaningless there and this criterion can pass locally while
+   * flapping in CI. The assertion that would survive is "the legacy file's BYTES are unchanged"
+   * (content hash), not "its mtime is older". Recorded; not rewritten in this round. */
+  if (!fs.existsSync(stream)) {
+    console.log('NEEDS-INPUT: workspace-store absent — ' + stream
+      + ' does not exist, so "the second book stays untouched" cannot be judged (anaphase is pointed'
+      + ' somewhere else). This is a PRECONDITION, not a red.');
+    process.exit(3);
+  }
   const mt = (f) => (fs.existsSync(f) ? fs.statSync(f).mtimeMs : -1);
   ok('M2-③: the SECOND book is no longer written (the legacy side log stays untouched, and the writing path is gone)',
     mt(legacy) <= mt(stream) && !fs.existsSync(legacyDir),

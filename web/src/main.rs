@@ -25,7 +25,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
      * `start-panel.sh`) derive it from there and pass it. A literal here would be a
      * fourth restatement of a fact that already had four (measured 2026-09-24:
      * 18932 in the shell launcher, 8080 in this binary and the test runner, 18932
-     * in two suites). Refusing to guess is what makes the declaration the source. */
+     * in two suites). Refusing to guess is what makes the declaration the source.
+     *
+     * HISTORY, NOT BEHAVIOUR (2026-10-09): the `8080` above is the number this binary
+     * USED TO default to, and it is the port `not_ecosystem.llama-server` owns in
+     * `Helix-Mind/docs/helixECO/ports.json` — i.e. the default once put the panel on
+     * llama-server's port, which is the collision this project actually hit. It was
+     * removed by `Cellrix:ADR-0046`; the SSOT says `panel = 50050`. Read the sentence
+     * above as a measurement, never as a current default: there is no default here to
+     * change, only this refusal. */
     let port = match args
         .windows(2)
         .find(|w| w[0] == "--port")
@@ -78,6 +86,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 return Ok(());
             }
+            /* LOUD AND NAMED (2026-10-09). The port is a shared resource and the occupant is
+             * someone else's process: "Address already in use" alone sends the reader hunting, and a
+             * banner printed just above it can read as "it started". So: say which port, say that a
+             * FOREIGN process holds it, and try to name that process. `lsof` is best-effort — absence
+             * of a name must not become absence of a failure. */
+            eprintln!("cellrix-web: FAILED TO START — port {port} is held by another process.");
+            eprintln!("             (this is not the panel; the panel is not running)");
+            if let Ok(out) = std::process::Command::new("lsof")
+                .args(["-nP", &format!("-iTCP:{port}"), "-sTCP:LISTEN"])
+                .output()
+            {
+                let listed = String::from_utf8_lossy(&out.stdout);
+                let lines: Vec<&str> = listed.lines().skip(1).take(3).collect();
+                if lines.is_empty() {
+                    eprintln!("             occupant: (lsof found none — the port may have just been freed)");
+                } else {
+                    eprintln!("             occupant:");
+                    for l in lines {
+                        eprintln!("               {l}");
+                    }
+                }
+            }
+            eprintln!("             fix: choose a free port, e.g. --port 50050 (SSOT `panel`); 8080 is llama-server's");
             return Err(e.into());
         }
     };
@@ -140,7 +171,7 @@ fn index_html(_cfg: &PanelConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::io::{Read, Write};
 
     use config::{ANAPHASE_ENDPOINT_DEFAULT, TUCK_LIMIT_DEFAULT};
     use server::{route, Route};
@@ -234,22 +265,52 @@ mod tests {
         assert_eq!(cfg.flowmodus_url.as_deref(), Some("http://127.0.0.1:7000"));
     }
 
+    /// 有界就绪等待：最多等 `budget` 让 `f` 为真，超时返回 false。
+    ///
+    /// 竞态修复（CI run #8 实证 `panel_already_up(&port)` 断言失败）：原测试
+    /// 固定 `sleep(50ms)` 后单次断言 —— listener 线程在 CI 上慢启动（调度延迟）
+    /// 时尚未就绪 ⇒ 探测失败 ⇒ 断言 panic ⇒ exit 101。
+    /// 有界轮询：慢启动 ⇒ 等它就绪（绿）；真起不来 ⇒ budget 后返回 false，
+    /// 由调用方具名失败。**有界**（不是无限等，也不是无限重试）。
+    fn wait_until(f: impl Fn() -> bool, budget: std::time::Duration) -> bool {
+        let start = std::time::Instant::now();
+        loop {
+            if f() {
+                return true;
+            }
+            if start.elapsed() >= budget {
+                return false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
     #[test]
     fn panel_already_up_detects_own_panel_and_ignores_foreign() {
         // Our panel: a listener answering with the index page marker.
+        // 服务线程 **循环** accept（真实面板持续服务；单次 accept 会让多次探测
+        // 的连接堆积），且先**读掉请求**再响应 —— 实测（2026-10-11 慢启动注入 +
+        // 最小复现）：不读请求就 close ⇒ macOS 对"close 未读数据的连接"发 RST ⇒
+        // 客户端 read 报 Connection reset ⇒ 探测 false ⇒ 断言失败。
         let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = l.local_addr().unwrap().port();
-        std::thread::spawn(move || {
+        std::thread::spawn(move || loop {
             let (mut s, _) = l.accept().unwrap();
+            let mut req = [0u8; 4096];
+            let _ = s.read(&mut req);
             let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n<div id=view-chat></div>");
         });
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        assert!(panel_already_up(&port));
+        assert!(
+            wait_until(|| panel_already_up(&port), std::time::Duration::from_secs(3)),
+            "own panel did not come up within 3s (slow-boot race; was a fixed 50ms sleep)"
+        );
         // Foreign/empty port: no panel.
         let l2 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let p2 = l2.local_addr().unwrap().port();
-        std::thread::spawn(move || {
+        std::thread::spawn(move || loop {
             let (mut s, _) = l2.accept().unwrap();
+            let mut req = [0u8; 4096];
+            let _ = s.read(&mut req);
             let _ = s.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n");
         });
         std::thread::sleep(std::time::Duration::from_millis(50));

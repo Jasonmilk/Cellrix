@@ -12,7 +12,7 @@
 /* MACHINE-READABLE, NOT ONLY HUMAN-READABLE (ADR-0048 §203): this suite already SAID
  * `NEEDS-INPUT: jsdom 未安装` — in prose. The ledger reads `REQUIRES`, so "said" and
  * "declared" were separated by a BLOCKING. Both hosts, or neither counts. */
-const REQUIRES = 'jsdom';
+const REQUIRES = 'jsdom,panel-http';;
 
 let JSDOM, VirtualConsole;
 try { ({ JSDOM, VirtualConsole } = require("jsdom")); }
@@ -36,7 +36,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   console.log(`== real render: ${BASE}  job=${JOB} ==`);
 
-  const html = await (await fetch(`${BASE}/`)).text();
+  /* A MISSING PRECONDITION IS NOT A CRASH (2026-10-09, GROWTH trap 13). Measured: without a panel
+   * this line threw `HARNESS ERROR: TypeError: fetch failed / ECONNREFUSED`, and the runner filed the
+   * suite ABORTED — "the suite crashed". But nothing was asserted and nothing is broken: the SUITE
+   * NEEDS A RUNNING PANEL, which is the `panel-http` capability it already declares elsewhere. So the
+   * precondition is named here and the suite goes HELD (exit 3), which is the same reading the runner
+   * gives any other absent capability. A crash and an unmet precondition must not share a word. */
+  let html;
+  try {
+    html = await (await fetch(`${BASE}/`)).text();
+  } catch (e) {
+    console.log('NEEDS-INPUT: panel-http absent — ' + BASE + ' did not answer (' + (e && e.message) + ').'
+      + ' This is a PRECONDITION, not a red.');
+    process.exit(3);
+  }
 
   const errors = [];
   const vc = new VirtualConsole();

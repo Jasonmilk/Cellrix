@@ -234,9 +234,12 @@ function skip(label, why) {
   /* ---- the trajectory opened ON ITS OWN ---------------------------------
    *
    * The criterion: opening the trajectory without going through the
-   * conversation shows the WHOLE chain, not one period. The expected number is
-   * recomputed by this test from the API — the app's own count would agree with
-   * itself, which is the shape of every false green this project has found.
+   * the DISPLAY loads the SEGMENT (`scope='period'`), not the lineage path — revised 2026-10-09,
+   * see the ADR-0049 revision note. The expected number is STILL recomputed independently by this
+   * test from the API (the app's own count would agree with itself — the shape of every false green
+   * this project has found); only WHICH WINDOW is recomputed changed, and it is the one the product
+   * actually loads. Evidence for the revision: clicking a card on `run-f911e602dcba3236…` loaded
+   * 24 segments / 405 events for a 16-event round, newest round last, "Turn 1" five days old.
    */
   console.log("-- prove-track: opened on its own, with no period chosen --");
   {
@@ -263,7 +266,9 @@ function skip(label, why) {
        * branch below with the FALSE reason "this panel has no period to chain" — measured: 42 periods in
        * the panel while four of the strongest assertions never ran. A false skip is worse than a red. */
       const start = list[0] && list[0].period_id;
-      const ids = start ? NORMX.chainJobIds(list, start) : [];
+      /* THE PRODUCT'S WINDOW (revised 2026-10-09): the display asks for `[start]`. The lineage path is
+       * still what CONTEXT LOADING uses (ADR-0021) — that read is server-side and untouched. */
+      const ids = start ? [start] : [];
       const byJob = {};
       for (const id of ids) {
         const j = await (await fetch(BASE + "/api/events?job_id=" + encodeURIComponent(id))).json();

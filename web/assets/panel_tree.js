@@ -291,6 +291,50 @@
         tag.textContent = isStart ? ' · 起点(仅此一轮)' : ' · 最新(点它看整段)';
         row.appendChild(tag);
       }
+      /* ADR-0049 read-only projection (human, 2026-10-09): active zone / sediment zone /
+       * rejected branch. CARBON-SILICON ISOMORPHISM (Cellrix:ADR-0021) — every visible element
+       * must be addressable by the AI, so each block carries `data-role` and every ledger line
+       * carries `data-action|when|who`. An element that is purely decorative does not exist for
+       * the AI, so it must not be drawn.
+       * RENDER PURITY: this reads only `n.row`'s fields and never Date.now()/Math.random() —
+       * the same state rendered twice must be byte-identical, or the AI cannot point at the same
+       * block in the mirror twice. */
+
+      var pr = n.row || {};
+      var stEl = doc.createElement('span');
+      stEl.className = 'pt-st';
+      stEl.setAttribute('data-role', 'converge-status');
+      stEl.setAttribute('data-status', pr.status || 'derived');
+      stEl.textContent = pr.status || '按龄期';
+      row.appendChild(stEl);
+      if (pr.gist) {
+        var gEl = doc.createElement('div');
+        gEl.className = 'pt-gist';
+        gEl.setAttribute('data-role', 'gist');
+        gEl.textContent = pr.gist;
+        row.appendChild(gEl);
+      }
+      if (pr.rejection_log && pr.rejection_log.length) {
+        /* THE WHOLE LEDGER, not the current state: a reversal is not an erasure, and a panel
+         * showing only the current state erases the history on the user's behalf
+         * (human, 2026-10-09). */
+
+        var ul = doc.createElement('ul');
+        ul.className = 'pt-rej';
+        ul.setAttribute('data-role', 'rejection-ledger');
+        ul.setAttribute('data-current', pr.rejected ? 'rejected' : 'revoked');
+        for (var li = 0; li < pr.rejection_log.length; li++) {
+          var q = String(pr.rejection_log[li]).split(' | ');
+          var item = doc.createElement('li');
+          item.setAttribute('data-action', q[2] || '');
+          item.setAttribute('data-when', q[0] || '');
+          item.setAttribute('data-who', q[1] || '');
+          item.textContent = (q[2] || '') + '（' + (q[0] || '') + ' / ' + (q[1] || '') + '）'
+            + q.slice(3).join(' | ');
+          ul.appendChild(item);
+        }
+        row.appendChild(ul);
+      }
       row.addEventListener('click', function () {
         selectOne(id);
         /* The prove-track view has its own gesture so the PRIMARY click can stay "continue this
@@ -509,25 +553,21 @@
     var hostId = opts.hostId || 's-side';
     var host = (typeof document !== 'undefined') && document.getElementById(hostId);
     if (!host) { return null; }
-    /* ONE default detail, not none and not all (P0-2g): the payload is newest-first, so opening the
-     * panel selects the newest experience exactly once. `overview first` still holds — the tree is
-     * drawn in full — while `details-on-demand` is honoured by fetching ONE period rather than N. */
-    if (!opts.selected && periods && periods.length && periods[0] && periods[0].period_id) {
-      /* THE DEFAULT SELECTION MUST BE A RENDERED ROW (ADR-0048 §249). The payload is newest-first, and
-       * the newest period can be a CONTINUATION — while the entry set here is the ROOTS. Selecting it
-       * then marked NOTHING, and the detail described a node the list did not contain:
-       * measured live as `the highlight still lands on exactly one row [0 marked]` (three criteria).
-       * So the default walks UP the parent chain to the row that is actually on screen. */
-      var want = periods[0].period_id;
-      if (opts.rootsOnly !== false) {
-        var t = buildTree(periods);
-        var guard = 0;
-        while (t.byId[want] && t.byId[want].parent && t.byId[t.byId[want].parent] && guard++ < 256) {
-          want = t.byId[want].parent;
-        }
-      }
-      opts = Object.assign({}, opts, { selected: want });
-    }
+    /* NO DEFAULT SELECTION (human ruling 2026-10-09). This block used to select the NEWEST experience
+     * on mount, and that selection is the panel's continuation target — measured in LIVE use: the first
+     * message of a brand-new conversation carried `resume_from` = a period from five days earlier, with
+     * 20 memory nodes injected. The injection side was already correct (`resume_period: None` injects
+     * nothing); the PANEL was choosing for the reader.
+     *
+     * EXPLICIT IS NOT AUTO-INJECTED (trap 18). Recent experiences stay VISIBLE in the list — that is what
+     * being visible means — without becoming the next turn's parent. Selection may only come from a click.
+     *
+     * The alternative ("keep a display-only default, add a second field for inheritance") was REJECTED:
+     * giving one slot two meanings (look-with vs carry-forward) is exactly what trap 16 forbids, and a
+     * second slot is the same defect relocated. `selected` means "you chose this" — so the slot is
+     * EMPTIED, not duplicated. The tree is still drawn in full; the detail region simply starts empty,
+     * which the sidebar already renders as a named state (§337: "the one entry that needs no
+     * selection"). */
     /* ONE SURFACE (§240.2): the sidebar already had a flat card list, and mounting a tree INTO the
      * same host left BOTH visible — the owner's "still duplicated and messy". The legacy children are
      * hidden here; the tree takes the surface. Deleting them outright is a separate step. */

@@ -284,15 +284,6 @@ mod tests {
         ("__FLOWS__", "flows.html"),
     ];
 
-    fn legacy_index_html() -> String {
-        let mut out = embedded("base.html").expect("base.html embedded").to_string();
-        for (placeholder, asset) in LEGACY {
-            out = out.replace(placeholder, embedded(asset).expect("asset embedded"));
-        }
-        out = out.replace("__REFRESH__", &crate::config::REFRESH_SECS.to_string());
-        out
-    }
-
     /// Byte offset of the first disagreement, quoted for a readable failure.
     fn first_diff(a: &str, b: &str) -> String {
         let (ab, bb) = (a.as_bytes(), b.as_bytes());
@@ -309,27 +300,63 @@ mod tests {
         format!("长度不同: 新={} 旧={}", ab.len(), bb.len())
     }
 
+    /// ★ K28（2026-10-10）：**T1a 的"逐字节等于旧机制"契约已在 `76b8d25` 被【有意作废】** ——
+    /// 那次把 `"__PANEL_TREE__"` 加进了 `boot.json`（"投影资产进清单/替换表/占位符"），
+    /// 而 `LEGACY` 是 **"pre-T1a 机制，逐字"** ⇒ **历史不该被改写**。
+    /// ⇒ 故此处把契约变更**声明为一个具名 delta**（而不是抹掉它），由两道新守卫接住：
+    ///   ① 产出逐字节等于**金样**（新契约；改了就要重生成并**写明理由**）
+    ///   ② 清单与历史的差**恰好是这一件**（任何进一步新增都必须在此声明）
+    const DECLARED_DELTA: (&str, &str) = ("__PANEL_TREE__", "panel_tree.js");
+
+    /// 守卫①：产出必须与**金样**逐字节相同。
+    /// 改了产出 ⇒ `REGEN_GOLDEN=1` 重生成，**并在提交信息里具名说明为什么**
+    /// （与 anaphase 的 `REGEN_SNAPSHOT` 同一惯例 —— 金样是**载荷的函数**，改载荷必须同步它）。
     #[test]
-    fn boot_output_is_byte_identical_to_the_legacy_mechanism() {
-        let new = render_index().expect("boot graph must assemble");
-        let old = legacy_index_html();
+    fn boot_output_matches_the_golden() {
+        let got = render_index().expect("boot graph must assemble");
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/boot_index.html");
+        if std::env::var("REGEN_GOLDEN").is_ok() {
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            std::fs::write(&path, &got).expect("write golden");
+            eprintln!("regenerated {}", path.display());
+            return;
+        }
+        let want = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "cannot read {}: {e}\n首次运行或有意变更：REGEN_GOLDEN=1 重生成，并在提交信息里写明为什么",
+                path.display()
+            )
+        });
         assert!(
-            new == old,
-            "T1a 必须是纯重构，输出须逐字节相同\n{}",
-            first_diff(&new, &old)
+            got == want,
+            "boot 产出与金样不同（若是有意变更 ⇒ REGEN_GOLDEN=1 并写明理由）\n{}",
+            first_diff(&got, &want)
         );
     }
 
+    /// 守卫②：**与历史的差必须【恰好是那一件具名资产】** —— 契约变更被声明，而不是被抹掉。
     #[test]
-    fn graph_order_matches_the_legacy_sequence() {
+    fn the_manifest_differs_from_history_by_exactly_one_declared_asset() {
         let g = graph().expect("boot.json parses");
         let got: Vec<(&str, &str)> = g
             .pieces
             .iter()
             .map(|p| (p.placeholder.as_str(), p.asset.as_str()))
             .collect();
-        let want: Vec<(&str, &str)> = LEGACY.to_vec();
-        assert_eq!(got, want, "boot.json 的 pieces 顺序/映射必须与旧序列一致");
+        let mut want: Vec<(&str, &str)> = LEGACY.to_vec();
+        let at = want
+            .iter()
+            .position(|(ph, _)| *ph == "__NORMALIZE__")
+            .expect("NORMALIZE 必须在历史表里")
+            + 1;
+        want.insert(at, DECLARED_DELTA);
+        assert_eq!(
+            got, want,
+            "清单与历史的差必须恰好是 {:?}；新增资产要在这里声明（而不是让历史悄悄变）",
+            DECLARED_DELTA
+        );
     }
 
     #[test]

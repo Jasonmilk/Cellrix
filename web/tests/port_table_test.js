@@ -63,6 +63,53 @@ function check(cfgPath) {
   const lies = names.filter(function (n) { return !comps[n].protocol; });
   say(lies.length === 0, 'scheme: every component declares its real protocol' + (lies.length ? ' (missing: ' + lies.join(',') + ')' : ''));
 
+  /* ⑤ THE PANEL'S OWN ENDPOINT LITERALS MUST BE TABLE PORTS (D2-殘, 2026-10-09).
+   *
+   * WHY THIS SECTION: ③ looks only at `mind`'s default in `config.rs`; the panel is a SEPARATE
+   * code site and carried its own endpoint literals (`routes.rs` et al). A literal that is not in
+   * the table is a SECOND SOURCE OF TRUTH — the thing the table's own doc forbids. The assertion
+   * is "declared", not "equals one particular port": a project may legitimately define a default
+   * (it must still run alone), but the number must be one the table knows.
+   *
+   * ★ AND WHY IT IS NARROW — the first draft was a BARE grep for 5/6-digit numbers and produced
+   * FALSE POSITIVES, measured: `Vec::with_capacity(size.min(65536))` (a BUFFER SIZE, 2^16) and
+   * `http://127.0.0.1:50123` inside `#[test] fn config_file_round_trip` (a fixture value).
+   * This file's sibling already records the same lesson ("every pattern below is word-bounded"
+   * after 18 false positives), so:
+   *   · only the HOST:PORT form counts — that is the shape that can drift from the SSOT;
+   *   · a `#[cfg(test)]` region is skipped (its numbers are fixtures, not endpoints);
+   *   · scope is still asserted non-empty FIRST (a scan finding nothing is green and says nothing);
+   *   · the scanned dir is a DECLARED INPUT (`PANEL_SRC`) so the mutation can point it elsewhere
+   *     (a hard-coded path would repeat §118.1's own bug: a crash read as a red).
+   */
+  const PANEL_SRC = process.env.PANEL_SRC || path.join(__dirname, '..', 'src');
+  const ENDPOINT = /(?:[A-Za-z0-9_.-]+|\d{1,3}(?:\.\d{1,3}){3}):(\d{4,5})\b/g;
+  const known = {};
+  names.forEach(function (n) { known[comps[n].port] = n; });
+  const found = [];
+  (function walk(d) {
+    fs.readdirSync(d, { withFileTypes: true }).forEach(function (e) {
+      const f = path.join(d, e.name);
+      if (e.isDirectory()) { walk(f); return; }
+      if (!/\.rs$/.test(e.name)) { return; }
+      const lines = fs.readFileSync(f, 'utf8').split('\n');
+      let inTests = false, m;
+      lines.forEach(function (line, i) {
+        if (/^\s*#\[cfg\(test\)\]/.test(line)) { inTests = true; }
+        if (inTests) { return; }                  /* fixtures, not endpoints */
+        if (/^\s*\/\//.test(line)) { return; }    /* comments are not code */
+        ENDPOINT.lastIndex = 0;
+        while ((m = ENDPOINT.exec(line)) !== null) {
+          found.push({ file: path.relative(PANEL_SRC, f) + ':' + (i + 1), port: Number(m[1]) });
+        }
+      });
+    });
+  })(PANEL_SRC);
+  say(found.length >= 5, 'panel: the scan found >= 5 host:port literals (got ' + found.length + ')');
+  const unknown = found.filter(function (x) { return !known[x.port]; });
+  say(unknown.length === 0, 'panel: every endpoint literal is a port the table declares' +
+    (unknown.length ? ' (undeclared: ' + unknown.slice(0, 5).map(function (x) { return x.port + ' at ' + x.file; }).join(', ') + ')' : ''));
+
   return bad;
 }
 

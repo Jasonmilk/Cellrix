@@ -140,7 +140,7 @@
    * for the same facts, which is how a trajectory and a conversation come to
    * tell different stories.
    */
-  function loadWindow(jobId) {
+  function loadWindow(jobId, scope) {
     var NORM = window.CxNormalize;
     return fetch('/api/sessions?limit=500').then(function (r) { return r.json(); })
       .then(function (d) {
@@ -153,7 +153,18 @@
          * one-round window — the same "a silent output merges causes" rule this cell keeps meeting. */
         var start = jobId || (list[0] && list[0].period_id) || null;
         if (!start) { throw new Error('没有可用的经历'); }
-        var ids = NORM ? NORM.chainJobIds(list, start) : [start];
+        /* TWO PROJECTIONS, ONE ENTRY (ADR-0047's third window; human ruling 2026-10-09).
+         * `scope === 'period'` = **the segment itself** — what `git show <commit>` shows and what the
+         * reader is looking at. Omitted = the LINEAGE PATH (root->leaf), which is CORRECT FOR CONTEXT
+         * LOADING (the prompt wants what this turn inherits) and WRONG FOR DISPLAY: measured live,
+         * opening the newest round listed FIVE periods and the newest message was not among them,
+         * because the window started at the root — a period from five days earlier.
+         * Branchat (CHI 2026, N=12) shows the lineage is right to VISUALISE; what was missing is the
+         * segment's own projection. CQRS: each projection serves one query mode (trap: one projection
+         * doing every job). So the caller declares which one it wants, and the tail below is shared. */
+        var ids = (scope === 'period')
+          ? [start]
+          : (NORM ? NORM.chainJobIds(list, start) : [start]);
         var walk = (NORM && typeof NORM.lastWalk === 'function') ? NORM.lastWalk() : null;
         var windowState = (walk && walk.kind) ? walk.kind : 'unnamed';
         if (!ids.length) {

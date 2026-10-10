@@ -30,7 +30,12 @@ function ok(name, cond, detail) {
 
 function runGate(scrubJsdom) {
   const env = Object.assign({}, process.env, { CX_NO_SPAWN: '1' });
-  if (scrubJsdom) { delete env.NODE_PATH; }
+  /* `NODE_PATH` WAS THE WRONG SEAM (2026-10-09). Once jsdom can be installed locally
+   * (`web/tests/node_modules`), Node resolves the bare require from the requiring file's directory
+   * and scrubbing `NODE_PATH` no longer removes the capability — so this simulation silently became
+   * a no-op and this suite went red for the RIGHT reason. The seam is explicit now; the mutation
+   * below still runs WITHOUT it, so the check stays non-vacuous. */
+  if (scrubJsdom) { delete env.NODE_PATH; env.CX_NO_JSDOM = '1'; }
   try {
     return execFileSync(process.execPath, [RUNNER], { encoding: 'utf8', env, timeout: 600000, stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (e) {

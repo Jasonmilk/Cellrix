@@ -41,7 +41,7 @@ ok('and the leaf SAYS opening it shows the whole chain', /\u770b\u6574\u6bb5/.te
 ok('a middle round carries neither tag (a prefix, not an endpoint)', rowOf('mid1').getAttribute('data-role') === null);
 ok('MUTATION: dropping the tag removes the only cue that 4/4 exists (measured root=1, leaf=4)',
   /latest/.test(String(rowOf('leaf1').getAttribute('data-role'))));
-ok('exactly one row is marked (the sidebar has one selection)', host.querySelectorAll('.ses-item.sel').length === 1);
+ok('NO row is marked (the sidebar starts with NO selection — human ruling 2026-10-09)', host.querySelectorAll('.ses-item.sel').length === 0);
 dom.window.close();
 
 console.log(fail ? ('  FAILED — ' + fail + ' check(s) red') : ('  OK — ' + pass + ' passed, 0 failed'));

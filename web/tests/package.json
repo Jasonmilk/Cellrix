@@ -1,0 +1,8 @@
+{
+  "name": "cellrix-web-tests",
+  "private": true,
+  "description": "TEST-ONLY tooling for web/tests. Nothing here is a product dependency: the panel is Rust + include_str! and must not gain a JS build system. jsdom exists so the ~38 jsdom-declaring suites can actually run instead of being filed as environment-missing.",
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

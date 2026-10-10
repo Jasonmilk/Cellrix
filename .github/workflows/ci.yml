@@ -1,0 +1,54 @@
+# Cellrix · 最小 CI（R4，2026-10-10）
+#
+# 为什么"最小"（而不是把面板套件设成硬门）：
+#   · 面板套件**依赖环境**（`cdp` / `panel` / `jsdom` / 兄弟仓）⇒ 在 CI 里 `panel` 必然缺席
+#     ⇒ 若把它设成硬门 ⇒ 立刻得到一个 **"永远红"的 CI** ⇒ 而那正是我们刚入册的反模式
+#     （`red-lifecycle` ③：**永远红的检查会教人忽略红灯**）。
+#   · ⇒ 故：**Rust 侧当硬门**（headless、确定、可判）；**面板套件当顾问**（打印读数与 RED ROSTER，不判红）。
+#   · 棘轮（只对"红名单变长"判红）需要**先在 CI 环境里跑一次拿到基线** ⇒
+#     本文件先把读数搬上 CI，**下一版**再据真实 run 的名单把棘轮钉死（这行字就是那件事的登记）。
+name: ci
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-24.04   # ★ 钉住（2026-10-10）：ubuntu-latest 将于 2026-10-19 迁到 Ubuntu 26
+                           #   ⇒ 不钉住 = 9 天后由【外部变更】决定我们的红绿（"今天绿"可能纯因环境）
+                           #   冻结是默认；预演 26 应是一次【有意】的实验，不是被动接受
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust 工具链
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: ① Rust 侧（硬门）
+        run: |
+          set +e
+          cargo test --all-features 2>&1 | tee /tmp/rust-gate.log
+          rc=${PIPESTATUS[0]}
+          # ★ 让失败【可读】：CI 日志需 admin（实测 403 ⇒ 我读不到）⇒ 写进 artifact（可下载）。
+          #   "静默仪器不能当证据"在 CI 上同样成立；**读不到的证据等于没有证据**。
+          if [ "$rc" != 0 ]; then echo "--- 末尾 150 行（完整见 artifact）---"; tail -150 /tmp/rust-gate.log; fi
+          # ★★ 耐久修法（reviewer Ⓑ，2026-10-10）：**把失败尾部同时写进 job summary** ——
+          #   CI logs 要 admin（403）· artifact 下载要凭据（401）⇒ **两者我都读不到**。
+          #   而 **job summary 是公开可读的**（网页上直接看）⇒ **从此不依赖任何凭据**。
+          if [ "$rc" != 0 ]; then
+          # ★ 失败具名 → annotations（公开可读）—— 本仓自带脚本（引擎纪律：不跨仓取文件）
+          # ★ 2026-10-11 修复：日志实际写在 /tmp/rust-gate.log（上一步 tee），此处原传 /tmp/test.log
+          #   ⇒ emit-failures 每次打出"找不到日志"（run #6 annotations 实证）⇒ 失败名从未进 annotations。
+          bash tools/emit-failures.sh /tmp/rust-gate.log || true
+            { echo '## 失败尾部（前 120 行）'; echo '```'; tail -120 /tmp/*.log 2>/dev/null | head -120; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+          exit $rc
+      - name: 上传日志（失败时也上传）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: rust-gate-log, path: /tmp/rust-gate.log, if-no-files-found: warn }
+      - name: 引擎与上游一致（R4 附带：防分叉）
+        run: bash tools/upstream-manifest.sh
+      - name: Node
+        uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: ② 面板套件（**顾问**：打印读数与 RED ROSTER，不判红）
+        run: |
+          set +e
+          node web/tests/run_all.js 2>&1 | tail -20
+          echo "::notice::面板套件在 CI 里缺 panel/cdp ⇒ 其读数与本地不可比；棘轮基线待本 run 后钉定"
+          exit 0

@@ -54,6 +54,18 @@ const SELF_CONTAINED = [
   ['compact_fold_test.js', 'the fold must be able to happen at all (the container row must not veto it)'],
   ['agent_loop_skeleton_test.js', 'the EIGHT Agent Loop criteria, written BEFORE the Loop (4 live homes, 4 declared absent with assertion+mutation)'],
   ['panel_tree_test.js', 'DAG navigation core: edges == parents, structural closures, three NAMED modes'],
+  /* REGISTERED 2026-10-09 — three suites that were ON DISK and in NO register, i.e. never ran.
+   * Two of them test exactly the defects this month hit: the port table (8080 vs llama-swap) and the
+   * reply line naming the model that ACTUALLY served the turn (C1's `model` leg). Their criteria
+   * existed; only the instrument was switched off. */
+  ['port_table_test.js', 'THE PORT TABLE IS THE SINGLE SOURCE — the colliding legacy default put back is its mutation'],
+  ['chat_model_test.js', 'the reply line names the model that ACTUALLY served the turn (C1 model leg, front half)'],
+  ['render_test.js', 'the LIVE panel page through the real render path (jsdom + panel-http)'],
+  /* DUPLICATES REMOVED 2026-10-09: those four were ALREADY in this roster (fork_entry:116,
+   * session_addressable:117, newest_first:72, chain_e2e:75) — the insert was a REPEAT, and a repeat
+   * is a double count: one suite = one line = one count (runner's own rule, line ~408). Measured
+   * consequence: `newest_first_contract_test` reported BOTH "PASS" and "UNREGISTERED/BLOCKING",
+   * which read as "the classifier lies" but was one member counted twice. */
   ['code_language_test.js', 'code and comments are English: declared-clean files asserted, backlog counted, detector mutates'],
   ['plan_dag_test.js', 'the plan is a DAG: acyclic, deps exist, single focus, frontier printed'],
   ['agent_loop_probe_test.js', 'THE FOUR PROBES: red until the Loop exists (a declaration with a name, not a disease)'],
@@ -424,9 +436,16 @@ for (const [file, what] of SELF_CONTAINED) {
    * suite silently got nothing, answered NEEDS-INPUT, and was filed `UNREGISTERED/BLOCKING — capability
    * IS present (probed), yet this suite is unproven` (measured with `events_param_contract_test.js`).
    * The explicit list below stays only as a fallback for suites that have not declared yet. */
-  const req = declaredRequires(file);
-  const extra = (req === 'cdp-browser') ? [PANEL, CDP]
-    : (req === 'panel-http') ? [PANEL]
+  /* MULTI-CAPABILITY (2026-10-09). A suite may need MORE THAN ONE capability: `render_test.js` needs
+   * jsdom AND the panel address. `declaredRequires` returns the raw declaration, so the capabilities
+   * are read as a LIST (`'jsdom,panel-http'`). Before this, a suite declaring only `jsdom` got
+   * `extra = []`, never received the panel address, answered NEEDS-INPUT for that reason, and was then
+   * filed UNREGISTERED/BLOCKING — "registered but does not run", which is the same dead end as before.
+   * ADDING IT TO THE ROSTER ALONE WOULD NOT HAVE MADE IT RUN. */
+  const reqs = String(declaredRequires(file) || '').split(/[,\s]+/).filter(Boolean);
+  const req = reqs[0] || null;
+  const extra = reqs.indexOf('cdp-browser') >= 0 ? [PANEL, CDP]
+    : reqs.indexOf('panel-http') >= 0 ? [PANEL]
     : (file === 'layout_test.js' || file === 'measure_test.js'
        || file === 'perf_measure.js' || file === 'hit_targets_test.js') ? [PANEL, CDP] : [];
   try {
@@ -550,8 +569,15 @@ function panelUrl() {
 function probeOk(name) {
   if (Object.prototype.hasOwnProperty.call(PROBE_CACHE, name)) { return PROBE_CACHE[name]; }
   if (name === 'jsdom') {
-    let okJsdom = false;
-    try { require.resolve('jsdom'); okJsdom = true; } catch (e) { okJsdom = false; }
+    /* THE SIMULATION SEAM IS EXPLICIT, NOT `NODE_PATH` (2026-10-09). `CX_NO_JSDOM` exists so a gate
+     * can ask "what does this repo look like WITHOUT the capability?" — P64's whole point. It used to
+     * be simulated by deleting `NODE_PATH`, which stopped working the moment jsdom could be installed
+     * LOCALLY (`web/tests/node_modules`): Node resolves a bare require from the REQUIRING FILE's
+     * directory, so no amount of `NODE_PATH` scrubbing removes it, and P64's simulation silently
+     * became a no-op (`0 suite(s) held`). A correct repair that breaks the simulation is a real
+     * finding: the seam, not the dependency, was wrong. */
+    let okJsdom = !process.env.CX_NO_JSDOM;
+    if (okJsdom) { try { require.resolve('jsdom'); } catch (e) { okJsdom = false; } }
     PROBE_CACHE[name] = okJsdom;
     return okJsdom;
   }
@@ -610,7 +636,8 @@ function declaredRequires(file) {
 }
 function classify(file) {
   if (!DEFERRALS) { return { kind: 'unknown', why: 'no deferrals.json — nothing is registered' }; }
-  const cap = declaredRequires(file);
+  const caps = String(declaredRequires(file) || '').split(/[,\s]+/).filter(Boolean);
+  const cap = caps[0] || null;
   /* P64 (ADR-0048 §344): JSDOM DEPENDENCE IS MEASURED, NOT MERELY DECLARED. Measured: on a machine without
    * jsdom SIX suites were counted as RED — a red that is a property of the ENVIRONMENT, not of the code
    * (they `require('jsdom')` but declared only `panel-http`, whose probe passed). Two things happen here:
@@ -986,7 +1013,10 @@ console.log(failed === 0
         var names = ['Helix-Mind', 'Anaphase-Helix', 'FlowModus'];
         return names.filter(function (n) { return fsx.existsSync(px.join(root, n)); }).length + '/' + names.length;
       })()
-    + ' jsdom=' + (function () { try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })()
+    + ' jsdom=' + (function () {
+        if (process.env.CX_NO_JSDOM) { return 'no (simulated)'; }
+        try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; }
+      })()
     + ']'
     + (abortedRoster.length ? ', ' + abortedRoster.length + ' ABORTED (not red)' : '')
     + (envMissingRoster.length ? ', ' + envMissingRoster.length + ' env-missing (not red)' : '')
@@ -995,4 +1025,91 @@ console.log(failed === 0
 /* XPASS is NOT a red test: a red test means "fix the code", XPASS means "fix the
  * ledger". Merging them into exit 1 would guarantee the wrong remedy, so XPASS
  * rides the register channel (3 = the checker's own bookkeeping is stale). */
+/* THE RESULT IS WRITTEN WHERE A READER CAN CHECK IT (phyt-DNA ledger/ · append-only).
+ * WHY: this harness has been printing, every run, that its own criterion count is read from a
+ * HAND-WRITTEN table — "structurally a claim, not evidence". That was true because the run left no
+ * record. A generated line per run is evidence; a typed-in table is a claim.
+ * `kind: scan` on purpose: the template counts only `kind: task` as a production metric, and a
+ * suite sweep is not a task. Absent ledger/ is not an error (a checkout may not carry one). */
+(function () {
+  try {
+    var fsL = require('fs'), pxL = require('path');
+    var dir = pxL.join(__dirname, '..', '..', 'ledger');
+    if (!fsL.existsSync(dir)) { return; }
+    /* STRUCTURED, NOT PROSE (human ruling 2026-10-09 · P6+P7).
+     * WHY: a free-text `note` cannot be compared between two runs, so the ledger recorded history
+     * without being able to answer "did anything change". The counts and the environment move into
+     * fields a machine reads.
+     * AND THE ENVIRONMENT IS PROBED, NEVER TYPED: a hand-written env is the same disease as a
+     * hand-written note — it would happily say `panel=up` while the panel is down. These values are
+     * the SAME probes the verdict line already uses (ADR-0048 §200: a count without its environment
+     * is not comparable across commits). */
+    var envPanel = probeOk('panel');
+    var envSiblings = (function () {
+      var fsx = require('fs'), px = require('path'), root = px.join(__dirname, '..', '..', '..');
+      var names = ['Helix-Mind', 'Anaphase-Helix', 'FlowModus'];
+      return { present: names.filter(function (n) { return fsx.existsSync(px.join(root, n)); }).length, of: names.length };
+    })();
+    /* ★ THE MULTIMETER'S SECOND AXIS (phyt-DNA BACKFLOW P11, 2026-10-09).
+     * A verdict is not one value. `pass | block` cannot tell these four apart:
+     *   TRUE GREEN   passed AND can be shown to fail (a fixture exists that crosses the threshold)
+     *   FALSE GREEN  passed but no fixture — nobody ever proved it can go red
+     *   TRUE RED     failed for a nameable reason (the criterion)
+     *   FALSE RED    failed for a reason that is NOT the criterion (tool usage error, missing
+     *                precondition, or — the nastiest — the same command answering differently)
+     * The fence that makes it more than advice: `pass` ALONE IS NOT REPORTABLE. A green set with no
+     * fixtures is not green, it is UNMEASURED (the same rule as the zero-gate BLOCK in validate.sh).
+     * `fingerprint` is the timing axis: it names this run's verdict so TWO runs can be compared —
+     * if the same command yields two fingerprints, the verdict is FLAKY and is neither red nor green. */
+    var cryptoL = require('crypto');
+    var redRosterSorted = (typeof redRoster !== 'undefined' ? redRoster : []).map(function (r) { return typeof r === 'string' ? r : (r && (r.name || r.file)) || String(r); }).sort();
+    var fp = cryptoL.createHash('sha256').update(JSON.stringify({
+      proven: proven, red: failed, held: deferred.length, unregistered: unknown.length,
+      reds: redRosterSorted
+    })).digest('hex').slice(0, 12);
+    var withFixture = 0;
+    try {
+      var fsF = require('fs'), pxF = require('path');
+      var fxDir = pxF.join(__dirname, '..', '..', 'fixtures');
+      if (fsF.existsSync(fxDir)) {
+        withFixture = fsF.readdirSync(fxDir, { withFileTypes: true })
+          .filter(function (e) { return e.isDirectory() && fsF.existsSync(pxF.join(fxDir, e.name, 'inject.sh')); })
+          .length;
+      }
+    } catch (e) { /* a count we cannot read is left at 0, and `alive` says so */ }
+
+    var rec = {
+      ts: new Date().toISOString(),
+      gate_id: 'suite',
+      task: 'run_all',
+      verdict: failed === 0 ? 'pass' : 'block',
+      override: false,
+      source: 'cli',
+      event_id: 'suite-' + Date.now() + '-' + process.pid,
+      kind: 'scan',
+      counts: { proven: proven, red: failed, held: deferred.length, unregistered: unknown.length,
+                aborted: abortedRoster.length, envMissing: envMissingRoster.length },
+      fingerprint: fp,
+      validity: {
+        /* TRUE GREEN candidates = gates that have a fixture (they can be shown to fail).
+         * Anything counted `proven` beyond this is a FALSE GREEN candidate: unproven, not measured. */
+        gatesWithFixture: withFixture,
+        provenWithoutFixture: Math.max(0, proven - withFixture),
+        falseGreenRisk: proven > 0 && withFixture === 0 ? 'ALL' : (proven > withFixture ? 'PARTIAL' : 'NONE'),
+        redIsAttributable: failed === 0 ? null : 'see RED ROSTER (a count is not attributable)'
+      },
+      env: { cdp: probeOk('cdp') ? 'up' : 'down',
+             panel: envPanel === true ? 'up' : (envPanel === null ? 'unknown' : 'down'),
+             jsdom: (function () { if (process.env.CX_NO_JSDOM) { return 'no (simulated)'; }
+                                   try { require.resolve('jsdom'); return 'yes'; } catch (e) { return 'no'; } })(),
+             siblings: envSiblings },
+      note: 'proven=' + proven + ' red=' + failed + ' held=' + deferred.length
+        + ' unregistered=' + unknown.length + ' aborted=' + abortedRoster.length
+    };
+    fsL.appendFileSync(pxL.join(dir, 'hits-2026.jsonl'), JSON.stringify(rec) + '\n');
+  } catch (e) {
+    /* A WRITE FAILURE MUST NEVER DECIDE THE VERDICT: it is printed, not thrown. */
+    console.error('  WARN  ledger append failed: ' + (e && e.message));
+  }
+})();
 process.exit(failed > 0 ? 1 : (xpass.length > 0 ? 3 : (unknown.length > 0 ? 2 : 0)));

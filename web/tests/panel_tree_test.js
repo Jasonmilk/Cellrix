@@ -39,6 +39,70 @@ ok(t.byId.a.children.join(',') === 'b,c', 'the fork has two children (a ⇒ b,c)
 ok(t.byId.x.truncated === 'ghost',
   'a parent outside the list is a TRUNCATED walk, not a second root (declared)');
 
+/* ADR-0049 read-only projection / targets 2+3 — RENDER ASSERTIONS THAT NEED NO jsdom
+ * (human, 2026-10-09).
+ * The intended home, all_views_test.js, does not execute here: without jsdom that family only
+ * prints NEEDS-INPUT and exits 3 (this file repeats that three times below). Writing the
+ * assertions there would produce a test that NEVER RUNS. So this hand-rolled minimal DOM stub
+ * keeps the assertions on the RENDER OUTPUT, not on "the function I wrote" (trap 7). */
+function stubDoc() {
+  function el(tag) {
+    return {
+      tagName: tag, children: [], attrs: {}, _text: '', className: '', style: {},
+      setAttribute(k, v) { this.attrs[k] = String(v); },
+      getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
+      appendChild(c) { this.children.push(c); return c; },
+      removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) { this.children.splice(i, 1); } return c; },
+      insertBefore(c) { this.children.unshift(c); return c; },
+      addEventListener() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      get textContent() { return this._text; },
+      set textContent(v) { this._text = String(v); this.children.length = 0; }
+    };
+  }
+  const d = { createElement: el, createTextNode(t) { return { _text: String(t), children: [] }; } };
+  d.ownerDocument = d;
+  return d;
+}
+function serialize(node, out) {
+  out = out || [];
+  if (!node) { return out; }
+  const a = node.attrs
+    ? Object.keys(node.attrs).sort().map((k) => k + '=' + node.attrs[k]).join(';') : '';
+  out.push((node.tagName || '') + '[' + a + ']' + (node._text || ''));
+  (node.children || []).forEach((c) => serialize(c, out));
+  return out;
+}
+const PROJECTED = [{
+  period_id: 'p1', parent: null, name: 'A', status: 'converged', gist: '沉底摘要',
+  rejected: false,
+  rejection_log: ['2026-10-09T00:00:00Z | human | reject | 因为X，所以不吸收',
+                  '2026-10-09T03:00:00Z | human | revoke | 因为Y，所以撤销']
+}];
+const h1 = stubDoc(); const host1 = h1.createElement('div'); host1.ownerDocument = h1;
+PT.render(host1, PROJECTED, {});
+const h2 = stubDoc(); const host2 = h2.createElement('div'); host2.ownerDocument = h2;
+PT.render(host2, PROJECTED, {});
+const s1 = serialize(host1).join('\n');
+const s2 = serialize(host2).join('\n');
+
+/* 目标 3 —— render 纯。变异：渲染里注入 Date.now()/Math.random() ⇒ 这条红。 */
+ok(s1 === s2, 'PURE: 同一 state 渲染两次 ⇒ 输出逐字节相同（目标 3）');
+/* 目标 1 —— 碳硅同构：人类看到几块，AI 就能指到几块。 */
+ok(s1.indexOf('data-role=converge-status') >= 0 && s1.indexOf('data-status=converged') >= 0,
+  'ADDRESSABLE: 收敛状态块（data-role + data-status）');
+ok(s1.indexOf('data-role=gist') >= 0 && s1.indexOf('沉底摘要') >= 0,
+  'ADDRESSABLE: 沉淀区 gist');
+ok(s1.indexOf('data-role=rejection-ledger') >= 0 && s1.indexOf('data-current=revoked') >= 0,
+  'ADDRESSABLE: 被驳回支线 + 当前态（最后一行 = revoke ⇒ revoked）');
+const ledgerLines = (s1.match(/data-action=(reject|revoke)/g) || []).length;
+ok(ledgerLines === 2,
+  'LEDGER: 整本流水账逐行可寻址（' + ledgerLines + ' 行）—— 面板不得替用户把历史擦了');
+ok(s1.indexOf('data-when=2026-10-09T00:00:00Z') >= 0 && s1.indexOf('data-who=human') >= 0,
+  'LEDGER: 每行带 when/who');
+
+
 const cl = PT.ancestorClosure(t, 'd');
 ok(cl.path.join('>') === 'r>a>c>d', 'ancestor closure is the single root path, root-first  [' + cl.path.join('>') + ']');
 ok(cl.truncated === null && cl.cycle === false, 'and it is neither truncated nor cyclic');
@@ -69,6 +133,15 @@ ok(PT.modeFacts('Nonsense').kind === 'undeclared', 'a made-up mode is undeclared
 const broken = PT.buildTree(PERIODS.concat([{ period_id: 'z', parent: null }]));
 ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   'MUTATION scope: adding a root changes roots, not edges — so the edge equality is about parents');
+/* The pure section above needs no jsdom, so its failure must appear AS A FAILURE: otherwise the
+ * file exits 3 below for missing jsdom (NEEDS-INPUT) and swallows a pure-section red as "did not
+ * run" — GROWTH trap 10 (a checker silently swallowing a line). A missing jsdom is an ENVIRONMENT
+ * fact, not this section's red. */
+if (bad) {
+  console.log('\nPURE SECTION FAILED: ' + bad + ' assertion(s) — 这不是 NEEDS-INPUT，是 FAIL');
+  process.exit(1);
+}
+
 
 /* ── DOM: overview first, details ON DEMAND (§227 / Shneiderman) ── */
 {
@@ -309,12 +382,16 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   const host = w.document.getElementById('s-side');
   w.CxPanelTree.mountSidebar(P3, {});
   const marked = host.querySelectorAll('.ses-item[aria-current="true"]');
-  ok(marked.length === 1, 'exactly ONE rendered row carries aria-current at load  [' + marked.length + ']');
-  ok(marked.length === 1 && marked[0].getAttribute('data-period') === 'root-1',
-    'and it is the ROOT of the newest continuation — a row that is actually rendered  ['
-    + (marked[0] && marked[0].getAttribute('data-period')) + ']');
-  ok(marked.length === 1,
-    'MUTATION: whether or not the newest period is rendered, the marker stays EXACTLY ONE  [' + marked.length + ']');
+  /* REWRITTEN 2026-10-09 (human ruling: no default selection). These three used to demand that the
+   * mount mark EXACTLY ONE row — the newest — as the default detail. That contract is GONE: a bare
+   * open selects nothing, because the selection is the panel's continuation target and the panel may
+   * not choose it for the reader (measured live: a brand-new conversation inherited a five-day-old
+   * period). Not deleted — turned around, so they still guard a real property and still go red if a
+   * default comes back. */
+  ok(marked.length === 0,
+    'NO row carries aria-current at load — a bare open selects NOTHING  [' + marked.length + ']');
+  ok(marked.length === 0,
+    'MUTATION: restoring a default selection puts a marked row back ⇒ this goes red  [' + marked.length + ']');
   dom.window.close();
 }
 
@@ -496,10 +573,14 @@ ok(broken.edges.length === nonNullParents && broken.roots.length === 2,
   T.mountSidebar(PERIODS, { fetchRows: function (id) { calls.push(id); return []; } });
   const box = w.document.querySelector('[data-panel-tree]');
   ok(!!box, 'the mount creates its OWN container under the host (the list is untouched)');
-  ok(calls.length === 1, 'opening the panel fetches detail for EXACTLY ONE period  [' + calls + ']');
+  /* REWRITTEN 2026-10-09: the mount must fetch NO detail, because it selects nothing. The old
+   * "EXACTLY ONE" was the default selection seen from the fetch side — same contract, same removal. */
+  ok(calls.length === 0,
+    'opening the panel fetches NO detail — nothing is selected to fetch it for  [' + calls + ']');
   const selected = box.querySelector('[aria-selected="true"]');
-  ok(!!selected && selected.getAttribute('data-period') === PERIODS[0].period_id,
-    'and the default selection is the newest experience  [' + (selected && selected.getAttribute('data-period')) + ']');
+  ok(!selected,
+    'and there is NO default selection — the newest experience is NOT chosen for the reader  ['
+    + (selected && selected.getAttribute('data-period')) + ']');
   /* SEMANTICS UPDATED WITH THE CODE (§240.3 ⑤): the SIDEBAR's entry set is the forest's ROOTS —
    * the full DAG is still one call away (`render(..., {rootsOnly:false})`), and that is asserted in
    * the block below. Exactly ONE assertion moved, because the change was confined to ONE caller. */
@@ -567,3 +648,46 @@ setTimeout(function () {
     : 'FAILED — ' + bad + ' check(s) red');
   process.exit(bad ? 1 : 0);
 }, 0);
+
+/* ── 默认不选中（人类裁决 2026-10-09）────────────────────────────────────────────
+ * 这一对守卫落在**被消费的那一层**：选中态就是面板的续接目标（它流进 nav.meta.job_id，
+ * 而 chat.js 把它当 job_id 发出）。可观测 = detail 区出现 `[data-path]`。
+ * 第一条：**裸开面板 ⇒ 无选中**（新开一轮不得继承）。变异=把默认选中加回去 ⇒ 红。
+ * 第二条：**显式选中 ⇒ 有选中**（证明"继续"这条路没被一起改坏）。 */
+{
+  let JSDOM2;
+  try { ({ JSDOM: JSDOM2 } = require('jsdom')); } catch (e) {
+    console.log('NEEDS-INPUT: jsdom not installed (default-selection guard)');
+  }
+  if (JSDOM2) {
+    const dom = new JSDOM2('<!DOCTYPE html><body><div id="s-side"></div><div id="pt-detail"></div></body>',
+      { runScripts: 'outside-only' });
+    const w = dom.window;
+    w.document.getElementById('pt-detail');
+    w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'three_state.js'), 'utf8'));
+    w.eval(fs.readFileSync(path.join(__dirname, '..', 'assets', 'panel_tree.js'), 'utf8'));
+    const PTB = w.CxPanelTree;
+    ok(!!PTB && typeof PTB.mountSidebar === 'function', 'panel_tree mounts in a real document (jsdom)');
+
+    const PERIODS2 = [
+      { period_id: 'p2', parent: 'p1', name: 'newest', first_ts: '2026-10-09T02:22:00Z' },
+      { period_id: 'p1', parent: null, name: 'older', first_ts: '2026-10-04T07:00:00Z' }
+    ];
+    const marked = (id) => {
+      const host = w.document.getElementById(id);
+      return !!host && host.querySelectorAll('[data-path]').length > 0;
+    };
+
+    PTB.mountSidebar(PERIODS2, { hostId: 's-side' });
+    ok(!marked('s-side'),
+      'NO DEFAULT SELECTION: a bare open leaves nothing selected (so a new turn inherits nothing)');
+
+    /* 第二条：显式选中仍然工作 —— 否则"一并改坏"不会被发现。 */
+    const host2 = w.document.createElement('div');
+    host2.id = 's-side-2';
+    w.document.body.appendChild(host2);
+    PTB.mountSidebar(PERIODS2, { hostId: 's-side-2', selected: 'p2' });
+    ok(marked('s-side-2'),
+      'EXPLICIT SELECTION still selects: clicking a segment is the only way to carry it forward');
+  }
+}
