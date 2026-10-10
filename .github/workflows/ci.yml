@@ -17,7 +17,18 @@ jobs:
       - name: Rust 工具链
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: ① Rust 侧（硬门）
-        run: cargo test --all-features
+        run: |
+          set +e
+          cargo test --all-features 2>&1 | tee /tmp/rust-gate.log
+          rc=${PIPESTATUS[0]}
+          # ★ 让失败【可读】：CI 日志需 admin（实测 403 ⇒ 我读不到）⇒ 写进 artifact（可下载）。
+          #   "静默仪器不能当证据"在 CI 上同样成立；**读不到的证据等于没有证据**。
+          if [ "$rc" != 0 ]; then echo "--- 末尾 150 行（完整见 artifact）---"; tail -150 /tmp/rust-gate.log; fi
+          exit $rc
+      - name: 上传日志（失败时也上传）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: rust-gate-log, path: /tmp/rust-gate.log, if-no-files-found: warn }
       - name: 引擎与上游一致（R4 附带：防分叉）
         run: bash tools/upstream-manifest.sh
       - name: Node
