@@ -1,0 +1,31 @@
+# Cellrix · 最小 CI（R4，2026-10-10）
+#
+# 为什么"最小"（而不是把面板套件设成硬门）：
+#   · 面板套件**依赖环境**（`cdp` / `panel` / `jsdom` / 兄弟仓）⇒ 在 CI 里 `panel` 必然缺席
+#     ⇒ 若把它设成硬门 ⇒ 立刻得到一个 **"永远红"的 CI** ⇒ 而那正是我们刚入册的反模式
+#     （`red-lifecycle` ③：**永远红的检查会教人忽略红灯**）。
+#   · ⇒ 故：**Rust 侧当硬门**（headless、确定、可判）；**面板套件当顾问**（打印读数与 RED ROSTER，不判红）。
+#   · 棘轮（只对"红名单变长"判红）需要**先在 CI 环境里跑一次拿到基线** ⇒
+#     本文件先把读数搬上 CI，**下一版**再据真实 run 的名单把棘轮钉死（这行字就是那件事的登记）。
+name: ci
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust 工具链
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: ① Rust 侧（硬门）
+        run: cargo test --all-features
+      - name: 引擎与上游一致（R4 附带：防分叉）
+        run: bash tools/upstream-manifest.sh
+      - name: Node
+        uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: ② 面板套件（**顾问**：打印读数与 RED ROSTER，不判红）
+        run: |
+          set +e
+          node web/tests/run_all.js 2>&1 | tail -20
+          echo "::notice::面板套件在 CI 里缺 panel/cdp ⇒ 其读数与本地不可比；棘轮基线待本 run 后钉定"
+          exit 0
