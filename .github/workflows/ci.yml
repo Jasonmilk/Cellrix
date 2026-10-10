@@ -24,6 +24,12 @@ jobs:
           # ★ 让失败【可读】：CI 日志需 admin（实测 403 ⇒ 我读不到）⇒ 写进 artifact（可下载）。
           #   "静默仪器不能当证据"在 CI 上同样成立；**读不到的证据等于没有证据**。
           if [ "$rc" != 0 ]; then echo "--- 末尾 150 行（完整见 artifact）---"; tail -150 /tmp/rust-gate.log; fi
+          # ★★ 耐久修法（reviewer Ⓑ，2026-10-10）：**把失败尾部同时写进 job summary** ——
+          #   CI logs 要 admin（403）· artifact 下载要凭据（401）⇒ **两者我都读不到**。
+          #   而 **job summary 是公开可读的**（网页上直接看）⇒ **从此不依赖任何凭据**。
+          if [ "$rc" != 0 ]; then
+            { echo '## 失败尾部（前 120 行）'; echo '```'; tail -120 /tmp/*.log 2>/dev/null | head -120; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+          fi
           exit $rc
       - name: 上传日志（失败时也上传）
         if: always()
