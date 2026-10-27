@@ -41,7 +41,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with: { name: rust-gate-log, path: /tmp/rust-gate.log, if-no-files-found: warn }
-      - name: 引擎与上游一致（R4 附带：防分叉）
+      - name: 引擎副本未漂（自签指纹；≠ 上游对齐）
         run: bash tools/upstream-manifest.sh
       - name: Node
         uses: actions/setup-node@v4
