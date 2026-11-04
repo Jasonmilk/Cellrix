@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cellrix 架构研讨图 v12 · Ω 判别力 → 四层 + 进程轴 → 目标导向闭环</title>
+<style>
+:root{
+  --bg:#0b0f16; --card:#161d2b; --card2:#1b2333;
+  --line:#2a3446; --line2:#3a4761;
+  --txt:#e6edf7; --txt2:#9fb0c9; --txt3:#6b7d99;
+  --green:#3fb950; --orange:#e3a008; --purple:#bc8cff;
+  --blue:#58a6ff; --cyan:#39c5cf; --red:#f85149; --pink:#ff7b9c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","WenQuanYi Micro Hei",Arial,sans-serif;
+  line-height:1.7;font-size:15px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px 80px}
+
+/* nav */
+nav{position:sticky;top:0;z-index:50;background:rgba(11,15,22,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1200px;margin:0 auto;padding:9px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.nav-in::-webkit-scrollbar{display:none}
+.nav-in a{flex:0 0 auto;padding:5px 13px;border-radius:18px;font-size:12.5px;color:var(--txt2);
+  text-decoration:none;border:1px solid var(--line);white-space:nowrap;transition:.2s}
+.nav-in a:hover{color:var(--txt);border-color:var(--line2);background:var(--card)}
+.nav-in a.on{color:#0b0f16;background:var(--blue);border-color:var(--blue);font-weight:600}
+
+/* hero */
+header{padding:44px 0 24px;text-align:center}
+.kicker{display:inline-block;font-size:11.5px;letter-spacing:.18em;color:var(--cyan);
+  border:1px solid rgba(57,197,207,.35);border-radius:18px;padding:3px 13px;margin-bottom:16px}
+h1{font-size:clamp(23px,4.8vw,37px);line-height:1.28;font-weight:700;letter-spacing:-.01em}
+h1 .hl{background:linear-gradient(100deg,var(--blue),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin:14px auto 0;max-width:760px;color:var(--txt2);font-size:14.5px}
+.sub b{color:var(--txt)}
+
+.law{margin:24px auto 0;max-width:900px;border-radius:14px;padding:15px 20px;
+  background:linear-gradient(135deg,rgba(188,140,255,.10),rgba(88,166,255,.08));
+  border:1px solid var(--line2);font-size:14.5px;text-align:left}
+.law .k{color:var(--purple);font-weight:700;margin-right:8px;font-size:12px;letter-spacing:.06em}
+.law .why{display:block;margin-top:7px;padding-top:8px;border-top:1px dashed var(--line2);font-size:12.5px;color:var(--txt3)}
+
+/* diff banner */
+.diffbox{margin:14px auto 0;max-width:900px;border-radius:13px;padding:14px 18px;
+  background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.28);text-align:left}
+.diffbox .dt{font-size:12px;font-weight:800;color:var(--green);letter-spacing:.06em;margin-bottom:8px}
+.diffbox ul{list-style:none;font-size:12.8px;color:var(--txt2);line-height:1.85}
+.diffbox li{padding-left:16px;position:relative}
+.diffbox li::before{content:"▸";position:absolute;left:0;color:var(--green)}
+.diffbox li b{color:var(--txt)}
+
+/* section */
+section{padding-top:46px}
+.sec-h{display:flex;align-items:center;gap:11px;margin-bottom:6px;flex-wrap:wrap}
+.sec-n{width:27px;height:27px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;
+  font-size:12.5px;font-weight:700;background:var(--card2);border:1px solid var(--line2);color:var(--blue)}
+h2{font-size:clamp(18px,3.3vw,24px);font-weight:700;letter-spacing:-.01em}
+.sec-d{color:var(--txt3);font-size:13px;margin:0 0 18px 38px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px 19px}
+.card+.card{margin-top:12px}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:7px 16px;margin:0 0 15px;font-size:12.5px;color:var(--txt2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.lg-done{background:var(--green)} .lg-move{background:var(--orange)} .lg-new{background:var(--purple)} .lg-warn{background:var(--red)}
+
+/* tags */
+.tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:5px;letter-spacing:.02em;white-space:nowrap}
+.t-done{background:rgba(63,185,80,.16);color:var(--green);border:1px solid rgba(63,185,80,.32)}
+.t-move{background:rgba(227,160,8,.16);color:var(--orange);border:1px solid rgba(227,160,8,.32)}
+.t-new{background:rgba(188,140,255,.14);color:var(--purple);border:1px solid rgba(188,140,255,.3)}
+.t-later{background:rgba(107,125,153,.16);color:var(--txt2);border:1px solid var(--line2)}
+.t-warn{background:rgba(248,81,73,.14);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+.t-ok{background:rgba(63,185,80,.16);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+.t-ax{background:rgba(57,197,207,.15);color:var(--cyan);border:1px solid rgba(57,197,207,.32)}
+
+/* axioms */
+.axgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:11px}
+.ax{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;position:relative;overflow:hidden}
+.ax.a1{border-color:rgba(88,166,255,.42);background:linear-gradient(160deg,rgba(88,166,255,.09),var(--card))}
+.ax.up{border-color:rgba(63,185,80,.38)}
+.ax .n{font-size:11px;font-weight:800;color:var(--blue);letter-spacing:.08em;margin-bottom:5px}
+.ax .t{font-size:14.5px;font-weight:700;margin-bottom:6px}
+.ax .b{font-size:12.5px;color:var(--txt2);line-height:1.62}
+.ax .j{margin-top:8px;padding-top:7px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--txt3)}
+.ax .j b{color:var(--cyan);font-weight:600}
+.ax .fire{margin-top:7px;font-size:11px;color:var(--txt3)}
+.ax .fire b{color:var(--green)}
+.ax .first{position:absolute;top:0;right:0;font-size:9.5px;background:var(--blue);color:#0b0f16;
+  padding:2px 8px;border-bottom-left-radius:8px;font-weight:800;letter-spacing:.05em}
+.ax .badge{position:absolute;top:0;right:0;font-size:9.5px;background:var(--green);color:#0b0f16;
+  padding:2px 8px;border-bottom-left-radius:8px;font-weight:800;letter-spacing:.05em}
+
+/* svg */
+.svgbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;overflow-x:auto}
+svg{display:block;width:100%;height:auto;min-width:760px}
+
+/* layers */
+.layers{display:flex;flex-direction:column;gap:10px}
+.layer{display:grid;grid-template-columns:150px 1fr;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.lh{padding:15px 13px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.lh .nm{font-size:16px;font-weight:700}
+.lh .old{font-size:11px;color:var(--txt3)}
+.lh .old s{opacity:.6}
+.lh .q{font-size:11.5px;color:var(--txt3);font-style:italic}
+.lh .src{font-size:10.5px;margin-top:3px}
+.lb{padding:13px;display:flex;flex-wrap:wrap;gap:9px;align-items:stretch;border-left:1px solid var(--line)}
+.mod{flex:1 1 205px;min-width:190px;background:var(--card2);border:1px solid var(--line);
+  border-radius:11px;padding:10px 12px;border-left-width:3px;position:relative}
+.mod.d{border-left-color:var(--green);background:linear-gradient(90deg,rgba(63,185,80,.055),var(--card2))}
+.mod.m{border-left-color:var(--orange);background:linear-gradient(90deg,rgba(227,160,8,.055),var(--card2))}
+.mod.n{border-left-color:var(--purple);background:linear-gradient(90deg,rgba(188,140,255,.05),var(--card2))}
+.mod .mn{font-size:12.8px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mod .md{font-size:11.5px;color:var(--txt3);line-height:1.55}
+.mod .mt{margin-top:7px;padding-top:6px;border-top:1px dashed var(--line);font-size:11px;line-height:1.6}
+.mod .mt .r{color:var(--txt2)} .mod .mt .r b{color:var(--orange);font-weight:600}
+.mod .mt .s{color:var(--txt3);margin-top:2px} .mod .mt .s b{color:var(--cyan);font-weight:600}
+.mod .own{position:absolute;top:8px;right:9px;font-size:9.5px;color:var(--cyan);letter-spacing:.03em}
+.l4{border-color:rgba(255,123,156,.3)} .l4 .lh{background:linear-gradient(180deg,rgba(255,123,156,.13),transparent)}
+.l3{border-color:rgba(57,197,207,.3)} .l3 .lh{background:linear-gradient(180deg,rgba(57,197,207,.13),transparent)}
+.l2{border-color:rgba(88,166,255,.32)} .l2 .lh{background:linear-gradient(180deg,rgba(88,166,255,.13),transparent)}
+.l1{border-color:rgba(188,140,255,.3)} .l1 .lh{background:linear-gradient(180deg,rgba(188,140,255,.13),transparent)}
+.inter{text-align:center;color:var(--txt3);font-size:11.5px;letter-spacing:.22em;padding:4px 0;user-select:none}
+
+/* axis */
+.axis{margin-top:12px;border:1px dashed rgba(57,197,207,.45);border-radius:14px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(57,197,207,.07),var(--card))}
+.axis .ah{padding:13px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px dashed rgba(57,197,207,.3)}
+.axis .ah .nm{font-size:16px;font-weight:700;color:var(--cyan)}
+.axis .ah .why{font-size:12px;color:var(--txt2);flex:1 1 320px;min-width:240px}
+.axis .ab{padding:13px;display:flex;flex-wrap:wrap;gap:9px}
+.axis .mod{border-left-color:var(--cyan);background:rgba(57,197,207,.05)}
+
+/* table */
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:12.8px;min-width:680px}
+th{text-align:left;padding:10px 12px;background:var(--card2);color:var(--txt2);font-size:11px;
+  letter-spacing:.05em;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--txt)}
+tr:last-child td{border-bottom:none}
+td.c{white-space:nowrap}
+del{color:var(--txt3);opacity:.7}
+
+/* warn box */
+.warnbox{background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.26);border-radius:13px;padding:15px 17px}
+.warnbox .wt{font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px}
+.warnbox .wb{font-size:12.8px;color:var(--txt2);line-height:1.72}
+.warnbox .fix{margin-top:9px;padding-top:9px;border-top:1px dashed rgba(248,81,73,.25);font-size:12.5px}
+.warnbox .fix b{color:var(--green)}
+
+/* notes */
+.note{background:rgba(227,160,8,.06);border:1px solid rgba(227,160,8,.26);border-radius:13px;padding:15px 17px}
+.note .nt{font-size:14px;font-weight:700;color:var(--orange);margin-bottom:7px}
+.note .nb{font-size:12.8px;color:var(--txt2);line-height:1.72}
+.note .nb b{color:var(--txt)}
+
+/* closure */
+.clo{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px}
+.cl{border-radius:12px;padding:13px 14px;border:1px solid var(--line);background:var(--card2)}
+.cl .cn{font-size:12.5px;font-weight:700;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cl .ci{font-size:11.5px;color:var(--txt3);line-height:1.6}
+.cl.ok{border-color:rgba(63,185,80,.3)}
+.cl.ax{border-color:rgba(57,197,207,.4);background:rgba(57,197,207,.05)}
+.cl.tot{border-color:rgba(88,166,255,.4);background:linear-gradient(160deg,rgba(88,166,255,.09),var(--card2))}
+
+/* roadmap */
+.rm{position:relative;padding-left:26px}
+.rm::before{content:"";position:absolute;left:8px;top:8px;bottom:8px;width:2px;
+  background:linear-gradient(180deg,var(--blue),var(--purple),var(--cyan),var(--line))}
+.step{position:relative;margin-bottom:11px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+.step::before{content:"";position:absolute;left:-23px;top:19px;width:12px;height:12px;border-radius:50%;
+  background:var(--bg);border:2px solid var(--blue)}
+.step.s2::before{border-color:var(--cyan)} .step.s3::before{border-color:var(--orange)}
+.step.s4::before{border-color:var(--purple)} .step.s5::before{border-color:var(--pink)}
+.step.hold{opacity:.72;border-style:dashed}
+.sh{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+.pid{font-size:11.5px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:6px;
+  background:rgba(88,166,255,.16);color:var(--blue)}
+.step.s2 .pid{background:rgba(57,197,207,.15);color:var(--cyan)}
+.step.s3 .pid{background:rgba(227,160,8,.15);color:var(--orange)}
+.step.s4 .pid{background:rgba(188,140,255,.15);color:var(--purple)}
+.step.s5 .pid{background:rgba(255,123,156,.15);color:var(--pink)}
+.stitle{font-size:14px;font-weight:700}
+.sbody{font-size:12.5px;color:var(--txt2);line-height:1.62}
+.acc{margin-top:9px;padding:8px 11px;border-radius:8px;font-size:12.3px;
+  background:rgba(63,185,80,.07);border-left:3px solid var(--green)}
+.acc .al{color:var(--green);font-weight:700;font-size:10.5px;letter-spacing:.05em;margin-right:6px}
+.acc .mut{display:block;margin-top:5px;padding-top:5px;border-top:1px dashed rgba(63,185,80,.22);color:var(--txt2)}
+.acc .mut b{color:var(--red)}
+code{background:rgba(88,166,255,.13);color:var(--blue);padding:1px 5px;border-radius:4px;font-size:12px}
+
+/* budget */
+.bud{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:11px}
+.bd{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card2)}
+.bd .bp{font-size:11.5px;font-weight:700;color:var(--blue);margin-bottom:4px}
+.bd .bv{font-size:13px;font-weight:700;color:var(--orange)}
+.bd .br{font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.55}
+
+/* discuss */
+.disc{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.q{background:linear-gradient(160deg,rgba(227,160,8,.07),var(--card));border:1px solid rgba(227,160,8,.3);
+  border-radius:13px;padding:15px 16px}
+.q.done{background:linear-gradient(160deg,rgba(63,185,80,.07),var(--card));border-color:rgba(63,185,80,.32)}
+.q.done .qt{color:var(--green)}
+.q .qt{font-size:13.5px;font-weight:700;color:var(--orange);margin-bottom:7px}
+.q .qb{font-size:12.3px;color:var(--txt2);line-height:1.65}
+.q .opt{margin-top:9px;padding-top:8px;border-top:1px dashed rgba(227,160,8,.28);font-size:12px;color:var(--txt3)}
+.q .opt b{color:var(--txt)}
+.q .mine{margin-top:7px;font-size:11.8px;color:var(--green)}
+.q.done .mine{color:var(--green)}
+
+/* pitch */
+.pitch{margin-top:14px;border-radius:14px;padding:17px 19px;
+  background:linear-gradient(135deg,rgba(63,185,80,.10),rgba(88,166,255,.07));border:1px solid rgba(63,185,80,.34)}
+.pitch .pt{font-size:12px;font-weight:800;color:var(--green);letter-spacing:.06em;margin-bottom:8px}
+.pitch .p1{font-size:15px;font-weight:700;color:var(--txt);line-height:1.7}
+.pitch .p1 em{font-style:normal;color:var(--green)}
+.pitch .p2{margin-top:9px;font-size:12.8px;color:var(--txt2);line-height:1.72}
+.pitch .p3{margin-top:9px;padding-top:9px;border-top:1px dashed rgba(63,185,80,.25);font-size:12px;color:var(--txt3)}
+
+footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--txt3);font-size:12px;text-align:center;line-height:1.9}
+
+@media(max-width:760px){
+  .layer{grid-template-columns:1fr}
+  .lb{border-left:none;border-top:1px solid var(--line)}
+  .lh{flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px}
+  .lh .q,.lh .old,.lh .src{margin-top:0}
+  .sec-d{margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<nav><div class="nav-in">
+  <a href="#top" class="on">命题</a>
+  <a href="#ax">① 命名宪法</a>
+  <a href="#chain">② 意图与事实的分界</a>
+  <a href="#layers">③ 四层 + 进程轴</a>
+  <a href="#crash">④ 撞车清单</a>
+  <a href="#closure">⑤ 闭环</a>
+  <a href="#road">⑥ 路线图</a>
+  <a href="#disc">⑦ G0 已定案</a>
+</div></nav>
+
+<div class="wrap">
+
+<header id="top">
+  <div class="kicker">CELLRIX · ARCHITECTURE v12 · Ω 判别力为元公理 · 里程碑目标导向 · 闭环真跑验证</div>
+  <h1>四层是<span class="hl">概念</span>，进程边界是<span class="hl">部署</span></h1>
+  <p class="sub">进程拓扑回答的是<b>「代码跑在哪」</b>，不是「这层是什么」⇒ 它是<b>横贯四层的部署轴</b>，不是第五层。把它当成一层，会把部署维度混进概念分层。</p>
+
+  <div class="law">
+    <span class="k">元原则</span><b>领域定义提候选，代码给证据，公理来否决。</b>
+    三阶段：<b>① 领域定义提出候选词</b>（先说清这个概念是什么、边界在哪）；<b>② 代码提供映射证据</b>——优先取代码里已有的词（<code>event_family</code> ⇒ 事件）；代码里没有 ⇒ 须从代码词汇派生（事件 + 流 ⇒ 事件流）；<b>③ 无论哪条通道，都必须过 A2–A5</b>。未被否决的即为最终答案。
+    <span class="why"><b style="color:var(--pink)">并列原则（不替换本条）：</b>V &gt; 0 在哪，真相就在哪。</b>——本条管<b>谁有命名权</b>，Ω 管<b>判据有没有证据力</b>，两件事，不互相替代。<br>
+    代码是<b>证据方 + 平局裁决方</b>，不是提议方：代码可能反映旧实现、临时变量名或历史债务，把代码当唯一来源会让架构语言被当前实现锁死；但把提议权全交给领域定义，又会退回凭空取名。<br>
+      <b style="color:var(--green)">冲突时的执行顺序（三段）</b>：<b>①</b> 公理否决（A2–A5，最高）；<b>②</b> 定义 vs 代码冲突 ⇒ <b>代码胜</b>（平局裁决方，不阻塞推进）；<b>③</b> 但必须<b>记入迁移债表</b>——当前代码名 ≠ 目标名，列为待迁项。<b>代码胜 ≠ 问题已解决。</b></span>
+  </div>
+
+
+</header>
+
+<!-- 1 AXIOMS -->
+<section id="ax">
+  <div class="sec-h"><span class="sec-n">1</span><h2>命名宪法：Ω 判别力 + A0 + T1 + A2–A5</h2></div>
+  <p class="sec-d"><b style="color:var(--purple)">Ω 是元公理，五条命名规则都是它的实例。</b>它们此前并列 ⇒ 会打架、会循环论证；成树之后不会。<br>
+  <b style="color:var(--red)">T1 不是 A0 的推论。</b>A0（以发生记账）为真时，T1（可拒绝性二分）仍可为假——完全可以有一个按发生记账、但请求仍可被拒的系统。故 <b>A0 是领域事实，T1 是有作用域的设计约定</b>，两者<b>平级自封</b>，不存在推导关系。</p>
+
+  <div class="card" style="margin-bottom:12px;border-color:rgba(88,166,255,.4);background:linear-gradient(135deg,rgba(88,166,255,.08),var(--card))">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--blue)">显式层级链（冲突裁决顺序）</div>
+    <div style="font-size:12.5px;color:var(--txt2);line-height:1.95">
+      <div><b style="color:var(--pink)">LΩ · Ω（元公理）</b>　判据必须能排除一个世界 —— <b>一切判据的判据</b></div>
+      <div><b style="color:var(--purple)">L0 · A0（领域事实）</b>　系统以发生为单位记账 —— 代码可判</div>
+      <div><b style="color:var(--blue)">L0′ · T1（设计不变量）</b>　可拒绝性 —— <b style="color:var(--red)">与 A0 平级自封</b>，不是 A0 的推论（L0′ 仅为排序，非派生）</div>
+      <div><b style="color:var(--txt)">L2 · A2–A5（命名规则）</b>　独立，不可被下层覆盖</div>
+      <div><b style="color:var(--green)">L3 · C1–C4（闭环校验）</b>　管图的完整性，不管命名</div>
+      <div><b style="color:var(--orange)">L4 · 代码</b>　只有<b>提议权</b>，无否决权</div>
+    </div>
+    <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);font-size:12.3px;color:var(--txt3)">
+      冲突时自上而下裁决：<b>Ω 检验 → 公理否决 → 代码平局裁决 → 记入迁移债表</b>。<b style="color:var(--txt2)">「代码为准」仅在其未被 LΩ–L3 否决时成立</b>——层级链显式化后，不存在循环。<br>
+      <b style="color:var(--orange)">代码作平局裁决方的正当性</b> = 代码侧判据<b>在该世界对上 V &gt; 0</b>；若代码侧无法区分两个世界，则代码不具裁决资格，交给定义侧。
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px;border-color:rgba(255,123,156,.45);background:linear-gradient(135deg,rgba(255,123,156,.10),var(--card))">
+    <div style="font-size:13.5px;font-weight:800;margin-bottom:8px;color:var(--pink)">Ω · 判别力（元公理）—— 一切判据的判据</div>
+    <div style="font-size:13px;color:var(--txt);line-height:1.9">
+      <b>一条断言是判据 ⟺ 它能排除一个世界。</b>能答「它排除的是哪两个世界」 ⇒ V &gt; 0 ⇒ 判据；答不出 ⇒ <b style="color:var(--red)">装饰</b>，不许写。<br>
+      <span style="color:var(--txt2)">这条把喊了几十轮的「判据必须能红」变成了可判的命题：<b>能红 = 存在一个世界让它红 = V &gt; 0</b>。</span>
+    </div>
+    <div style="margin-top:9px;padding:9px 12px;border-radius:8px;background:rgba(0,0,0,.24);font-size:12.5px;color:var(--txt2);line-height:1.85">
+      <b style="color:var(--cyan)">度量：V(a; A_good, B_bad) = log₂ [ P(通过 | A) / P(通过 | B) ]</b><br>
+      <b style="color:var(--orange)">三处必须写明的修正：</b><br>
+      ① <b>V 带世界对为参数</b>，不是判据的固有属性 ⇒ 同一条判据换一对世界，V 就变。<b>正是这一点让 P0b/P0d 正交可推导</b>（它们排除的是不同的世界对），而非诉诸直觉。<br>
+      ② <b>本领域中 V 是退化的</b>：确定性测试的 P 只能取 0/1 ⇒ V ∈ {0, +∞, −∞}。<b>它是「能不能区分」的是/否</b>，不是分级度量 ⇒ 不要拿它比较两条判据谁更强。<br>
+      ③ <b>方向：V &gt; 0 ⟹ 能红；能红 ⇏ V &gt; 0。</b>一个在两个世界里都 50% 飘红的测试<b>能红但 V = 0</b> ⇒ 在确定性前提下两者重合，V &lt; 0 = 极性反了 ⇒ 用 <code>A_good / B_bad</code> 固定极性，不看 |V|。
+    </div>
+    <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--txt2);line-height:1.95">
+      <b style="color:var(--txt)">五条命名规则全是 Ω 的实例（此前并列、会打架；成树后不会）</b>
+      <div style="margin-top:5px"><b>T1 可拒绝性</b>　＝ Ω 在<b>时间维度</b>　两个世界：已提交 / 未提交 ⇒ 不可分 ⇒ V = 0</div>
+      <div><b>A2 机制≠内容</b>　＝ Ω 在<b>语义维度</b>　两个世界：桶 / 桶里的东西 ⇒ 一词两义，反查不可分</div>
+      <div><b>A3a 无同名占用</b>　＝ Ω 在<b>仓库维度</b>　两个世界：同物 / 异物 ⇒ grep 可判</div>
+      <div><b>A3b 结构断言</b>　＝ Ω 在<b>理解维度</b>　两个世界：断言真 / 断言假 ⇒ 核对可判</div>
+      <div><b>A4 具象性</b>　＝ Ω 在<b>指认维度</b>　两个世界：这段代码 / 那段代码 ⇒ 词太抽象则不可分</div>
+      <div><b>A5 一物一名</b>　＝ Ω 在<b>反查维度</b>　两个世界：一个词指两个东西 ⇒ 反查不可分</div>
+      <div style="margin-top:7px;color:var(--green)"><b>推论（不再单列 A6）</b>：换同义词不改变两个世界的可分性 ⇒ V = 0 ⇒ 白做。这正是「用同义词解决同义撞车 = 循环论证」的机制解释。</div>
+    </div>
+  </div>
+
+  <div class="axgrid">
+    <div class="ax a1">
+      <span class="first">起点</span>
+      <div class="n">A0 · 领域事实</div>
+      <div class="t">以发生为单位记账</div>
+      <div class="b">系统数的是<b>发生</b>，不是「想做」。48 次相同提问 = 48 个身份，因为它们是 48 次发生。</div>
+      <div class="j">判据：<b>身份是否按发生计数？</b>（代码可判）</div>
+      <div class="fire">地位：<b>领域事实起点</b>。<b style="color:var(--orange)">边界：到达次数 ≠ 业务身份</b>——用户提交一次、客户端重试 48 次，物理上到达 48 次；业务上算几次由<b>幂等键 / 请求 ID / 去重边界</b>决定，不由 A0 决定。</div>
+    </div>
+    <div class="ax a1">
+      <span class="first">推论</span>
+      <div class="n">T1 · 设计约定（非推论）</div>
+      <div class="t">可拒绝性</div>
+      <div class="b"><b style="color:var(--red)">这是设计约定，不是从 A0 推出的定理。</b>原文：尚未提交、可被拒绝或撤销的称<b>意图</b>；已提交、不可改写的记录称<b>事实（事件）</b>。事件可被后续事件<b>更正或补偿</b>，但历史记录本身不被覆盖。<br><b>二分，无第三类</b>——但这是<b style="color:var(--orange)">有作用域的约定</b>，不是已证明穷尽的分类。</div>
+      <div class="j">判据：<b>能否被拒绝？</b>（先问：它是变更单元吗？）<br><b style="color:var(--pink)">Ω 检验：</b>排除的世界对 = <b>已提交 / 未提交</b>；V &gt; 0 ⇒ 是判据</div>
+      <div class="fire">命中：<b>Intent 日志</b> → 事件流；<b>挂起意图</b>仍属意图域（见 ②）<br><b style="color:var(--green)">判据前置：先看它是不是变更单元</b>——<b>写入是否进入事件流 / 是否必须经 <code>apply()</code></b> ⇒ 是 ⇒ 受本约定约束；否 ⇒ 不受（声明 / 观测 / 触发源 / 投影）</div>
+    </div>
+    <div class="ax up">
+      <span class="badge">已归位</span>
+      <div class="n">A2</div>
+      <div class="t">机制 ≠ 内容</div>
+      <div class="b">容器与内容不合成一词。桶是桶，桶里的东西是桶里的东西。<b>只管语义分层，不管词能否指代到代码（那是 A4）。</b></div>
+      <div class="j">判据：<b>它是桶，还是桶里的东西？</b><br><b style="color:var(--pink)">Ω 检验：</b>排除的世界对 = <b>容器 / 内容</b>；一词两义 ⇒ 反查不可分 ⇒ V = 0</div>
+      <div class="fire">命中：<b>终端桥</b>（机制）vs 桥进来的外部 TUI（内容）；<b>pane</b>（容器）vs pane 里的进程状态（内容）</div>
+    </div>
+    <div class="ax up">
+      <span class="badge">可判</span>
+      <div class="n">A3a · 仓库内</div>
+      <div class="t">无同名占用</div>
+      <div class="b">该词在<b>本仓库</b>中是否已指别物？<code>grep</code> 一次即判。已指别物 ⇒ 改名；未指 ⇒ 通过。</div>
+      <div class="j">判据：<b>grep 出来是不是同一个东西？</b><br><b style="color:var(--pink)">Ω 检验：</b>排除的世界对 = <b>同物 / 异物</b>；grep 命中即 V &gt; 0</div>
+      <div class="fire">命中：<b>视图层</b>（<code>view.js</code> 即只读派生，无冲突）</div>
+    </div>
+    <div class="ax up">
+      <span class="badge">可陈述</span>
+      <div class="n">A3b · 跨语境</div>
+      <div class="t">名字的结构断言为真</div>
+      <div class="b">每个借来的词都携带一条<b>结构断言</b>。把它写出来，与设计一对一比对：<b>假 ⇒ 改名；真 ⇒ 保留并可借势</b>。断言为真但存在著名同名 ⇒ 保留 + 加限定词。<br><b style="color:var(--orange)">定性：这是「可审议的语义核对」，不是客观判定器</b>——它依赖选取哪种词义、在哪个语境判断。</div>
+      <div class="j">判据：<b>把这个词的断言写出来，它对吗？</b><br><b style="color:var(--orange)">四字段必须记录</b>：本文采用义 · 来源语境 · 对应架构属性 · 为何其他常见义不适用<br><b style="color:var(--pink)">Ω 检验：</b>排除的世界对 = <b>断言真 / 断言假</b>；核对一对即判</div>
+      <div class="fire">命中：<b>WAL</b> 断言「日志守卫另一个 store」⇒ 与设计<b>相反</b> ⇒ 假 ⇒ 改名；<b>视图层</b> 断言「只读派生、自身不存数据」⇒ <b>真</b> ⇒ 借势；<b>壳层</b> 断言「命令行解释器」⇒ 假 ⇒ 改名</div>
+    </div>
+    <div class="ax">
+      <div class="n">A4</div>
+      <div class="t">具象性（两条要求）</div>
+      <div class="b"><b>① 代码映射：</b>概念能映射到明确的<b>模块 / 类型 / 接口 / 代码区域</b>——<b style="color:var(--red)">不必是单独一行代码</b>。<br><b>② 架构定义：</b>概念的<b>职责边界明确</b>，即使它没有单一代码位置（「契约层」「适配层」「进程轴」等架构概念属此类）。</div>
+      <div class="j">判据：<b>能指出来是哪段代码，或说清职责边界吗？</b><br><b style="color:var(--pink)">Ω 检验：</b>排除的世界对 = <b>这段代码 / 那段代码</b>；指认不到 ⇒ 不可分 ⇒ V = 0<br><b style="color:var(--orange)">与 A2 的适用顺序：</b>先 A2（判语义分层：桶 vs 内容），再 A4②（验职责边界是否可陈述）；<b>结论冲突时以 A2 为准</b>——A2 管语义，A4② 只管表达。</div>
+      <div class="fire">命中：<b>外延/边界层</b> → 适配层；<b>状态树</b> → 对象图</div>
+    </div>
+    <div class="ax">
+      <div class="n">A5</div>
+      <div class="t">一物一名</div>
+      <div class="b">禁第二份清单、禁一词两义。异物不共名，同物不两名。</div>
+      <div class="j">判据：<b>反查唯一吗？</b><br><b style="color:var(--pink)">Ω 检验：</b>排除的世界对 = <b>一词一物 / 一词两物</b>；反查重复 ⇒ 不可分 ⇒ V = 0</div>
+      <div class="fire">命中：<b>mode</b> 拆为运行模式/交互模式；<b>capability</b> 拆为权限分级/模态；<b>turn/job</b> 段自带序号</div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:12px">
+    <div class="nt">A3 为什么要拆两条：单靠 grep 会丢掉跨语境判决</div>
+    <div class="nb">
+      <b>A3a 只能查仓库内部</b>：grep 一次即可判定「该词在本仓库是否已指别物」。但 <b>WAL 在本仓库里根本不存在</b>——grep 一次也命中不了，<b>A3a 抓不到它</b>。
+      而对 WAL 的否决，实际依据的是<b>跨语境语义</b>（数据库 WAL 守卫另一个 store，与本设计相反）。
+      ⇒ <b>仅靠 A3a 无法复现这个判决。</b>同理「视图层」「壳层」的判定也都是跨语境的，grep 判不出来 ⇒ 必须有 A3b。
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(227,160,8,.28)">
+        <b style="color:var(--green)">拆法：</b>A3a 管仓库内（grep 可判）；A3b 管名字携带的<b>结构断言</b>——<b>写出来就能核对</b>。<br>
+        为什么 A3b 比「陌生人想到什么」强：断言是<b>可陈述、可辩论、有对错</b>的，争执时可查该词的标准定义来裁决；而「想到什么」是纯主观的，无从裁决。<b>把不可判的判断，换成可判的核对。</b>
+        <div style="margin-top:6px">复核：A3b 能复现全部三个判决 —— <b>WAL</b>（断言假·改名）· <b>视图层</b>（断言真·借势）· <b>壳层</b>（断言假·改名）。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;border-color:rgba(88,166,255,.35)">
+    <div style="font-size:12.8px;color:var(--txt2);line-height:1.8">
+      <b style="color:var(--red)">⚠️「A0 ⇒ T1」这条推导不成立。</b>
+      <div style="margin-top:6px">「以发生为单位记账」<b>不蕴含</b>「可拒绝性二分」。反例：<b>①</b> 一个系统按发生记录每个到达的请求，但请求仍可能被拒绝 ⇒ 满足 A0 而不满足 T1；<b>②</b> 不可修改的事实事件，之后仍可用更正 / 撤销 / 补偿事件改变其业务效力 ⇒ A0 为真而 T1 的「不可撤销」边界并不自动成立。</div>
+      <div style="margin-top:7px"><b style="color:var(--green)">改法：</b>T1 明确标为<b>设计约定 / 设计不变量</b>，与 A0 平级自封，不再声称被推出。这是清楚的工程语义，但<b>不需要伪造成逻辑推导</b>——伪造推导比承认约定更危险，因为它会让下游把约定当定理使用。</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--txt3)">
+      </div>
+    </div>
+
+  <div class="card" style="margin-top:12px;border-color:rgba(227,160,8,.35);background:linear-gradient(135deg,rgba(227,160,8,.06),var(--card))">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--orange)">T1 作用域：变更单元判据 + 应用示例</div>
+    <div style="margin-bottom:8px;padding:8px 11px;border-radius:8px;background:rgba(63,185,80,.07);border-left:3px solid var(--green);font-size:12.5px;color:var(--txt2)">
+      <b style="color:var(--green)">判据（不是名单）：</b>变更单元 ⇔ <b>该对象的写入是否进入事件流 / 是否必须经 <code>apply()</code></b>。<br>
+      ⇒ 是 ⇒ 受 T1 约束；否 ⇒ 不受（声明 / 观测 / 触发源 / 投影）。<b>来一个新对象用判据判定，不必再枚举一次</b> ⇒ 下表是判据的<b>应用示例</b>，不是边界定义。
+    </div>
+    <div class="tblwrap">
+    <table style="min-width:560px">
+      <thead><tr><th>对象</th><th>是否变更单元</th><th>归属</th></tr></thead>
+      <tbody>
+        <tr><td>已提交的状态变更事件</td><td class="c"><span class="tag t-ok">是</span></td><td><b>事实</b>（不可撤销，可补偿）</td></tr>
+        <tr><td>未提交的意图 / 挂起意图</td><td class="c"><span class="tag t-ok">是</span></td><td><b>意图</b>（可拒绝）</td></tr>
+        <tr><td><b>配置声明</b>（运行模式等）</td><td class="c"><span class="tag t-warn">否</span></td><td>契约层声明语义，<b>不是状态</b></td></tr>
+        <tr><td><b>外部观测</b>（PTY 存活检查等）</td><td class="c"><span class="tag t-warn">否</span></td><td>观测事件（记录观察结果，非变更）</td></tr>
+        <tr><td><b>定时任务触发</b></td><td class="c"><span class="tag t-warn">否</span></td><td>触发源；其产生的结果才是变更单元</td></tr>
+        <tr><td><b>校验失败</b></td><td class="c"><span class="tag t-warn">否</span></td><td>拒绝本身是事实（拒绝了什么），不是变更</td></tr>
+        <tr><td><b>投影缓存</b>（对象图、视图、渲染缓存）</td><td class="c"><span class="tag t-warn">否</span></td><td>派生投影，可重建，不受 T1 约束</td></tr>
+        <tr style="background:rgba(248,81,73,.07)"><td><b>已提交但副作用未完成的操作</b></td><td class="c"><span class="tag t-warn">作用域边界</span></td><td><b>事件已记 / 效果未做</b>的窗口 ⇒ 需 Transactional Outbox 或等价机制（见 P1 前数据契约）</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div style="margin-top:9px;font-size:12.3px;color:var(--txt3)">
+      这张表是判据的<b>应用示例</b>，也是「二分」的<b>作用域声明</b>。T1 对它未覆盖的对象<b>不作主张</b>——因此它不是已证明穷尽的分类，而是<b>有作用域的约定</b>。<br>
+      <b style="color:var(--red)">⚠️ 表中「作用域边界」不是第三类。</b>它表示<b>T1 对该行不作主张</b>（作用域之外）；而「第三类」表示<b>T1 主张存在第三类事物</b>。两者形式相似、性质相反——混读会把「不作主张」误读成「主张存在第三类」。
+    </div>
+  </div>
+  </div>
+
+  <div class="note" style="margin-top:12px">
+    <div class="nt">公理完备性的验证方式要换</div>
+    <div class="nb">
+      「120 种优先级排列结论一致」只能证明规则<b>之间无环</b>——一条零命中的规则放在任何位置都不会改变结论，所以那个一致性是空洞的。真正的无环验证是：<b>任一条规则的判据不引用另一条规则</b>。<br>
+      ⇒ 改用<b>可复核的两条</b>：<br>
+      ① <b>无环</b>：任一条规则的判据不引用另一条规则（读一遍即可验，不需要 120 次排列）。<br>
+      ② <b>完备</b>：收集 10 个已知有歧义的术语，看 A2–A5 能否全部捕获。
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(227,160,8,.28)">
+        <b style="color:var(--orange)">完备性的作用域必须限定：</b>「事件广播无家」「计数错误」扫不出来，因为它们<b>不是命名问题</b>——前者是图的结构缺口，后者是算术。
+        用它们判定「命名公理不完备」是<b>范畴错误</b>。<br>
+        ⇒ 不新增 A6/A7（那会模糊公理与不变量的边界），而是把<b>闭环校验独立成 C 组</b>：命名规则管「叫什么」，闭环规则管「图全不全」。
+        <div style="margin-top:6px;color:var(--txt2)">
+          <b>C1</b> 反查唯一 · <b>C2</b> 无概念占两层（<b>同维度内</b>；跨维度双标除外）· <b>C3</b> 无概念无家 · <b>C4</b> 计数自洽（<b>T0 前只验弱自洽</b>）
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 CHAIN -->
+<section id="chain">
+  <div class="sec-h"><span class="sec-n">2</span><h2>意图与事实的分界</h2></div>
+  <p class="sec-d"><b>本约定</b>划出全图最重要的一条界（注意：是约定，不是从 A0 推出的定理）。所有改名都由它开始。<b>挂起意图不是第三态</b>——它能被拒绝，按本约定归为意图。</p>
+
+  <div class="svgbox">
+  <svg viewBox="0 0 1000 330" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 z" fill="#4a5a76"/></marker>
+      <marker id="arg" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 z" fill="#3fb950"/></marker>
+      <marker id="aro" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 z" fill="#e3a008"/></marker>
+    </defs>
+
+    <rect x="16" y="92" width="170" height="74" rx="11" fill="#1b2333" stroke="#e3a008" stroke-opacity=".6"/>
+    <text x="101" y="120" font-size="14" font-weight="700" text-anchor="middle" style="fill:#e6edf7">CI-144 意图</text>
+    <text x="101" y="140" font-size="11.5" text-anchor="middle" style="fill:#e3a008">可被拒绝 · 可被取消</text>
+    <text x="101" y="155" font-size="11" text-anchor="middle" style="fill:#6b7d99">想做的事</text>
+
+    <path d="M186 129 L258 129" stroke="#4a5a76" stroke-width="1.7" fill="none" marker-end="url(#ar)"/>
+    <text x="222" y="119" font-size="10.5" text-anchor="middle" style="fill:#6b7d99">apply</text>
+
+    <rect x="264" y="84" width="168" height="90" rx="13" fill="#16233a" stroke="#58a6ff" stroke-width="1.7"/>
+    <text x="348" y="112" font-size="14.5" font-weight="700" text-anchor="middle" style="fill:#58a6ff">事实层入口</text>
+    <text x="348" y="132" font-size="11.5" text-anchor="middle" style="fill:#9fb0c9">判定 · 发放编号</text>
+    <text x="348" y="150" font-size="11.5" text-anchor="middle" style="fill:#9fb0c9">此刻起——不可撤销</text>
+
+    <!-- pending branch -->
+    <path d="M348 174 L348 214 L246 214" stroke="#e3a008" stroke-width="1.5" fill="none"
+      stroke-dasharray="5 4" marker-end="url(#aro)"/>
+    <rect x="26" y="186" width="220" height="56" rx="10" fill="#1b2333" stroke="#e3a008" stroke-opacity=".55" stroke-dasharray="4 3"/>
+    <text x="136" y="208" font-size="12" font-weight="700" text-anchor="middle" style="fill:#e3a008">挂起意图 · pending</text>
+    <text x="136" y="226" font-size="10.5" text-anchor="middle" style="fill:#6b7d99">已提出 · 未批准 · 未拒绝</text>
+    <text x="136" y="238" font-size="10.5" text-anchor="middle" style="fill:#39c5cf">仍可被拒绝 ⇒ 按本约定归为意图</text>
+
+    <path d="M432 129 L504 129" stroke="#3fb950" stroke-width="1.7" fill="none" marker-end="url(#arg)"/>
+    <text x="468" y="119" font-size="10.5" text-anchor="middle" style="fill:#6b7d99">通过</text>
+
+    <rect x="510" y="84" width="166" height="90" rx="11" fill="#1b2333" stroke="#3fb950" stroke-opacity=".6"/>
+    <text x="593" y="112" font-size="14" font-weight="700" text-anchor="middle" style="fill:#e6edf7">事件 Event</text>
+    <text x="593" y="132" font-size="11.5" text-anchor="middle" style="fill:#3fb950">不可撤销 · 不可拒绝</text>
+    <text x="593" y="150" font-size="11" text-anchor="middle" style="fill:#6b7d99">已发生的事实</text>
+
+    <path d="M676 129 L744 129" stroke="#3fb950" stroke-width="1.7" fill="none" marker-end="url(#arg)"/>
+
+    <rect x="750" y="78" width="234" height="102" rx="11" fill="#16233a" stroke="#3fb950" stroke-width="1.7"/>
+    <text x="867" y="106" font-size="14.5" font-weight="700" text-anchor="middle" style="fill:#3fb950">事件流</text>
+    <text x="867" y="125" font-size="11" text-anchor="middle" style="fill:#9fb0c9">（原错名：Intent 日志 / WAL）</text>
+    <line x1="770" y1="135" x2="964" y2="135" stroke="#2a3446"/>
+    <text x="867" y="152" font-size="11" text-anchor="middle" style="fill:#9fb0c9">追加 · max+1 · 尾换行</text>
+    <text x="867" y="168" font-size="11" text-anchor="middle" style="fill:#e3a008">重放 → 对象图 → 视图</text>
+
+    <path d="M867 180 C867 244 500 268 348 258 C230 250 130 236 101 196" stroke="#4a5a76"
+      stroke-width="1.4" fill="none" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+    <text x="500" y="292" font-size="11.5" text-anchor="middle" style="fill:#6b7d99">反向只能【追加】新事件（tombstone / purge）——这正是"不可撤销"的注脚</text>
+
+    <rect x="26" y="258" width="220" height="52" rx="9" fill="none" stroke="#2a3446" stroke-dasharray="4 3"/>
+    <text x="136" y="280" font-size="11" text-anchor="middle" style="fill:#6b7d99">删除不是撤销</text>
+    <text x="136" y="295" font-size="10.5" text-anchor="middle" style="fill:#6b7d99">是追加一条新事实</text>
+
+    <text x="620" y="238" font-size="11" text-anchor="middle" style="fill:#6b7d99">log 即是 store（事件源）· 旁边没有第二个 store</text>
+  </svg>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div style="font-size:12.8px;color:var(--txt2);line-height:1.78">
+      <b style="color:var(--txt)">代码证据（仓库全站在「事件」这一边）：</b>
+      <code>EventType::Purge</code> · <code>event_family.js</code> · <code>period/purge</code> · <code>turn/start</code> · <code>ref/move</code>
+      ——<b style="color:var(--green)">全是 Event，没有一个是 Intent</b>。
+      ⇒ 「Intent 日志」这个词把 A1 那条线抹掉了，所以它不是「名字不好听」，是<b style="color:var(--red)">定义错了</b>。
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)">
+        <b style="color:var(--cyan)">关于意图的事实：</b>事件流里完全可以有 <code>IntentProposed</code> / <code>IntentRejected</code> 记录——
+        它们是<b style="color:var(--green)">「关于意图的事实」</b>，不是意图本身。这句同时也是<b>挂起意图不破坏 T1 二分</b>的根据：意图留在队列里（可拒绝），只有关于它的事实进入事件流。
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:12px">
+    <div class="nt">挂起意图不是第三态：T1 的二分不破</div>
+    <div class="nb">
+      若把 pending 称为「第三态（既非意图也非事实）」，在形式上违反排中律——T1 声称意图/事实穷尽一切，pending 声称两者都不是，二者不能同真。<br>
+      <b style="color:var(--green)">按 T1 自己的判据判定：pending 能被拒绝（这正是确认门的意义）⇒ 它就是意图。</b>
+      它不是第三类事物，是<b>队列里的一条意图</b>；其持久化形态是 <code>IntentProposed</code> 等<b>关于意图的事实</b>。T1 二分保持完整，无需增补第三类。
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(227,160,8,.28)">
+        <b>推论：挂起队列是派生状态，由事件流重放重建</b>，不需要单独持久化机制。<br>
+        ⇒ 唯一剩下的决策是：重放后，指向已失效目标的意图（如「向某个已消失的 pane 注入按键」）该如何处理？<br>
+        <b>(a)</b> 原样呈现　<b>(b)</b> 丢弃　<b>(c)</b> 标记 stale、<b>降级为「需重新确认」</b><br>
+        <span style="color:var(--green)">→ 我倾向 (c)</span>：不丢也不自动生效，且因队列由重放派生，与 P0d 单一写入者判据不冲突。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 LAYERS -->
+<section id="layers">
+  <div class="sec-h"><span class="sec-n">3</span><h2>四概念层 + 一条进程拓扑轴</h2></div>
+  <p class="sec-d">四个概念层回答「这层是什么」；进程轴回答「代码跑在哪」。两者是<b>两个问题维度</b>（不是形式化的正交——refs、复活曾被两边都认领，说明它们有重叠气味）。</p>
+
+  <div class="legend">
+    <span><i class="lg-done"></i>现状 · 有实现且有<b>能红的判据</b></span>
+    <span><i class="lg-move"></i>待更新 · 东西在，位置/形态不对</span>
+    <span><i class="lg-new"></i>新能力 · 现在不存在</span>
+  </div>
+
+  <div class="layers">
+
+    <!-- L4 adapter -->
+    <div class="layer l4">
+      <div class="lh">
+        <div class="nm">④ 适配层</div>
+        <div class="old">原「外延/边界层」<s>（抽象占位）</s></div>
+        <div class="q">外部世界怎么进来</div>
+        <div class="src" style="color:var(--pink)">依据 A4 · 全是 adapter</div>
+      </div>
+      <div class="lb">
+        <div class="mod m"><div class="mn"><span class="tag t-move">待更新</span>模型适配</div>
+          <div class="md">能力字段已命名空间化；<b>只留接口</b>，不做过滤</div>
+          <div class="mt"><div class="r">理由：<b>flowmodus 契约写「留空=它自己路由」</b></div><div class="s">来源：<b>flowmodus.rs 实测</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>agent adapter</div>
+          <div class="md">mock-agent 扩展，长驻挂总线</div>
+          <div class="mt"><div class="r">理由：<b>已有实现</b></div><div class="s">来源：<b>mock-agent</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>终端桥 PTY</div>
+          <div class="md">外部 TUI 变成本系统的 pane</div>
+          <div class="mt"><div class="r">理由：<b>现在不存在</b>；A2：桥是机制，桥进来的是内容</div><div class="s">来源：<b>Zellij 工程范式</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>bridge 声明</div>
+          <div class="md">项目自报：如何拉起 / 暴露什么</div>
+          <div class="mt"><div class="r">理由：<b>融合 N 个项目不能逐个硬编码</b></div><div class="s">来源：<b>原创</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>权限分级 · 模态</div>
+          <div class="md">原<b>两个 capability</b> 拆开：工具权限 / 模型模态</div>
+          <div class="mt"><div class="r">理由：<b>A5 一词两义</b></div><div class="s">来源：<b>capability.rs 实测</b></div></div></div>
+      </div>
+    </div>
+    <div class="inter">▲ 适配层把外部世界接进 ① 与 ② ▲</div>
+
+    <!-- L3 view -->
+    <div class="layer l3">
+      <div class="lh">
+        <div class="nm">③ 视图层</div>
+        <div class="old">原「投影层」</div>
+        <div class="q">人怎么看、怎么动</div>
+        <div class="src" style="color:var(--green)">A3 借势 · 已定案</div>
+      </div>
+      <div class="lb">
+        <div class="mod m"><div class="mn"><span class="tag t-move">待更新</span>TUI</div>
+          <div class="md">瘦化为纯渲染：不再持有状态</div>
+          <div class="mt"><div class="r">理由：<b>状态现住 TUI 进程，退出即丢</b></div><div class="s">来源：<b>现状自查</b></div></div></div>
+        <div class="mod m"><div class="mn"><span class="tag t-move">待更新</span>WebUI</div>
+          <div class="md">升格为<b>并列</b>一等公民，不是附属 Panel</div>
+          <div class="mt"><div class="r">理由：<b>ADR-0016 已分离，缝已划好</b></div><div class="s">来源：<b>ADR-0016</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>语义快照</div>
+          <div class="md">Helix-Mind 的<b>产物</b>（契约本身在 ①）</div>
+          <div class="mt"><div class="r">理由：<b>A5 拆开，不再占两层</b></div><div class="s">来源：<b>Helix-Mind</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>字符网格 grid</div>
+          <div class="md">agent 按需 grounding，与人类像素级一致</div>
+          <div class="mt"><div class="r">理由：<b>依赖 render 是纯函数</b></div><div class="s">来源：<b>herdr 同屏哲学</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>keymap 数据化</div>
+          <div class="md">换文件即换按键；底栏自动生成提示</div>
+          <div class="mt"><div class="r">理由：<b>现在不存在</b></div><div class="s">来源：<b>Zellij 杀手锏</b></div></div></div>
+      </div>
+    </div>
+    <div class="inter">▲ 视图层只读事实层，反向无写 ▲</div>
+
+    <!-- L2 fact -->
+    <div class="layer l2">
+      <div class="lh">
+        <div class="nm">② 事实层</div>
+        <div class="old">原「核心层」</div>
+        <div class="q">什么是真的</div>
+        <div class="src" style="color:var(--blue)">依据 A1 · 只有这层存「已发生」</div>
+      </div>
+      <div class="lb">
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>事件流</div>
+          <div class="md">按事件流契约落盘的那批<b>事件</b>——<b>数据，不是规则</b>（原错名「Intent 日志」）</div>
+          <div class="mt"><div class="r">理由：<b>A1 存的是事实，不是意图</b></div><div class="s">来源：<b>代码全是 Event</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>对象图</div>
+          <div class="md"><b>原错名「状态树」</b>——有分叉，是 DAG 不是树</div>
+          <div class="mt"><div class="r">理由：<b>A4 指认准确：分叉存在</b></div><div class="s">来源：<b>continue_from 实测</b></div></div></div>
+        <div class="mod m"><div class="mn"><span class="tag t-move">待更新</span>意图入口 apply</div>
+          <div class="md">所有状态变更的<b>必经之路</b>，收拢中</div>
+          <div class="mt"><div class="r">理由：<b>还有绕过它的调用点</b></div><div class="s">来源：<b>现状自查</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>删除三旋钮</div>
+          <div class="md">D0 墓碑 / D1 回收+purge / D2 销毁保 id</div>
+          <div class="mt"><div class="r">理由：<b>三旋钮齐，各有能红判据</b></div><div class="s">来源：<b>M2 全绿</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>生命周期</div>
+          <div class="md">腾位 · 宽限 · 持有者（声明式 owner）</div>
+          <div class="mt"><div class="r">理由：<b>owner 可重启识别，孤儿具名</b></div><div class="s">来源：<b>M2-B 实测</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>refs 三层<span class="tag t-ax">由轴迁入</span></div>
+          <div class="md">指针在仓库，重启仍在；客户端以服务器为准</div>
+          <div class="mt"><div class="r">理由：<b>指针是数据、是事实，不是部署拓扑</b></div><div class="s">来源：<b>M1a/b 验收</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>复活 Resurrection<span class="tag t-ax">由轴迁入</span></div>
+          <div class="md">重放事件流重建状态（比快照多一份审计）</div>
+          <div class="mt"><div class="r">理由：<b>重放本就是事实层操作</b>，不是进程拓扑</div><div class="s">来源：<b>原创 · 可证伪性</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>交互模式<span class="tag t-ax">由视图层迁入</span></div>
+          <div class="md">normal / pane / tab / locked。<b>与运行模式的分工：这个能切换</b></div>
+          <div class="mt"><div class="r">理由：<b>归属在 ② 事实层</b>（若标「归属事实层」却画在视图层即自相矛盾）；G0② 后分工：<b>运行模式 = 声明（不可切）／交互模式 = 状态（可切）</b></div><div class="s">来源：<b>Zellij mode 系统</b> · <b>G0② 裁定</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>确认门</div>
+          <div class="md">高风险意图挂起待批。<b>目标失效 ⇒ 标记 stale ⇒ 降级需重新确认</b></div>
+          <div class="mt"><div class="r">理由：<b>重放安全三级中的第三级</b>；<b>意图携带目标 ref，apply() 核对存活</b>（G0③）</div><div class="s">来源：<b>Zellij 复活挡那层</b> · <b>G0③ 裁定</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>项目注册表</div>
+          <div class="md"><b>现在只加字段（零成本）</b>，P3 才填实现</div>
+          <div class="mt"><div class="r">理由：<b>agent 的项目寻址空间</b></div><div class="s">来源：<b>原创</b></div></div></div>
+      </div>
+    </div>
+    <div class="inter">▲ 事实层是唯一真相；①③④ 都围着它 ▲</div>
+
+    <!-- L1 contract -->
+    <div class="layer l1">
+      <div class="lh">
+        <div class="nm">① 契约层 <span style="font-size:10px;color:var(--orange)">横切</span></div>
+        <div class="old">原「语言层」<s>（撞编译原理）</s></div>
+        <div class="q">大家怎么对话</div>
+        <div class="src" style="color:var(--purple)">依据 A3+A4 · 能容纳三者<br><b style="color:var(--orange)">横切契约视角</b>——它贯穿多组件的接口约束，<b>不要求依赖严格沿四层单向流动</b></div>
+      </div>
+      <div class="lb">
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>CI-144 意图</div>
+          <div class="md">统一行动语言。<b>代码 Ci144Intent</b>；文档「CI-144 意图」，简称「意图」</div>
+          <div class="mt"><div class="r">理由：<b>A3b 四字段核对</b>——采用义「CI-144 协议定义的行动单元」· 来源语境「本文档协议族」· 对应架构属性「统一行动语言」· <b>为何其他义不适用</b>：Android <code>android.content.Intent</code> 是组件间消息对象，与本义不同域。<br><b style="color:var(--orange)">限定降低歧义 ≠ 消除歧义</b> ⇒ 结论由「无冲突」<b>降级</b>为「<b>加限定后歧义可接受</b>」</div><div class="s">来源：<b>代码 Ci144Intent</b> · <b>G0① 裁定</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>Helix-Mind 语义契约</div>
+          <div class="md">语义<b>契约</b>（产物「快照」在 ③）</div>
+          <div class="mt"><div class="r">理由：<b>A5 曾同时占两层，已拆</b></div><div class="s">来源：<b>Helix-Mind</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>事件流契约</div>
+          <div class="md">写入<b>规则</b>本身（append 语义 / max+1 分配 / 尾换行 / 半行拒绝）——<b>规则，不是数据</b></div>
+          <div class="mt"><div class="r">理由：<b>四道守卫实测在线</b></div><div class="s">来源：<b>open_append 实测</b></div></div></div>
+        <div class="mod d"><div class="mn"><span class="tag t-done">现状</span>运行模式<span class="tag t-ok">G0② 已定</span></div>
+          <div class="md">drive / partner / survive，来自声明不是默认。<b>声明语义 ⇒ 归契约层</b>。<b style="color:var(--red)">「切换」不进意图动词表</b>——不存在的操作不给名字（A4）</div>
+          <div class="mt"><div class="r">理由：<b>agent 不允许运行时切换 ⇒ 它不是状态，是声明</b>。<b style="color:var(--orange)">本卡归属由这一条独立得出</b>——<b>不依赖</b>字段可选性：<code>Option&lt;T&gt;</code> + <code>#[serde(default)]</code> 在字段缺席时通常反而得到 <code>None</code>，是否被后续逻辑填成 <code>Some</code> 须查真实代码，<b>不作为本卡依据</b></div><div class="s">来源：<b>config.rs</b><span style="color:var(--orange)">（<b>行号与字段状态待 G1 核验</b>：工程线称 242 + serde default）</span> · <b>G0② 裁定</b></div></div></div>
+        <div class="mod n"><div class="mn"><span class="tag t-new">新</span>段自带序号</div>
+          <div class="md">消掉「第 i 个 turn/start ↔ win.jobs[i]」这个隐式约定</div>
+          <div class="mt"><div class="r">理由：<b>不改名，是补洞</b>；按索引对齐两个数组违反 A5</div><div class="s">来源：<b>turn/job 实测</b></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AXIS -->
+  <div class="axis">
+    <div class="ah">
+      <div class="nm">⇢ 进程拓扑轴</div>
+      <div class="why"><b>不是第五层。</b>它回答「代码跑在哪」，不回答「这层是什么」。Zellij 的 <code>zellij-client</code> / <code>zellij-server</code> 是 crate 拆分与部署事实，从来不是一个概念层——P1「守护进程化」改的正是代码跑在哪，不改系统是什么意思。<br><b style="color:var(--orange)">维度规则</b>：<b>逻辑职责</b>（这层是什么）· <b>部署位置</b>（代码跑在哪）· <b>横切机制</b>（贯穿多层的约束）——三者分开判断，再在卡上标双属主。</div>
+      <span class="tag t-ax">横贯四层</span>
+    </div>
+    <div class="ab">
+      <div class="mod n"><div class="mn"><span class="tag t-new">新</span>守护进程边界</div>
+        <div class="md">transport 从模块升为<b>进程边界</b>；这是唯一的大刀</div>
+        <div class="mt"><div class="r">理由：<b>改变的是部署，不是语义</b></div><div class="s">来源：<b>Zellij client/server</b></div></div></div>
+      <div class="mod n"><div class="mn"><span class="tag t-new">新</span>attach / detach<span class="tag t-ax">双属主</span></div>
+        <div class="md">关掉界面，里面的东西继续跑。<b>逻辑职责 = 会话生命周期能力；部署位置 = 客户端—服务端协议</b></div>
+        <div class="mt"><div class="r">理由：<b>现在没有这个概念</b>；<b>双属主不违反 C2</b>——C2 的「占两层」指<b>同一维度内</b>职责重复，<b>跨维度（逻辑职责 / 部署位置）双标不算违规</b></div><div class="s">来源：<b>Zellij 三件套</b> · <b>维度规则</b></div></div></div>
+      <div class="mod n"><div class="mn"><span class="tag t-new">新</span>URL 寻址</div>
+        <div class="md">服务端已支持多名字；<b>客户端只认 current</b></div>
+        <div class="mt"><div class="r">理由：<b>能力在了，线没接 ⇒ 会话不可寻址</b></div><div class="s">来源：<b>§317 实测</b></div></div></div>
+      <div class="mod n"><div class="mn"><span class="tag t-new">新</span>事件广播双编码<span class="tag t-ax">逻辑归 ①</span></div>
+        <div class="md">同一份 Event：bincode 给本地 TUI、JSON 给 WebUI。<b>它是序列化 / 传输契约，不必然属于进程拓扑</b></div>
+        <div class="mt"><div class="r">理由：<b>逻辑职责归 ① 契约层</b>（序列化格式是协议）；<b>此处仅标部署位置</b> ⇒ 避免「无概念无家」</div><div class="s">来源：<b>原创</b> · <b>维度规则</b></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 CRASH -->
+<section id="crash">
+  <div class="sec-h"><span class="sec-n">4</span><h2>撞车清单：11 处（含本版新增 3 处）</h2></div>
+  <p class="sec-d">依据列已全部重算：A2 不再零命中。</p>
+
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>#</th><th>原名</th><th>歧义</th><th>改法</th><th>依据</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>Intent 日志</b></td><td>意图 vs 事件混成一词</td><td class="c"><span class="tag t-ok">事件流</span></td><td>T1</td></tr>
+      <tr><td>2</td><td><b>状态树</b></td><td>有分叉 ⇒ 是 DAG 不是树</td><td class="c"><span class="tag t-ok">对象图</span></td><td>A4</td></tr>
+      <tr><td>3</td><td><b>壳层</b></td><td>shell 在终端语境 = bash/zsh（想到<b>错的</b>）</td><td class="c"><span class="tag t-ok">进程拓扑轴</span>（不再是层）</td><td>A3b</td></tr>
+      <tr><td>4</td><td><b>投影层</b></td><td>撞数学投影 / 数据库 π</td><td class="c"><span class="tag t-ok">视图层（借势·定案）</span></td><td>A3b</td></tr>
+      <tr><td>5</td><td><b>外延 / 边界层</b></td><td>抽象占位词</td><td class="c"><span class="tag t-ok">适配层</span></td><td>A4</td></tr>
+      <tr><td>6</td><td><b>语言层</b></td><td>撞编译原理的「语言层」</td><td class="c"><span class="tag t-ok">契约层</span></td><td>A3b</td></tr>
+      <tr><td>7</td><td><b>mode（两义）</b></td><td>运行模式 vs UI 模式</td><td class="c"><span class="tag t-ok">运行模式 / 交互模式</span></td><td>A5</td></tr>
+      <tr><td>8</td><td><b>capability（两义）</b></td><td>工具权限 vs 模型模态</td><td class="c"><span class="tag t-ok">权限分级 / 模态</span></td><td>A5</td></tr>
+      <tr><td>9</td><td><b>turn / job</b></td><td>疑似同指「段」⇒ 第二份清单</td><td class="c"><span class="tag t-ok">段自带序号</span></td><td>A5</td></tr>
+      <tr style="background:rgba(188,140,255,.05)"><td>10</td><td><b>WAL</b><br><span style="font-size:11px;color:var(--txt3)">（文档自拟词，代码无此词）</span></td><td>数据库 WAL = <b>守卫另一个 store</b>；此处 log <b>就是</b> store ⇒ 结构语义相反。<b>且仓库中根本无此词</b>，是文档杜撰</td><td class="c"><span class="tag t-ok">事件流</span></td><td>A3b + A4</td></tr>
+      <tr style="background:rgba(188,140,255,.05)"><td>11</td><td><b>事件广播</b></td><td>曾在图里无家（页脚提到但图内没有）</td><td class="c"><span class="tag t-ok">逻辑归 ① · 轴标部署</span></td><td>闭环 + 维度规则</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="warnbox" style="margin-top:12px">
+    <div class="wt">#10 WAL：元原则根本不保护它</div>
+    <div class="wb">
+      本系统的<b>事件溯源链</b>是 <b>追加 → 重放 → 对象图 → 视图</b>，即 <b>log 本身即是 store（事件源）</b>。<br>
+      而数据库语境的 WAL 定义是「<b>写前日志，守卫另一个 store</b>」——两者是<b style="color:var(--red)">相反的结构关系</b>。按 A3：想到的是<b>错的</b>东西 ⇒ 应改名。<br>
+      若援引元原则「代码里若就叫 WAL ⇒ 保留」——<b style="color:var(--red)">但代码里没有 WAL</b>。代码有的是 <code>EventType</code> · <code>event_family</code>。WAL 是文档自己取的名字，<b>没有代码证据，元原则无从适用</b> ⇒ 公理否决成立。
+    </div>
+    <div class="fix">
+      <b>裁定：WAL 双违规 —— A3b（结构断言「日志守卫另一个 store」为假）+ A4（映射不到任何代码词汇）</b> ⇒ 改名「事件流」。<br>
+      <span style="color:var(--txt3)"><b>派生规则已在 A4 内，无需新增：</b>「事件流」同样不在代码里，但它能<b>映射到</b> <code>event_family</code> / <code>EventType::Purge</code>；WAL 映射不到任何东西。这才是 WAL 被否决而事件流被接受的真正判据。<br>
+      <b>A3b 四字段样例（全表唯一已记录实例，其余待补）</b>：采用义「事件的有序序列」· 来源语境「<code>event_family</code> / <code>EventType::Purge</code>」· 对应架构属性「追加 · max+1 · 尾换行」· <b>为何其他义不适用</b>：数据库 WAL 守卫另一个 store，此处 log 就是 store。</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div style="font-size:12.8px;color:var(--txt2);line-height:1.78">
+      <b style="color:var(--txt)">「视图层」的循环论证指控不成立：</b>
+      按 <b>A3b</b> 重判：「视图」携带的结构断言 = <b>只读、由源数据派生、自身不存数据</b>；③ 视图层 = 只读、由事实层派生、自身不持有状态。
+      ⇒ <b style="color:var(--green)">断言为真 ⇒ 借势成立。</b>对照「壳层」：断言 = 命令行解释器 ⇒ 与本层（会话/进程常驻）不符 ⇒ <b>假</b> ⇒ 改名。
+      <div style="margin-top:6px;color:var(--txt3)">论证形式是<b>断言核对</b>，不是「陌生人想到什么」——后者不作为判据。</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 CLOSURE -->
+<section id="closure">
+  <div class="sec-h"><span class="sec-n">5</span><h2>闭环验证 C1–C4：管图的完整性，不管命名</h2></div>
+  <p class="sec-d">C 组是<b>独立规则集</b>，与 A2–A5 并列而非从属：命名规则管「叫什么」，闭环规则管「图全不全」。</p>
+
+  <div class="card" style="margin-bottom:12px;border-color:rgba(63,185,80,.35)">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+      <span style="font-size:13px;font-weight:700">C 组 · 结构不变量</span>
+      <span class="tag t-ok">不新增 A6/A7</span>
+    </div>
+    <div style="font-size:12.5px;color:var(--txt2);line-height:1.9">
+      <div><b>C1 反查唯一</b>　每个概念只出现在五层+轴的唯一位置</div>
+      <div><b>C2 无概念占两层</b>　<b>同一维度内</b>职责不重复 —— <span style="color:var(--green)">例外：跨维度双标（逻辑职责 / 部署位置）不算违规</span>，如 attach/detach</div>
+      <div><b>C3 无概念无家</b>　已修案例：事件广播（逻辑归 ① + 轴标部署）· 段自带序号（归 ①）</div>
+      <div><b>C4 计数自洽 · C5 状态双编码一致 · C6 概念描述非空</b>　各层徽标之和 = 总数<br>
+        <span style="color:var(--red)">计数降级：<b>当前 29 是「卡片口径」，不是「概念口径」</b></span>——卡片粒度不稳定（「权限分级·模态」「删除三旋钮」「refs 三层」都是打包产物），<b>计数结果可通过改卡片边界改变</b>。<br>
+        <span style="color:var(--green)">C4 过渡期规则：</span><br>
+        <b>T0 之前</b>：C4 只验<b>弱自洽</b> —— 卡片数与徽标数一致（<b>不</b>声称概念正确）；合计卡标注「<b>卡片口径 29 · 概念数待 T0 清单</b>」。<br>
+        <b>T0 之后</b>：C4 由<b>独立概念清单</b>生成（稳定 ID · 定义 · owner · 状态 · 代码映射），恢复<b>强自洽</b>；卡片只引用 ID。</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--txt3)">
+        为什么<i>不</i>把它们写成 A6/A7：「无概念无家」和「计数自洽」<b>不是命名规则</b>——它们不告诉你该叫什么，只告诉你图有没有漏。混进公理集会让人误以为改名能修复结构缺口。
+      </div>
+    </div>
+  </div>
+
+  <div class="clo">
+    <div class="cl ok"><div class="cn"><span>① 契约层</span><span class="tag t-done">5</span></div>
+      <div class="ci">CI-144 意图 · Helix-Mind 语义契约 · 事件流契约 · 运行模式 · 段自带序号</div></div>
+    <div class="cl ok"><div class="cn"><span>② 事实层</span><span class="tag t-done">10</span></div>
+      <div class="ci">事件流 · 对象图 · 意图入口 · 删除三旋钮 · 生命周期 · refs 三层 · 复活 · 交互模式 · 确认门 · 项目注册表</div></div>
+    <div class="cl ok"><div class="cn"><span>③ 视图层</span><span class="tag t-done">5</span></div>
+      <div class="ci">TUI · WebUI · 语义快照 · grid · keymap 数据化</div></div>
+    <div class="cl ok"><div class="cn"><span>④ 适配层</span><span class="tag t-done">5</span></div>
+      <div class="ci">模型适配 · agent adapter · 终端桥 · bridge 声明 · 权限分级/模态</div></div>
+    <div class="cl ax"><div class="cn"><span>⇢ 进程轴</span><span class="tag t-ax">4</span></div>
+      <div class="ci">守护进程边界 · attach/detach · URL 寻址 · 事件广播双编码</div></div>
+    <div class="cl tot"><div class="cn"><span>合计</span><span class="tag t-done">29</span></div>
+      <div class="ci"><b style="color:var(--green)">现状 11</b> · <b style="color:var(--orange)">待更新 4</b> · <b style="color:var(--purple)">新 14</b></div></div>
+  </div>
+
+  <div class="note" style="margin-top:12px">
+    <div class="nt">计数口径（读这张图的数字前先看这里）</div>
+    <div class="nb">
+      <b>29 = 卡片口径，不是概念口径。</b>卡片粒度不稳定（「权限分级·模态」「删除三旋钮」「refs 三层」都是打包产物）⇒ 计数结果<b>可通过改卡片边界改变</b>。<br>
+      完成度 <b>11/29 = 37.9%</b>（仅现状）或 <b>15/29 = 51.7%</b>（含待更新——东西在，只是位置/形态不对）。<br>
+      <b style="color:var(--green)">数字看起来偏低，但它是真的。</b>拿虚高数字当开场白，被追问一次就全线失守。<br>
+      <span style="color:var(--txt3)">T0 后改由独立概念清单生成，恢复强自洽。</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;border-color:rgba(63,185,80,.3)">
+    <div style="font-size:12.8px;color:var(--txt2);line-height:1.78">
+      <b style="color:var(--green)">✓ 闭环规则现状</b>
+      <div style="margin-top:5px"><b>三项已修</b>：事件广播归位（逻辑 ① + 轴标部署）· 段自带序号归 ① · 交互模式 owner 定为 ②。</div>
+      <div style="margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)">
+        另：<b>E1/E2（M4 收尾）</b>属<b>待办项而非概念</b>，不计入 29 —— 据 DAG v5.0（§370，M4② 端到端 2 passed）判定<b>已完成</b>。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ROADMAP -->
+<section id="road">
+  <div class="sec-h"><span class="sec-n">6</span><h2>路线图：**目标导向** · 关键路径与并行分支</h2></div>
+  <p class="sec-d" style="margin-left:38px"><b style="color:var(--red)">里程碑的组织维度是「要达成的状态」，不是时间。</b>每格 = 一个<b>目标</b> + 一条<b>退出条件（状态断言）</b>。退出条件写成「做完 N 天」⇒ V=0 ⇒ 装饰（见下方 V12）。工期与预算<b>不是目标</b>，已在 DAG 中移入参考估计。</p>
+  <p class="sec-d">每条验收<b>必带变异</b>（判据必须能红）。★ = 最要紧的一格。</p>
+
+  <div class="rm">
+    <div class="step">
+      <div class="sh"><span class="pid">T0</span><span class="stitle">术语对照 · 两线词汇对账</span><span class="tag t-done">门禁已解除</span></div>
+      <div class="sbody">把已完成的 15 项与四层+轴命名对上，<b>并把架构线词汇与工程线（M0–M5）词汇对上账</b>。<b>不动代码</b>——乱的不是楼，是名字。<br><b style="color:var(--green)">⑦ 研讨区 3 项已定案 ⇒ 门禁解除</b>；<b style="color:var(--orange)">执行序仍在 S303 之后</b>（见 DAG v5.0）。<b>非小格</b>：两线词汇对账 + 三套词汇（含 CI-144 协议族）+ <b>独立概念清单</b>。<b style="color:var(--orange)">工期不构成目标</b>（见 DAG §7 参考估计）。</div>
+      <div class="acc"><span class="al">验收</span>① 每个新层名能指出旧文件；每个旧模块能指出新层；<br>
+        ② <b style="color:var(--green)">交付独立概念清单</b>——稳定 ID · 定义 · owner · 状态 · 代码映射（<b>此后计数由清单生成，不再由卡片生成</b>）；<br>
+        ③ <b>三套词汇对账完成</b>：架构线 · 工程线（M0–M5）· CI-144 协议族
+        <span class="mut"><b>变异：</b>增删任一层名 ⇒ 出现孤儿 ⇒ 红；<b>只交层名映射而没交概念清单 ⇒ 红</b>（否则本格会验收通过却未交付交付物）</span></div>
+    </div>
+
+    <div class="step">
+      <div class="sh"><span class="pid">P0a</span><span class="stitle">hash 域 + 排除项分类</span><span class="tag t-move">先做</span></div>
+      <div class="sbody">hash 域 = 全部字段 − 排除清单。排除项<b>必须分类</b>，不能一律要求退休计划。</div>
+      <div class="acc"><span class="al">验收</span>任一字段未归类 ⇒ 红
+        <span class="mut"><b>变异：</b>新增一个未归类字段 ⇒ 红（否则清单会自己长成第二个事实源）</span></div>
+    </div>
+
+    <div class="card" style="margin:9px 0 11px;padding:12px 14px;background:rgba(227,160,8,.06);border-color:rgba(227,160,8,.28)">
+      <div style="font-size:12.5px;color:var(--txt2);line-height:1.75">
+        <b style="color:var(--orange)">排除项分两类（混在一起要求退休计划，会逼出假计划）：</b>
+        <table style="min-width:0;font-size:12px;margin-top:7px">
+          <thead><tr><th>类型</th><th>例子</th><th>性质</th></tr></thead>
+          <tbody>
+            <tr><td><b>债务型</b></td><td>HashMap 迭代序、wall-clock 时间、随机 id</td><td style="color:var(--green)">有退休计划，会归零</td></tr>
+            <tr><td><b>边界型</b></td><td>外部进程输出、活状态</td><td style="color:var(--orange)"><b>永久排除</b>，永远不可能进 hash 域</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:7px;color:var(--txt3)">给「PTY 输出」编退休计划，就像给「外部世界的存在」编退休计划。<b>边界型不进债表，债表才是干净的。</b><br>
+        <b style="color:var(--cyan)">注意：挂起队列不在排除清单里</b>——它由事件流重放<b>派生</b>（<code>IntentProposed</code> 等事实），是纯数据，可以在 hash 域内（列为边界型是错的）。</div>
+      </div>
+    </div>
+
+    <div class="step s2">
+      <div class="sh"><span class="pid">P0b</span><span class="stitle">重放判据</span><span class="tag t-move">确定性</span></div>
+      <div class="sbody">20 个操作 ⇒ <code>kill -9</code> ⇒ 重放 ⇒ hash A == B。操作集<b>按 7 类泄漏配齐</b>，不只写「20 个」。</div>
+      <div class="acc"><span class="al">验收</span>漏一条事件 ⇒ hash 必须<b>不等</b>
+        <span class="mut"><b>变异：</b>故意漏一条 ⇒ 仍相等 ⇒ 红</span></div>
+    </div>
+
+    <div class="step s3">
+      <div class="sh"><span class="pid">P0c</span><span class="stitle">绕过计数器</span><span class="tag t-done">立刻生效</span></div>
+      <div class="sbody">老代码允许直通但挂计数器；<b>新代码一律不准直接改状态</b>。这个数字就是剩下的债，且它不再增长。</div>
+      <div class="acc"><span class="al">验收</span>新增一个直改状态的调用点 ⇒ 计数 +1 ⇒ 红</div>
+    </div>
+
+    <div class="step s4">
+      <div class="sh"><span class="pid">P0d ★</span><span class="stitle">状态覆盖判据</span><span class="tag t-new">单一性</span></div>
+      <div class="sbody">每个状态字段<b>点名唯一写入者</b>。补的正是「单一事实源至今无法证伪」那个洞。</div>
+      <div class="acc"><span class="al">验收</span>注入第二写入器 ⇒ 红
+        <span class="mut"><b>关键：</b>即使该写入器是确定性的也<b>必须红</b>——hash 相等证不了「只有一本账」（实测双源系统全绿，判别力 0）<br>
+        <b>注入机制（缺此则验收不可执行）：</b>① <b>编译期</b>（工程偏好，非逻辑必然）——字段包成只能由 <code>IntentApplier</code> 写入的 newtype，<code>trybuild</code> 跑 compile-fail，第二写入器<b>编译不过</b> ⇒ 红。② 运行时 <code>#[cfg(test)]</code> 写入追踪器——<b>覆盖率本身就是漏洞</b>，漏一个写入点就假绿。<br>
+        <span style="color:var(--txt3)">选 ① 的理由是<b>工程上的</b>（编译期保证不依赖覆盖率），不是逻辑上的——务必与逻辑判据区分开。</span></span></div>
+    </div>
+
+    <div class="step s5">
+      <div class="sh"><span class="pid">P0.5</span><span class="stitle">同进程双视图</span><span class="tag t-move">先于 daemon</span></div>
+      <div class="sbody">切进程边界之前，先让两个 renderer 在同一进程内消费同一条事件流。IPC 会冻结 API，而意图词汇表还在 churn。</div>
+      <div class="acc"><span class="al">验收</span>两个 renderer · 一个 core · 一个 hash
+        <span class="mut"><b>变异 1：</b>任一 renderer 自带状态 ⇒ 红<br>
+        <b>变异 2（本版补）：</b><b>同一 state 渲染两次 ⇒ 字符网格 diff 必须为空。</b>「自带状态」≠「render 纯」——render 里藏时间戳或随机 ID，renderer 完全无状态，照样绿。而 grid grounding 的构造性保证全靠它。</span></div>
+    </div>
+
+    <div class="step">
+      <div class="sh"><span class="pid">P1</span><span class="stitle">进程轴落地：守护进程 + attach/detach + URL 寻址 + 广播</span><span class="tag t-new">唯一大刀</span></div>
+      <div class="sbody">transport 从模块升为进程边界；三件套 <code>list-sessions</code> / <code>attach</code> / <code>delete</code>；URL 三段式；广播双编码。</div>
+      <div class="acc"><span class="al">验收</span>关掉界面，里面的东西继续跑；重连回原位
+        <span class="mut"><b>变异：</b>界面退出 ⇒ 内容停 ⇒ 红</span></div>
+    </div>
+
+    <div class="step s2">
+      <div class="sh"><span class="pid">P2</span><span class="stitle">交互模式 + keymap 数据化</span><span class="tag t-new">归属已定</span></div>
+      <div class="sbody">模式 <b>owner = ② 事实层</b>，视图层只读渲染。enum 还是字符串是表示层选择；一旦落进视图层本地，agent 就<b>失去事实源</b>。</div>
+      <div class="acc"><span class="al">验收</span>换一个 keymap 文件 ⇒ 视图变，事实层零改动
+        <span class="mut"><b>变异：</b>模式落视图层本地 ⇒ 红</span></div>
+    </div>
+
+    <div class="step s3">
+      <div class="sh"><span class="pid">P3</span><span class="stitle">终端桥 + bridge 声明 + 项目注册表</span><span class="tag t-new">三者同批</span></div>
+      <div class="sbody">外部 TUI 变成活的、可输入的 pane。<b>三者是一件事</b>，拆开做会得到空壳。</div>
+      <div class="acc"><span class="al">验收</span>新增一个项目 = 只加一份 bridge 声明，本系统<b>零改动</b></div>
+    </div>
+
+    <div class="step s4">
+      <div class="sh"><span class="pid">P4+</span><span class="stitle">权限分级 · 多 agent · 回放审计</span><span class="tag t-later">未触发不动工</span></div>
+      <div class="sbody">一份声明两个用途：权限声明即确认门配置。WASM 沙箱等真有第二个 skill 提供者再说。</div>
+      <div class="acc"><span class="al">验收</span>一份声明，两个用途；整条流可回放审计</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div style="font-size:12.8px;color:var(--txt2);line-height:1.8">
+      <b style="color:var(--cyan)">可并行：</b>P2 与 P1 可并行；P4+ 只依赖 P1，<b>P1 完成后</b>可插入。<br>
+      <span style="color:var(--txt3)">~~E1/E2（M4 收尾）~~ <b style="color:var(--green)">已完成</b>——据 DAG v5.0（§370，M4② 端到端 2 passed），<b>已移出并行位</b>。</span>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)">
+        <b style="color:var(--txt)">为什么 P0b 与 P0d 必须并行（由 Ω 推导，不诉诸直觉）：</b>两格排除的是<b style="color:var(--pink)">不同的世界对</b> —— P0b 排除「重放一致 / 重放漂移」（证确定性）；P0d 排除「单一写入者 / 双写入者」（证单一性）。任一格绿都不能替代另一格。<br>
+        <span style="color:var(--txt3)">只做 P0b = 「抄两遍一样就宣布只有一本账」——双源但确定性的系统实测全绿，判别力 0。</span>
+      </div>
+    </div>
+
+    <div style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:4px">测试迁移预算</div>
+      <div style="font-size:11.8px;color:var(--txt3);margin-bottom:6px">349 个测试的 churn 是真实工期。每步设上限，<b style="color:var(--orange)">超限即停，重新评估，不要硬推进</b>。</div>
+      <div class="bud">
+        <div class="bd"><div class="bp">T0</div><div class="bv">≤ 5</div><div class="br">超限 ⇒ 命名影响面比预估大</div></div>
+        <div class="bd"><div class="bp">P0a–c</div><div class="bv">≤ 10</div><div class="br">超限 ⇒ 泄漏面大，先补管道</div></div>
+        <div class="bd"><div class="bp">P0d</div><div class="bv">≤ 15</div><div class="br">超限 ⇒ 写入者比预估分散</div></div>
+        <div class="bd"><div class="bp">P0.5</div><div class="bv">≤ 15</div><div class="br">超限 ⇒ 渲染副作用未剥离</div></div>
+        <div class="bd"><div class="bp">P1</div><div class="bv">≤ 25</div><div class="br">超限 ⇒ 拆成两次切</div></div>
+        <div class="bd"><div class="bp">P2</div><div class="bv">≤ 30</div><div class="br">超限 ⇒ keymap 动了语义而非表示层</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;border-color:rgba(63,185,80,.4);background:linear-gradient(135deg,rgba(63,185,80,.07),var(--card))">
+    <div style="font-size:13px;font-weight:800;margin-bottom:7px;color:var(--green)">✓ 闭环验证（真跑，非声明）· <code>cellrix_dag_verify.py</code></div>
+    <div style="font-size:12.3px;color:var(--txt2);line-height:1.85">
+      <code>节点 16 · 边 16 · 源点 4 · 终端 5</code><br>
+      <code>拓扑序：E1 → G0 → G2 → G3 → G1 → S303 → T0 → P0a → P0c → P0b → P0d → P0.5 → P1 → P2 → P3 → P4+</code><br>
+      <b style="color:var(--green)">✓ 闭环成立</b>：无环 · 无悬空 · 无孤儿 · 全部可达 · 每格有目标 / 世界对 / 判据 / 变异
+    </div>
+    <div style="margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);font-size:12.3px;color:var(--txt2);line-height:1.85">
+      <b style="color:var(--cyan)">逻辑链条闭环（<code>cellrix_logic_verify.py</code>）：</b>
+      <code>Ω → 公理 → 四层+轴 → 概念(29) → 不变量(16) → 里程碑(11) → 判据</code> <b style="color:var(--green)">✓ 双向闭合</b><br>
+      <span style="color:var(--txt3)">闭合是<b>双向</b>的：正向每格证某条不变量，反向每条不变量都有格证它。4 处断点已修 · 补齐失败路径(L13) 与物理契约 2 条 · 系统性变异枚举 340 个算子 · 339 杀死 · 1 个标注为已知不可判 —— 其中 <b>P4 / P4+ 标识符不一致</b>最典型：同一个东西两个名字，链条在标识符层面断开，靠阅读发现不了，靠双向闭合检查才逼出来。</span>
+    </div>
+    <div style="margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);font-size:12px;color:var(--txt3);line-height:1.9">
+      <b style="color:var(--txt2)">12 条不变量：</b>V1 依赖完整 · V2 无环 · V3 有目标+退出条件 · <b>V4 世界对可分</b> · <b>V5 判据+变异且变异声明"红"</b> · <b>V6 世界对全局唯一</b> · V7 全部可达 · V8 无孤儿 · V9 终端有出口 · V10 关键路径首尾相接 · V11 要害格必有世界对 · <b style="color:var(--orange)">V12 退出条件不含时间词</b> · <b style="color:var(--red)">V13 门禁基线（4 个，G0–G3 全在）</b> · <b style="color:var(--red)">V14 图⇄表节点双向</b>
+      <div style="margin-top:6px"><b style="color:var(--green)">验证器自测 14/14 通过</b> —— 每个不变量注入缺陷后必须报红。<b>过程中抓到自身两个缺陷</b>（Kahn 入度方向写反误报全环；<code>world=None</code> 时抛异常而非报红），均已修。<span style="color:var(--txt3)">验证器不是靠"我觉得它对"，是靠"注入缺陷它必须红"。</span></div>
+    </div>
+    <div style="margin-top:9px;padding:9px 12px;border-radius:8px;background:rgba(248,81,73,.08);border-left:3px solid var(--red)">
+      <div style="font-size:12.5px;font-weight:800;color:var(--red);margin-bottom:5px">🔴 第六轮：G3 被静默跳过（第五次同类，且最隐蔽）</div>
+      <div style="font-size:12.2px;color:var(--txt2);line-height:1.85">
+        复核时发现<b>节点从 16 掉到 15 —— G3 门对账消失了，而验证器仍报「✓ 闭环成立」</b>。<br>
+        <b>真因</b>：门禁表 G3 行写 <code>**G3 · 门对账**（v4 新增）</code>，解析正则要求 <code>**…**</code> 后紧跟 <code>|</code> ⇒ 括号注释导致不匹配 ⇒ G3 被静默吞掉。<br>
+        <b>性质</b>：<b style="color:var(--red)">东西丢了，检查机制看不见</b> —— 与 C4 重言式、C5 只读一处、L16 恒假、覆盖源未生效 同类，<b>第五次</b>。而且丢的是「第一个动作」。<br>
+        <b style="color:var(--green)">修法</b>：正则容许括号注释 · 区段锚点修正 · 新增 <b>V13 门禁基线</b> + <b>V14 图⇄表双向</b>。<br>
+        <span style="color:var(--txt3)">V13 不是"检查 G3 存在"，是<b>检查解析没有静默吞行</b>。一条正则写错就能让一个门禁从图里消失而全图仍然"成立"。</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 RESOLVED -->
+<section id="disc">
+  <div class="sec-h"><span class="sec-n">7</span><h2>G0 研讨区：3 项全部定案 ✅</h2></div>
+  <p class="sec-d">研讨区已清空 ⇒ <b>T0 门禁解除</b>。以下三项直接进入术语对照表。</p>
+
+  <div class="disc">
+    <div class="q" style="border-color:rgba(63,185,80,.35);background:linear-gradient(160deg,rgba(63,185,80,.07),var(--card))">
+      <div class="qt" style="color:var(--green)">① CI-144 意图命名 ✅</div>
+      <div class="qb">代码 <code>Ci144Intent</code>；文档「CI-144 意图」，简称「意图」。<br>
+      <b>理由：限定并入词本身</b>——Android Intent 无包名可挂，加限定后无冲突（A3b + A5）。</div>
+      <div class="opt">符合元原则「词从代码来」：文档词从代码词汇 <code>Ci144Intent</code> 派生，非杜撰。</div>
+    </div>
+
+    <div class="q" style="border-color:rgba(63,185,80,.35);background:linear-gradient(160deg,rgba(63,185,80,.07),var(--card))">
+      <div class="qt" style="color:var(--green)">② 运行模式归属 ✅ ① 契约层</div>
+      <div class="qb">drive / partner / survive 是<b>声明</b>语义（agent 不允许运行时切换）⇒ 不是状态 ⇒ 归契约层。<br>
+      <b>附带纪律：「切换」一词不进意图动词表</b>——不存在的操作不给名字（A4）。</div>
+      <div class="opt"><b>由此产生的分工（必须显式，否则 P2 验收会自相矛盾）：</b><br>
+        <b>运行模式</b> = 声明，<b>无切换动词</b>；<b>交互模式</b> = 状态，<b>SwitchMode 合法</b>。</div>
+    </div>
+
+    <div class="q" style="border-color:rgba(63,185,80,.35);background:linear-gradient(160deg,rgba(63,185,80,.07),var(--card))">
+      <div class="qt" style="color:var(--green)">③ 失效意图处置 ✅</div>
+      <div class="qb"><b>目标失效 ⇒ 标记 stale ⇒ 降级需重新确认。</b><br>
+      机制：意图携带<b>目标 ref</b> · <code>apply()</code> 核对存活 · 与 GitHub / 交易 / CI / K8s 同构。</div>
+      <div class="opt"><b>队列累积 ≠ 本项</b>——走既有的<b>生命周期三旋钮</b>（M2 已全绿），不新增机制（只减不增）。</div>
+    </div>
+  </div>
+
+  <div class="warnbox" style="margin-top:14px;border-color:rgba(227,160,8,.3)">
+    <div class="wt" style="color:var(--orange)">⚠️ G0 定案带出的一个新约束（必须写进 P0a）</div>
+    <div class="wb">
+      G0③ 引入「<b>目标存活</b>」这一新状态量，而它是 <b>stale 判定的输入</b>。重放时它必须能重建，否则 <b>P0b 会假绿</b>。<br>
+      ⇒ P0a 的排除项分类需新增一类判定：
+      <div style="margin:8px 0;padding:8px 12px;background:rgba(0,0,0,.22);border-left:3px solid var(--orange)">
+        <b>内部目标</b>（Cellrix pane / tab / 意图队列）⇒ 存活由事件流派生 ⇒ <b>在 hash 域内</b>，重放可重现。<br>
+        <b>外部目标</b>（PTY 桥接进来的进程）⇒ 存活在事件流之外 ⇒ <b>边界型排除</b>，重放时 stale 标记不可重现 ⇒ 必须在 P0b 操作集中显式标注为「近似重放」。
+      </div>
+      <b style="color:var(--green)">这一条不改 DAG 结构，只给 P0a 加一项归类要求。</b>
+    </div>
+  </div>
+
+  <div class="warnbox" style="margin-top:14px">
+    <div class="wt">给架构师时，第一句话必须是这句</div>
+    <div class="wb">
+      <b style="color:var(--green);font-size:14px">这不是新项目。四层 + 进程轴共 29 项，其中 11 项现状、4 项待更新——它只是给已完成的经历链换一张更大的图。</b>
+      <div style="margin-top:8px">真新增 14 项，全是「还没有」，<b>没有一个是「做错了」</b>。G0 三项已定案，T0 可开工。</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Cellrix 架构研讨图 v11 · 命名宪法（Ω 元公理）→ 意图与事实的分界 → 四层 + 进程轴 → 撞车 → 闭环 → 路线图 → G0 已定案<br>
+  元原则：<b style="color:var(--txt2)">词从代码来，公理来否决</b>（代码已有的词优先；没有则须从代码词汇派生；派生词同样过 A2–A5）· 路线图只减不增 · 每条验收必带变异<br>
+  <span style="color:var(--txt3)">诚实边界：<b>A0 是领域事实；T1 是设计约定而非推导结论</b>。A3a 仓库内撞名 grep 可判；<b>A3b 是可审议的语义核对，不是客观判定器</b>——依赖选取哪种词义与语境，「该词的标准定义是什么」仍依赖常识（未检索验证）。turn/job 同义为推断。<b>计数为卡片口径，概念清单待 T0 产出</b>。本系统是<b>工程实用自洽</b>，不是形式逻辑严格自洽</span>
+</footer>
+
+</div>
+
+<script>
+const links=[...document.querySelectorAll('.nav-in a')];
+const secs=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+function upd(){
+  const y=window.scrollY+130;let cur=0;
+  secs.forEach((s,i)=>{if(s.offsetTop<=y)cur=i;});
+  links.forEach((a,i)=>a.classList.toggle('on',i===cur));
+}
+window.addEventListener('scroll',upd,{passive:true});upd();
+</script>
+</body>
+</html>

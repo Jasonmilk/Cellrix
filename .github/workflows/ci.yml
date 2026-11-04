@@ -16,6 +16,14 @@ jobs:
                            #   冻结是默认；预演 26 应是一次【有意】的实验，不是被动接受
     steps:
       - uses: actions/checkout@v4
+      - name: ⑤ 地基仪器（DAG 自测 14/14 · 逻辑自测 39/39 · 产物级变异 10/10）
+        # 会不会恒绿：不会。前两个读真实 docs（glob 唯一匹配，0 或多于 1 份 ⇒ 具名 UNMEASURABLE）；
+        # 第三个把 docs 拷进 tmp 后**改坏**再跑，改坏不红就报 10/10 不足 ⇒ 本 step 自己会红。
+        run: |
+          set -e
+          python3 tools/cellrix_dag_verify.py
+          python3 tools/cellrix_logic_verify.py
+          python3 tools/cellrix_mutate_artifacts.py
       - name: Rust 工具链
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: ① Rust 侧（硬门）
