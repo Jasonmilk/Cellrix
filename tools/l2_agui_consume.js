@@ -15,6 +15,10 @@ assert.ok(!types.some(t => t.startsWith('TOOL_CALL')), 'L1: 无工具段却出�
 const fin = events[events.length - 1];
 const keys = Object.keys(fin.metadata || {});
 assert.ok(keys.length === 0 || (keys.length === 1 && keys[0] === 'verdict'), 'L3: metadata 只许为空或仅 verdict');
+// 从已删的 l2_evidence_test.js 并进来两条有价值断言（其余"5 条/每条时间·阶段·一句话"是第二份定义，删）：
+// ① 空输入必须非零退出（读到空不是通过）② 末条必须是 RUN_FINISHED（证轨必须收尾）
+if (events.length === 0) { console.error('RED: 空投影 ⇒ 不是通过'); process.exit(1); }
 const c = events.find(e => e.type === 'TEXT_MESSAGE_CONTENT');
 assert.ok(c && typeof c.delta === 'string', 'L3: 取不到正文');
+assert.strictEqual(types[types.length - 1], 'RUN_FINISHED', '证轨收尾: 末条必须是 RUN_FINISHED');
 console.log('OK L2 消费 · ' + events.length + ' 条 · types=' + types.join(','));
