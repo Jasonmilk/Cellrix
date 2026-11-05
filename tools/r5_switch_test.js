@@ -21,7 +21,19 @@ fs.unlinkSync(prefs);
 // 切换事件在 AG-UI 投影里必须是空（用 anaphase bin 的规则：认不出的类型 ⇒ 空）
 const switchEvent = { type: 'workspace/switched', period_id: 'p', job_id: 'j', data: { to: switched } };
 const { execSync } = require('child_process');
-const out = execSync(`printf '%s\\n' '${JSON.stringify(switchEvent)}' | cargo run -q --manifest-path ${path.join(ROOT,'..','anaphase-helix','Cargo.toml')} --bin agui 2>/dev/null || true`, { encoding: 'utf8' });
+// ★ 我自己埋的假绿：原来 `|| true` 把「投影器跑不起来」也变成空输出，
+//   而断言恰好是 out === '' ⇒ 工具挂了也"通过"（不可量被当成通过）。
+//   现在分两步：先证明投影器**跑成功**（exit 0 + 有 stderr 计数行），再判投影为空。
+let out = '', toolOk = false, err = '';
+try {
+  // 用**已构建的二进制**（cargo 在 node 子进程里不一定在 PATH 上 ⇒ 会假红/假空）。
+  const BIN = path.join(ROOT, '..', 'anaphase-helix', 'target', 'debug', 'agui');
+  assert.ok(fs.existsSync(BIN), 'R5: 投影器二进制不存在 ⇒ UNMEASURABLE（先 cargo build --bin agui）：' + BIN);
+  out = execSync(`printf '%s\\n' '${JSON.stringify(switchEvent)}' | ${BIN} 2>/tmp/r5.err`, { encoding: 'utf8' });
+  toolOk = true; err = fs.readFileSync('/tmp/r5.err', 'utf8');
+} catch (e) { toolOk = false; err = String(e.message || e); }
+assert.ok(toolOk, 'R5: 投影器跑不起来 ⇒ UNMEASURABLE（不可量不是通过）：' + err.slice(0, 200));
+assert.ok(/agui: \d+ 条/.test(err), 'R5: 投影器没打印计数行 ⇒ 无法区分"空"与"没跑"');
 
 assert.strictEqual(hashDir(ledgerDir), before.ledger, 'R5: 切换不得改账本');
 assert.strictEqual(index(path.join(ROOT, 'data', 'manifests')).rows.length, before.rows, 'R5: 切换不得改 manifest 索引');
