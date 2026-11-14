@@ -54,7 +54,18 @@ D1/D2 rc=0
 ── 产物目录：/tmp/my-cycle
 ```
 
-拿到的 tape 可直接喂 ①②：
+脚本现在会把整条链跑完，产物都在 `$OUT`：
+
+```
+$OUT/events/*.jsonl       本次周期的 tape（10 行，含 turn/start）
+$OUT/ring.json            那一轮的事件环（8 事件）
+$OUT/casefile.json        案卷（选中边/候选边/支撑读数/未记项）
+$OUT/d3.json              6 项对照
+$OUT/evidence.html        证轨页（缺口 2 处「本 tape 未记录」）
+open /tmp/my-cycle/evidence.html
+```
+
+拿到的 tape 也可直接喂 ①②：
 ```bash
 node tools/d1_d2_check.js /tmp/my-cycle/events/<上面选中的那条>.events.jsonl; echo "rc=$?"
 node tools/l2_casefile.js /tmp/my-cycle/ring.json /tmp/my-cycle/events ../anaphase-helix/src/run_cycle/mod.rs > /tmp/mine.json 2>/dev/null
