@@ -3,7 +3,7 @@
 | 字段 | 内容 |
 |---|---|
 | id | `standalone-webui` |
-| 身份 | **正式（已执行，2026-11-05）** —— 触发条件已满足并完成删除 |
+| 身份 | **待确认（已执行删除，终局待园丁验收）** —— 删除已落盘，但"正式"不由我签发；园丁按完三个入口后开口才算终局 |
 | 执行读数 | PRE `dc31969` · `web/` **1396 文件 / 18M** → POST **目录不存在 / 0 文件**（commit `725c66f`，带 `[large]` 过门） |
 | 删后三层 | D1/D2 `rc=0`（`tools/d1_d2_check.js`）· D3 `rc=0`（6 行对照，baseline 冻结 `269f2b7e`）· 反样本仍可红：删 `turn/end` ⇒ 1 · `metadata` 多键 ⇒ 1 · baseline 缺失 ⇒ 4 |
 | 同批副作用修复 | `Cargo.toml` workspace 移除 `web`；`ci.yml` / `determinism.sh` 改具名 SKIP；`l1_manifest_test` 核心目录改 `protocol`；`d3_compare --baseline` ⇒ `UNMEASURABLE` rc=4（对照物冻结） |
