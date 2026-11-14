@@ -36,3 +36,28 @@ cd /Users/jason/Developer/Jasonmilk/Cellrix
 git ls-files web | wc -l      # 期望 0
 test -d web; echo $?          # 期望 1
 ```
+
+## ④（可选）你自己产一条新 tape，而不是只信仓里的样本
+
+```bash
+cd /Users/jason/Developer/Jasonmilk/Cellrix
+bash tools/run_one_cycle.sh /tmp/my-cycle
+```
+
+读期望形状（每次运行的数字可变）：
+```
+job_id=run-… · jsonl=…-p….events.jsonl · 行数=10
+ring 事件=8
+tape 选中=…（含 turn/start）      ← 必须选含 turn/start 那条（目录里另有一条 rails 演示的 3 行流）
+agui 标准事件=5
+D1/D2 rc=0
+── 产物目录：/tmp/my-cycle
+```
+
+拿到的 tape 可直接喂 ①②：
+```bash
+node tools/d1_d2_check.js /tmp/my-cycle/events/<上面选中的那条>.events.jsonl; echo "rc=$?"
+node tools/l2_casefile.js /tmp/my-cycle/ring.json /tmp/my-cycle/events ../anaphase-helix/src/run_cycle/mod.rs > /tmp/mine.json 2>/dev/null
+```
+
+桩只证明通路，**不是生产上游**；真上游见 `real-upstream-checklist-2026-11-05.md`。
