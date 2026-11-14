@@ -3,7 +3,8 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto'), assert = require('assert');
 const { index } = require('./l1_manifest.js');
 const DIR = process.argv[2] || path.join(__dirname, '..', 'data', 'manifests');
-const CORE = path.join(__dirname, '..', 'web', 'src');
+// web/ 已退役 ⇒ 核心目录改用 protocol（同一条 R1 判据：新增 manifest 不得触碰核心）
+const CORE = path.join(__dirname, '..', 'protocol');
 
 function coreHash() {
   const h = crypto.createHash('sha256');
@@ -28,4 +29,4 @@ assert.strictEqual(h1, h0, 'R1: 新增 manifest 不得触碰 web/src（核心 di
 assert.strictEqual(afterBad.rows.length, before.rows.length, 'R6: 坏 manifest 不得被索引');
 assert.strictEqual(afterBad.errors.length, 1, 'R6: 坏 manifest 必须记错（不拖垮其余）');
 console.log('OK R1/R6 · 基线 ' + before.rows.length + ' 行 → 新增后 ' + mid.rows.length +
-            ' 行 · web/src 哈希 ' + h0.slice(0, 8) + ' 未变 · 坏文件被记错');
+            ' · 核心(protocol) 哈希 ' + h0.slice(0, 8) + ' 未变 · 坏文件被记错');

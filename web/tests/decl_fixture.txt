@@ -1,3 +1,0 @@
-const REQUIRES = 'alpha';
-const REQUIRES = 'beta';
-const REQUIRES = 'gamma';

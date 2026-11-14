@@ -23,7 +23,11 @@ LED="ledger/hits-2026.jsonl"
 N=8
 if [ "${1:-}" = "--rerun" ]; then
   N="${2:-2}"; i=1
-  while [ "$i" -le "$N" ]; do echo "  run $i/$N (慢) ..."; node web/tests/run_all.js >/dev/null 2>&1 || true; i=$((i + 1)); done
+  while [ "$i" -le "$N" ]; do
+    # web/ 已按 DEATH-CERT 退役 ⇒ 没有"慢层"可复跑 ⇒ 本分支只剩具名跳过（不是通过）
+    echo "  run $i/$N (慢) ... SKIP: web/ 已退役，无可复跑对象"
+    i=$((i + 1))
+  done
   N=8
 else
   N="${1:-$N}"
@@ -33,7 +37,7 @@ import json, sys, collections
 led, n = sys.argv[1], int(sys.argv[2])
 rows = [json.loads(l) for l in open(led, encoding='utf-8') if l.strip() and '"fingerprint"' in l][-n:]
 if len(rows) < 2:
-    print("  [无法测量] 可比的运行少于 2 条（先跑一次 node web/tests/run_all.js）"); sys.exit(3)
+    print("  [无法测量] 可比的运行少于 2 条（web/ 已退役 ⇒ 该项不可测，具名）"); sys.exit(3)
 # 只比较【环境相同】的运行 —— 不同的环境本来就不可比（P6）
 groups = collections.defaultdict(list)
 for r in rows:

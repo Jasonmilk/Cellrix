@@ -57,6 +57,7 @@ jobs:
       - name: ② 面板套件（**顾问**：打印读数与 RED ROSTER，不判红）
         run: |
           set +e
-          node web/tests/run_all.js 2>&1 | tail -20
+          # web/ 已按 DEATH-CERT-standalone-webui 删除（pre-signed → 正式）；此处只留具名说明
+          echo "SKIP: web/ 已退役（死亡证明在 docs/deaths/DEATH-CERT-standalone-webui.md）"
           echo "::notice::面板套件在 CI 里缺 panel/cdp ⇒ 其读数与本地不可比；棘轮基线待本 run 后钉定"
           exit 0

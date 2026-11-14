@@ -8,6 +8,10 @@ const WEB = path.join(ROOT, 'web', 'assets', 'prove_track.js');
 const BASE = path.join(ROOT, 'docs', 'observations', 'd3-baseline.json');
 
 function extract() {
+  if (!fs.existsSync(WEB)) {
+    console.error('UNMEASURABLE: web/ 已按死亡证明删除 ⇒ 对照物已冻结在 docs/observations/d3-baseline.json（不再重生成）');
+    process.exit(4);
+  }
   const src = fs.readFileSync(WEB, 'utf8');
   const derived = [...src.matchAll(/\bS\.([a-zA-Z]+)\s*=/g)].map(m => m[1]);
   const helpers = [...src.matchAll(/\bN\.([a-zA-Z]+)\(/g)].map(m => m[1]);
