@@ -1,0 +1,53 @@
+{
+ "baseline_sha": "269f2b7ed831d983",
+ "rows": [
+  {
+   "label": "选中边",
+   "web_field": "steps",
+   "web_has": false,
+   "l2_field": "selected_edges",
+   "l2": "有",
+   "verdict": "对得上"
+  },
+  {
+   "label": "时间/区间",
+   "web_field": "session",
+   "web_has": true,
+   "l2_field": "support_reading",
+   "l2": "有",
+   "verdict": "对得上"
+  },
+  {
+   "label": "用量",
+   "web_field": "usage",
+   "web_has": true,
+   "l2_field": "support_reading",
+   "l2": "有",
+   "verdict": "对得上"
+  },
+  {
+   "label": "按 turn 索引",
+   "web_field": "turnIndex",
+   "web_has": true,
+   "l2_field": "selected_edges",
+   "l2": "有",
+   "verdict": "对得上"
+  },
+  {
+   "label": "候选选择",
+   "web_field": "openTurns",
+   "web_has": true,
+   "l2_field": "candidate_edges",
+   "l2": "有",
+   "verdict": "对得上"
+  },
+  {
+   "label": "重复检测",
+   "web_field": "repeats",
+   "web_has": false,
+   "l2_field": "unselected_reason",
+   "l2": "UNMEASURABLE（具名缺口）",
+   "verdict": "如实标缺（不假装完整）"
+  }
+ ]
+}

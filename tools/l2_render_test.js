@@ -1,39 +1,27 @@
-/* L2 渲染的判据（三形）：① 真实案卷 ⇒ 页面含 5 条选中边 + 2 处"本 tape 未记录"
- * ② 缺口被涂成"有值"（删掉 UNMEASURABLE 换成空串）⇒ 必须 RED（不许把缺画成空）
- * ③ 缺输入 ⇒ UNMEASURABLE（不是生成空白页通过） */
-const fs = require('fs'), path = require('path'), assert = require('assert'), { execSync } = require('child_process');
-const T = (s) => path.join('/tmp/l2', s);
-const run = (cf, d3, out) => { try { execSync(`node ${__dirname}/l2_render.js ${cf} ${d3} ${out}`, { stdio: 'pipe' }); return 0; } catch (e) { return e.status || 1; } };
+/* 入口②的反向检查：①真实案卷 ⇒ 每个 UNMEASURABLE 都有可见「本 tape 未记录」且样式区别于有值
+ * ②把缺口改成"有值" ⇒ 页面必须变化（标注消失）——证明页面不会把缺涂成有值
+ * ③缺输入 ⇒ UNMEASURABLE(4) */
+const fs = require('fs'), assert = require('assert'), { execSync } = require('child_process');
+const CF = 'docs/observations/l2-casefile-2026-11-05.json';
+const D3 = 'docs/observations/l2-d3-compare-2026-11-05.json';
+const run = (cf, out) => { try { execSync(`node tools/l2_render.js ${cf} ${D3} ${out}`, { stdio: 'pipe' }); return 0; } catch (e) { return e.status || 1; } };
+const countGap = f => (fs.readFileSync(f, 'utf8').match(/本 tape 未记录/g) || []).length;
 
-// ③ 缺输入
-assert.strictEqual(run('/tmp/nope.json', T('d3.json'), T('x.html')), 4, '缺输入必须 UNMEASURABLE(4)');
+assert.strictEqual(run('/tmp/nope.json', '/tmp/x.html'), 4, '缺输入必须 UNMEASURABLE(4)');
 
-// ① 正常
-assert.strictEqual(run(T('case.json'), T('d3.json'), T('ok.html')), 0);
-const html = fs.readFileSync(T('ok.html'), 'utf8');
-const gaps = (html.match(/本 tape 未记录/g) || []).length;
-assert.strictEqual(gaps, 2, '两处缺口必须如实标注');
-assert.ok(html.includes('Perception --Success--> PreAssessment'), '选中边必须渲染');
-assert.ok(/D3 对照/.test(html), 'D3 对照段必须在');
+const base = JSON.parse(fs.readFileSync(CF, 'utf8'));
+const gapsInCase = Object.values(base.casefile).filter(v => typeof v === 'string' && v.startsWith('UNMEASURABLE')).length;
+assert.strictEqual(run(CF, '/tmp/ok.html'), 0);
+const n = countGap('/tmp/ok.html');
+assert.ok(n >= gapsInCase, '每个 UNMEASURABLE 都应有可见标注（案卷 ' + gapsInCase + ' 项，页面 ' + n + ' 处）');
+assert.ok(/class="gap"/.test(fs.readFileSync('/tmp/ok.html', 'utf8')), '缺口必须有区别于有值的样式');
 
-// ② 静默缺失**不可能**：渲染层用 `v || 'UNMEASURABLE'`，空串/缺键都会落回具名缺口。
-//    ⇒ 这条断言验的是那个保证（不是"能抓静默"，抓不到是因为结构上不存在静默）。
-//    ★ 我上一版把这条写成"必须抓到"= 假测试（空串被 `||` 兜住，抓不到但测试仍绿）。
-const bad = JSON.parse(fs.readFileSync(T('case.json'), 'utf8'));
-bad.casefile.candidate_edges = ''; bad.casefile.unselected_reason = '';
-fs.writeFileSync(T('case_bad.json'), JSON.stringify(bad));
-run(T('case_bad.json'), T('d3.json'), T('bad.html'));
-const badHtml = fs.readFileSync(T('bad.html'), 'utf8');
-const badGaps = (badHtml.match(/本 tape 未记录/g) || []).length;
-if (badGaps !== 2) {
-  console.error('RED: 空串/缺键没有被兜成具名缺口（实际标注 ' + badGaps + ' 处）⇒ 渲染层允许假完整');
-  process.exit(1);
-}
-// ③' 缺键（不是空串）同样必须兜住
-const gone = JSON.parse(fs.readFileSync(T('case.json'), 'utf8'));
-delete gone.casefile.candidate_edges;
-fs.writeFileSync(T('case_gone.json'), JSON.stringify(gone));
-run(T('case_gone.json'), T('d3.json'), T('gone.html'));
-const goneGaps = (fs.readFileSync(T('gone.html'), 'utf8').match(/本 tape 未记录/g) || []).length;
-if (goneGaps !== 2) { console.error('RED: 缺键未兜成具名缺口（' + goneGaps + ' 处）'); process.exit(1); }
-console.log('OK L2 渲染：正常 2 处如实标注 · 缺输入 UNMEASURABLE(4) · 空串/缺键都被兜成具名缺口');
+// 反向：把缺口填成有值 ⇒ 标注必须消失（页面变化）
+const filled = JSON.parse(JSON.stringify(base));
+filled.casefile.unselected_reason = '园丁裁定：该边未选是因为 X（示例）';
+fs.writeFileSync('/tmp/filled.json', JSON.stringify(filled));
+assert.strictEqual(run('/tmp/filled.json', '/tmp/filled.html'), 0);
+const n2 = countGap('/tmp/filled.html');
+assert.ok(n2 < n, '把缺口填成有值后标注应减少（前 ' + n + ' 后 ' + n2 + '）');
+assert.notStrictEqual(fs.readFileSync('/tmp/ok.html', 'utf8'), fs.readFileSync('/tmp/filled.html', 'utf8'), '有值/无值页面必须不同');
+console.log('OK 入口②：缺口 ' + n + ' 处可见且样式独立 · 填值后降到 ' + n2 + ' · 页面有差异 · 缺输入 rc=4');

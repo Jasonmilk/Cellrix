@@ -1,0 +1,10 @@
+{"type":"turn/start","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":0,"time":"2026-11-14T20:32:14Z","data":{}}
+{"type":"user/message","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":1,"time":"2026-11-14T20:32:14Z","data":{"text":"compute 9^9"}}
+{"type":"context/inject","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":2,"time":"2026-11-14T20:32:14Z","data":{"chars":800,"injected_chars":0,"nodes":0}}
+{"type":"assistant/usage","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":3,"time":"2026-11-14T20:32:14Z","data":{"cached_tokens":null,"completion_tokens":5,"model":"stub","prompt_tokens":10,"reasoning_tokens":null}}
+{"type":"assistant/usage","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":4,"time":"2026-11-14T20:32:14Z","data":{"cached_tokens":null,"completion_tokens":5,"model":"stub","prompt_tokens":10,"reasoning_tokens":null}}
+{"type":"assistant/think","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":5,"time":"2026-11-14T20:32:14Z","data":{"text":""}}
+{"type":"assistant/attempt","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":6,"time":"2026-11-14T20:32:14Z","data":{"empty":true,"text":"no calls planned — answered directly"}}
+{"type":"assistant/reply","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":7,"time":"2026-11-14T20:32:14Z","data":{"bypass":null,"chars":0,"model":"stub","text":""}}
+{"type":"turn/end","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":8,"time":"2026-11-14T20:32:14Z","data":{"bypass":null,"done":true,"impasse":false,"model":"stub","reply":"","success":true,"verdict":null}}
+{"type":"check/status","period_id":"run-752d73d3ed4afb18-p006af8c54e000001","job_id":"run-752d73d3ed4afb18","seq":9,"time":"2026-11-14T20:32:14Z","data":{"allowed_once":0,"cancelled":0,"kinds":{},"phase":"hitl","rejected":0,"unavailable":0}}

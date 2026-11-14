@@ -1,0 +1,105 @@
+{
+ "tape": "ring.json",
+ "transitions_source": "mod.rs",
+ "begin": {
+  "input": "Calculate 2 to the power of 10",
+  "mode": "Partner"
+ },
+ "end": {
+  "done": true,
+  "success": true,
+  "impasse": false,
+  "reason": "completed"
+ },
+ "hitl": {
+  "allowed_once": 0,
+  "cancelled": 0,
+  "kinds": {},
+  "rejected": 0,
+  "unavailable": 0
+ },
+ "casefile": {
+  "selected_edges": [
+   "Perception --Success--> PreAssessment",
+   "PreAssessment --Success--> MemoryRetrieval",
+   "MemoryRetrieval --Success--> Reasoning",
+   "Reasoning --NoToolNeeded--> Reflection",
+   "Reflection --Success--> Perception"
+  ],
+  "candidate_edges": "来自状态机转移表（7 个状态 · d26d302ab28b7c90）",
+  "candidate_not_taken": [
+   {
+    "from": "Perception",
+    "candidates": [
+     "Success"
+    ],
+    "selected": "Success",
+    "not_taken": []
+   },
+   {
+    "from": "PreAssessment",
+    "candidates": [
+     "Success"
+    ],
+    "selected": "Success",
+    "not_taken": []
+   },
+   {
+    "from": "MemoryRetrieval",
+    "candidates": [
+     "Success",
+     "Failure"
+    ],
+    "selected": "Success",
+    "not_taken": [
+     "Failure"
+    ]
+   },
+   {
+    "from": "Reasoning",
+    "candidates": [
+     "NeedsTool",
+     "NoToolNeeded",
+     "Impass",
+     "Failure"
+    ],
+    "selected": "NoToolNeeded",
+    "not_taken": [
+     "NeedsTool",
+     "Impass",
+     "Failure"
+    ]
+   },
+   {
+    "from": "Reflection",
+    "candidates": [
+     "Success"
+    ],
+    "selected": "Success",
+    "not_taken": []
+   }
+  ],
+  "by_from_recorded": {
+   "Perception": [
+    "Success"
+   ],
+   "PreAssessment": [
+    "Success"
+   ],
+   "MemoryRetrieval": [
+    "Success"
+   ],
+   "Reasoning": [
+    "NoToolNeeded"
+   ],
+   "Reflection": [
+    "Success"
+   ]
+  },
+  "support_reading": {
+   "verdict": "null",
+   "session_rows": 10
+  },
+  "unselected_reason": "UNMEASURABLE"
+ }
+}

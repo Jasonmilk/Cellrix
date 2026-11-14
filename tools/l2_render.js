@@ -20,8 +20,14 @@ const lanes = [
   ['未选原因', [['为什么没走另一条边', c.unselected_reason || 'UNMEASURABLE']]],
   ['门与审计', [['HITL 四态', JSON.stringify(cf.hitl || {})], ['收尾', JSON.stringify(cf.end || {})]]]
 ];
-const d3rows = (d3.rows || []).map(r =>
-  '<tr><td>' + r.label + '</td><td>' + r.web_field + (r.web_has ? ' ✓' : ' —') + '</td><td>' + r.l2 + '</td><td>' + r.verdict + '</td></tr>').join('\n');
+const d3rows = (d3.rows || []).map(r => {
+  const l2cell = String(r.l2 || '');
+  const gap = l2cell.startsWith('UNMEASURABLE');
+  return '<tr><td>' + r.label + '</td><td>' + r.web_field + (r.web_has ? ' ✓' : ' —') + '</td><td>' +
+    (gap ? '<span class="gap">本 tape 未记录<span class="why">' + l2cell.replace(/^UNMEASURABLE[^）]*）?/, '') + '</span></span>'
+         : l2cell) +
+    '</td><td>' + r.verdict + '</td></tr>';
+}).join('\n');
 
 const html = `<!doctype html><meta charset="utf-8"><title>证轨 · ${cf.tape || ''}</title>
 <style>body{font:14px/1.6 system-ui;margin:28px;color:#1d2733;background:#f7f9fa}
