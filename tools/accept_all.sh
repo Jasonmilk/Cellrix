@@ -15,6 +15,13 @@ if diff -q /tmp/replay-1.json /tmp/replay-2.json >/dev/null; then
   echo "   diff=0 · sha=$(shasum -a 256 /tmp/replay-1.json | cut -c1-16)"
 else echo "   ★ FAIL: 两次输出不一致"; fail=1; fi
 
+# 出口判据依赖 anaphase 的 agui 二进制；缺失时**具名不可量**，不是报"期望5条"那种误导性 FAIL
+if [ ! -x "$AGUI" ]; then
+  echo "── ② 出口：UNMEASURABLE（找不到 $AGUI）"
+  echo "   先: (cd ../anaphase-helix && cargo build --all-features --bin agui)"
+  exit 4
+fi
+
 echo "── ② 出口（标准事件 + D1/D2）"
 n=$($AGUI "$EV" 2>/dev/null | wc -l | tr -d ' ')
 echo "   事件条数=$n"
