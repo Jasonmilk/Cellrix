@@ -3,7 +3,10 @@
 | 字段 | 内容 |
 |---|---|
 | id | `standalone-webui` |
-| 身份 | **预签发（待触发）** —— 触发条件未满足前它**没死**，`web/` 仍在；满足后本证明转正式，届时补 `git rm` 读数 |
+| 身份 | **正式（已执行，2026-11-05）** —— 触发条件已满足并完成删除 |
+| 执行读数 | PRE `dc31969` · `web/` **1396 文件 / 18M** → POST **目录不存在 / 0 文件**（commit `725c66f`，带 `[large]` 过门） |
+| 删后三层 | D1/D2 `rc=0`（`tools/d1_d2_check.js`）· D3 `rc=0`（6 行对照，baseline 冻结 `269f2b7e`）· 反样本仍可红：删 `turn/end` ⇒ 1 · `metadata` 多键 ⇒ 1 · baseline 缺失 ⇒ 4 |
+| 同批副作用修复 | `Cargo.toml` workspace 移除 `web`；`ci.yml` / `determinism.sh` 改具名 SKIP；`l1_manifest_test` 核心目录改 `protocol`；`d3_compare --baseline` ⇒ `UNMEASURABLE` rc=4（对照物冻结） |
 | 出生 | 合拢期夹具：为了让生态在**没有真正前端**时也能看事件，做的一份独立 WebUI |
 | 触发条件 | **登记在坐标**（`helix-mind/docs/helixECO/execution-queue.md` 的「脱落触发条件」段），本证明不复述判据口径，只引用。 |
 | 死因 | 它的存在理由是"补上没有前端"，而 AG-UI 出口落地后，这个理由消失 ⇒ **理由消失即死**，不是"没时间维护" |
