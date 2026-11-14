@@ -1,0 +1,11 @@
+{
+  "_note": "AG-UI 1.0 的**最小**契约子集（不是全规范）：只钉我们真正产出的 5 类事件与必填键。钉版本而非钉 SDK —— 见 D2 的替换声明。",
+  "pinned": "agui-1.0-min/2026-11-05",
+  "events": {
+    "RUN_STARTED":      { "required": ["type", "threadId", "runId"] },
+    "TEXT_MESSAGE_START":   { "required": ["type", "threadId", "runId", "messageId", "role"] },
+    "TEXT_MESSAGE_CONTENT": { "required": ["type", "threadId", "runId", "messageId", "delta"] },
+    "TEXT_MESSAGE_END":     { "required": ["type", "threadId", "runId", "messageId"] },
+    "RUN_FINISHED":     { "required": ["type", "threadId", "runId"], "optional": ["metadata"], "metadata_keys": ["verdict"] }
+  }
+}
