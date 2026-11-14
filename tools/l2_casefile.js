@@ -4,6 +4,7 @@
  * 取不到的**具名 UNMEASURABLE**，不填想象值。 */
 const fs = require('fs'), path = require('path');
 const ringFile = process.argv[2], evDir = process.argv[3];
+const transFile = process.argv[4];   // 可选：anaphase 状态机转移表源码（候选边的真源）
 if (!ringFile) { console.error('UNMEASURABLE: 需要 <ring.json> [events-dir]'); process.exit(4); }
 const ring = JSON.parse(fs.readFileSync(ringFile, 'utf8'));
 const evs = ring.events || [];
@@ -15,10 +16,31 @@ const hitl = evs.find(e => e.phase === 'hitl');
 // ① 选中边 = 实际发生的迁移序列（tape 里有的）
 const selected = states.map(s => `${s.from} --${s.condition}--> ${s.to}`);
 
-// ② 候选边 = 每条选中边的**兄弟条件**（同一 from 的其他 cond）。tape 只记录被选的那条，
-//    兄弟条件不在 tape 里 ⇒ 缺一句就具名，不猜。
+// ② 候选边 = **状态机转移表**（源码为真源，可复现、可哈希），不是猜 tape。
+//    tape 只记被选中的那条；兄弟边由程序定义决定，读程序即可，也不需要给事件加字段。
 const byFrom = {};
 for (const s of states) (byFrom[s.from] = byFrom[s.from] || []).push(s.condition);
+
+let candidates = 'UNMEASURABLE（未提供状态机转移表）', transHash = null, unselected = null;
+if (transFile && fs.existsSync(transFile)) {
+  const src = fs.readFileSync(transFile, 'utf8');
+  transHash = require('crypto').createHash('sha256').update(src).digest('hex').slice(0, 16);
+  const re = /transitions\.insert\(\(HelixState::(\w+), TransitionCondition::(\w+)\),\s*HelixState::(\w+)\)/g;
+  const table = {};
+  let m;
+  while ((m = re.exec(src))) (table[m[1]] = table[m[1]] || []).push({ cond: m[2], to: m[3] });
+  // 每条被选中的边，列出同 from 下的其他候选（未选）
+  unselected = states.map(st => {
+    const all = table[st.from] || [];
+    return {
+      from: st.from,
+      candidates: all.map(c => c.cond),
+      selected: st.condition,
+      not_taken: all.filter(c => c.cond !== st.condition).map(c => c.cond)
+    };
+  });
+  candidates = '来自状态机转移表（' + Object.keys(table).length + ' 个状态 · ' + transHash + '）';
+}
 
 // ③ 支撑读数 = 该步的 condition + 该周期的 verdict（session 流 turn/end）
 let verdict = 'UNMEASURABLE', rows = 0;
@@ -39,12 +61,14 @@ const unselectedReason = 'UNMEASURABLE';
 
 const out = {
   tape: path.basename(ringFile),
+  transitions_source: transFile ? path.basename(transFile) : null,
   begin: begin ? JSON.parse(begin.detail) : null,
   end: end ? JSON.parse(end.detail) : null,
   hitl: hitl ? JSON.parse(hitl.detail) : null,
   casefile: {
     selected_edges: selected,
-    candidate_edges: 'UNMEASURABLE（tape 只记被选中的那条；兄弟条件未落盘）',
+    candidate_edges: candidates,
+    candidate_not_taken: unselected === null ? 'UNMEASURABLE' : unselected,
     by_from_recorded: byFrom,
     support_reading: { verdict, session_rows: rows },
     unselected_reason: unselectedReason
