@@ -59,5 +59,15 @@ else
   echo "   ★ FAIL: 没找到含 turn/start 的 tape"; fail=1
 fi
 [ -n "${f:-}" ] && [ -s "$OUT/ring.json" ] || { echo "★ FAIL: 没收到 tape/ring"; fail=1; }
-echo "── 产物目录：$OUT"
+echo "⑥ 用这条 tape 生成证轨页（同一条链，不另取数）"
+CX="$(cd "$HERE/.." && pwd)"
+if [ -n "${f:-}" ]; then
+  ( cd "$CX" && node tools/l2_casefile.js "$OUT/ring.json" "$OUT/events" "$ANA/src/run_cycle/mod.rs" > "$OUT/casefile.json" 2>/dev/null \
+    && node tools/d3_compare.js "$OUT/casefile.json" > "$OUT/d3.json" 2>/dev/null \
+    && node tools/l2_render.js "$OUT/casefile.json" "$OUT/d3.json" "$OUT/evidence.html" 2>/dev/null ) \
+    && echo "   页面：$OUT/evidence.html · 缺口标注=$(grep -c '本 tape 未记录' "$OUT/evidence.html" 2>/dev/null || echo 0) 处" \
+    || { echo "   ★ FAIL: 页面生成失败"; fail=1; }
+fi
+
+echo "── 产物目录：$OUT（tape/ ring.json casefile.json d3.json evidence.html）"
 exit $fail
