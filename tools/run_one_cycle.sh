@@ -45,10 +45,19 @@ curl -s -m 10 "http://127.0.0.1:$SVC_PORT/v1/agent/events" > "$OUT/ring.json"
 
 echo "⑤ 读数"
 JOB=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("job_id",""))' "$OUT/chat.json" 2>/dev/null)
-f=$(ls -t "$OUT"/events/*.jsonl 2>/dev/null | head -1)
+# ★ 一个目录里可能有两条流：本次周期的 10 行 + rails 演示的 3 行（后者没有 turn/start）。
+#   选 tape 必须按内容选（含 turn/start），不能拿 glob 第一个 —— 否则量错了对象。
+f=$(grep -l '"type":"turn/start"' "$OUT"/events/*.jsonl 2>/dev/null | head -1)
+[ -n "${f:-}" ] || f=$(ls -S "$OUT"/events/*.jsonl 2>/dev/null | head -1)
 echo "   job_id=${JOB:-?} · jsonl=$(basename "${f:-none}") · 行数=$(wc -l < "${f:-/dev/null}" 2>/dev/null | tr -d ' ')"
 echo "   ring 事件=$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["events"]))' "$OUT/ring.json" 2>/dev/null || echo '?')"
-[ -n "${f:-}" ] && echo "   agui 标准事件=$("$ANA/target/debug/agui" "$f" 2>/dev/null | wc -l | tr -d ' ')"
+if [ -n "${f:-}" ]; then
+  echo "   tape 选中=$(basename "$f")（含 turn/start）"
+  echo "   agui 标准事件=$("$ANA/target/debug/agui" "$f" 2>/dev/null | wc -l | tr -d ' ')"
+  ( cd "$HERE/.." && node tools/d1_d2_check.js "$f" >/dev/null 2>&1 ) && echo "   D1/D2 rc=0" || { echo "   ★ FAIL: D1/D2 rc≠0"; fail=1; }
+else
+  echo "   ★ FAIL: 没找到含 turn/start 的 tape"; fail=1
+fi
 [ -n "${f:-}" ] && [ -s "$OUT/ring.json" ] || { echo "★ FAIL: 没收到 tape/ring"; fail=1; }
 echo "── 产物目录：$OUT"
 exit $fail
