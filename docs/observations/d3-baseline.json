@@ -1,0 +1,34 @@
+{
+ "source": "web/assets/prove_track.js",
+ "sha256_16": "269f2b7ed831d983",
+ "lines": 331,
+ "derived_fields": [
+  "callsOpen",
+  "compact",
+  "durMode",
+  "meta",
+  "modelByTurn",
+  "openTurns",
+  "q",
+  "sel",
+  "session",
+  "stepModels",
+  "turnIds",
+  "turnIndex",
+  "usage",
+  "usageByModel",
+  "usageByTurn"
+ ],
+ "node_helpers": [
+  "modelByTurn",
+  "stepModels",
+  "usageByModel",
+  "usageByTurn"
+ ],
+ "renderers": [
+  "renderLanes",
+  "renderStats",
+  "renderTable"
+ ],
+ "note": "只读提取：这些是 web 侧**从同一份 snapshot 派生**出来的字段（tape target，无自有数据源）"
+}
