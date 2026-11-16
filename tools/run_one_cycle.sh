@@ -3,8 +3,14 @@
 # 桩只证明"通路"，**不是生产上游**。真上游接入见 docs/observations/real-upstream-checklist-2026-11-05.md
 # 用法：bash tools/run_one_cycle.sh [输出目录]
 set -uo pipefail
-MODE=stub; OUT=""
-for a in "$@"; do case "$a" in --config-upstream) MODE=config ;; *) OUT="$a" ;; esac; done
+MODE=stub; OUT=""; PROMPT="compute 9^9"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --config-upstream) MODE=config; shift ;;
+    --prompt) PROMPT="${2:-}"; shift 2 ;;
+    *) OUT="$1"; shift ;;
+  esac
+done
 OUT="${OUT:-/tmp/cycle-$(date +%Y%m%d-%H%M%S)}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ANA="$(cd "$HERE/../../anaphase-helix" && pwd)"
@@ -29,17 +35,18 @@ if [ "$MODE" = config ]; then
     exit 4
   fi
   echo "   config.toml 有 reasoning_endpoint（脱敏不打印）"
-  REASONING_ENV=""
+  REASONING_ENV=()
 else
   echo "① 起桩 LLM :$STUB_PORT（仅证明通路，不是生产上游）"
   python3 "$HERE/stub_llm.py" "$STUB_PORT" >/dev/null 2>&1 & STUB_PID=$!
   sleep 1
   curl -s -m 3 -o /dev/null -w "   stub http=%{http_code}\n" -X POST "http://127.0.0.1:$STUB_PORT/chat/completions" -d '{}' || fail=1
-  REASONING_ENV="ANAPHASE_REASONING_ENDPOINT=http://127.0.0.1:$STUB_PORT ANAPHASE_REASONING_MODEL=stub"
+  # 必须是**多个参数**：`env "A=1 B=2"` 会被当成一个变量值（实测导致 endpoint 丢失 ⇒ 适配器 builder error）
+  REASONING_ENV=(ANAPHASE_REASONING_ENDPOINT="http://127.0.0.1:$STUB_PORT" ANAPHASE_REASONING_MODEL=stub)
 fi
 
 echo "② 起 anaphase :$SVC_PORT（events → $OUT/events）"
-( cd "$ANA" && env ${REASONING_ENV:+"$REASONING_ENV"} ANAPHASE_SESSION_EVENTS_PATH="$OUT/events" \
+( cd "$ANA" && env "${REASONING_ENV[@]}" ANAPHASE_SESSION_EVENTS_PATH="$OUT/events" \
   cargo run -q --all-features --bin anaphase -- --config config.toml >"$OUT/svc.log" 2>&1 ) & SVC_PID=$!
 up=0
 for i in $(seq 1 60); do
@@ -50,7 +57,8 @@ done
 echo "   health ok"
 
 echo "③ 喂一轮"
-curl -s -m 40 -X POST "http://127.0.0.1:$SVC_PORT/v1/chat" -H 'content-type: application/json' -d '{"message":"use a tool: compute 12^12"}' > "$OUT/chat.json"
+curl -s -m 40 -X POST "http://127.0.0.1:$SVC_PORT/v1/chat" -H 'content-type: application/json' \
+  -d "$(python3 -c 'import json,sys;print(json.dumps({"message":sys.argv[1]}))' "$PROMPT")" > "$OUT/chat.json"
 head -c 140 "$OUT/chat.json"; echo
 sleep 2   # 等事件流 flush
 echo "④ 收 ring"
@@ -94,7 +102,14 @@ for l in open(sys.argv[1],encoding='utf-8'):
     d=json.loads(l); t=d.get('type'); dd=d.get('data') or {}
     if t=='turn/end': imp=dd.get('impasse')
     if t=='assistant/attempt' and dd.get('error'): err=dd.get('error')
-print("⑤c 本轮结果：impasse=%s%s" % (imp, ("  reasoning_error=%s" % err) if err else ""))
+byp=None
+for l in open(sys.argv[1],encoding='utf-8'):
+    d=json.loads(l)
+    if d.get('type') in ('assistant/reply','turn/end'):
+        b=(d.get('data') or {}).get('bypass')
+        if b: byp=b
+print("⑤c 本轮结果：impasse=%s%s%s" % (imp, ("  reasoning_error=%s" % err) if err else "",
+      ("  bypass=%s（上游未被调用 ⇒ 通路未验证）" % byp) if byp else ""))
 if imp: sys.exit(1)
 PY2
   rc_cycle=$?; [ "$rc_cycle" = 0 ] || { echo "   ★ 本轮未跑成（impasse）⇒ 通路读数不可当作"跑通一轮""; fail=1; }
