@@ -3,7 +3,9 @@
 # 桩只证明"通路"，**不是生产上游**。真上游接入见 docs/observations/real-upstream-checklist-2026-11-05.md
 # 用法：bash tools/run_one_cycle.sh [输出目录]
 set -uo pipefail
-OUT="${1:-/tmp/cycle-$(date +%Y%m%d-%H%M%S)}"
+MODE=stub; OUT=""
+for a in "$@"; do case "$a" in --config-upstream) MODE=config ;; *) OUT="$a" ;; esac; done
+OUT="${OUT:-/tmp/cycle-$(date +%Y%m%d-%H%M%S)}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ANA="$(cd "$HERE/../../anaphase-helix" && pwd)"
 STUB_PORT="${STUB_PORT:-19999}"; SVC_PORT="${SVC_PORT:-50061}"
@@ -20,14 +22,25 @@ CARGO_BIN="$(command -v cargo 2>/dev/null || rustup which cargo 2>/dev/null || t
 [ -n "$CARGO_BIN" ] || { echo "★ FAIL: 找不到 cargo（先装 rustup 或在 PATH 里导出）"; exit 3; }
 export PATH="$(dirname "$CARGO_BIN"):$PATH"
 
-echo "① 起桩 LLM :$STUB_PORT"
-python3 "$HERE/stub_llm.py" "$STUB_PORT" >/dev/null 2>&1 & STUB_PID=$!
-sleep 1
-curl -s -m 3 -o /dev/null -w "   stub http=%{http_code}\n" -X POST "http://127.0.0.1:$STUB_PORT/chat/completions" -d '{}' || fail=1
+if [ "$MODE" = config ]; then
+  echo "① 上游：用 anaphase/config.toml（不启桩）"
+  if ! grep -qE '^[[:space:]]*reasoning_endpoint[[:space:]]*=' "$ANA/config.toml" 2>/dev/null; then
+    echo "   UNMEASURABLE: config.toml 里没有 reasoning_endpoint ⇒ 无法接真上游（不是通过）"
+    exit 4
+  fi
+  echo "   config.toml 有 reasoning_endpoint（脱敏不打印）"
+  REASONING_ENV=""
+else
+  echo "① 起桩 LLM :$STUB_PORT（仅证明通路，不是生产上游）"
+  python3 "$HERE/stub_llm.py" "$STUB_PORT" >/dev/null 2>&1 & STUB_PID=$!
+  sleep 1
+  curl -s -m 3 -o /dev/null -w "   stub http=%{http_code}\n" -X POST "http://127.0.0.1:$STUB_PORT/chat/completions" -d '{}' || fail=1
+  REASONING_ENV="ANAPHASE_REASONING_ENDPOINT=http://127.0.0.1:$STUB_PORT ANAPHASE_REASONING_MODEL=stub"
+fi
 
 echo "② 起 anaphase :$SVC_PORT（events → $OUT/events）"
-( cd "$ANA" && ANAPHASE_REASONING_ENDPOINT="http://127.0.0.1:$STUB_PORT" ANAPHASE_REASONING_MODEL=stub \
-  ANAPHASE_SESSION_EVENTS_PATH="$OUT/events" cargo run -q --all-features --bin anaphase -- --config config.toml >"$OUT/svc.log" 2>&1 ) & SVC_PID=$!
+( cd "$ANA" && env ${REASONING_ENV:+"$REASONING_ENV"} ANAPHASE_SESSION_EVENTS_PATH="$OUT/events" \
+  cargo run -q --all-features --bin anaphase -- --config config.toml >"$OUT/svc.log" 2>&1 ) & SVC_PID=$!
 up=0
 for i in $(seq 1 60); do
   if curl -s -m 2 "http://127.0.0.1:$SVC_PORT/v1/health" | grep -q '"'; then up=1; break; fi
@@ -53,7 +66,11 @@ echo "   job_id=${JOB:-?} · jsonl=$(basename "${f:-none}") · 行数=$(wc -l < 
 echo "   ring 事件=$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["events"]))' "$OUT/ring.json" 2>/dev/null || echo '?')"
 if [ -n "${f:-}" ]; then
   echo "   tape 选中=$(basename "$f")（含 turn/start）"
-  echo "   agui 标准事件=$("$ANA/target/debug/agui" "$f" 2>/dev/null | wc -l | tr -d ' ')"
+  if [ ! -x "$ANA/target/debug/agui" ]; then
+    echo "   ★ FAIL: 缺 $ANA/target/debug/agui（先 cargo build --all-features --bin agui）"; fail=1
+  else
+    echo "   agui 标准事件=$("$ANA/target/debug/agui" "$f" 2>/dev/null | wc -l | tr -d ' ')"
+  fi
   ( cd "$HERE/.." && node tools/d1_d2_check.js "$f" >/dev/null 2>&1 ) && echo "   D1/D2 rc=0" || { echo "   ★ FAIL: D1/D2 rc≠0"; fail=1; }
 else
   echo "   ★ FAIL: 没找到含 turn/start 的 tape"; fail=1

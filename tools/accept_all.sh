@@ -8,6 +8,12 @@ EV=$TAPE/run-752d73d3ed4afb18-p006af8c54e000001.events.jsonl
 AGUI=../anaphase-helix/target/debug/agui
 fail=0
 
+if [ ! -d "$TAPE" ]; then
+  echo "── ① 重放：UNMEASURABLE（缺 tape 夹具 $TAPE）"
+  echo "   先: bash tools/run_one_cycle.sh /tmp/my-cycle 然后把它拷进 fixtures/"
+  exit 4
+fi
+
 echo "── ① 重放（同一 tape 两遍）"
 node tools/l2_casefile.js $TAPE/ring.json $TAPE ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-1.json 2>/dev/null
 node tools/l2_casefile.js $TAPE/ring.json $TAPE ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-2.json 2>/dev/null
