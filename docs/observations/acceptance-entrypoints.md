@@ -1,5 +1,16 @@
 # 三个可自按的验收入口（cwd 见每块第一行）
 
+## ⓪「真上游到底配了没」——一行判定（不回显 key）
+
+```bash
+cd /Users/jason/Developer/Jasonmilk/Cellrix
+bash tools/check_upstream.sh; echo "rc=$?"
+# 期望形状：NO   config.toml 里没有 reasoning_endpoint（… mtime=…）      rc=1
+#            YES  endpoint=https://…  model=…  key=set|none  env=0     rc=0
+```
+
+# 三个可自按的验收入口（cwd 见每块第一行）
+
 ## ① 重放：同一份 tape 跑两遍，比一字不差
 
 ```bash
