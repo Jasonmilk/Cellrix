@@ -13,14 +13,11 @@ ANA="$(cd "${ANAPHASE_DIR:-../anaphase-helix}" 2>/dev/null && pwd)"
 # 可注入（喂夹具）：默认读 anaphase 仓内 config；测试可用 ANAPHASE_CONFIG 指向别处
 CFG="${ANAPHASE_CONFIG:-$ANA/config.toml}"
 if [ -n "${ANA:-}" ] && [ -f "$CFG" ]; then
-  n=$(grep -c 'tool_calls' "$ANA/src/adapters/"*.rs 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
-  [ "${n:-0}" -eq 0 ] && g1="缺（适配器不读 tool_calls：grep=0）" || g1="有（grep=$n）"
   grep -qE '^[[:space:]]*tentacle_endpoint[[:space:]]*=' "$CFG" 2>/dev/null && g2="已配置" || g2="缺（pipeline Unbound）"
   grep -qE '^[[:space:]]*reasoning_endpoint[[:space:]]*=' "$CFG" 2>/dev/null && g3="已配置" || g3="缺（无上游）"
-  echo "── 三道门（预检，只读）"
-  echo "   ① 适配器解析 tool_calls : $g1"
-  echo "   ② 上游 reasoning_endpoint: $g3"
-  echo "   ③ 执行点 tentacle_endpoint: $g2"
+  echo "── 两道门（预检，只读；2026-11-16 纠正：原先的'①适配器不读 tool_calls'是桩形状错）"
+  echo "   ① 上游 reasoning_endpoint : $g3"
+  echo "   ② 执行点 tentacle_endpoint: $g2"
 fi
 
 if [ ! -d "$TAPE" ]; then
