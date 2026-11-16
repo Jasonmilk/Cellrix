@@ -76,6 +76,32 @@ else
   echo "   ★ FAIL: 没找到含 turn/start 的 tape"; fail=1
 fi
 [ -n "${f:-}" ] && [ -s "$OUT/ring.json" ] || { echo "★ FAIL: 没收到 tape/ring"; fail=1; }
+if [ -n "${f:-}" ]; then
+  tc=$(grep -c '"type":"tool/call"' "$f" 2>/dev/null || true)
+  tr=$(grep -c '"type":"tool/result"' "$f" 2>/dev/null || true)
+  md=$(python3 -c "
+import json,sys
+for l in open(sys.argv[1],encoding='utf-8'):
+    d=json.loads(l)
+    if d.get('type')=='assistant/usage':
+        print((d.get('data') or {}).get('model') or 'null'); break
+else: print('none')" "$f" 2>/dev/null || echo '?')
+  # 本轮到底跑成没跑成：impasse / reasoning 报错必须露出来（否则"通路 OK"会掩盖"没跑成"）
+  python3 - "$f" <<'PY2'
+import json,sys
+imp=None; err=None
+for l in open(sys.argv[1],encoding='utf-8'):
+    d=json.loads(l); t=d.get('type'); dd=d.get('data') or {}
+    if t=='turn/end': imp=dd.get('impasse')
+    if t=='assistant/attempt' and dd.get('error'): err=dd.get('error')
+print("⑤c 本轮结果：impasse=%s%s" % (imp, ("  reasoning_error=%s" % err) if err else ""))
+if imp: sys.exit(1)
+PY2
+  rc_cycle=$?; [ "$rc_cycle" = 0 ] || { echo "   ★ 本轮未跑成（impasse）⇒ 通路读数不可当作"跑通一轮""; fail=1; }
+
+  echo "⑤b 工具段：tool/call=$tc · tool/result=$tr · model=$md  （0 表示本轮未走工具段；这是读数不是结论）"
+fi
+
 echo "⑥ 用这条 tape 生成证轨页（同一条链，不另取数）"
 CX="$(cd "$HERE/.." && pwd)"
 if [ -n "${f:-}" ]; then
