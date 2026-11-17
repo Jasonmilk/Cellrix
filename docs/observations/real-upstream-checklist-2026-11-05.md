@@ -62,3 +62,31 @@ curl -sS -X POST "$ENDPOINT/chat/completions" \
 ③ 是否需要 key（以及 key 走 config.toml 可以吗——env 无 api_key 变体）
 ④ 该模型是否会自动发起 tool_calls（若不，需不需要我在提示里显式要求）
 ```
+
+## 7. 如果你"写了却没生效"——四种可能，各一条判定命令
+
+> 实测记录：连续 4 次检查 `anaphase-helix/config.toml` 的 mtime 仍是 `Oct 9 13:48`、
+> `reasoning_endpoint` 计数 0、环境变量 0、全仓 toml 里也没有该键。按下面四步自查一遍。
+
+```bash
+# ① 是不是改错了文件（config.toml vs config.toml.example vs 别处的副本）
+ls -l anaphase-helix/config.toml anaphase-helix/config.toml.example 2>/dev/null
+grep -c '^\s*reasoning_endpoint' anaphase-helix/config.toml      # 期望 1；0 = 没落盘
+
+# ② 是不是没保存（mtime 应是你编辑的时刻，不是 Oct 9）
+ls -l anaphase-helix/config.toml | awk '{print $6,$7,$8}'
+
+# ③ 是不是写错段（必须在 [anaphase] 段里；写到 [api] 下会被忽略）
+awk '/^\[/{sec=$0} /reasoning_endpoint/{print sec": "$0}' anaphase-helix/config.toml
+
+# ④ 是不是重复键（TOML 严格：同一个键写两次 ⇒ 服务直接退出，报 duplicate key）
+grep -c '^\s*reasoning_model' anaphase-helix/config.toml         # >1 = 重复，会 TomlError
+```
+
+**一键判定**（本仓已有）：
+
+```bash
+bash tools/check_upstream.sh; echo rc=$?
+# YES … ⇒ 已落盘（继续跑 run_one_cycle --config-upstream）
+# NO  … ⇒ 未落盘（按上面四步查；不要靠"我记得写了"）
+```
