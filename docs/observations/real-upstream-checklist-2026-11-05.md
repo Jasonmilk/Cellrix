@@ -90,3 +90,30 @@ bash tools/check_upstream.sh; echo rc=$?
 # YES … ⇒ 已落盘（继续跑 run_one_cycle --config-upstream）
 # NO  … ⇒ 未落盘（按上面四步查；不要靠"我记得写了"）
 ```
+
+## 8. 三条可直接粘贴的写入命令（本地实测过，key 不经过对话）
+
+> 命令只在 **`[anaphase]` 段内**插入，且**插完自检**。把 `<网关>` / `<tentacle>` 换成真值；
+> 需要 key 的那行由你自己在编辑器里加（`reasoning_api_key = "…"`），不要贴进对话。
+
+```bash
+cd /Users/jason/Developer/Jasonmilk/anaphase-helix
+cp config.toml config.toml.bak-$(date +%Y%m%d-%H%M%S)
+
+# ① 写 reasoning_endpoint（在 [anaphase] 段内插一行）
+awk '/^\[/{insub=($0 ~ /^\[anaphase\]/)} {print} insub && !d && /^\[anaphase\]/{print "reasoning_endpoint = \"https://<网关>\""; d=1}' \
+  config.toml > config.toml.new && mv config.toml.new config.toml
+
+# ② 写 tentacle_endpoint（同上；缺它则 pipeline Unbound，tool/call 恒 0）
+awk '/^\[/{insub=($0 ~ /^\[anaphase\]/)} {print} insub && !d && /^\[anaphase\]/{print "tentacle_endpoint = \"grpc://<tentacle>\""; d=1}' \
+  config.toml > config.toml.new && mv config.toml.new config.toml
+
+# ③ 自检（段位 + 落盘 + 就绪）
+awk '/^\[/{s=$0} /reasoning_endpoint|tentacle_endpoint/{print s" :: "$0}' config.toml
+cd ../../Cellrix && bash tools/check_upstream.sh; echo "rc=$?"
+# 期望：两行都在 [anaphase] 下 · YES … ⇒ 工具段第二道前置已具备 · rc=0
+```
+
+**实测记录**：上述 awk 在 `config.toml` 的副本上跑过，插入结果确在 `[anaphase]` 段内；
+`check_upstream.sh`（用 `ANAPHASE_DIR` 指向副本）报 `YES … rc=0`。
+**它不会防止你写重复键** —— 若已存在同名键，请手工改而不是追加（TOML 会 `duplicate key` 直接退出）。
