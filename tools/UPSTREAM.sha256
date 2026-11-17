@@ -1,7 +1,7 @@
-ef9de3abf9d7151ec84f8ffd725ef24965eaf10c  tools/accept_all.sh
-d5475bc80dc24aff55c1d5fac7e9f7aac356b5b6  tools/check_upstream.sh
+795bb9d4867ef7b17dc297ab44620c14f4107c05  tools/accept_all.sh
+587090363e027b80427f02b30a53b41cd41a70fd  tools/check_upstream.sh
 246839193d9223405b3a3a6d664834d38d43046e  tools/determinism.sh
 353407b382e2fc6bb5cba21aa639117a318571e9  tools/emit-failures.sh
-92a17b24bf4695d210a64acd539d3f9e1ed35a5f  tools/run_one_cycle.sh
+77e00b54ac9e0c8ff4f4feccf21bae0555495712  tools/run_one_cycle.sh
 dd9dc2fa31dacdbfbbcf9670dd6ff265bbc2a166  tools/validate.sh
 28beabce5d9041e5c04aff2a72a02dfd46cc10a9  tools/xray.sh
