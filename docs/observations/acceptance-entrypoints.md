@@ -83,3 +83,34 @@ node tools/l2_casefile.js /tmp/my-cycle/ring.json /tmp/my-cycle/events ../anapha
 ```
 
 桩只证明通路，**不是生产上游**；真上游见 `real-upstream-checklist-2026-11-05.md`。
+
+## ⑤ 真上游一轮（本机已跑通 · verdict=Met）
+
+```bash
+# 1) 本地推理（OpenAI 兼容 8080）
+llama-swap --config ~/llama-swap/config.yaml &
+
+# 2) 工具通道必须带插件目录（不带 ⇒ 注册 0 个工具 ⇒ gRPC NotFound）
+cd /Users/jason/Developer/Jasonmilk/helix-tentacle
+./target/debug/tentacle --transport grpc --grpc-port 50051 --plugins-dir ./fixtures &
+
+# 3) anaphase 本地 config（gitignored，两行；端口取自 ecosystem/chain.json）
+#    reasoning_endpoint = "http://127.0.0.1:8080/v1"
+#    tentacle_endpoint  = "http://127.0.0.1:50051"
+cd /Users/jason/Developer/Jasonmilk/anaphase-helix
+ANAPHASE_SESSION_EVENTS_PATH=/tmp/cycle cargo run -q --all-features --bin anaphase -- --config config.toml &
+curl -s -X POST http://127.0.0.1:50061/v1/chat -H 'content-type: application/json' \
+  -d '{"message":"Reply with ONLY this JSON in a ```json fence: {\"calls\":[{\"tool\":\"calc\",\"args\":{\"expression\":\"9**9\"},\"expect\":\"ok\"}]}"}'
+```
+
+期望形状（本机实测）：
+```
+reply  'calc: {"ok":true,"result":"387420489"}'   success=true   verdict=Met
+tape   tool/call → tool/result{ok:true,55ms} → exec_ok(ok=true) → answer.delivered → verdict Met
+       check(phase=hitl) {"allowed_once":1,…}
+```
+
+**会误导的三处**：端口取 `ecosystem/chain.json`（ADR-0046）· `/v1/health` 的 `reasoning not configured`
+是按 config 字段名判、不代表端点没生效 · 50061 上若有旧 anaphase 实例，它会用**自己的**事件目录应答（先清场）。
+
+完整读数与三个真原因：`helix-mind/docs/helixECO/observations/2026-11-18/first-green-cycle.md`
