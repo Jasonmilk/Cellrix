@@ -96,8 +96,22 @@ if (evDir && fs.existsSync(evDir)) {
 // ③d HITL 读数的源（B1，2026-11-19 第三个）：页面原来**只认 ring**（内存环）——
 //     ring 为空/被 dropped 时，页面就丢了 HITL 四态，而 **tape（落盘）里明明有**。
 //     落盘是持久事实，ring 是易失投影 ⇒ ring 缺就回落 tape，并如实标源。
-let hitlValue = (typeof hitl !== 'undefined' && hitl) ? hitl : null;
-let hitlSource = hitlValue ? 'ring' : null;
+// B1-d（2026-11-19 第四个）：ring 是**跨 period 的全局环**，`find(phase==='hitl')` 取到的可能是
+// **别轮**的事件（实测 trace_id=run-8bba24c5… 而本轮 period_id=run-ec4a82…）。
+// 身份是 period_id（I1）⇒ 只接受 trace_id === 本 period 的 ring 事件；否则回落 tape 并标 ring-stale。
+const periodId = (function () {
+  if (evDir && fs.existsSync(evDir)) {
+    for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+      const line = fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n').find(l => l.trim());
+      if (line) { try { const d = JSON.parse(line); if (d.period_id) return d.period_id; if (d.trace_id) return d.trace_id; } catch (_) {} }
+    }
+  }
+  return null;
+})();
+const ringHitl = (typeof hitl !== 'undefined' && hitl) ? hitl : null;
+const ringHitlOwn = ringHitl && (!periodId || !ringHitl.trace_id || ringHitl.trace_id === periodId);
+let hitlValue = ringHitlOwn ? ringHitl : null;
+let hitlSource = hitlValue ? 'ring' : (ringHitl ? 'tape(ring-stale)' : null);
 if (!hitlValue && evDir && fs.existsSync(evDir)) {
   for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
     for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
@@ -106,12 +120,17 @@ if (!hitlValue && evDir && fs.existsSync(evDir)) {
       const v = d.data || {};
       if (d.type === 'check/status' && v.phase === 'hitl') {
         hitlValue = { allowed_once: v.allowed_once, rejected: v.rejected, cancelled: v.cancelled, unavailable: v.unavailable, kinds: v.kinds };
-        hitlSource = 'tape';
+        if (!hitlSource) hitlSource = 'tape';
       }
     }
   }
 }
-if (hitlValue) hitlValue = Object.assign({}, hitlValue, { _source: hitlSource });
+if (hitlValue && hitlValue.detail && typeof hitlValue.detail === 'string') {
+  try { hitlValue = Object.assign({}, hitlValue, JSON.parse(hitlValue.detail), { ringDetailParsed: true }); } catch (_) {}
+}
+if (!hitlValue && hitlSource) hitlSource = 'UNMEASURABLE·ring-stale 且 tape 无本 period hitl 行';
+if (!hitlValue) hitlValue = { _source: hitlSource || 'UNMEASURABLE·ring 与 tape 均无 hitl 行' };
+if (hitlValue) hitlValue = Object.assign({}, hitlValue, { _source: hitlSource || hitlValue._source });
 
 // ④ 未选原因 —— tape 里没有任何字段记录"为什么没走另一条边"
 const unselectedReason = 'UNMEASURABLE';

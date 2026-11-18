@@ -101,6 +101,16 @@
    "session_rows": 10
   },
   "tool_calls": "本轮无工具段（tape 里 0 条 tool/call）",
+  "verdict_status": "UNMEASURABLE（tape 里 0 条 verdict/status）",
+  "hitl": {
+   "detail": "{\"allowed_once\":0,\"cancelled\":0,\"kinds\":{},\"rejected\":0,\"unavailable\":0}",
+   "phase": "hitl",
+   "seq": 7,
+   "stage": 0,
+   "trace_id": "run-8bba24c5ee368a4a-p006af8c540000000",
+   "ts": "2026-11-14T20:32:00Z",
+   "_source": "ring"
+  },
   "unselected_reason": "UNMEASURABLE"
  }
 }
