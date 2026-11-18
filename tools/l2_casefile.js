@@ -56,6 +56,26 @@ if (evDir && fs.existsSync(evDir)) {
   }
 }
 
+// ③b 工具段（B1，2026-11-19）：AG-UI 出口已能产 TOOL_CALL_*，但**没有人展示它** ——
+//     casefile 里根本没有工具信息，页面于是看不见"这一轮到底调没调工具"。
+//     只读当轮 tape 的 tool/call + tool/result，不新增数据源。
+let toolCalls = '本轮无工具段（tape 里 0 条 tool/call）';
+if (evDir && fs.existsSync(evDir)) {
+  const rows = [];
+  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+    for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let d; try { d = JSON.parse(line); } catch (_) { continue; }
+      if (d.type === 'tool/call') rows.push({ index: (d.data||{}).index, tool: (d.data||{}).tool, ok: null, ms: null });
+      if (d.type === 'tool/result') {
+        const r = rows.find(x => x.index === (d.data||{}).index);
+        if (r) { r.ok = (d.data||{}).ok; r.ms = (d.data||{}).duration_ms; }
+      }
+    }
+  }
+  if (rows.length) toolCalls = rows.map(r => 'index=' + r.index + ' · ' + r.tool + ' · ok=' + r.ok + ' · ' + r.ms + 'ms');
+}
+
 // ④ 未选原因 —— tape 里没有任何字段记录"为什么没走另一条边"
 const unselectedReason = 'UNMEASURABLE';
 
@@ -71,6 +91,7 @@ const out = {
     candidate_not_taken: unselected === null ? 'UNMEASURABLE' : unselected,
     by_from_recorded: byFrom,
     support_reading: { verdict, session_rows: rows },
+    tool_calls: toolCalls,
     unselected_reason: unselectedReason
   }
 };
