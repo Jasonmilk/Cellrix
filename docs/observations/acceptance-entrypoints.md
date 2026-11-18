@@ -114,3 +114,51 @@ tape   tool/call → tool/result{ok:true,55ms} → exec_ok(ok=true) → answer.d
 是按 config 字段名判、不代表端点没生效 · 50061 上若有旧 anaphase 实例，它会用**自己的**事件目录应答（先清场）。
 
 完整读数与三个真原因：`helix-mind/docs/helixECO/observations/2026-11-18/first-green-cycle.md`
+
+## ⑥ 园丁三下（可重跑；每条都能自己按）
+
+> 三条入口只写在**这一处**。参数用「当轮目录」占位：把 `<ROUND>` 换成你自己的轮次目录
+> （例：`/tmp/round-t2`，里面至少要有 `ring.json` 与 `events/<job>-<period>.events.jsonl`）。
+
+**① 重放：同一份当轮 jsonl 跑两遍，比一字不差**
+
+```bash
+cd "${REPO_ROOT:-$HOME/Developer/Jasonmilk}/Cellrix"
+R=<ROUND>
+node tools/l2_casefile.js "$R/ring.json" "$R/events" ../anaphase-helix/src/run_cycle/mod.rs > "$R/a.json"
+node tools/l2_casefile.js "$R/ring.json" "$R/events" ../anaphase-helix/src/run_cycle/mod.rs > "$R/b.json"
+diff "$R/a.json" "$R/b.json" && echo "diff=0"
+shasum -a 256 "$R/a.json" "$R/b.json"      # 两行哈希应相同
+```
+
+**② 页面：点开看留白（数字以命令为准）**
+
+```bash
+# 生成（用当轮 casefile）
+node tools/d3_compare.js "$R/a.json" > "$R/d3.json"
+node tools/l2_render.js "$R/a.json" "$R/d3.json" "$R/evidence.html"
+grep -c '本 tape 未记录' "$R/evidence.html"       # 实际值：本轮实测 = 2
+open "$R/evidence.html"
+
+# 仓内既有页面（由 fixtures 样本生成）同样是 2 处
+grep -c '本 tape 未记录' docs/observations/l2-evidence-2026-11-05.html    # = 2
+```
+
+**③ 数地面变化：web/ 是不是 0**
+
+```bash
+git ls-files web | wc -l      # 期望 0
+test -d web; echo $?          # 期望 1
+```
+
+**附：AG-UI 出口折回 L2 的两条查看命令（不新开格子）**
+
+```bash
+AGUI="${REPO_ROOT:-$HOME/Developer/Jasonmilk}/anaphase-helix/target/debug/agui"
+"$AGUI" "$R"/events/*.events.jsonl | wc -l                 # 标准事件条数（本轮实测 5）
+node tools/d1_d2_check.js "$R"/events/*.events.jsonl       # D1/D2 rc（本轮实测 0）
+```
+
+**读数口径（贴在入口处，避免被读成完成）**：`diff=0` / `agui=5` / `D1·D2 rc=0` / `tool-call` / `Met` / `HITL`
+**都只是当轮读数**。同一输入在不同 period 可以分别是「用了工具答对」与「没用工具答错」，
+所以它们不构成能力断言，也不构成完成判据。
