@@ -117,8 +117,23 @@ tape   tool/call → tool/result{ok:true,55ms} → exec_ok(ok=true) → answer.d
 
 ## ⑥ 园丁三下（可重跑；每条都能自己按）
 
-> 三条入口只写在**这一处**。参数用「当轮目录」占位：把 `<ROUND>` 换成你自己的轮次目录
-> （例：`/tmp/round-t2`，里面至少要有 `ring.json` 与 `events/<job>-<period>.events.jsonl`）。
+> 三条入口只写在**这一处**。`<ROUND>` 是**当轮真跑产物的目录**（不是冻结样本，也不是固定路径）：
+> 里面至少要有 `ring.json` 与 `events/<job_id>-<period_id>.events.jsonl` 两个文件。
+
+**按这个顺序来自按（顺序本身就是判据）**：
+
+```bash
+# ① 先探测/冷启动：链在跑就复用，别重启
+bash "${REPO_ROOT:-$HOME/Developer/Jasonmilk}/Cellrix/tools/check_upstream.sh"   # 期望 YES / rc=0
+curl -s localhost:50061/v1/health | python3 -c 'import json,sys;d=json.load(sys.stdin);print([c for c in d["checks"] if c["name"]=="tentacle"])'
+#   不通 ⇒ 按第⑤节冷启动一条真链（llama-swap 8080 → tentacle --plugins-dir → config 两行）
+
+# ② 再真跑一轮，拿到当轮产物路径（job_id 与 period_id 都要，别只记 job_id）
+curl -s -X POST localhost:50061/v1/chat -H 'content-type: application/json' \
+  -d '{"message":"What is 47 times 89? Use a tool if you have one."}'
+ls -t /tmp/<你的事件目录>/*.events.jsonl | head -1     # ← 这一份就是 <ROUND>/events 的来源
+#   把它和当轮的 /v1/agent/events 落盘一起放进 <ROUND>/，再跑下面三条
+```
 
 **① 重放：同一份当轮 jsonl 跑两遍，比一字不差**
 
@@ -143,6 +158,10 @@ open "$R/evidence.html"
 # 仓内既有页面（由 fixtures 样本生成）同样是 2 处
 grep -c '本 tape 未记录' docs/observations/l2-evidence-2026-11-05.html    # = 2
 ```
+
+> **读法（别读反）**：`2` 是**当轮命令的输出**，不是"应该 4"的欠账。
+> `2` 既不代表留白被清掉，也不代表被涂成有值；留白项是哪些，看页面里 `class="gap"` 的那几格。
+> 同理：留白**不算闭合，也不算欠着**（C-069 / VISION 408-410）。
 
 **③ 数地面变化：web/ 是不是 0**
 
