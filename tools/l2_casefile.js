@@ -76,6 +76,23 @@ if (evDir && fs.existsSync(evDir)) {
   if (rows.length) toolCalls = rows.map(r => 'index=' + r.index + ' · ' + r.tool + ' · ok=' + r.ok + ' · ' + r.ms + 'ms');
 }
 
+// ③c 判定行（B1，2026-11-19 第二个"有产出、无消费点"）：
+//     tape 里有 `verdict/status`（status/checks/reason，即整轮判定），
+//     而 Cellrix 的四个工具里**零命中** ⇒ 页面上看不到 Met/Unmet 与原因。
+let verdictStatus = 'UNMEASURABLE（tape 里 0 条 verdict/status）';
+if (evDir && fs.existsSync(evDir)) {
+  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+    for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let d; try { d = JSON.parse(line); } catch (_) { continue; }
+      if (d.type === 'verdict/status') {
+        const v = d.data || {};
+        verdictStatus = { status: v.status, checks: v.checks, reason: v.reason };
+      }
+    }
+  }
+}
+
 // ④ 未选原因 —— tape 里没有任何字段记录"为什么没走另一条边"
 const unselectedReason = 'UNMEASURABLE';
 
@@ -92,6 +109,7 @@ const out = {
     by_from_recorded: byFrom,
     support_reading: { verdict, session_rows: rows },
     tool_calls: toolCalls,
+    verdict_status: verdictStatus,
     unselected_reason: unselectedReason
   }
 };

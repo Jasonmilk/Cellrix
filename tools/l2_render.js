@@ -18,6 +18,7 @@ const lanes = [
   ['抉择（候选→选中）', [['选中边', c.selected_edges || 'UNMEASURABLE'], ['候选边', c.candidate_edges || 'UNMEASURABLE']]],
   ['支撑读数', [['verdict', (c.support_reading || {}).verdict], ['session 行数', (c.support_reading || {}).session_rows]]],
   ['未选原因', [['为什么没走另一条边', c.unselected_reason || 'UNMEASURABLE']]],
+  ['判定（verdict/status）', [['status', c.verdict_status && c.verdict_status.status ? c.verdict_status.status : c.verdict_status], ['checks/reason', c.verdict_status && c.verdict_status.reason ? (c.verdict_status.checks + ' · ' + c.verdict_status.reason) : '—']]],
   ['工具段（tool/call → TOOL_CALL_*）', [['本轮调用的工具', c.tool_calls || 'UNMEASURABLE']]],
   ['门与审计', [['HITL 四态', JSON.stringify(cf.hitl || {})], ['收尾', JSON.stringify(cf.end || {})]]]
 ];
