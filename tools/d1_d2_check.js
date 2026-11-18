@@ -29,7 +29,20 @@ if (types[0] !== 'RUN_STARTED') d1.push('首条不是 RUN_STARTED');
 if (types[types.length - 1] !== 'RUN_FINISHED') d1.push('末条不是 RUN_FINISHED');
 for (const t of ['TEXT_MESSAGE_START', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END'])
   if (!types.includes(t)) d1.push('缺 ' + t);
-if (types.some(t => t.startsWith('TOOL_CALL'))) d1.push('出现 TOOL_CALL_*（本轮 tape 无工具段）');
+// 工具事件的正确性有两个方向，都要判（2026-11-19 修）：
+//   反向（原本就有的守卫）：tape 没有工具段 ⇒ 不得出现 TOOL_CALL_*（防伪造）
+//   正向（本轮真跑撞出来的）：tape 有 tool/call ⇒ 必须出现 TOOL_CALL_*（防"整段消失"）
+const tapeTypes = new Set();
+if (!asAgui) {
+  for (const line of fs.readFileSync(src, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try { tapeTypes.add(JSON.parse(line).type); } catch (_) {}
+  }
+}
+const hasToolInTape = tapeTypes.has('tool/call');
+const hasToolInAgui = types.some(t => t.startsWith('TOOL_CALL'));
+if (hasToolInTape && !hasToolInAgui) d1.push('缺 TOOL_CALL_*（tape 里有 tool/call，投影把它丢了）');
+if (!asAgui && !hasToolInTape && hasToolInAgui) d1.push('出现 TOOL_CALL_*（本轮 tape 无工具段）');
 
 // ---- D2 语义层
 const d2 = [];
