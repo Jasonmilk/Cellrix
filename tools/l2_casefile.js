@@ -93,6 +93,26 @@ if (evDir && fs.existsSync(evDir)) {
   }
 }
 
+// ③d HITL 读数的源（B1，2026-11-19 第三个）：页面原来**只认 ring**（内存环）——
+//     ring 为空/被 dropped 时，页面就丢了 HITL 四态，而 **tape（落盘）里明明有**。
+//     落盘是持久事实，ring 是易失投影 ⇒ ring 缺就回落 tape，并如实标源。
+let hitlValue = (typeof hitl !== 'undefined' && hitl) ? hitl : null;
+let hitlSource = hitlValue ? 'ring' : null;
+if (!hitlValue && evDir && fs.existsSync(evDir)) {
+  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+    for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let d; try { d = JSON.parse(line); } catch (_) { continue; }
+      const v = d.data || {};
+      if (d.type === 'check/status' && v.phase === 'hitl') {
+        hitlValue = { allowed_once: v.allowed_once, rejected: v.rejected, cancelled: v.cancelled, unavailable: v.unavailable, kinds: v.kinds };
+        hitlSource = 'tape';
+      }
+    }
+  }
+}
+if (hitlValue) hitlValue = Object.assign({}, hitlValue, { _source: hitlSource });
+
 // ④ 未选原因 —— tape 里没有任何字段记录"为什么没走另一条边"
 const unselectedReason = 'UNMEASURABLE';
 
@@ -110,6 +130,7 @@ const out = {
     support_reading: { verdict, session_rows: rows },
     tool_calls: toolCalls,
     verdict_status: verdictStatus,
+    hitl: hitlValue,
     unselected_reason: unselectedReason
   }
 };

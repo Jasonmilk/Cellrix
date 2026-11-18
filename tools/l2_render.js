@@ -20,7 +20,7 @@ const lanes = [
   ['未选原因', [['为什么没走另一条边', c.unselected_reason || 'UNMEASURABLE']]],
   ['判定（verdict/status）', [['status', c.verdict_status && c.verdict_status.status ? c.verdict_status.status : c.verdict_status], ['checks/reason', c.verdict_status && c.verdict_status.reason ? (c.verdict_status.checks + ' · ' + c.verdict_status.reason) : '—']]],
   ['工具段（tool/call → TOOL_CALL_*）', [['本轮调用的工具', c.tool_calls || 'UNMEASURABLE']]],
-  ['门与审计', [['HITL 四态', JSON.stringify(cf.hitl || {})], ['收尾', JSON.stringify(cf.end || {})]]]
+  ['门与审计', [['HITL 四态（源=' + (((c.hitl || cf.hitl) && (c.hitl || cf.hitl)._source) || 'none') + '）', JSON.stringify(c.hitl || cf.hitl || {})], ['收尾', JSON.stringify(cf.end || {})]]]
 ];
 const d3rows = (d3.rows || []).map(r => {
   const l2cell = String(r.l2 || '');
