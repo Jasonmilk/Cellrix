@@ -1,5 +1,7 @@
 {
- "tape": "ring.json",
+ "tape": "run-8bba24c5ee368a4a-p006af8c540000000.events.jsonl",
+ "tape_file": "run-8bba24c5ee368a4a-p006af8c540000000.events.jsonl",
+ "ring_file": "ring.json",
  "transitions_source": "mod.rs",
  "begin": {
   "input": "Calculate 2 to the power of 10",

@@ -201,7 +201,13 @@ if (hitlValue) hitlValue = Object.assign({}, hitlValue, { _source: hitlSource ||
 const unselectedReason = 'UNMEASURABLE';
 
 const out = {
-  tape: path.basename(ringFile),
+  /* B1-q（2026-11-19）：这个字段名叫 `tape`，装的却是 **ring.json 的文件名** ——
+   * 页面头部于是把 ring 当成 tape 展示。而 A 轮（5cfd94a）已证明 ring 只含苏醒 period，
+   * 所以"看起来在读 tape、其实在读 ring"会让读者把苏醒轮的数据当成当轮。
+   * 修：`tape` 保留但**改为真实 tape 名**；另列 `ring_file`（旧含义）与 `tape_file`（同 tape）。 */
+  tape: (tapes[0] ? path.basename(tapes[0]) : 'UNMEASURABLE'),
+  tape_file: (tapes[0] ? path.basename(tapes[0]) : 'UNMEASURABLE'),
+  ring_file: path.basename(ringFile),
   transitions_source: transFile ? path.basename(transFile) : null,
   begin: tapeBegin || (beginRing ? JSON.parse(beginRing.detail) : null),
   end: end ? JSON.parse(end.detail) : null,
