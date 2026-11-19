@@ -143,14 +143,19 @@ if (evDir && fs.existsSync(evDir)) {
 //     tape 里有 `verdict/status`（status/checks/reason，即整轮判定），
 //     而 Cellrix 的四个工具里**零命中** ⇒ 页面上看不到 Met/Unmet 与原因。
 let verdictStatus = 'UNMEASURABLE（tape 里 0 条 verdict/status）';
+let verdictRows = null;
 if (evDir && fs.existsSync(evDir)) {
   for (const fn of tapes) {
     for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
       if (!line.trim()) continue;
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
       if (d.type === 'verdict/status') {
+        /* B1-v（2026-11-19）：与 B1-u 同族 —— 多条 verdict 时边扫边覆盖 ⇒ 静默取最后一条
+         * （构造实测：真实 Met 之后追加 Unmet，casefile 只显示 Unmet，且无提示）。 */
         const v = d.data || {};
-        verdictStatus = { status: v.status, checks: v.checks, reason: v.reason };
+        if (!verdictRows) verdictRows = [];
+        verdictRows.push({ status: v.status, checks: v.checks, reason: v.reason });
+        verdictStatus = verdictRows[verdictRows.length - 1];
       }
     }
   }
@@ -259,7 +264,9 @@ const out = {
     by_from_recorded: byFrom,
     support_reading: { verdict, session_rows: rows },
     tool_calls: toolCalls,
-    verdict_status: verdictStatus,
+    verdict_status: (verdictRows && verdictRows.length > 1)
+    ? { _ambiguous_n: verdictRows.length, _rows: verdictRows }
+    : verdictStatus,
     hitl: hitlValue,
     unselected_reason: unselectedReason
   }
