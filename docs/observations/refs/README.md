@@ -5,9 +5,10 @@
 | 文件 | 来源（取用命令） | sha256（前 16） |
 |---|---|---|
 | `ag-ui-1.0-schema.json` | `curl -sSL https://docs.ag-ui.com/spec/1.0/schema.json -o ag-ui-1.0-schema.json` | `4b5c93226838a0e7`（96 KB · `$defs` 98） |
+| `ag-ui-README.md` | `curl -sSL https://raw.githubusercontent.com/ag-ui-protocol/ag-ui/main/README.md -o ag-ui-README.md` | `667422d2a16f79ba`（19,476 B） |
 | `ag-ui-EventType.java` | `curl -sSL https://raw.githubusercontent.com/ag-ui-protocol/ag-ui/main/sdks/community/java/ag-ui/core/src/main/java/com/agui/community/core/event/EventType.java -o ag-ui-EventType.java` | `9e1cce4a1d2c8b1b` |
 
-取用时间：2026-11-19。**不随上游自动更新**；要更新就重跑上面的命令并改本表（旧的 sha 留在提交历史里）。
+取用时间：2026-11-19 / README 2026-11-20。**基准以 `ag-ui-1.0-schema.json` 为准**；`ag-ui-EventType.java` 只作旁证（它比 schema 少 SUBAGENT_* 3 类、多 META_EVENT 之差 —— 两个官方工件本身不同步）。**不随上游自动更新**；要更新就重跑上面的命令并改本表（旧的 sha 留在提交历史里）。
 
 ## 边界（免得把副本当成合规证明）
 
