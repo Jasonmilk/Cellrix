@@ -70,6 +70,18 @@ for (const e of events) {
 /* B1-aa（2026-11-19）：B1-z 只判了"END/RESULT 有没有 START"，漏了反方向 ——
  * 构造：去掉 tool/result 只留 tool/call ⇒ 投影出 TOOL_CALL_START 但**没有 END/RESULT**，D1 仍 rc=0。
  * 规则：每个 TOOL_CALL_START 必须被同 id 的 END 与 RESULT 收口（调用不许悬空）。 */
+/* B1-ab（2026-11-19）：toolCallId 的**唯一性**没被判 —— 构造同 index=0 的两条 tool/call（calc 与 exec），
+ * 投影出**两条同 id 的 TOOL_CALL_START**，而 END/RESULT 各一条仍能满足 B1-aa 的配对规则 ⇒ D1 rc=0。
+ * 一个 toolCallId 只能对应一次调用（否则 id 失去身份作用）。 */
+{
+  const seen = new Map();
+  for (const e of events) {
+    if (e.type !== 'TOOL_CALL_START') continue;
+    const id = e.toolCallId;
+    if (seen.has(id)) d1.push('TOOL_CALL_START 的 toolCallId ' + id + ' 重复（' + seen.get(id) + ' 与 ' + (e.toolCallName || '?') + '）');
+    else seen.set(id, e.toolCallName || '?');
+  }
+}
 if (!asAgui) {
   const startedIds = events.filter(e => e.type === 'TOOL_CALL_START').map(e => e.toolCallId);
   for (const id of startedIds) {
