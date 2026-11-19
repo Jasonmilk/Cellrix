@@ -27,6 +27,12 @@ const types = events.map(e => e.type);
 const d1 = [];
 if (types[0] !== 'RUN_STARTED') d1.push('首条不是 RUN_STARTED');
 if (types[types.length - 1] !== 'RUN_FINISHED') d1.push('末条不是 RUN_FINISHED');
+/* B1-w（2026-11-19）：生命周期的"恰好一次"没被判 —— 构造两条 turn/end 时投影出 **2 条 RUN_FINISHED**，
+ * 而 D1 仍 rc=0（只判首/末条）。一条 tape 对应一次运行 ⇒ RUN_STARTED 与 RUN_FINISHED 各必须恰好 1 次。 */
+for (const t of ['RUN_STARTED', 'RUN_FINISHED', 'TEXT_MESSAGE_START', 'TEXT_MESSAGE_END']) {
+  const n = types.filter(x => x === t).length;
+  if (n !== 1) d1.push(t + ' 出现 ' + n + ' 次（必须恰好 1 次）');
+}
 for (const t of ['TEXT_MESSAGE_START', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END'])
   if (!types.includes(t)) d1.push('缺 ' + t);
 // 工具事件的正确性有两个方向，都要判（2026-11-19 修）：
