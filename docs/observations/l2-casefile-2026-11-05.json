@@ -20,6 +20,7 @@
  "period_id": "run-8bba24c5ee368a4a-p006af8c540000000",
  "tape_rows": 3,
  "tapes_in_dir": 2,
+ "selection": "mtime-newest(unpinned)",
  "ring_period_ids": [
   "run-8bba24c5ee368a4a-p006af8c540000000"
  ],

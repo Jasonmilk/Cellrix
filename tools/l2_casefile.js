@@ -4,6 +4,11 @@
  * 取不到的**具名 UNMEASURABLE**，不填想象值。 */
 const fs = require('fs'), path = require('path');
 const ringFile = process.argv[2], evDir = process.argv[3];
+// B1-n（2026-11-19）：选"当轮"原来只按 **mtime 最新** ⇒ 苏醒 period 只要更晚写就顶掉真轮（已构造复现：
+// 把苏醒 tape 的 mtime 改新 ⇒ 选中 000000、rows=6，而用户那轮是 000001）。
+// 认轮必须能**由当次 POST 的 job_id/period_id 钉住**：`--expect <id>`（或 EXPECT_PERIOD 环境变量）。
+const expIdx = process.argv.indexOf('--expect');
+const expect = (expIdx > -1 ? process.argv[expIdx + 1] : process.env.EXPECT_PERIOD) || null;
 // ①c B1-g（2026-11-19）：本文件原本对 `evDir` 里**所有** tape 逐行扫 —— `tape_rows` 变成 12 份之和
 //     （实测 87）、`tool_calls`/`verdict_status` 会取到**别的 period**、`period_id` 取自"目录里第一份"。
 //     与 B1-d 同族：跨轮取数。口径：多份时**以最新 mtime 那份为当轮**，其余不计，
@@ -19,7 +24,30 @@ function listTapes(dir) {
   } catch (_) { return []; }
 }
 const tapesInDir = (evDir && fs.existsSync(evDir)) ? listTapes(evDir) : [];
-const tapes = tapesInDir.length ? [tapesInDir[0]] : [];
+function tapeId(dir, f) {
+  try {
+    const line = fs.readFileSync(path.join(dir, f), 'utf8').split('\n').find(l => l.trim());
+    if (!line) return null;
+    const d = JSON.parse(line);
+    return { job: d.job_id || null, period: d.period_id || null };
+  } catch (_) { return null; }
+}
+let tapes = [];
+let selection = 'mtime-newest(unpinned)';
+if (expect) {
+  const hit = tapesInDir.find(f => {
+    const id = tapeId(evDir, f);
+    return id && ((id.period && id.period === expect) || (id.job && id.job === expect));
+  });
+  if (!hit) {
+    console.error('UNMEASURABLE: --expect ' + expect + ' 在 ' + evDir + ' 里找不到对应 tape（不猜）');
+    process.exit(4);
+  }
+  tapes = [hit];
+  selection = 'expect:' + expect;
+} else if (tapesInDir.length) {
+  tapes = [tapesInDir[0]];
+}
 const tapes_in_dir = tapesInDir.length;
 
 const transFile = process.argv[4];   // 可选：anaphase 状态机转移表源码（候选边的真源）
@@ -182,6 +210,7 @@ const out = {
   period_id: (typeof periodId !== 'undefined' ? periodId : null),
   tape_rows: tapeRows,
   tapes_in_dir: tapes_in_dir,
+  selection: selection,
   /* B1-h（2026-11-19）：页面里两套口径不同源 —— tape 定 period_id，ring 只作兜底。
    * 若 ring 里的事件属于**别的** period，必须显式写出，不能静默混用。 */
   ring_period_ids: Array.from(new Set((evs || []).map(e => e.trace_id).filter(Boolean))),
