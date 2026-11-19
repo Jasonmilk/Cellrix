@@ -110,6 +110,13 @@ tape   tool/call → tool/result{ok:true,55ms} → exec_ok(ok=true) → answer.d
        check(phase=hitl) {"allowed_once":1,…}
 ```
 
+> **`allowed_once=1` 是什么**（限定，2026-11-19 补）：它是**程序自记计数器**的读数
+> （`anaphase-helix:src/hitl.rs:482` `check_approval` → `:484` `counters.record_for(...)`），
+> 只证明"该轮的工具闸被经过且 counter 会写"，**不证明人在环里** ——
+> 当前没有 human 的 allow/reject/cancel 入口（无 `ApproverRegistry`/`Binding`/`EscalationStep`）。
+> 所以它不等于"HITL 已可达"；真闭环是另一条门后线（C-076 持久化 + 应答者注册 + K22 + K17）。
+> 台账出处：`helix-mind/docs/helixECO/execution-queue.md` 的「更正 · 对 815c759…加限定」节。
+
 **会误导的三处**：端口取 `ecosystem/chain.json`（ADR-0046）· `/v1/health` 的 `reasoning not configured`
 是按 config 字段名判、不代表端点没生效 · 50061 上若有旧 anaphase 实例，它会用**自己的**事件目录应答（先清场）。
 
