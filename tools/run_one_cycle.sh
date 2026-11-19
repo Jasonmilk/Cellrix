@@ -30,11 +30,16 @@ export PATH="$(dirname "$CARGO_BIN"):$PATH"
 
 if [ "$MODE" = config ]; then
   echo "① 上游：用 anaphase/config.toml（不启桩）"
-  if ! grep -qE '^[[:space:]]*reasoning_endpoint[[:space:]]*=' "$ANA/config.toml" 2>/dev/null; then
-    echo "   UNMEASURABLE: config.toml 里没有 reasoning_endpoint ⇒ 无法接真上游（不是通过）"
+  # B1-k（2026-11-19）：原来**只认 config.toml**，而 `src/config.rs:473` 是 env 覆盖 config
+  # ⇒ "config 没这行、env 有"这种**已接通**的情形被这里判 UNMEASURABLE/exit 4（与 B1-j 同一个错的第二处）。
+  if grep -qE '^[[:space:]]*reasoning_endpoint[[:space:]]*=' "$ANA/config.toml" 2>/dev/null; then
+    echo "   reasoning_endpoint 来源：config.toml（脱敏不打印）"
+  elif [ -n "${ANAPHASE_REASONING_ENDPOINT:-}" ]; then
+    echo "   reasoning_endpoint 来源：ANAPHASE_REASONING_ENDPOINT（脱敏不打印）"
+  else
+    echo "   UNMEASURABLE: config.toml 与 ANAPHASE_REASONING_ENDPOINT 都没有 ⇒ 无法接真上游（不是通过）"
     exit 4
   fi
-  echo "   config.toml 有 reasoning_endpoint（脱敏不打印）"
   REASONING_ENV=()
 else
   echo "① 起桩 LLM :$STUB_PORT（仅证明通路，不是生产上游）"
@@ -77,7 +82,13 @@ if [ -n "${f:-}" ]; then
   if [ ! -x "$ANA/target/debug/agui" ]; then
     echo "   ★ FAIL: 缺 $ANA/target/debug/agui（先 cargo build --all-features --bin agui）"; fail=1
   else
-    echo "   agui 标准事件=$("$ANA/target/debug/agui" "$f" 2>/dev/null | wc -l | tr -d ' ')"
+    # B1-k 附：`agui | wc -l` 在 agui 崩溃时给出 **0**（读到空）⇒ 先取 rc 再数
+    ag_out=$("$ANA/target/debug/agui" "$f" 2>/dev/null); ag_rc=$?
+    if [ "$ag_rc" -eq 0 ]; then
+      echo "   agui 标准事件=$(printf '%s\n' "$ag_out" | grep -c . )"
+    else
+      echo "   agui 标准事件=UNMEASURABLE（agui rc=$ag_rc，不是 0 条）"
+    fi
   fi
   ( cd "$HERE/.." && node tools/d1_d2_check.js "$f" >/dev/null 2>&1 ) && echo "   D1/D2 rc=0" || { echo "   ★ FAIL: D1/D2 rc≠0"; fail=1; }
 else
@@ -85,8 +96,8 @@ else
 fi
 [ -n "${f:-}" ] && [ -s "$OUT/ring.json" ] || { echo "★ FAIL: 没收到 tape/ring"; fail=1; }
 if [ -n "${f:-}" ]; then
-  tc=$(grep -c '"type":"tool/call"' "$f" 2>/dev/null || true)
-  tr=$(grep -c '"type":"tool/result"' "$f" 2>/dev/null || true)
+  tc=$(grep -c '"type":"tool/call"' "$f" 2>/dev/null); [ -n "${tc:-}" ] || tc=UNMEASURABLE
+  tr=$(grep -c '"type":"tool/result"' "$f" 2>/dev/null); [ -n "${tr:-}" ] || tr=UNMEASURABLE
   md=$(python3 -c "
 import json,sys
 for l in open(sys.argv[1],encoding='utf-8'):
