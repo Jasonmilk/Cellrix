@@ -2,6 +2,6 @@
 bb8841ad45d40a9980ff81975cb45a0fb099a305  tools/check_upstream.sh
 246839193d9223405b3a3a6d664834d38d43046e  tools/determinism.sh
 0a15191ff8aad7ed63f7c15ebdc5aa5027915265  tools/emit-failures.sh
-60dc6160a342651f3f947c0c68b3d0917a5499c3  tools/run_one_cycle.sh
+4e45a150061658b010bc45731b3b8049e1b7a51d  tools/run_one_cycle.sh
 dd9dc2fa31dacdbfbbcf9670dd6ff265bbc2a166  tools/validate.sh
 28beabce5d9041e5c04aff2a72a02dfd46cc10a9  tools/xray.sh

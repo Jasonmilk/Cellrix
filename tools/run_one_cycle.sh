@@ -16,7 +16,17 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ANA="$(cd "$HERE/../../anaphase-helix" && pwd)"
 STUB_PORT="${STUB_PORT:-19999}"; SVC_PORT="${SVC_PORT:-50061}"
 mkdir -p "$OUT/events"; fail=0
-cleanup(){ [ -n "${SVC_PID:-}" ] && kill "$SVC_PID" 2>/dev/null; [ -n "${STUB_PID:-}" ] && kill "$STUB_PID" 2>/dev/null; }
+# B1-p（2026-11-19）：`SVC_PID=$!` 拿到的是**子 shell**（里面跑 `cargo run`），
+# kill 它杀不到真正的 anaphase 进程 ⇒ 退出后服务仍在监听 50061，并用**本工具的**事件目录应答下一次请求
+# （实测：roc2 结束后 50061 仍是 roc2 的实例，我随后的 POST 落进 /tmp/roc2/events，而 /tmp/t2round 没新 tape）。
+# 修：退出时按端口补杀（脚本开头已经把旧占用杀过 ⇒ 此刻监听者就是本工具刚起的）。
+cleanup(){
+  [ -n "${SVC_PID:-}" ] && kill "$SVC_PID" 2>/dev/null
+  [ -n "${STUB_PID:-}" ] && kill "$STUB_PID" 2>/dev/null
+  p=$(lsof -ti -i :"${SVC_PORT:-50061}" 2>/dev/null)
+  [ -n "${p:-}" ] && kill $p 2>/dev/null
+  return 0
+}
 trap cleanup EXIT
 
 # 端口若有旧实例（未开 session_events 的那种）会冒充成功 ⇒ 先清场
