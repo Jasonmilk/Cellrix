@@ -192,6 +192,7 @@ const periodId = (function () {
 const ringHitl = (typeof hitl !== 'undefined' && hitl) ? hitl : null;
 const ringHitlOwn = ringHitl && (!periodId || !ringHitl.trace_id || ringHitl.trace_id === periodId);
 let hitlValue = ringHitlOwn ? ringHitl : null;
+let hitlTapeRows = null;
 let hitlSource = hitlValue ? 'ring' : (ringHitl ? 'tape(ring-stale)' : null);
 if (!hitlValue && evDir && fs.existsSync(evDir)) {
   for (const fn of tapes) {
@@ -200,7 +201,12 @@ if (!hitlValue && evDir && fs.existsSync(evDir)) {
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
       const v = d.data || {};
       if (d.type === 'check/status' && v.phase === 'hitl') {
-        hitlValue = { allowed_once: v.allowed_once, rejected: v.rejected, cancelled: v.cancelled, unavailable: v.unavailable, kinds: v.kinds };
+        /* B1-u（2026-11-19）：同一 period 里若有多条 hitl 行，原来**边扫边覆盖** ⇒ 静默取最后一条
+         * （构造两行实测：真实 1 与构造 7 同时存在，casefile 只显示 7，无任何提示）。
+         * 现在：全部收起来；>1 就如实标 ambiguous 并把每个元组列出来，让读者自己看到歧义。 */
+        if (!hitlTapeRows) hitlTapeRows = [];
+        hitlTapeRows.push({ allowed_once: v.allowed_once, rejected: v.rejected, cancelled: v.cancelled, unavailable: v.unavailable, kinds: v.kinds });
+        hitlValue = hitlTapeRows[hitlTapeRows.length - 1];
         if (!hitlSource) hitlSource = 'tape';
       }
     }
@@ -212,6 +218,9 @@ if (hitlValue && hitlValue.detail && typeof hitlValue.detail === 'string') {
 if (!hitlValue && hitlSource) hitlSource = 'UNMEASURABLE·ring-stale 且 tape 无本 period hitl 行';
 if (!hitlValue) hitlValue = { _source: hitlSource || 'UNMEASURABLE·ring 与 tape 均无 hitl 行' };
 if (hitlValue) hitlValue = Object.assign({}, hitlValue, { _source: hitlSource || hitlValue._source });
+if (hitlTapeRows && hitlTapeRows.length > 1) {
+  hitlValue = Object.assign({}, hitlValue, { _source: (hitlSource || 'tape') + '(ambiguous n=' + hitlTapeRows.length + ')', _rows: hitlTapeRows });
+}
 
 // ④ 未选原因 —— tape 里没有任何字段记录"为什么没走另一条边"
 const unselectedReason = 'UNMEASURABLE';
