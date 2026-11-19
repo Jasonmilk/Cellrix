@@ -1,4 +1,4 @@
-661831b3e955925ed4b4d9c7507dac7ed092f942  tools/accept_all.sh
+fae8dc557b0deb86eec9d4cdb96a95d56c9ebfa0  tools/accept_all.sh
 bb8841ad45d40a9980ff81975cb45a0fb099a305  tools/check_upstream.sh
 246839193d9223405b3a3a6d664834d38d43046e  tools/determinism.sh
 0a15191ff8aad7ed63f7c15ebdc5aa5027915265  tools/emit-failures.sh

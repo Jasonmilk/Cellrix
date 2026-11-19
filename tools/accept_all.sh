@@ -3,8 +3,19 @@
 # 用法：bash tools/accept_all.sh
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 3
-TAPE=fixtures/l2-tape-2026-11-05
-EV=$TAPE/run-752d73d3ed4afb18-p006af8c54e000001.events.jsonl
+# B1-r（2026-11-19）：本工具的三项都跑在**冻结夹具**上（fixtures/l2-tape-2026-11-05，2026-11-15），
+# 但输出只说"分项全绿"，很容易被读成"当前链路通过"——而 objective 明确禁止拿冻结 tape/fixtures 当完成对象。
+# 口径：夹具绿 = 重放确定性成立；**不等于当轮通过**。要验当轮就传 ROUND_DIR=<当轮目录>。
+TAPE="${ROUND_DIR:-fixtures/l2-tape-2026-11-05}"
+if [ -n "${ROUND_DIR:-}" ]; then
+  EV=$(ls -t "$TAPE"/events/*.events.jsonl 2>/dev/null | head -1)
+  [ -n "${EV:-}" ] || EV=$(ls -t "$TAPE"/*.events.jsonl 2>/dev/null | head -1)
+  echo "── 输入：当轮目录 $TAPE（EV=$(basename "${EV:-none}")）"
+else
+  EV=$TAPE/run-752d73d3ed4afb18-p006af8c54e000001.events.jsonl
+  echo "── 输入：**冻结夹具** $TAPE（$(ls -l "$TAPE/README.md" 2>/dev/null | awk '{print $6,$7,$8}')）"
+  echo "   ⇒ 这里绿只证明『重放确定性』；**不代表当轮通过**（验当轮请 ROUND_DIR=<当轮目录>）"
+fi
 AGUI=../anaphase-helix/target/debug/agui
 fail=0
 
