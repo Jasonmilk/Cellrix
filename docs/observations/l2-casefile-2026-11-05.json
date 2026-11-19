@@ -2,7 +2,8 @@
  "tape": "ring.json",
  "transitions_source": "mod.rs",
  "begin": {
-  "input": "compute 9^9"
+  "input": "Calculate 2 to the power of 10",
+  "mode": "Partner"
  },
  "end": {
   "done": true,
@@ -16,10 +17,11 @@
   "rejected": 0,
   "unavailable": 0
  },
- "period_id": "run-752d73d3ed4afb18-p006af8c54e000001",
- "tape_rows": 13,
+ "period_id": "run-8bba24c5ee368a4a-p006af8c540000000",
+ "tape_rows": 3,
+ "tapes_in_dir": 2,
  "_source": {
-  "begin": "tape",
+  "begin": "ring",
   "end": "tape"
  },
  "casefile": {
@@ -102,17 +104,24 @@
   },
   "support_reading": {
    "verdict": "null",
-   "session_rows": 10
+   "session_rows": 3
   },
   "tool_calls": "本轮无工具段（tape 里 0 条 tool/call）",
   "verdict_status": "UNMEASURABLE（tape 里 0 条 verdict/status）",
   "hitl": {
+   "detail": "{\"allowed_once\":0,\"cancelled\":0,\"kinds\":{},\"rejected\":0,\"unavailable\":0}",
+   "phase": "hitl",
+   "seq": 7,
+   "stage": 0,
+   "trace_id": "run-8bba24c5ee368a4a-p006af8c540000000",
+   "ts": "2026-11-14T20:32:00Z",
    "allowed_once": 0,
-   "rejected": 0,
    "cancelled": 0,
-   "unavailable": 0,
    "kinds": {},
-   "_source": "tape(ring-stale)"
+   "rejected": 0,
+   "unavailable": 0,
+   "ringDetailParsed": true,
+   "_source": "ring"
   },
   "unselected_reason": "UNMEASURABLE"
  }

@@ -4,6 +4,24 @@
  * 取不到的**具名 UNMEASURABLE**，不填想象值。 */
 const fs = require('fs'), path = require('path');
 const ringFile = process.argv[2], evDir = process.argv[3];
+// ①c B1-g（2026-11-19）：本文件原本对 `evDir` 里**所有** tape 逐行扫 —— `tape_rows` 变成 12 份之和
+//     （实测 87）、`tool_calls`/`verdict_status` 会取到**别的 period**、`period_id` 取自"目录里第一份"。
+//     与 B1-d 同族：跨轮取数。口径：多份时**以最新 mtime 那份为当轮**，其余不计，
+//     并把 `tapes_in_dir` 写出（多份不是错，**静默合并**才是错）。
+function listTapes(dir) {
+  try {
+    const out = fs.readdirSync(dir).filter(x => x.endsWith('.jsonl')).map(f => {
+      let t = 0; try { t = fs.statSync(path.join(dir, f)).mtimeMs; } catch (_) {}
+      return { f, t };
+    });
+    out.sort((a, b) => b.t - a.t);
+    return out.map(x => x.f);
+  } catch (_) { return []; }
+}
+const tapesInDir = (evDir && fs.existsSync(evDir)) ? listTapes(evDir) : [];
+const tapes = tapesInDir.length ? [tapesInDir[0]] : [];
+const tapes_in_dir = tapesInDir.length;
+
 const transFile = process.argv[4];   // 可选：anaphase 状态机转移表源码（候选边的真源）
 if (!ringFile) { console.error('UNMEASURABLE: 需要 <ring.json> [events-dir]'); process.exit(4); }
 const ring = JSON.parse(fs.readFileSync(ringFile, 'utf8'));
@@ -46,7 +64,7 @@ if (transFile && fs.existsSync(transFile)) {
 // ③ 支撑读数 = 该步的 condition + 该周期的 verdict（session 流 turn/end）
 let verdict = 'UNMEASURABLE', rows = 0;
 if (evDir && fs.existsSync(evDir)) {
-  const f = fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))
+  const f = tapes
     .map(x => path.join(evDir, x))
     .sort((a, b) => fs.statSync(b).size - fs.statSync(a).size)[0];
   if (f) {
@@ -63,7 +81,7 @@ if (evDir && fs.existsSync(evDir)) {
 let toolCalls = '本轮无工具段（tape 里 0 条 tool/call）';
 if (evDir && fs.existsSync(evDir)) {
   const rows = [];
-  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+  for (const fn of tapes) {
     for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
       if (!line.trim()) continue;
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
@@ -82,7 +100,7 @@ if (evDir && fs.existsSync(evDir)) {
 //     而 Cellrix 的四个工具里**零命中** ⇒ 页面上看不到 Met/Unmet 与原因。
 let verdictStatus = 'UNMEASURABLE（tape 里 0 条 verdict/status）';
 if (evDir && fs.existsSync(evDir)) {
-  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+  for (const fn of tapes) {
     for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
       if (!line.trim()) continue;
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
@@ -100,7 +118,7 @@ if (evDir && fs.existsSync(evDir)) {
 //     落盘 tape 才是这一轮的事实 ⇒ 先读 tape 的 user/message 与 turn/end，ring 只作兜底并标源。
 let tapeBegin = null, tapeEnd = null, tapeRows = 0;
 if (evDir && fs.existsSync(evDir)) {
-  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+  for (const fn of tapes) {
     for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
       if (!line.trim()) continue;
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
@@ -120,7 +138,7 @@ if (evDir && fs.existsSync(evDir)) {
 // 身份是 period_id（I1）⇒ 只接受 trace_id === 本 period 的 ring 事件；否则回落 tape 并标 ring-stale。
 const periodId = (function () {
   if (evDir && fs.existsSync(evDir)) {
-    for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+    for (const fn of tapes) {
       const line = fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n').find(l => l.trim());
       if (line) { try { const d = JSON.parse(line); if (d.period_id) return d.period_id; if (d.trace_id) return d.trace_id; } catch (_) {} }
     }
@@ -132,7 +150,7 @@ const ringHitlOwn = ringHitl && (!periodId || !ringHitl.trace_id || ringHitl.tra
 let hitlValue = ringHitlOwn ? ringHitl : null;
 let hitlSource = hitlValue ? 'ring' : (ringHitl ? 'tape(ring-stale)' : null);
 if (!hitlValue && evDir && fs.existsSync(evDir)) {
-  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+  for (const fn of tapes) {
     for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
       if (!line.trim()) continue;
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
@@ -163,6 +181,7 @@ const out = {
   end: tapeEnd || (endRing ? JSON.parse(endRing.detail) : null),
   period_id: (typeof periodId !== 'undefined' ? periodId : null),
   tape_rows: tapeRows,
+  tapes_in_dir: tapes_in_dir,
   _source: { begin: tapeBegin ? 'tape' : 'ring', end: tapeEnd ? 'tape' : 'ring' },
   casefile: {
     selected_edges: selected,
