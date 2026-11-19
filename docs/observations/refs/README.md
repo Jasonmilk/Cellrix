@@ -19,3 +19,5 @@
   ⇒ **额外键会被拒**，不是"未见禁止"。
 · 校验器我们**没有官方实现**；任何"通过/不通过"的读数都要写明用的是哪个最小校验器。
 ```
+
+> **更正（2026-11-20，append-only）**：上面写的「java 比 schema 少 SUBAGENT_* 3 类、多 META_EVENT 之差」数值口径不完整 —— 我此前数 java 常量时用的正则只认「逗号结尾」，漏掉了**最后一个以分号结尾**的常量 `META_EVENT;`，于是报成 28。实测（`^\s{4}([A-Z][A-Z0-9_]+)[,;]`）：**schema enum = 31 · java = 29**；`schema − java = {SUBAGENT_STARTED, SUBAGENT_FINISHED, SUBAGENT_ERROR}`（3）、`java − schema = {META_EVENT}`（1）⇒ **31 = 29 − 1 + 3**。⇒ META_EVENT 并非「我方凭空多列」：它在 java 枚举里存在、在 1.0 schema enum 里不存在 ⇒ 属**两个官方工件不同步**。
