@@ -57,6 +57,16 @@ const hasToolInTape = tapeTypes.has('tool/call');
 const hasToolInAgui = types.some(t => t.startsWith('TOOL_CALL'));
 if (hasToolInTape && !hasToolInAgui) d1.push('缺 TOOL_CALL_*（tape 里有 tool/call，投影把它丢了）');
 if (!asAgui && !hasToolInTape && hasToolInAgui) d1.push('出现 TOOL_CALL_*（本轮 tape 无工具段）');
+/* B1-z（2026-11-19）：工具事件的**配对**没被判 —— 构造一条 index=9 的 tool/result（无对应 tool/call）：
+ * 若它排在 turn/end 之前，投影会发一条孤儿 TOOL_CALL_END/RESULT，而 D1 **rc=0**（只查"有没有"、不查"配不配"）。
+ * 规则：每个 TOOL_CALL_END / TOOL_CALL_RESULT 的 toolCallId 必须**前面出现过同 id 的 TOOL_CALL_START**。 */
+const startedToolIds = new Set();
+for (const e of events) {
+  if (e.type === 'TOOL_CALL_START') startedToolIds.add(e.toolCallId);
+  if ((e.type === 'TOOL_CALL_END' || e.type === 'TOOL_CALL_RESULT') && !startedToolIds.has(e.toolCallId)) {
+    d1.push(e.type + ' 的 toolCallId ' + e.toolCallId + ' 没有对应的 TOOL_CALL_START（孤儿）');
+  }
+}
 
 // ---- D2 语义层
 const d2 = [];
