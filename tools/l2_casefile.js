@@ -166,6 +166,7 @@ if (evDir && fs.existsSync(evDir)) {
 //     页面于是无法归属到任何一轮（违反 I1：身份是 period_id）。
 //     落盘 tape 才是这一轮的事实 ⇒ 先读 tape 的 user/message 与 turn/end，ring 只作兜底并标源。
 let tapeBegin = null, tapeEnd = null, tapeRows = 0;
+let beginRows = null, endRows = null;
 if (evDir && fs.existsSync(evDir)) {
   for (const fn of tapes) {
     for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
@@ -173,8 +174,11 @@ if (evDir && fs.existsSync(evDir)) {
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
       tapeRows++;
       const v = d.data || {};
-      if (d.type === 'user/message' && tapeBegin === null) tapeBegin = { input: v.text };
-      if (d.type === 'turn/end') tapeEnd = { done: v.done, success: v.success, impasse: v.impasse, reason: v.reason };
+      /* B1-y（2026-11-19）：与 B1-u/v 同族 —— `begin` 取**第一条** user/message、`end` 取**最后一条** turn/end，
+       * 两者都在多来源时**静默选一个**（构造实测：追加第二条 turn/end ⇒ end 变成构造的 success=false/impasse=true，
+       * 无任何提示）。现在：各收全，>1 就标 ambiguous 并列出。 */
+      if (d.type === 'user/message') { if (!beginRows) beginRows = []; beginRows.push({ input: v.text }); tapeBegin = beginRows[0]; }
+      if (d.type === 'turn/end') { if (!endRows) endRows = []; endRows.push({ done: v.done, success: v.success, impasse: v.impasse, reason: v.reason }); tapeEnd = endRows[endRows.length - 1]; }
     }
   }
 }
@@ -239,10 +243,12 @@ const out = {
   tape_file: (tapes[0] ? path.basename(tapes[0]) : 'UNMEASURABLE'),
   ring_file: path.basename(ringFile),
   transitions_source: transFile ? path.basename(transFile) : null,
-  begin: tapeBegin || (beginRing ? JSON.parse(beginRing.detail) : null),
+  begin: (beginRows && beginRows.length > 1) ? { _ambiguous_n: beginRows.length, _rows: beginRows }
+         : (tapeBegin || (beginRing ? JSON.parse(beginRing.detail) : null)),
   end: end ? JSON.parse(end.detail) : null,
   hitl: hitl ? JSON.parse(hitl.detail) : null,
-  end: tapeEnd || (endRing ? JSON.parse(endRing.detail) : null),
+  end: (endRows && endRows.length > 1) ? { _ambiguous_n: endRows.length, _rows: endRows }
+       : (tapeEnd || (endRing ? JSON.parse(endRing.detail) : null)),
   period_id: (typeof periodId !== 'undefined' ? periodId : null),
   tape_rows: tapeRows,
   tapes_in_dir: tapes_in_dir,
