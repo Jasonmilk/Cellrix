@@ -26,6 +26,21 @@ if [ ! -d "$TAPE" ]; then
   exit 4
 fi
 
+# B1-l2（2026-11-19）：本工具报"三项均通过"时**不查引擎指纹** ——
+# 实测：tools/check_upstream.sh 与 tools/run_one_cycle.sh 漂了（UPSTREAM.sha256 未重签），
+# 而本工具仍打印「三项均通过」。指纹红是读数，不是通过 ⇒ 加一项，红了就计入 fail。
+echo "── ⓪ 引擎副本自签指纹"
+if bash tools/upstream-manifest.sh > /tmp/mf.txt 2>&1; then
+  echo "   $(head -1 /tmp/mf.txt | cut -c1-60)"
+else
+  rc=$?
+  if [ "$rc" -eq 4 ]; then
+    echo "   UNMEASURABLE（rc=4）: $(head -1 /tmp/mf.txt | cut -c1-70)"
+  else
+    echo "   ★ FAIL(rc=$rc): $(head -1 /tmp/mf.txt | cut -c1-70)"; fail=1
+  fi
+fi
+
 echo "── ① 重放（同一 tape 两遍）"
 node tools/l2_casefile.js $TAPE/ring.json $TAPE ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-1.json 2>/dev/null
 node tools/l2_casefile.js $TAPE/ring.json $TAPE ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-2.json 2>/dev/null
@@ -60,5 +75,6 @@ w=$(git ls-files web | wc -l | tr -d ' ')
 echo "   git ls-files web = $w · test -d web ⇒ $(test -d web; echo $?)"
 [ "$w" = "0" ] || { echo "   ★ FAIL: web 仍有跟踪文件"; fail=1; }
 
-echo "── 结果：$([ $fail = 0 ] && echo '三项均通过（读数如上，不是结论）' || echo '★ 有失败项')"
+# 计数不写死成"三项"：加了 ⓪ 之后是四项，写死会让读数与工具不一致（同族："文档说三项、实跑四项"）
+echo "── 结果：$([ $fail = 0 ] && echo '分项全绿（读数如上，不是结论；项数以上面 ── 行为准）' || echo '★ 有失败项')"
 exit $fail

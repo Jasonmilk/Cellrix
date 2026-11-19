@@ -20,12 +20,19 @@
 set -uo pipefail
 MAN="tools/UPSTREAM.sha256"
 FILES=$(ls tools/*.sh | grep -vE '^tools/(upstream-manifest)\.sh$')
+# B1-l（2026-11-19）：`shasum` 无文件参数时**读 stdin**，并把它记成文件名 `-` ——
+# 于是"没有引擎文件"会被写成一份对 **stdin** 的清单，`shasum -c` 还会返回 OK（实测：44 字节、`-: OK`）。
+# 空清单 = 读到空 ⇒ 必须拒写（UNMEASURABLE），且校验时拒绝含 `-` 的清单。
 if [ "${1:-}" = "--write" ]; then
+  [ -n "${FILES:-}" ] || { printf 'UNMEASURABLE: tools/*.sh 名下没有可签的引擎文件（不写空清单）\n'; exit 4; }
   # shellcheck disable=SC2086
   shasum $FILES > "$MAN"
   printf '已写入 %s（%s 个引擎文件）\n' "$MAN" "$(printf '%s\n' $FILES | wc -l | tr -d ' ')"
 else
   [ -f "$MAN" ] || { printf '缺 %s ⇒ 维护者先跑：bash tools/upstream-manifest.sh --write\n' "$MAN"; exit 2; }
+  if grep -qE '[[:space:]]+-[[:space:]]*$' "$MAN"; then
+    printf 'UNMEASURABLE: %s 里有 stdin 条目（文件名 `-`）⇒ 这份清单没签任何真实文件\n' "$MAN"; exit 4
+  fi
   if shasum -c "$MAN" >/dev/null 2>&1; then
     printf 'OK: 引擎副本与本仓自签指纹一致（%s）—— 这只证明副本没被再改过；**不证明与上游一致**（上游对齐要另比 phyt-DNA 的同名文件）\n' "$MAN"
   else
