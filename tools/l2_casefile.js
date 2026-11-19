@@ -182,6 +182,15 @@ const out = {
   period_id: (typeof periodId !== 'undefined' ? periodId : null),
   tape_rows: tapeRows,
   tapes_in_dir: tapes_in_dir,
+  /* B1-h（2026-11-19）：页面里两套口径不同源 —— tape 定 period_id，ring 只作兜底。
+   * 若 ring 里的事件属于**别的** period，必须显式写出，不能静默混用。 */
+  ring_period_ids: Array.from(new Set((evs || []).map(e => e.trace_id).filter(Boolean))),
+  ring_mismatch: (function () {
+    const ids = Array.from(new Set((evs || []).map(e => e.trace_id).filter(Boolean)));
+    if (!ids.length || !periodId) return null;
+    if (ids.indexOf(periodId) !== -1) return null;
+    return ids;
+  })(),
   _source: { begin: tapeBegin ? 'tape' : 'ring', end: tapeEnd ? 'tape' : 'ring' },
   casefile: {
     selected_edges: selected,
