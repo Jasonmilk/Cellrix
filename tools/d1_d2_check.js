@@ -1,14 +1,30 @@
 /* D1（线层）+ D2（语义层）各自的能红判据。
  * D1：同一份 tape 能派生出完整序列（首 RUN_STARTED / 末 RUN_FINISHED / TEXT_MESSAGE_* 齐 / 无 TOOL_CALL_*）
  * D2：每条事件按**钉定版本**的最小 schema 校验必填键；metadata 只许 verdict。
- *     ★ 替换声明：AG-UI 官方参考 SDK 未装 ⇒ D2 的"钉定 SDK"由 **钉定 schema 快照** 替代（具名，不假装等价）。
+ *     ★ 替换声明（2026-11-20 更新）：官方参考 SDK 未装；D2 的键口径改读**官方 schema 副本**
+ *       （refs/ag-ui-1.0-schema.json · sha256_16=4b5c93226838a0e7），不再读自有最小快照。
  * 用法：node tools/d1_d2_check.js <session-events.jsonl> */
 const fs = require('fs'), path = require('path'), { execSync } = require('child_process');
 const src = process.argv[2];
 if (!src || !fs.existsSync(src)) { console.error('UNMEASURABLE: 需要 <session-events.jsonl>'); process.exit(4); }
 const BIN = path.join(__dirname, '..', '..', 'anaphase-helix', 'target', 'debug', 'agui');
 if (!fs.existsSync(BIN)) { console.error('UNMEASURABLE: 投影器缺失 ' + BIN); process.exit(4); }
-const SCHEMA = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'docs', 'observations', 'agui-1.0-min.schema.json'), 'utf8'));
+/* ②（2026-11-20 · gardener 裁四连带①②）：D2 的必填键口径改从**官方副本**读。
+ * 自有 `agui-1.0-min.schema.json` 已改性质为「指向官方副本的薄说明 + 未覆盖清单」，**不再当验收基准**。
+ * D1 段（序列 / 生命周期次数 / 工具事件配对与唯一）**完全不动**。 */
+const crypto = require('crypto');
+const OFFICIAL_PATH = path.join(__dirname, '..', 'docs', 'observations', 'refs', 'ag-ui-1.0-schema.json');
+const OFFICIAL_RAW = fs.readFileSync(OFFICIAL_PATH, 'utf8');
+const OFFICIAL_SHA16 = crypto.createHash('sha256').update(OFFICIAL_RAW).digest('hex').slice(0, 16);
+const SCHEMA = JSON.parse(OFFICIAL_RAW);
+const DEFS = SCHEMA.$defs || SCHEMA.definitions || {};
+function defFor(type) {
+  for (const [name, def] of Object.entries(DEFS)) {
+    const c = ((def.properties || {}).type || {}).const;
+    if (c !== undefined && c === type) return { name, def };
+  }
+  return null;
+}
 
 // 两种输入：① tape（走 bin 投影，端到端）② 已是 AG-UI 事件的文件（--agui，用于喂夹具）
 const asAgui = process.argv.includes('--agui');
@@ -90,21 +106,22 @@ if (!asAgui) {
   }
 }
 
-// ---- D2 语义层
+// ---- D2 语义层（数据源 = 官方副本；规则 = required 齐 + unevaluatedProperties:false 下无额外键）
 const d2 = [];
 for (const e of events) {
-  const spec = SCHEMA.events[e.type];
-  if (!spec) { d2.push('未钉定的事件类型: ' + e.type); continue; }
-  for (const k of spec.required) if (!(k in e)) d2.push(e.type + ' 缺必填键 ' + k);
-  if (e.metadata !== undefined) {
-    const allowed = spec.metadata_keys || [];
-    const extra = Object.keys(e.metadata).filter(k => !allowed.includes(k));
-    if (extra.length) d2.push(e.type + ' metadata 出现未钉定键: ' + extra.join(','));
+  const hit = defFor(e.type);
+  if (!hit) { d2.push('官方副本里没有该事件类型的定义: ' + e.type); continue; }
+  for (const k of (hit.def.required || [])) if (!(k in e)) d2.push(e.type + ' 缺必填键 ' + k);
+  const props = Object.keys(hit.def.properties || {});
+  const forbidsExtra = hit.def.unevaluatedProperties === false || hit.def.additionalProperties === false;
+  if (forbidsExtra) {
+    const extra = Object.keys(e).filter(k => !props.includes(k));
+    if (extra.length) d2.push(e.type + ' 出现官方未声明的键: ' + extra.join(','));
   }
 }
 console.log(JSON.stringify({ d1_fail: d1, d2_fail: d2, events: events.length, types,
-  schema_pinned: SCHEMA.pinned }, null, 1));
+  schema_pinned: 'official refs/ag-ui-1.0-schema.json · sha256_16=' + OFFICIAL_SHA16 }, null, 1));
 if (d1.length) { console.error('RED D1: ' + d1.join(' · ')); }
 if (d2.length) { console.error('RED D2: ' + d2.join(' · ')); }
 if (d1.length || d2.length) process.exit(1);
-console.error('OK D1/D2：序列完整 · 全部事件符合钉定 schema ' + SCHEMA.pinned);
+console.error('OK D1/D2：序列完整 · 全部事件符合 **官方副本** refs/ag-ui-1.0-schema.json · sha256_16=' + OFFICIAL_SHA16);

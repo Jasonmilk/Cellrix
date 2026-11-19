@@ -1,84 +1,36 @@
 {
-  "_note": "AG-UI 1.0 的**最小**契约子集（不是全规范）：只钉我们真正产出的 5 类事件与必填键。钉版本而非钉 SDK —— 见 D2 的替换声明。 2026-11-19：新增 TOOL_CALL_START/END/RESULT（原本 tool/call 与 tool/result 在投影里整段消失，真跑撞到后补齐；仍只映射标准类型）。",
-  "pinned": "agui-1.0-min/2026-11-05",
-  "events": {
-    "RUN_STARTED": {
-      "required": [
-        "type",
-        "threadId",
-        "runId"
-      ]
-    },
-    "TEXT_MESSAGE_START": {
-      "required": [
-        "type",
-        "threadId",
-        "runId",
-        "messageId",
-        "role"
-      ]
-    },
-    "TEXT_MESSAGE_CONTENT": {
-      "required": [
-        "type",
-        "threadId",
-        "runId",
-        "messageId",
-        "delta"
-      ]
-    },
-    "TEXT_MESSAGE_END": {
-      "required": [
-        "type",
-        "threadId",
-        "runId",
-        "messageId"
-      ]
-    },
-    "RUN_FINISHED": {
-      "required": [
-        "type",
-        "threadId",
-        "runId"
-      ],
-      "optional": [
-        "metadata"
-      ],
-      "metadata_keys": [
-        "verdict"
-      ]
-    },
-    "TOOL_CALL_START": {
-      "required": [
-        "type",
-        "threadId",
-        "runId",
-        "toolCallId",
-        "toolCallName"
-      ]
-    },
-    "TOOL_CALL_END": {
-      "required": [
-        "type",
-        "threadId",
-        "runId",
-        "toolCallId"
-      ]
-    },
-    "TOOL_CALL_RESULT": {
-      "required": [
-        "type",
-        "threadId",
-        "runId",
-        "toolCallId",
-        "content"
-      ],
-      "optional": [
-        "metadata"
-      ],
-      "metadata_keys": [
-        "ok"
-      ]
-    }
+ "_note": "**本文件已改性质（2026-11-20 · gardener 裁四连带①②）**：它不再是验收基准，只是一份『指向官方副本的薄说明 + 本地未覆盖清单』。D2 的必填键口径一律从官方副本读取。",
+ "baseline": {
+  "official_copy": "docs/observations/refs/ag-ui-1.0-schema.json",
+  "sha256_16": "4b5c93226838a0e7",
+  "how_to_fetch": "curl -sSL https://docs.ag-ui.com/spec/1.0/schema.json -o ag-ui-1.0-schema.json",
+  "superseded": {
+   "pinned": "agui-1.0-min/2026-11-05",
+   "why": "D2 的绿曾依赖由我们改过的快照；2026-11-20 起 D2 基线改判为官方副本 sha256_16=4b5c93226838a0e7（K-134 改判）"
   }
+ },
+ "uncovered_official_types": [
+  "STEP_STARTED",
+  "STEP_FINISHED",
+  "RUN_ERROR",
+  "TOOL_CALL_ARGS",
+  "TOOL_CALL_CHUNK",
+  "REASONING_START",
+  "REASONING_END",
+  "REASONING_MESSAGE_START",
+  "REASONING_MESSAGE_CONTENT",
+  "REASONING_MESSAGE_END",
+  "REASONING_MESSAGE_CHUNK",
+  "REASONING_ENCRYPTED_VALUE",
+  "STATE_SNAPSHOT",
+  "STATE_DELTA",
+  "MESSAGES_SNAPSHOT",
+  "ACTIVITY_SNAPSHOT",
+  "ACTIVITY_DELTA",
+  "TEXT_MESSAGE_CHUNK",
+  "RAW",
+  "CUSTOM",
+  "META_EVENT"
+ ],
+ "note_on_coverage": "上面这些是**官方存在、我们未覆盖**的类型（不是『协议没位置』）。投影侧同一份清单见 anaphase-helix:src/agui.rs 的 pub const UNCOVERED。"
 }
