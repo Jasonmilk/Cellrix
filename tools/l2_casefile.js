@@ -9,7 +9,8 @@ if (!ringFile) { console.error('UNMEASURABLE: 需要 <ring.json> [events-dir]');
 const ring = JSON.parse(fs.readFileSync(ringFile, 'utf8'));
 const evs = ring.events || [];
 const states = evs.filter(e => e.phase === 'state').map(e => JSON.parse(e.detail));
-const begin = evs.find(e => e.phase === 'begin');
+const beginRing = evs.find(e => e.phase === 'begin');
+const endRing = evs.find(e => e.phase === 'end');
 const end = evs.find(e => e.phase === 'end');
 const hitl = evs.find(e => e.phase === 'hitl');
 
@@ -93,6 +94,24 @@ if (evDir && fs.existsSync(evDir)) {
   }
 }
 
+// ①b B1-f（2026-11-19）：`begin`/`end` 原来只从 **ring** 取，且输出里**没有 period_id**
+//     ⇒ 两个不同 period 的 casefile 可能**字节完全相同**（实测 fb4a4092… 两份一样），
+//     页面于是无法归属到任何一轮（违反 I1：身份是 period_id）。
+//     落盘 tape 才是这一轮的事实 ⇒ 先读 tape 的 user/message 与 turn/end，ring 只作兜底并标源。
+let tapeBegin = null, tapeEnd = null, tapeRows = 0;
+if (evDir && fs.existsSync(evDir)) {
+  for (const fn of fs.readdirSync(evDir).filter(x => x.endsWith('.jsonl'))) {
+    for (const line of fs.readFileSync(path.join(evDir, fn), 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let d; try { d = JSON.parse(line); } catch (_) { continue; }
+      tapeRows++;
+      const v = d.data || {};
+      if (d.type === 'user/message' && tapeBegin === null) tapeBegin = { input: v.text };
+      if (d.type === 'turn/end') tapeEnd = { done: v.done, success: v.success, impasse: v.impasse, reason: v.reason };
+    }
+  }
+}
+
 // ③d HITL 读数的源（B1，2026-11-19 第三个）：页面原来**只认 ring**（内存环）——
 //     ring 为空/被 dropped 时，页面就丢了 HITL 四态，而 **tape（落盘）里明明有**。
 //     落盘是持久事实，ring 是易失投影 ⇒ ring 缺就回落 tape，并如实标源。
@@ -138,9 +157,13 @@ const unselectedReason = 'UNMEASURABLE';
 const out = {
   tape: path.basename(ringFile),
   transitions_source: transFile ? path.basename(transFile) : null,
-  begin: begin ? JSON.parse(begin.detail) : null,
+  begin: tapeBegin || (beginRing ? JSON.parse(beginRing.detail) : null),
   end: end ? JSON.parse(end.detail) : null,
   hitl: hitl ? JSON.parse(hitl.detail) : null,
+  end: tapeEnd || (endRing ? JSON.parse(endRing.detail) : null),
+  period_id: (typeof periodId !== 'undefined' ? periodId : null),
+  tape_rows: tapeRows,
+  _source: { begin: tapeBegin ? 'tape' : 'ring', end: tapeEnd ? 'tape' : 'ring' },
   casefile: {
     selected_edges: selected,
     candidate_edges: candidates,

@@ -42,6 +42,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 .foot{color:#aab4bf;font-size:12px;margin-top:16px}</style>
 <h1>证轨 · 抉择案卷</h1>
 <div style="color:#8793a1;font-size:12.5px">tape: ${cf.tape} · 只读投影，无编辑入口</div>
+<div style="color:#8793a1;font-size:12.5px">period_id: ${cf.period_id || 'UNMEASURABLE（casefile 未带 period_id）'} · tape 行数: ${cf.tape_rows ?? 'UNMEASURABLE'} · begin/end 源: ${(cf._source && cf._source.begin) || '—'}</div>
 ${lanes.map(([name, rows]) => `<div class="card"><h2 style="margin:0 0 10px">${name}</h2><dl class="kv">` +
   rows.map(([k, v]) => `<dt>${k}</dt><dd>${cell(v)}</dd>`).join('') + '</dl></div>').join('\n')}
 <div class="card"><h2 style="margin:0 0 10px">D3 对照（web 侧独立提取 · sha ${d3.baseline_sha || '?'}）</h2>

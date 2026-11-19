@@ -2,14 +2,12 @@
  "tape": "ring.json",
  "transitions_source": "mod.rs",
  "begin": {
-  "input": "Calculate 2 to the power of 10",
-  "mode": "Partner"
+  "input": "compute 9^9"
  },
  "end": {
   "done": true,
   "success": true,
-  "impasse": false,
-  "reason": "completed"
+  "impasse": false
  },
  "hitl": {
   "allowed_once": 0,
@@ -17,6 +15,12 @@
   "kinds": {},
   "rejected": 0,
   "unavailable": 0
+ },
+ "period_id": "run-752d73d3ed4afb18-p006af8c54e000001",
+ "tape_rows": 13,
+ "_source": {
+  "begin": "tape",
+  "end": "tape"
  },
  "casefile": {
   "selected_edges": [
@@ -103,13 +107,12 @@
   "tool_calls": "本轮无工具段（tape 里 0 条 tool/call）",
   "verdict_status": "UNMEASURABLE（tape 里 0 条 verdict/status）",
   "hitl": {
-   "detail": "{\"allowed_once\":0,\"cancelled\":0,\"kinds\":{},\"rejected\":0,\"unavailable\":0}",
-   "phase": "hitl",
-   "seq": 7,
-   "stage": 0,
-   "trace_id": "run-8bba24c5ee368a4a-p006af8c540000000",
-   "ts": "2026-11-14T20:32:00Z",
-   "_source": "ring"
+   "allowed_once": 0,
+   "rejected": 0,
+   "cancelled": 0,
+   "unavailable": 0,
+   "kinds": {},
+   "_source": "tape(ring-stale)"
   },
   "unselected_reason": "UNMEASURABLE"
  }
