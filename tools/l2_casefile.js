@@ -35,16 +35,32 @@ function tapeId(dir, f) {
 let tapes = [];
 let selection = 'mtime-newest(unpinned)';
 if (expect) {
-  const hit = tapesInDir.find(f => {
+  /* B1-s（2026-11-19）：同一个 **job_id** 可以有多个 period（每次重启的"苏醒轮"同 job id 不同 period）。
+   * 原来 `.find()` 取第一个匹配 ⇒ **歧义被静默消解**成"钉住了"（selection 写法与唯一命中完全一样）。
+   * 现在：把所有命中列出来；>1 就如实标 `ambiguous`，并写明按哪条规则选（mtime 最新）；
+   * `--strict-pin` 时歧义 ⇒ rc=4（不猜）。 */
+  const hits = tapesInDir.filter(f => {
     const id = tapeId(evDir, f);
     return id && ((id.period && id.period === expect) || (id.job && id.job === expect));
   });
-  if (!hit) {
+  if (!hits.length) {
     console.error('UNMEASURABLE: --expect ' + expect + ' 在 ' + evDir + ' 里找不到对应 tape（不猜）');
     process.exit(4);
   }
-  tapes = [hit];
-  selection = 'expect:' + expect;
+  if (hits.length > 1) {
+    const strict = process.argv.includes('--strict-pin');
+    const picked = hits[0]; // tapesInDir 已按 mtime 降序
+    const detail = 'expect:' + expect + ' (ambiguous n=' + hits.length + ', picked newest mtime: ' + path.basename(picked) + ')';
+    if (strict) {
+      console.error('UNMEASURABLE: --expect ' + expect + ' 命中 ' + hits.length + ' 份 tape ⇒ 歧义（--strict-pin 不猜）');
+      process.exit(4);
+    }
+    tapes = [picked];
+    selection = detail;
+  } else {
+    tapes = [hits[0]];
+    selection = 'expect:' + expect;
+  }
 } else if (tapesInDir.length) {
   tapes = [tapesInDir[0]];
 }
