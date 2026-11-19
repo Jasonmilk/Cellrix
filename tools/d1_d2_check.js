@@ -67,6 +67,16 @@ for (const e of events) {
     d1.push(e.type + ' 的 toolCallId ' + e.toolCallId + ' 没有对应的 TOOL_CALL_START（孤儿）');
   }
 }
+/* B1-aa（2026-11-19）：B1-z 只判了"END/RESULT 有没有 START"，漏了反方向 ——
+ * 构造：去掉 tool/result 只留 tool/call ⇒ 投影出 TOOL_CALL_START 但**没有 END/RESULT**，D1 仍 rc=0。
+ * 规则：每个 TOOL_CALL_START 必须被同 id 的 END 与 RESULT 收口（调用不许悬空）。 */
+if (!asAgui) {
+  const startedIds = events.filter(e => e.type === 'TOOL_CALL_START').map(e => e.toolCallId);
+  for (const id of startedIds) {
+    if (!events.some(e => e.type === 'TOOL_CALL_END' && e.toolCallId === id)) d1.push('TOOL_CALL_START ' + id + ' 没有 TOOL_CALL_END（悬空）');
+    if (!events.some(e => e.type === 'TOOL_CALL_RESULT' && e.toolCallId === id)) d1.push('TOOL_CALL_START ' + id + ' 没有 TOOL_CALL_RESULT（悬空）');
+  }
+}
 
 // ---- D2 语义层
 const d2 = [];
