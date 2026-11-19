@@ -29,10 +29,18 @@ if (types[0] !== 'RUN_STARTED') d1.push('首条不是 RUN_STARTED');
 if (types[types.length - 1] !== 'RUN_FINISHED') d1.push('末条不是 RUN_FINISHED');
 /* B1-w（2026-11-19）：生命周期的"恰好一次"没被判 —— 构造两条 turn/end 时投影出 **2 条 RUN_FINISHED**，
  * 而 D1 仍 rc=0（只判首/末条）。一条 tape 对应一次运行 ⇒ RUN_STARTED 与 RUN_FINISHED 各必须恰好 1 次。 */
-for (const t of ['RUN_STARTED', 'RUN_FINISHED', 'TEXT_MESSAGE_START', 'TEXT_MESSAGE_END']) {
+/* B1-x（2026-11-19）：B1-w 把 TEXT_MESSAGE_* 也钉成"恰好 1 次" —— **过严**。
+ * 一次运行里出现多条消息在协议上是合法的（构造实测：两条 assistant/reply ⇒ 2 条 TEXT_MESSAGE_START
+ * 被 B1-w 判红）。真跑 35 份 tape 目前都只有 1 条 reply，所以"没有反例"≠"规则对"。
+ * 收紧到该紧的地方：RUN_* 恰好 1 次（一次运行一条生命周期）；TEXT_MESSAGE_* 至少 1 次且 START==END。 */
+for (const t of ['RUN_STARTED', 'RUN_FINISHED']) {
   const n = types.filter(x => x === t).length;
-  if (n !== 1) d1.push(t + ' 出现 ' + n + ' 次（必须恰好 1 次）');
+  if (n !== 1) d1.push(t + ' 出现 ' + n + ' 次（一次运行必须恰好 1 次）');
 }
+const nStart = types.filter(x => x === 'TEXT_MESSAGE_START').length;
+const nEnd = types.filter(x => x === 'TEXT_MESSAGE_END').length;
+if (nStart < 1) d1.push('缺 TEXT_MESSAGE_START');
+if (nStart !== nEnd) d1.push('TEXT_MESSAGE_START(' + nStart + ') 与 TEXT_MESSAGE_END(' + nEnd + ') 不配对');
 for (const t of ['TEXT_MESSAGE_START', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END'])
   if (!types.includes(t)) d1.push('缺 ' + t);
 // 工具事件的正确性有两个方向，都要判（2026-11-19 修）：
