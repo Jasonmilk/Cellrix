@@ -73,8 +73,24 @@ echo "⑤ 读数"
 JOB=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("job_id",""))' "$OUT/chat.json" 2>/dev/null)
 # ★ 一个目录里可能有两条流：本次周期的 10 行 + rails 演示的 3 行（后者没有 turn/start）。
 #   选 tape 必须按内容选（含 turn/start），不能拿 glob 第一个 —— 否则量错了对象。
-f=$(grep -l '"type":"turn/start"' "$OUT"/events/*.jsonl 2>/dev/null | head -1)
+# B1-o（2026-11-19）：下一行注释说"另一条流没有 turn/start" —— **今天不成立**：
+# 启动 anaphase 会先写一个**苏醒 period**（session_notes，config.rs:114 P10c T1），它**也含 turn/start**
+# （实测 /tmp/roc1：000000 6 行 + 000001 9 行，两份都有 turn/start）。
+# 所以"按含 turn/start 选"会退化成 glob 字典序。认轮必须用**本次 POST 返回的 job_id**（本脚本已解析 JOB）。
+f=""
+if [ -n "${JOB:-}" ]; then
+  for c in "$OUT"/events/*.jsonl; do
+    [ -f "$c" ] || continue
+    if head -1 "$c" | grep -q "\"job_id\":\"$JOB\""; then f="$c"; break; fi
+  done
+  [ -n "${f:-}" ] && echo "   tape 按 job_id 钉住（$JOB）"
+fi
+if [ -z "${f:-}" ]; then
+  f=$(grep -l '"type":"turn/start"' "$OUT"/events/*.jsonl 2>/dev/null | head -1)
+  [ -n "${f:-}" ] && echo "   ⚠ 未按 job_id 钉住 ⇒ 退化为『含 turn/start 的第一个』（可能是苏醒轮）"
+fi
 [ -n "${f:-}" ] || f=$(ls -S "$OUT"/events/*.jsonl 2>/dev/null | head -1)
+echo "   本目录 period 数=$(ls "$OUT"/events/*.events.jsonl 2>/dev/null | wc -l | tr -d ' ')（>1 表示含苏醒轮）"
 echo "   job_id=${JOB:-?} · jsonl=$(basename "${f:-none}") · 行数=$(wc -l < "${f:-/dev/null}" 2>/dev/null | tr -d ' ')"
 echo "   ring 事件=$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["events"]))' "$OUT/ring.json" 2>/dev/null || echo '?')"
 if [ -n "${f:-}" ]; then
