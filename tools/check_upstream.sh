@@ -6,6 +6,20 @@ ANA="${ANAPHASE_DIR:-$(cd "$(dirname "$0")/../../anaphase-helix" && pwd)}"
 CFG="$ANA/config.toml"
 [ -f "$CFG" ] || { echo "NO_CONFIG  $CFG 不存在"; exit 4; }
 mtime=$(ls -l "$CFG" | awk '{print $6,$7,$8}')
+# B1-t（2026-11-19）：引擎对**重复键**是硬失败（实测：`Error: TomlError { message: "duplicate key
+# `reasoning_endpoint` in table `anaphase`" }` · rc=1），而本脚本只用 `grep -m1` 取第一行 ⇒
+# 对同一份配置它说 YES/rc=0 —— **假阳性**：报"配好了"，引擎根本起不来。
+# 修：本脚本读的每个键都数一次出现次数，>1 直接 UNMEASURABLE（rc=4），不猜哪一行生效。
+dup_check() {
+  local key="$1" n
+  n=$(grep -cE "^[[:space:]]*${key}[[:space:]]*=" "$CFG" 2>/dev/null || true)
+  if [ "${n:-0}" -gt 1 ]; then
+    echo "UNMEASURABLE: $key 在 $CFG 里出现 ${n} 次 —— 引擎会拒绝该配置（TomlError: duplicate key），读数无意义"
+    exit 4
+  fi
+}
+dup_check reasoning_endpoint
+dup_check tentacle_endpoint
 ep=$(grep -m1 -E '^[[:space:]]*reasoning_endpoint[[:space:]]*=' "$CFG" 2>/dev/null | sed -E 's/^[^=]*=[[:space:]]*"//; s/"[[:space:]]*$//')
 md=$(grep -m1 -E '^[[:space:]]*reasoning_model[[:space:]]*=' "$CFG" 2>/dev/null | sed -E 's/^[^=]*=[[:space:]]*//; s/"//g')
 key=$(grep -cE '^[[:space:]]*reasoning_api_key[[:space:]]*=' "$CFG" 2>/dev/null || true)
