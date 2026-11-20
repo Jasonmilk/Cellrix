@@ -7,6 +7,10 @@ cd "$(dirname "$0")/.." || exit 3
 # 但输出只说"分项全绿"，很容易被读成"当前链路通过"——而 objective 明确禁止拿冻结 tape/fixtures 当完成对象。
 # 口径：夹具绿 = 重放确定性成立；**不等于当轮通过**。要验当轮就传 ROUND_DIR=<当轮目录>。
 TAPE="${ROUND_DIR:-fixtures/l2-tape-2026-11-05}"
+# B1-zc（2026-11-20）：ROUND_DIR 形态原来把 `$TAPE`（目录）直接当 events 目录传给 casefile，
+# 而当轮目录的结构是 `<ROUND>/ring.json + <ROUND>/events/*.events.jsonl` ⇒ casefile 读不到 tape，
+# ① 直接失败（实测 rc=1/1）。这里统一成 EVDIR：有 events/ 子目录就用它，否则退回 TAPE 自身。
+if [ -d "$TAPE/events" ]; then EVDIR="$TAPE/events"; else EVDIR="$TAPE"; fi
 if [ -n "${ROUND_DIR:-}" ]; then
   EV=$(ls -t "$TAPE"/events/*.events.jsonl 2>/dev/null | head -1)
   [ -n "${EV:-}" ] || EV=$(ls -t "$TAPE"/*.events.jsonl 2>/dev/null | head -1)
@@ -53,11 +57,13 @@ else
 fi
 
 echo "── ① 重放（同一 tape 两遍）"
-node tools/l2_casefile.js $TAPE/ring.json $TAPE ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-1.json 2>/dev/null
-node tools/l2_casefile.js $TAPE/ring.json $TAPE ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-2.json 2>/dev/null
-if diff -q /tmp/replay-1.json /tmp/replay-2.json >/dev/null; then
-  echo "   diff=0 · sha=$(shasum -a 256 /tmp/replay-1.json | cut -c1-16)"
-else echo "   ★ FAIL: 两次输出不一致"; fail=1; fi
+node tools/l2_casefile.js $TAPE/ring.json $EVDIR ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-1.json 2>/dev/null; rc1=$?
+node tools/l2_casefile.js $TAPE/ring.json $EVDIR ../anaphase-helix/src/run_cycle/mod.rs > /tmp/replay-2.json 2>/dev/null; rc2=$?
+if [ "$rc1" -ne 0 ] || [ "$rc2" -ne 0 ]; then
+  echo "   ① rc=$rc1/$rc2 · ★ FAIL: casefile 自身失败（不是 diff 问题）"; fail=1
+elif diff -q /tmp/replay-1.json /tmp/replay-2.json >/dev/null; then
+  echo "   ① rc=$rc1/$rc2 · diff=0 · sha=$(shasum -a 256 /tmp/replay-1.json | cut -c1-16)"
+else echo "   ① rc=$rc1/$rc2 · ★ FAIL: 两次输出不一致"; fail=1; fi
 
 # 出口判据依赖 anaphase 的 agui 二进制；缺失时**具名不可量**，不是报"期望5条"那种误导性 FAIL
 if [ ! -x "$AGUI" ]; then
@@ -67,19 +73,26 @@ if [ ! -x "$AGUI" ]; then
 fi
 
 echo "── ② 出口（标准事件 + D1/D2）"
-n=$($AGUI "$EV" 2>/dev/null | wc -l | tr -d ' ')
-echo "   事件条数=$n"
-[ "$n" = "5" ] || { echo "   ★ FAIL: 期望 5 条"; fail=1; }
-node tools/d1_d2_check.js "$EV" >/dev/null 2>&1 || { echo "   ★ FAIL: D1/D2 rc≠0"; fail=1; }
+# B1-zb：原来硬编码"期望 5 条" —— rail 轮是 5，工具轮是 8 ⇒ 工具轮会被误判 FAIL。
+# 判据交给 D1/D2（它才是判据），这里只报条数。
+$AGUI "$EV" > /tmp/agui_out.jsonl 2>/dev/null; arc=$?
+n=$(grep -c . /tmp/agui_out.jsonl 2>/dev/null || echo 0)
+echo "   事件条数=$n（投影 rc=$arc）"
+[ "$arc" -eq 0 ] || { echo "   ② ★ FAIL: 投影器 rc=$arc"; fail=1; }
+node tools/d1_d2_check.js "$EV" >/dev/null 2>&1; d12=$?
+echo "   ② rc=$d12（D1/D2）"
+[ "$d12" -eq 0 ] || { echo "   ★ FAIL: D1/D2 rc≠0"; fail=1; }
 
-echo "── ②b 页面（缺口留白 + 反向）"
-node tools/l2_casefile.js $TAPE/ring.json $TAPE ../anaphase-helix/src/run_cycle/mod.rs > docs/observations/l2-casefile-2026-11-05.json 2>/dev/null
+echo "── ②b 页面（缺口留白 + 反向）"; rc_page=0
+node tools/l2_casefile.js $TAPE/ring.json $EVDIR ../anaphase-helix/src/run_cycle/mod.rs > docs/observations/l2-casefile-2026-11-05.json 2>/dev/null
 node tools/d3_compare.js docs/observations/l2-casefile-2026-11-05.json > docs/observations/l2-d3-compare-2026-11-05.json 2>/dev/null
 node tools/l2_render.js docs/observations/l2-casefile-2026-11-05.json docs/observations/l2-d3-compare-2026-11-05.json docs/observations/l2-evidence-2026-11-05.html 2>/dev/null
 g=$(grep -c '本 tape 未记录' docs/observations/l2-evidence-2026-11-05.html || true)
 echo "   缺口标注=$g 处 · $(wc -c < docs/observations/l2-evidence-2026-11-05.html | tr -d ' ') 字节"
 [ "${g:-0}" -ge 2 ] || { echo "   ★ FAIL: 缺口标注少于 2"; fail=1; }
-node tools/l2_render_test.js >/dev/null 2>&1 || { echo "   ★ FAIL: 反向检查（填值后页面应变化）"; fail=1; }
+node tools/l2_render_test.js >/dev/null 2>&1; rc_page=$?
+echo "   ②b rc=$rc_page（render_test）"
+[ "$rc_page" -eq 0 ] || { echo "   ★ FAIL: 反向检查（填值后页面应变化）"; fail=1; }
 
 echo "── ③ web/ 地面"
 w=$(git ls-files web | wc -l | tr -d ' ')
