@@ -234,6 +234,26 @@ if (hitlTapeRows && hitlTapeRows.length > 1) {
 // ④ 未选原因 —— tape 里没有任何字段记录"为什么没走另一条边"
 const unselectedReason = 'UNMEASURABLE';
 
+/* B1-za（2026-11-20）：tape 缺 begin/end 时原来**无条件**回落 ring —— 即使 ring 里那条属于**别的 period**
+ * （ring_mismatch 已把它标出来，但 end 仍被采用，读者只看 end 会读到别轮的 success/impasse）。
+ * 与 B1-d/B1-h 同族：身份是 period_id。修法：**已知 mismatch 就不采用**，如实 UNMEASURABLE。
+ * 口径：只有 ring 事件的 trace_id 与本 period 相同（或该事件无 trace_id）才允许回落。 */
+function ringEventOwn(ev) {
+  if (!ev) return false;
+  const t = ev.trace_id || '';
+  return !t || !periodId || t === periodId;
+}
+function ringFallbackBegin() {
+  if (!beginRing) return null;
+  if (!ringEventOwn(beginRing)) return { _source: 'ring(stale: 不采用，属于 ' + (beginRing.trace_id || '?') + ')' };
+  return JSON.parse(beginRing.detail);
+}
+function ringFallbackEnd() {
+  if (!endRing) return null;
+  if (!ringEventOwn(endRing)) return { _source: 'ring(stale: 不采用，属于 ' + (endRing.trace_id || '?') + ')' };
+  return JSON.parse(endRing.detail);
+}
+
 const out = {
   /* B1-q（2026-11-19）：这个字段名叫 `tape`，装的却是 **ring.json 的文件名** ——
    * 页面头部于是把 ring 当成 tape 展示。而 A 轮（5cfd94a）已证明 ring 只含苏醒 period，
@@ -244,11 +264,11 @@ const out = {
   ring_file: path.basename(ringFile),
   transitions_source: transFile ? path.basename(transFile) : null,
   begin: (beginRows && beginRows.length > 1) ? { _ambiguous_n: beginRows.length, _rows: beginRows }
-         : (tapeBegin || (beginRing ? JSON.parse(beginRing.detail) : null)),
+         : (tapeBegin || ringFallbackBegin()),
   end: end ? JSON.parse(end.detail) : null,
   hitl: hitl ? JSON.parse(hitl.detail) : null,
   end: (endRows && endRows.length > 1) ? { _ambiguous_n: endRows.length, _rows: endRows }
-       : (tapeEnd || (endRing ? JSON.parse(endRing.detail) : null)),
+       : (tapeEnd || ringFallbackEnd()),
   period_id: (typeof periodId !== 'undefined' ? periodId : null),
   tape_rows: tapeRows,
   tapes_in_dir: tapes_in_dir,
