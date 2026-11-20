@@ -10,27 +10,34 @@
   }
  },
  "uncovered_official_types": [
-  "STEP_STARTED",
-  "STEP_FINISHED",
-  "RUN_ERROR",
+  "TEXT_MESSAGE_CHUNK",
   "TOOL_CALL_ARGS",
   "TOOL_CALL_CHUNK",
-  "REASONING_START",
-  "REASONING_END",
-  "REASONING_MESSAGE_START",
-  "REASONING_MESSAGE_CONTENT",
-  "REASONING_MESSAGE_END",
-  "REASONING_MESSAGE_CHUNK",
-  "REASONING_ENCRYPTED_VALUE",
   "STATE_SNAPSHOT",
   "STATE_DELTA",
   "MESSAGES_SNAPSHOT",
   "ACTIVITY_SNAPSHOT",
   "ACTIVITY_DELTA",
-  "TEXT_MESSAGE_CHUNK",
   "RAW",
   "CUSTOM",
+  "RUN_ERROR",
+  "STEP_STARTED",
+  "STEP_FINISHED",
+  "REASONING_START",
+  "REASONING_MESSAGE_START",
+  "REASONING_MESSAGE_CONTENT",
+  "REASONING_MESSAGE_END",
+  "REASONING_MESSAGE_CHUNK",
+  "REASONING_END",
+  "REASONING_ENCRYPTED_VALUE",
+  "SUBAGENT_STARTED",
+  "SUBAGENT_FINISHED",
+  "SUBAGENT_ERROR"
+ ],
+ "note_on_coverage": "上面这些是**官方存在、我们未覆盖**的类型（不是『协议没位置』）。投影侧同一份清单见 anaphase-helix:src/agui.rs 的 pub const UNCOVERED。",
+ "not_in_schema_enum": [
   "META_EVENT"
  ],
- "note_on_coverage": "上面这些是**官方存在、我们未覆盖**的类型（不是『协议没位置』）。投影侧同一份清单见 anaphase-helix:src/agui.rs 的 pub const UNCOVERED。"
+ "not_in_schema_enum_note": "META_EVENT 只在 `ag-ui-EventType.java` 侧存在，1.0 schema 的 $defs.EventType.enum 里没有（两工件不同步）；因此**不混入未覆盖集合**，单列在此。",
+ "generated_from": "docs/observations/refs/ag-ui-1.0-schema.json · $defs.EventType.enum（sha256_16=4b5c93226838a0e7）；未覆盖 = enum − 已映射 8 = 23"
 }
