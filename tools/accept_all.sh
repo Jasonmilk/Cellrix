@@ -84,11 +84,15 @@ echo "   ② rc=$d12（D1/D2）"
 [ "$d12" -eq 0 ] || { echo "   ★ FAIL: D1/D2 rc≠0"; fail=1; }
 
 echo "── ②b 页面（缺口留白 + 反向）"; rc_page=0
-node tools/l2_casefile.js $TAPE/ring.json $EVDIR ../anaphase-helix/src/run_cycle/mod.rs > docs/observations/l2-casefile-2026-11-05.json 2>/dev/null
-node tools/d3_compare.js docs/observations/l2-casefile-2026-11-05.json > docs/observations/l2-d3-compare-2026-11-05.json 2>/dev/null
-node tools/l2_render.js docs/observations/l2-casefile-2026-11-05.json docs/observations/l2-d3-compare-2026-11-05.json docs/observations/l2-evidence-2026-11-05.html 2>/dev/null
-g=$(grep -c '本 tape 未记录' docs/observations/l2-evidence-2026-11-05.html || true)
-echo "   缺口标注=$g 处 · $(wc -c < docs/observations/l2-evidence-2026-11-05.html | tr -d ' ') 字节"
+# B1-zg：原先把当轮产物写进 docs/observations/l2-*-2026-11-05.*（**已跟踪的历史快照**），
+# 每跑一次就覆盖一次冻结快照 ⇒ 产物落到当轮目录（无 ROUND_DIR 则落临时目录），历史文件只读。
+OUT="${ROUND_DIR:-$(mktemp -d)}"; mkdir -p "$OUT"
+CF_OUT="$OUT/l2-casefile.json"; D3_OUT="$OUT/l2-d3-compare.json"; PAGE_OUT="$OUT/l2-evidence.html"
+node tools/l2_casefile.js $TAPE/ring.json $EVDIR ../anaphase-helix/src/run_cycle/mod.rs > "$CF_OUT" 2>/dev/null
+node tools/d3_compare.js "$CF_OUT" > "$D3_OUT" 2>/dev/null
+node tools/l2_render.js "$CF_OUT" "$D3_OUT" "$PAGE_OUT" 2>/dev/null
+g=$(grep -c '本 tape 未记录' "$PAGE_OUT" || true)
+echo "   产物目录=$OUT · 缺口标注=$g 处 · $(wc -c < "$PAGE_OUT" | tr -d ' ') 字节"
 [ "${g:-0}" -ge 2 ] || { echo "   ★ FAIL: 缺口标注少于 2"; fail=1; }
 node tools/l2_render_test.js >/dev/null 2>&1; rc_page=$?
 echo "   ②b rc=$rc_page（render_test）"
