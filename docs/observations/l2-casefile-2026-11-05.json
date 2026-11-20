@@ -110,7 +110,7 @@
    ]
   },
   "support_reading": {
-   "verdict": "null",
+   "verdict": "UNMEASURABLE（tape 里 turn/end.verdict 为 null）",
    "session_rows": 3
   },
   "tool_calls": "本轮无工具段（tape 里 0 条 tool/call）",

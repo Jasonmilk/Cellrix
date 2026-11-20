@@ -115,7 +115,13 @@ if (evDir && fs.existsSync(evDir)) {
     const lines = fs.readFileSync(f, 'utf8').trim().split('\n').map(JSON.parse);
     rows = lines.length;
     const te = lines.find(l => l.type === 'turn/end');
-    verdict = te && te.data ? JSON.stringify(te.data.verdict) : 'UNMEASURABLE';
+    /* B2-zd（2026-11-20）：`turn/end.verdict = null` 时原来写成**字符串 "null"**，
+     * 页面于是渲染成字面 `<dd>null</dd>` —— 空值冒充值（第三态）。改为如实 UNMEASURABLE。 */
+    if (te && te.data && te.data.verdict !== null && te.data.verdict !== undefined) {
+      verdict = JSON.stringify(te.data.verdict);
+    } else {
+      verdict = 'UNMEASURABLE（tape 里 turn/end.verdict 为 null）';
+    }
   }
 }
 
