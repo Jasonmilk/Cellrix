@@ -54,6 +54,21 @@ if [ -n "${ep:-}" ]; then
   else
     echo "     tentacle_endpoint=**缺失** ⇒ pipeline Unbound ⇒ execution point 会 refuse，tool/call 恒 0（fail-closed）"
   fi
+  # B1-ze（2026-11-20）：本脚本只看 **config 文件 + 调用者自己的 env**，
+  # 但真正在跑的是 50061 上的进程；它自己的 env 覆盖本脚本看不见。
+  # 实测：config 写 qwen3.8-27b，进程 env 设 ANAPHASE_REASONING_MODEL=coder-14b
+  # ⇒ 本脚本报 model=qwen3.8-27b（**与实际运行不符，且无任何提示**）。
+  # 修：读监听进程的 env（`ps -Eww`），发现覆盖就如实告警"config 值不生效"。
+  _pid=$(lsof -ti -i :50061 2>/dev/null | head -1)
+  if [ -n "${_pid:-}" ]; then
+    _penv=$(ps -Eww -p "$_pid" 2>/dev/null | tr ' ' '\n' | grep -E '^ANAPHASE_REASONING_(MODEL|ENDPOINT)=' || true)
+    if [ -n "${_penv:-}" ]; then
+      echo "     ⚠ 运行进程 pid=$_pid 自带 env 覆盖（**config 里的值不生效**）："
+      printf '%s\n' "$_penv" | sed -E 's/^/       /'
+    fi
+  else
+    echo "     （50061 无监听进程 ⇒ 无法核对运行态 env；本行数值只代表 config）"
+  fi
   exit 0
 else
   echo "NO   既无 config.toml 的 reasoning_endpoint、也无 ANAPHASE_REASONING_ENDPOINT（model=${md:-?} · key=$([ "${key:-0}" -gt 0 ] && echo set || echo none) · env=${envs} · mtime=$mtime）"

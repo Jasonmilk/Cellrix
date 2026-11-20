@@ -1,4 +1,4 @@
-<!doctype html><meta charset="utf-8"><title>证轨 · run-8bba24c5ee368a4a-p006af8c540000000.events.jsonl</title>
+<!doctype html><meta charset="utf-8"><title>证轨 · run-1ef37e9620a67ef2-p006b001869000001.events.jsonl</title>
 <style>body{font:14px/1.6 system-ui;margin:28px;color:#1d2733;background:#f7f9fa}
 h1{font-size:17px;margin:0 0 4px}h2{font-size:12px;color:#8793a1;margin:22px 0 8px;letter-spacing:.4px}
 .card{background:#fff;border:1px solid #e9edf0;border-radius:12px;padding:14px 18px;margin-bottom:12px}
@@ -8,15 +8,15 @@ li{margin:2px 0}.gap{color:#b8860b;background:#fdf6e3;border:1px dashed #e5c97b;
 table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #eef2f4;padding:5px 8px;text-align:left}
 .foot{color:#aab4bf;font-size:12px;margin-top:16px}</style>
 <h1>证轨 · 抉择案卷</h1>
-<div style="color:#8793a1;font-size:12.5px">tape: run-8bba24c5ee368a4a-p006af8c540000000.events.jsonl · ring: ring.json · 只读投影，无编辑入口</div>
-<div style="color:#8793a1;font-size:12.5px">period_id: run-8bba24c5ee368a4a-p006af8c540000000 · tape 行数: 3 · 目录内 tape 数: 2 · 选轮规则: mtime-newest(unpinned) · begin/end 源: ring</div>
-
+<div style="color:#8793a1;font-size:12.5px">tape: run-1ef37e9620a67ef2-p006b001869000001.events.jsonl · ring: ring.json · 只读投影，无编辑入口</div>
+<div style="color:#8793a1;font-size:12.5px">period_id: run-1ef37e9620a67ef2-p006b001869000001 · tape 行数: 15 · 目录内 tape 数: 1 · 选轮规则: mtime-newest(unpinned) · begin/end 源: tape</div>
+<div style="color:#c0392b;font-size:12.5px">⚠ ring 事件属于别的 period：run-8bba24c5ee368a4a-p006b001860000000 —— 本页一切读数以 tape 的 period_id 为准，ring 只作兜底且已标源</div>
 <div class="card"><h2 style="margin:0 0 10px">抉择（候选→选中）</h2><dl class="kv"><dt>选中边</dt><dd><li>Perception --Success--> PreAssessment</li><li>PreAssessment --Success--> MemoryRetrieval</li><li>MemoryRetrieval --Success--> Reasoning</li><li>Reasoning --NoToolNeeded--> Reflection</li><li>Reflection --Success--> Perception</li></dd><dt>候选边</dt><dd>来自状态机转移表（7 个状态 · d26d302ab28b7c90）</dd></dl></div>
-<div class="card"><h2 style="margin:0 0 10px">支撑读数</h2><dl class="kv"><dt>verdict</dt><dd><span class="gap">本 tape 未记录<span class="why">（tape 里 turn/end.verdict 为 null）</span></span></dd><dt>session 行数</dt><dd>3</dd></dl></div>
+<div class="card"><h2 style="margin:0 0 10px">支撑读数</h2><dl class="kv"><dt>verdict</dt><dd>"Met"</dd><dt>session 行数</dt><dd>15</dd></dl></div>
 <div class="card"><h2 style="margin:0 0 10px">未选原因</h2><dl class="kv"><dt>为什么没走另一条边</dt><dd><span class="gap">本 tape 未记录<span class="why"></span></span></dd></dl></div>
-<div class="card"><h2 style="margin:0 0 10px">判定（verdict/status）</h2><dl class="kv"><dt>status</dt><dd><span class="gap">本 tape 未记录<span class="why">（tape 里 0 条 verdict/status）</span></span></dd><dt>checks/reason</dt><dd>—</dd></dl></div>
-<div class="card"><h2 style="margin:0 0 10px">工具段（tool/call → TOOL_CALL_*）</h2><dl class="kv"><dt>本轮调用的工具</dt><dd>本轮无工具段（tape 里 0 条 tool/call）</dd></dl></div>
-<div class="card"><h2 style="margin:0 0 10px">门与审计</h2><dl class="kv"><dt>HITL 四态（源=ring）</dt><dd>{"detail":"{\"allowed_once\":0,\"cancelled\":0,\"kinds\":{},\"rejected\":0,\"unavailable\":0}","phase":"hitl","seq":7,"stage":0,"trace_id":"run-8bba24c5ee368a4a-p006af8c540000000","ts":"2026-11-14T20:32:00Z","allowed_once":0,"cancelled":0,"kinds":{},"rejected":0,"unavailable":0,"ringDetailParsed":true,"_source":"ring"}</dd><dt>收尾</dt><dd>{"done":true,"success":true,"impasse":false}</dd></dl></div>
+<div class="card"><h2 style="margin:0 0 10px">判定（verdict/status）</h2><dl class="kv"><dt>status</dt><dd>Met</dd><dt>checks/reason</dt><dd>2 · all checks passed</dd></dl></div>
+<div class="card"><h2 style="margin:0 0 10px">工具段（tool/call → TOOL_CALL_*）</h2><dl class="kv"><dt>本轮调用的工具</dt><dd><li>index=0 · calc · ok=true · 61ms</li></dd></dl></div>
+<div class="card"><h2 style="margin:0 0 10px">门与审计</h2><dl class="kv"><dt>HITL 四态（源=tape(ring-stale)）</dt><dd>{"allowed_once":1,"rejected":0,"cancelled":0,"unavailable":0,"kinds":{},"_source":"tape(ring-stale)"}</dd><dt>收尾</dt><dd>{"done":true,"success":true,"impasse":false}</dd></dl></div>
 <div class="card"><h2 style="margin:0 0 10px">D3 对照（web 侧独立提取 · sha 269f2b7ed831d983）</h2>
 <table><tr><th>项</th><th>web 字段</th><th>L2</th><th>判定</th></tr><tr><td>选中边</td><td>steps —</td><td>有</td><td>对得上</td></tr>
 <tr><td>时间/区间</td><td>session ✓</td><td>有</td><td>对得上</td></tr>

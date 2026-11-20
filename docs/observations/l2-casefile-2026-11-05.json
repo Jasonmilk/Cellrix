@@ -1,11 +1,10 @@
 {
- "tape": "run-8bba24c5ee368a4a-p006af8c540000000.events.jsonl",
- "tape_file": "run-8bba24c5ee368a4a-p006af8c540000000.events.jsonl",
+ "tape": "run-1ef37e9620a67ef2-p006b001869000001.events.jsonl",
+ "tape_file": "run-1ef37e9620a67ef2-p006b001869000001.events.jsonl",
  "ring_file": "ring.json",
  "transitions_source": "mod.rs",
  "begin": {
-  "input": "Calculate 2 to the power of 10",
-  "mode": "Partner"
+  "input": "Please call the calc tool with expression 15*15 and report the result."
  },
  "end": {
   "done": true,
@@ -19,16 +18,18 @@
   "rejected": 0,
   "unavailable": 0
  },
- "period_id": "run-8bba24c5ee368a4a-p006af8c540000000",
- "tape_rows": 3,
- "tapes_in_dir": 2,
+ "period_id": "run-1ef37e9620a67ef2-p006b001869000001",
+ "tape_rows": 15,
+ "tapes_in_dir": 1,
  "selection": "mtime-newest(unpinned)",
  "ring_period_ids": [
-  "run-8bba24c5ee368a4a-p006af8c540000000"
+  "run-8bba24c5ee368a4a-p006b001860000000"
  ],
- "ring_mismatch": null,
+ "ring_mismatch": [
+  "run-8bba24c5ee368a4a-p006b001860000000"
+ ],
  "_source": {
-  "begin": "ring",
+  "begin": "tape",
   "end": "tape"
  },
  "casefile": {
@@ -110,25 +111,24 @@
    ]
   },
   "support_reading": {
-   "verdict": "UNMEASURABLE（tape 里 turn/end.verdict 为 null）",
-   "session_rows": 3
+   "verdict": "\"Met\"",
+   "session_rows": 15
   },
-  "tool_calls": "本轮无工具段（tape 里 0 条 tool/call）",
-  "verdict_status": "UNMEASURABLE（tape 里 0 条 verdict/status）",
+  "tool_calls": [
+   "index=0 · calc · ok=true · 61ms"
+  ],
+  "verdict_status": {
+   "status": "Met",
+   "checks": 2,
+   "reason": "all checks passed"
+  },
   "hitl": {
-   "detail": "{\"allowed_once\":0,\"cancelled\":0,\"kinds\":{},\"rejected\":0,\"unavailable\":0}",
-   "phase": "hitl",
-   "seq": 7,
-   "stage": 0,
-   "trace_id": "run-8bba24c5ee368a4a-p006af8c540000000",
-   "ts": "2026-11-14T20:32:00Z",
-   "allowed_once": 0,
-   "cancelled": 0,
-   "kinds": {},
+   "allowed_once": 1,
    "rejected": 0,
+   "cancelled": 0,
    "unavailable": 0,
-   "ringDetailParsed": true,
-   "_source": "ring"
+   "kinds": {},
+   "_source": "tape(ring-stale)"
   },
   "unselected_reason": "UNMEASURABLE"
  }
