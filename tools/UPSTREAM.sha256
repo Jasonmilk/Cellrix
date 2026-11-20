@@ -1,5 +1,5 @@
 3142b29142a175ef9c73f7ec3dcff37ee349aa5d  tools/accept_all.sh
-516b6b6c883d1f07a26f43734c1aed2a9b616748  tools/check_upstream.sh
+2655b010f4d112bb8a9f71a793cfda829f935fc5  tools/check_upstream.sh
 246839193d9223405b3a3a6d664834d38d43046e  tools/determinism.sh
 0a15191ff8aad7ed63f7c15ebdc5aa5027915265  tools/emit-failures.sh
 4e45a150061658b010bc45731b3b8049e1b7a51d  tools/run_one_cycle.sh

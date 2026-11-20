@@ -67,7 +67,8 @@ if [ -n "${ep:-}" ]; then
       printf '%s\n' "$_penv" | sed -E 's/^/       /'
     fi
   else
-    echo "     （50061 无监听进程 ⇒ 无法核对运行态 env；本行数值只代表 config）"
+    # 无监听进程 ⇒ 运行态 env **无法核对** ⇒ 具名 UNMEASURABLE 并给子项 rc=4（不当作通过）。
+    echo "     运行态 env 核对：UNMEASURABLE（50061 无监听进程；该子项 rc=4，不计入上面的 YES/NO 与 src 口径）"
   fi
   exit 0
 else
