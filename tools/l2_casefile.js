@@ -142,7 +142,11 @@ if (evDir && fs.existsSync(evDir)) {
       }
     }
   }
-  if (rows.length) toolCalls = rows.map(r => 'index=' + r.index + ' · ' + r.tool + ' · ok=' + r.ok + ' · ' + r.ms + 'ms');
+  // B1-zh：缺失的读数不得渲染成假值 —— 原先 duration_ms 缺席时拼出 `undefinedms`、
+  //        ok 缺席时拼出 `ok=null`，读起来都像真值。缺项一律写 UNMEASURABLE（与 D1/D2 口径一致）。
+  const unm = v => (v === null || v === undefined) ? 'UNMEASURABLE' : v;
+  if (rows.length) toolCalls = rows.map(r => 'index=' + r.index + ' · ' + r.tool + ' · ok=' + unm(r.ok)
+    + ' · ' + (r.ms === null || r.ms === undefined ? 'UNMEASURABLE' : r.ms + 'ms'));
 }
 
 // ③c 判定行（B1，2026-11-19 第二个"有产出、无消费点"）：
